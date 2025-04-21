@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "challengecraft",
+	"version": "${version}",
+	"name": "Challenge Craft",
+	"description": "Adds exciting Challenges to Minecraft",
+	"authors": [
+		"Kasax"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "MIT",
+	"icon": "assets/challengecraft/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"net.kasax.challengecraft.ChallengeCraft"
+		],
+		"fabric-datagen": [
+			"net.kasax.challengecraft.ChallengeCraftDataGenerator"
+		],
+		"client": [
+			"net.kasax.challengecraft.ChallengeCraftClient"
+		]
+	},
+	"mixins": [
+		"challengecraft.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.16.13",
+		"minecraft": "~1.21.5",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
