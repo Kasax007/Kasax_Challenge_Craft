@@ -7,6 +7,9 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.PersistentStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,11 +28,17 @@ public class ChallengeCraft implements ModInitializer {
 		// 2) Now it's safe to hook up the handler:
 		PacketHandler.register();
 
-		// Then for SP integrated worlds, after the server's started:
-		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
-			// Write the last chosen challenge into the Overworld state
-			ChallengeSavedData.get(server.getOverworld())
-					.setSelectedChallenge(ChallengeCraftClient.LAST_CHOSEN);
+		// Only on world‐create for SP: check if our data is missing before writing
+		ServerLifecycleEvents.SERVER_STARTED.register((MinecraftServer server) -> {
+			ServerWorld overworld = server.getOverworld();
+			PersistentStateManager mgr = overworld.getPersistentStateManager();
+
+			// mgr.get(...) returns null if no .dat file existed
+			if (mgr.get(ChallengeSavedData.TYPE) == null) {
+				// first time: create & write our LAST_CHOSEN value
+				ChallengeSavedData.get(overworld)
+						.setSelectedChallenge(ChallengeCraftClient.LAST_CHOSEN);
+			}
 		});
 	}
 }
