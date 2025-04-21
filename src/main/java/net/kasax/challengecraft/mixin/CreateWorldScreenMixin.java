@@ -1,16 +1,15 @@
+// src/main/java/net/kasax/challengecraft/mixin/CreateWorldScreenMixin.java
 package net.kasax.challengecraft.mixin;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.kasax.challengecraft.ChallengeCraftClient;
-import net.kasax.challengecraft.client.screen.ChallengeTab;
 import net.kasax.challengecraft.network.ChallengePacket;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.tab.Tab;
 import net.minecraft.client.gui.widget.TabNavigationWidget;
-import net.minecraft.network.PacketByteBuf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,9 +21,8 @@ import java.util.Arrays;
 @Mixin(CreateWorldScreen.class)
 @Environment(EnvType.CLIENT)
 public class CreateWorldScreenMixin {
-    private ChallengeTab challengeTab;
+    private net.kasax.challengecraft.client.screen.ChallengeTab challengeTab;
 
-    // 1) Append our Challenges tab
     @ModifyArg(
             method = "init",
             at = @At(
@@ -35,17 +33,21 @@ public class CreateWorldScreenMixin {
     )
     private Tab[] addChallengeTab(Tab[] original) {
         Tab[] extended = Arrays.copyOf(original, original.length + 1);
-        ChallengeTab t = new ChallengeTab();
+        var t = new net.kasax.challengecraft.client.screen.ChallengeTab();
         extended[original.length] = t;
         this.challengeTab = t;
         return extended;
     }
 
-    // 2) Send the selected value when “Create” is invoked
     @Inject(method = "createLevel", at = @At("HEAD"))
     private void onCreateLevel(CallbackInfo ci) {
-        if (this.challengeTab != null) {
-            ClientPlayNetworking.send(new ChallengePacket(this.challengeTab.getSelectedValue()));
+        int val = this.challengeTab.getSelectedValue();
+        // 1) Always stash statically for SP
+        ChallengeCraftClient.LAST_CHOSEN = val;
+
+        // 2) If in MP (network handler exists) send the packet
+        if (MinecraftClient.getInstance().getNetworkHandler() != null) {
+            ClientPlayNetworking.send(new ChallengePacket(val));
         }
     }
 }

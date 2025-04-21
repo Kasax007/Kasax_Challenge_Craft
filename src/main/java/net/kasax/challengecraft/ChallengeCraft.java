@@ -2,7 +2,9 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
 import org.slf4j.Logger;
@@ -22,5 +24,12 @@ public class ChallengeCraft implements ModInitializer {
 
 		// 2) Now it's safe to hook up the handler:
 		PacketHandler.register();
+
+		// Then for SP integrated worlds, after the server's started:
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			// Write the last chosen challenge into the Overworld state
+			ChallengeSavedData.get(server.getOverworld())
+					.setSelectedChallenge(ChallengeCraftClient.LAST_CHOSEN);
+		});
 	}
 }
