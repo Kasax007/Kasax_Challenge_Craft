@@ -1,24 +1,26 @@
+// src/main/java/net/kasax/challengecraft/ChallengeCraft.java
 package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
-
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.kasax.challengecraft.network.ChallengePacket;
+import net.kasax.challengecraft.network.PacketHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ChallengeCraft implements ModInitializer {
 	public static final String MOD_ID = "challengecraft";
-
-	// This logger is used to write text to the console and the log file.
-	// It is considered best practice to use your mod id as the logger's name.
-	// That way, it's clear which mod wrote info, warnings, and errors.
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	@Override
 	public void onInitialize() {
-		// This code runs as soon as Minecraft is in a mod-load-ready state.
-		// However, some things (like resources) may still be uninitialized.
-		// Proceed with mild caution.
+		LOGGER.info("Challenge Craft loaded");
 
-		LOGGER.info("Challenge Craft Loaded!");
+		// 1) Register the C2S payload type and its CODEC:
+		PayloadTypeRegistry.playC2S()
+				.register(ChallengePacket.ID, ChallengePacket.CODEC);
+
+		// 2) Now it's safe to hook up the handler:
+		PacketHandler.register();
 	}
 }
