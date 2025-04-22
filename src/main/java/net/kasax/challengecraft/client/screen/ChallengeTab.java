@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
+
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
@@ -64,6 +66,7 @@ public class ChallengeTab extends GridScreenTab {
                 active.add(IDS.get(i));
             }
         }
+        LOGGER.info("Challenge Tab getActive result " + active);
         return active;
     }
 }

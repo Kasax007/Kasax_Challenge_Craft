@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
+
 @Mixin(CreateWorldScreen.class)
 @Environment(EnvType.CLIENT)
 public class CreateWorldScreenMixin {
@@ -43,15 +45,18 @@ public class CreateWorldScreenMixin {
 
     @Inject(method = "createLevel", at = @At("HEAD"))
     private void onCreateLevel(CallbackInfo ci) {
-        // 1) Gather all the active challenge IDs from the tab
-        List<Integer> active = this.challengeTab.getActive();
+        // instead of single getSelectedValue(), grab your full list:
+        List<Integer> chosen = this.challengeTab.getActive();
+        LOGGER.info("Create World Screen Mixing chosen List " + chosen);
 
-        // 2) Always stash statically for single‐player
-        ChallengeCraftClient.LAST_CHOSEN = active;
+        // stash for SP:
+        ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
 
-        // 3) If in MP (network handler exists), send our packet with the full list
+        LOGGER.info("Create World Screen Mixing LAST_CHOSEN List passed on values" + ChallengeCraftClient.LAST_CHOSEN);
+
+        // if we're on a real (integrated or remote) server, send them all:
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
-            ClientPlayNetworking.send(new ChallengePacket(active));
+            ClientPlayNetworking.send(new ChallengePacket(chosen));
         }
     }
 

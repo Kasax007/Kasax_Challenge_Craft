@@ -13,6 +13,8 @@ import net.minecraft.world.PersistentStateType;
 import java.util.ArrayList;
 import java.util.List;
 
+import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
+
 public class ChallengeSavedData extends PersistentState {
     private static final String KEY = "challengecraft_challenges";
 
@@ -75,6 +77,7 @@ public class ChallengeSavedData extends PersistentState {
     public void setActive(List<Integer> newActive) {
         active.clear();
         active.addAll(newActive);
+        LOGGER.info("setActive ChallengeSavedData result " + active);
         markDirty();
     }
 

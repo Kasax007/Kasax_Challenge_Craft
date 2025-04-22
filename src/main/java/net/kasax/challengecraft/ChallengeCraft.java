@@ -43,8 +43,8 @@ public class ChallengeCraft implements ModInitializer {
 			ServerWorld overworld = server.getOverworld();
 			PersistentStateManager mgr = overworld.getPersistentStateManager();
 			if (mgr.get(ChallengeSavedData.TYPE) == null) {
-				// first run => start with no challenges active
 				ChallengeSavedData.get(overworld).setActive(List.of());
+				LOGGER.info("Challenge Craft Data file created! " );
 			}
 		});
 	}
