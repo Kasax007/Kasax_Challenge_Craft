@@ -1,3 +1,9 @@
 {
-  "item.challengecraft.challenge_stick": "Challenge Stick"
+  "item.challengecraft.challenge_stick": "Challenge Stick",
+
+  "challengecraft.worldcreate.challenge1": "Level = Item",
+  "challengecraft.worldcreate.challenge2": "Another Fun Challenge",
+  "challengecraft.worldcreate.challenge3": "Yet Another One",
+  "challengecraft.worldcreate.challenge4": "Challenge #4 Title",
+  "challengecraft.worldcreate.challenge5": "Final Challenge"
 }

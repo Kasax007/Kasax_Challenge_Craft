@@ -1,49 +1,64 @@
 package net.kasax.challengecraft.network;
 
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketDecoder;
+import net.minecraft.network.codec.ValueFirstEncoder;
 import net.minecraft.util.Identifier;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ChallengePacket implements CustomPayload {
-    public final int selected;
+    public final List<Integer> active;
 
-    /** This is how Raft registers payload types—use the static helper. */
-    public static final CustomPayload.Id<ChallengePacket> ID =
-            new CustomPayload.Id<>(
-                    Identifier.of("challengecraft", "challenge_select")
-            );
+    public static final Id<ChallengePacket> ID =
+            new Id<>(Identifier.of("challengecraft", "update_challenges"));
 
-    /**
-     * B = PacketByteBuf,
-     * C = ChallengePacket,
-     * T1 = Integer
-     */
     public static final PacketCodec<PacketByteBuf, ChallengePacket> CODEC =
-            PacketCodec.tuple(
-                    PacketCodecs.VAR_INT,        // how to (de)serialize the integer
-                    pkt -> pkt.selected,         // encode: extract T1 from C
-                    ChallengePacket::new         // decode: build C from T1
+            CustomPayload.codecOf(
+                    // 1) encoder: write size + each challenge‑ID as a varint
+                    new ValueFirstEncoder<PacketByteBuf, ChallengePacket>() {
+                        @Override
+                        public void encode(ChallengePacket value, PacketByteBuf buf) {
+
+                        }
+
+                        public void encode(PacketByteBuf buf, ChallengePacket pkt) {
+                            buf.writeVarInt(pkt.active.size());
+                            for (int id : pkt.active) {
+                                buf.writeVarInt(id);
+                            }
+                        }
+                    },
+                    // 2) decoder: read back size + that many varints into your List
+                    new PacketDecoder<PacketByteBuf, ChallengePacket>() {
+                        @Override
+                        public ChallengePacket decode(PacketByteBuf buf) {
+                            int size = buf.readVarInt();
+                            List<Integer> list = new ArrayList<>(size);
+                            for (int i = 0; i < size; i++) {
+                                list.add(buf.readVarInt());
+                            }
+                            return new ChallengePacket(list);
+                        }
+                    }
             );
 
-    /** Called by the codec on the server when a packet arrives. */
-    public ChallengePacket(int selected) {
-        this.selected = selected;
+    /** client or command code uses this to build the packet to send */
+    public ChallengePacket(List<Integer> active) {
+        this.active = List.copyOf(active);
     }
 
-    /** Not called by the codec, but handy for your client to send: */
-    public ChallengePacket(PacketByteBuf buf) {
-        this.selected = buf.readInt();
-    }
-
-
+    /** used if you ever call ClientPlayNetworking.send(...) directly */
     public void write(PacketByteBuf buf) {
-        buf.writeInt(this.selected);
+        buf.writeVarInt(active.size());
+        for (int id : active) buf.writeVarInt(id);
     }
 
     @Override
-    public CustomPayload.Id<? extends CustomPayload> getId() {
+    public Id<? extends CustomPayload> getId() {
         return ID;
     }
 }

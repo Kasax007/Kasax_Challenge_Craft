@@ -3,18 +3,21 @@ package net.kasax.challengecraft.client.screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.tab.GridScreenTab;
-import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.GridWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private int selectedValue = 1;
-    private final ButtonWidget cycleButton;
+    private static final List<Integer> IDS = List.of(1, 2, 3, 4, 5);
+
+    private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
 
     public ChallengeTab() {
         super(TITLE);
@@ -22,28 +25,45 @@ public class ChallengeTab extends GridScreenTab {
         // lay out one widget per row, 8px spacing
         GridWidget.Adder adder = this.grid.setRowSpacing(8).createAdder(1);
 
-        // our cycle‑button, initial label "Challenge: 1"
-        this.cycleButton = ButtonWidget.builder(
-                        Text.literal("Challenge: " + selectedValue),
-                        button -> {
-                            selectedValue = selectedValue % 5 + 1;
-                            button.setMessage(Text.literal("Challenge: " + selectedValue));
-                        }
-                )
-                .dimensions(0, 0, 210, 20) // width=210 to match other tabs
-                .build();
+        for (int id : IDS) {
+            // translation key: "challengecraft.worldcreate.challenge1", etc.
+            Text label = Text.translatable("challengecraft.worldcreate.challenge" + id);
 
-        // center it
-        adder.add(this.cycleButton, adder.copyPositioner().alignHorizontalCenter());
+            CyclingButtonWidget<Boolean> toggle = CyclingButtonWidget
+                    .onOffBuilder(false)  // default = off
+                    .build(
+                            0, 0,           // we'll let the GridWidget position it
+                            210, 20,        // match other world‐create tab widths
+                            label,
+                            (btn, val) -> {
+                                // no‐op; we just read getValue() later
+                            }
+                    );
+
+            // center‐align each toggle
+            adder.add(toggle, adder.copyPositioner().alignHorizontalCenter());
+            toggles.add(toggle);
+        }
     }
 
     @Override
     public void forEachChild(Consumer<ClickableWidget> consumer) {
-        consumer.accept(this.cycleButton);
+        // register all of our toggles so they receive mouse/key events
+        for (var t : toggles) {
+            consumer.accept(t);
+        }
     }
 
-    /** Expose the 1–5 value so you can read it in your create‑world callback. */
-    public int getSelectedValue() {
-        return selectedValue;
+    /**
+     * @return a list of challenge‐IDs (1–5) that are currently toggled “on.”
+     */
+    public List<Integer> getActive() {
+        List<Integer> active = new ArrayList<>();
+        for (int i = 0; i < IDS.size(); i++) {
+            if (toggles.get(i).getValue()) {
+                active.add(IDS.get(i));
+            }
+        }
+        return active;
     }
 }

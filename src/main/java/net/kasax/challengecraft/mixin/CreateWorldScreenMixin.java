@@ -17,6 +17,8 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 @Mixin(CreateWorldScreen.class)
 @Environment(EnvType.CLIENT)
@@ -41,13 +43,16 @@ public class CreateWorldScreenMixin {
 
     @Inject(method = "createLevel", at = @At("HEAD"))
     private void onCreateLevel(CallbackInfo ci) {
-        int val = this.challengeTab.getSelectedValue();
-        // 1) Always stash statically for SP
-        ChallengeCraftClient.LAST_CHOSEN = val;
+        // 1) Gather all the active challenge IDs from the tab
+        List<Integer> active = this.challengeTab.getActive();
 
-        // 2) If in MP (network handler exists) send the packet
+        // 2) Always stash statically for single‐player
+        ChallengeCraftClient.LAST_CHOSEN = active;
+
+        // 3) If in MP (network handler exists), send our packet with the full list
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
-            ClientPlayNetworking.send(new ChallengePacket(val));
+            ClientPlayNetworking.send(new ChallengePacket(active));
         }
     }
+
 }
