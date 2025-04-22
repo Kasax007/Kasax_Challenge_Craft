@@ -4,7 +4,9 @@ package net.kasax.challengecraft;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.kasax.challengecraft.challenges.Challenge1Handler;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
 import net.minecraft.server.MinecraftServer;
@@ -20,6 +22,9 @@ public class ChallengeCraft implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		LOGGER.info("Challenge Craft loaded");
+
+		Challenge1Handler.register();
+		ModItems.registerModItems();
 
 		// 1) Register the C2S payload type and its CODEC:
 		PayloadTypeRegistry.playC2S()
