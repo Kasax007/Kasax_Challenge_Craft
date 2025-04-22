@@ -45,16 +45,13 @@ public class CreateWorldScreenMixin {
 
     @Inject(method = "createLevel", at = @At("HEAD"))
     private void onCreateLevel(CallbackInfo ci) {
-        // instead of single getSelectedValue(), grab your full list:
+        // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
-        LOGGER.info("Create World Screen Mixing chosen List " + chosen);
 
         // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
 
-        LOGGER.info("Create World Screen Mixing LAST_CHOSEN List passed on values" + ChallengeCraftClient.LAST_CHOSEN);
-
-        // if we're on a real (integrated or remote) server, send them all:
+        // if we’re on a real (integrated or remote) server, send them all:
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
             ClientPlayNetworking.send(new ChallengePacket(chosen));
         }

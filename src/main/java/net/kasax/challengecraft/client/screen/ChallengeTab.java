@@ -2,6 +2,7 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.kasax.challengecraft.ChallengeCraftClient;
 import net.minecraft.client.gui.tab.GridScreenTab;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.GridWidget;
@@ -67,6 +68,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         }
         LOGGER.info("Challenge Tab getActive result " + active);
+        ChallengeCraftClient.LAST_CHOSEN = List.copyOf(active);
         return active;
     }
 }

@@ -38,14 +38,5 @@ public class ChallengeCraft implements ModInitializer {
 		// 2) Now hook up the handler:
 		PacketHandler.register();
 
-		// On singleplayer world create, seed the file if missing
-		ServerLifecycleEvents.SERVER_STARTED.register((MinecraftServer server) -> {
-			ServerWorld overworld = server.getOverworld();
-			PersistentStateManager mgr = overworld.getPersistentStateManager();
-			if (mgr.get(ChallengeSavedData.TYPE) == null) {
-				ChallengeSavedData.get(overworld).setActive(List.of());
-				LOGGER.info("Challenge Craft Data file created! " );
-			}
-		});
 	}
 }
