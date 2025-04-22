@@ -23,8 +23,8 @@ public class ChallengeCraft implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Challenge Craft loaded");
 
-		Challenge1Handler.register();
-		ModItems.registerModItems();
+		ChallengeManager.register();
+		ModItems.initialize();
 
 		// 1) Register the C2S payload type and its CODEC:
 		PayloadTypeRegistry.playC2S()

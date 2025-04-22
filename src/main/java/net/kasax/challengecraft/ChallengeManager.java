@@ -1,6 +1,7 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.kasax.challengecraft.challenges.Challenge1Handler;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.World;
@@ -34,7 +35,10 @@ public class ChallengeManager {
     }
 
     private static void applyChallengeOne(ServerWorld world) {
-        // TODO: your logic for challenge #1
+        // register once (will no‑op if already registered)
+        Challenge1Handler.register();
+
+        // log or confirm
         LOGGER.info("Challenge #1 activated!");
     }
 

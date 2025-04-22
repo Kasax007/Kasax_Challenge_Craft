@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 public class Challenge1Handler {
     // your stick from your mod initializer
-    public static final Item CHALLENGE_STICK = ModItems.CHALLENGE_STICK;
 
     // cache all items for random pick
     private static final List<Item> ALL_ITEMS = Registries.ITEM.stream().collect(Collectors.toList());
@@ -27,9 +26,9 @@ public class Challenge1Handler {
                 boolean has = player.getInventory()
                         .getMainStacks()
                         .stream()
-                        .anyMatch(s -> s.isOf(CHALLENGE_STICK));
+                        .anyMatch(s -> s.isOf(ModItems.CHALLENGE_STICK));
                 if (!has) {
-                    player.getInventory().insertStack(new ItemStack(CHALLENGE_STICK));
+                    player.getInventory().insertStack(new ItemStack(ModItems.CHALLENGE_STICK));
                 }
             }
         });
@@ -38,7 +37,7 @@ public class Challenge1Handler {
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (!world.isClient() && hand == Hand.MAIN_HAND) {
                 ItemStack held = player.getMainHandStack();
-                if (held.isOf(CHALLENGE_STICK)) {
+                if (held.isOf(ModItems.CHALLENGE_STICK)) {
                     int lv = player.experienceLevel;
                     if (lv > 0) {
                         // pick random
