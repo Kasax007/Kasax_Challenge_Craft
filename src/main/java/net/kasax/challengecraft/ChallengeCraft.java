@@ -23,6 +23,7 @@ public class ChallengeCraft implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Challenge Craft loaded");
 
+		Challenge1Handler.register();
 		ChallengeManager.register();
 		ModItems.initialize();
 

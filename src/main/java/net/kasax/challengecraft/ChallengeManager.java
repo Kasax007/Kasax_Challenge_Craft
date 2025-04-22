@@ -2,6 +2,10 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.kasax.challengecraft.challenges.Challenge1Handler;
+//import net.kasax.challengecraft.challenges.Challenge2Handler;
+//import net.kasax.challengecraft.challenges.Challenge3Handler;
+//import net.kasax.challengecraft.challenges.Challenge4Handler;
+//import net.kasax.challengecraft.challenges.Challenge5Handler;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.World;
@@ -12,53 +16,28 @@ import static net.kasax.challengecraft.ChallengeCraft.MOD_ID;
 
 public class ChallengeManager {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    /** Call this once during mod init to hook world‐load. */
+
     public static void register() {
         ServerWorldEvents.LOAD.register((server, world) -> {
-            // Only trigger on the Overworld:
-            if (world.getRegistryKey() == World.OVERWORLD) {
-                int challenge = ChallengeSavedData.get(world).getSelectedChallenge();
-                applyChallenge(world, challenge);
+            if (world.getRegistryKey() != World.OVERWORLD) return;
+
+            // Deactivate _all_ challenges first
+            Challenge1Handler.setActive(false);
+            //Challenge2Handler.setActive(false);
+            //Challenge3Handler.setActive(false);
+            //Challenge4Handler.setActive(false);
+            //Challenge5Handler.setActive(false);
+
+            // Load the saved number and activate just that one
+            int challenge = ChallengeSavedData.get(world).getSelectedChallenge();
+            switch (challenge) {
+                case 1 -> { Challenge1Handler.setActive(true);  LOGGER.info("Activated Challenge #1"); }
+                //case 2 -> { Challenge2Handler.setActive(true);  LOGGER.info("Activated Challenge #2"); }
+                //case 3 -> { Challenge3Handler.setActive(true);  LOGGER.info("Activated Challenge #3"); }
+                //case 4 -> { Challenge4Handler.setActive(true);  LOGGER.info("Activated Challenge #4"); }
+                //case 5 -> { Challenge5Handler.setActive(true);  LOGGER.info("Activated Challenge #5"); }
+                default -> LOGGER.info("No challenge active");
             }
         });
-    }
-
-    private static void applyChallenge(ServerWorld world, int challenge) {
-        switch (challenge) {
-            case 1 -> applyChallengeOne(world);
-            case 2 -> applyChallengeTwo(world);
-            case 3 -> applyChallengeThree(world);
-            case 4 -> applyChallengeFour(world);
-            case 5 -> applyChallengeFive(world);
-            default -> {/* no challenge */}
-        }
-    }
-
-    private static void applyChallengeOne(ServerWorld world) {
-        // register once (will no‑op if already registered)
-        Challenge1Handler.register();
-
-        // log or confirm
-        LOGGER.info("Challenge #1 activated!");
-    }
-
-    private static void applyChallengeTwo(ServerWorld world) {
-        // TODO: your logic for challenge #2
-        LOGGER.info("Challenge #2 activated!");
-    }
-
-    private static void applyChallengeThree(ServerWorld world) {
-        // TODO: your logic for challenge #3
-        LOGGER.info("Challenge #3 activated!");
-    }
-
-    private static void applyChallengeFour(ServerWorld world) {
-        // TODO: your logic for challenge #4
-        LOGGER.info("Challenge #4 activated!");
-    }
-
-    private static void applyChallengeFive(ServerWorld world) {
-        // TODO: your logic for challenge #5
-        LOGGER.info("Challenge #5 activated!");
     }
 }
