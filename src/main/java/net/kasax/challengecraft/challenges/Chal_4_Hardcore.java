@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.mixin.LevelInfoAccessor;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
@@ -11,8 +12,8 @@ public class Chal_4_Hardcore {
     private static boolean active = false;
     public static void setActive(boolean on) { active = on; }
 
-    static {
-        ServerLifecycleEvents.SERVER_STARTED.register((MinecraftServer server) -> {
+    public static void register() {
+        ServerTickEvents.END_SERVER_TICK.register((MinecraftServer server) -> {
             if (!active) return;
 
             SaveProperties props = server.getSaveProperties();

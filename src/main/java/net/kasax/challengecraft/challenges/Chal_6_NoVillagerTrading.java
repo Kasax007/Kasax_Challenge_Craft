@@ -12,7 +12,7 @@ public class Chal_6_NoVillagerTrading {
         active = on;
     }
 
-    static {
+    public static void register() {
         // Prevent opening any villager trade UI
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (!active) return ActionResult.PASS;

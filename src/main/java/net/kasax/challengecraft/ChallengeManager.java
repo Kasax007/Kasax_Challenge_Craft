@@ -10,10 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import static net.kasax.challengecraft.ChallengeCraft.MOD_ID;
-
 public class ChallengeManager {
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    public static final Logger LOGGER = LoggerFactory.getLogger(ChallengeCraft.MOD_ID);
 
     public static void register() {
         ServerWorldEvents.LOAD.register((server, world) -> {
@@ -22,8 +20,11 @@ public class ChallengeManager {
         });
     }
 
+    /**
+     * Force-reapply all active challenges (e.g. after /reload).
+     */
     public static void applyAll(ServerWorld world) {
-        LOGGER.info("ChallengeManager.applyAll: re‑applying");
+        LOGGER.info("ChallengeManager.applyAll: re-applying");
         applyTo(world);
     }
 
@@ -31,8 +32,7 @@ public class ChallengeManager {
         ChallengeSavedData data = ChallengeSavedData.get(world);
         List<Integer> saved = data.getActive();
 
-        // If this is a fresh world (we only see the default [1]),
-        // and the client had selected something else, seed now:
+        // First boot-up seeding from client choice
         if (saved.size() == 1 && saved.get(0) == 1
                 && !ChallengeCraftClient.LAST_CHOSEN.equals(List.of(1))) {
             LOGGER.info("ChallengeManager: seeding from client LAST_CHOSEN {}", ChallengeCraftClient.LAST_CHOSEN);
@@ -40,23 +40,25 @@ public class ChallengeManager {
             saved = data.getActive();
         }
 
-        // turn everything off
+        // Turn everything off
         LOGGER.info("ChallengeManager: turning all challenges OFF");
-        Chal_1_LevelItem.setActive(false);
-        //Challenge2Handler.setActive(false);
-        //Challenge3Handler.setActive(false);
-        //Challenge4Handler.setActive(false);
-        //Challenge5Handler.setActive(false);
+        Chal_1_LevelItem       .setActive(false);
+        Chal_2_NoBlockDrops    .setActive(false);
+        Chal_3_NoMobDrops      .setActive(false);
+        Chal_4_Hardcore        .setActive(false);
+        Chal_5_NoRegen         .setActive(false);
+        Chal_6_NoVillagerTrading.setActive(false);
 
-        // read+apply exactly what’s in the now‐seeded state
+        // Turn on only those in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
         for (int id : saved) {
             switch (id) {
-                case 1 -> { Chal_1_LevelItem.setActive(true); LOGGER.info("Challenge 1 ON"); }
-               // case 2 -> { Challenge2Handler.setActive(true); LOGGER.info("Challenge 2 ON"); }
-               // case 3 -> { Challenge3Handler.setActive(true); LOGGER.info("Challenge 3 ON"); }
-               // case 4 -> { Challenge4Handler.setActive(true); LOGGER.info("Challenge 4 ON"); }
-               // case 5 -> { Challenge5Handler.setActive(true); LOGGER.info("Challenge 5 ON"); }
+                case 1 -> { Chal_1_LevelItem       .setActive(true); LOGGER.info("Challenge 1 ON"); }
+                case 2 -> { Chal_2_NoBlockDrops    .setActive(true); LOGGER.info("Challenge 2 ON"); }
+                case 3 -> { Chal_3_NoMobDrops      .setActive(true); LOGGER.info("Challenge 3 ON"); }
+                case 4 -> { Chal_4_Hardcore        .setActive(true); LOGGER.info("Challenge 4 ON"); }
+                case 5 -> { Chal_5_NoRegen         .setActive(true); LOGGER.info("Challenge 5 ON"); }
+                case 6 -> { Chal_6_NoVillagerTrading.setActive(true); LOGGER.info("Challenge 6 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }
