@@ -22,7 +22,8 @@
 			"net.kasax.challengecraft.ChallengeCraftDataGenerator"
 		],
 		"client": [
-			"net.kasax.challengecraft.ChallengeCraftClient"
+			"net.kasax.challengecraft.ChallengeCraftClient",
+			"net.kasax.challengecraft.client.ClientCommands"
 		]
 	},
 	"mixins": [

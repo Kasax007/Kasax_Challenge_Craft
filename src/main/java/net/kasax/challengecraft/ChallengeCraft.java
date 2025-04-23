@@ -28,7 +28,7 @@ public class ChallengeCraft implements ModInitializer {
 		// register items, commands, world‐load hooks, etc.
 		ModItems.initialize();
 		ChallengeManager.register();
-		ClientCommands.register();
+		//ClientCommands.register();
 		Challenge1Handler.register();
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:

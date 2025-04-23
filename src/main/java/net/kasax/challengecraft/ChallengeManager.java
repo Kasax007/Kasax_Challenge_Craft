@@ -43,6 +43,7 @@ public class ChallengeManager {
         // turn everything off
         LOGGER.info("ChallengeManager: turning all challenges OFF");
         Challenge1Handler.setActive(false);
+        /* todo add Modifiers like: starting equipment like treasure chest, no block drops, no mob drops, no regeneration, hardcore, no villager trading */
         //Challenge2Handler.setActive(false);
         //Challenge3Handler.setActive(false);
         //Challenge4Handler.setActive(false);

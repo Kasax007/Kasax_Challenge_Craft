@@ -1,37 +1,31 @@
 package net.kasax.challengecraft.client.screen;
 
+import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class ChallengeSelectionScreen extends Screen {
-    // IDs and display names for each challenge
     private static final List<Integer> IDS = List.of(1,2,3,4,5);
-    private static final List<Text> TITLES = List.of(
-            Text.literal("Challenge #1: The Lucky Stick"),
-            Text.literal("Challenge #2: …"),
-            Text.literal("Challenge #3: …"),
-            Text.literal("Challenge #4: …"),
-            Text.literal("Challenge #5: …")
-    );
+    private static final List<Text> TITLES = IDS.stream()
+            .map(id -> Text.of(Text.translatable("challengecraft.worldcreate.challenge" + id)))
+            .toList();
 
-    // One on/off toggle per challenge:
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
 
     public ChallengeSelectionScreen() {
-        super(Text.translatable("screen.challengecraft.select_challenges"));
+        super(Text.literal("Modify active Challenges (CAUTION: may break world)"));
     }
 
     @Override
@@ -41,53 +35,64 @@ public class ChallengeSelectionScreen extends Screen {
 
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
+        List<Integer> active = server != null
+                ? ChallengeSavedData.get(server.getOverworld()).getActive()
+                : List.of();
 
-        // if there is no local server (i.e. multiplayer), just start with nothing
-        List<Integer> active = List.of();
-        if (server != null) {
-            active = ChallengeSavedData.get(server.getOverworld()).getActive();
-        }
-
-        // now build your toggles exactly as before
-        int y = this.height / 4;
+        int y = height / 4;
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
-            CyclingButtonWidget<Boolean> toggle = CyclingButtonWidget.onOffBuilder(isOn)
-                    .build(this.width/2 - 100, y, 200, 20, TITLES.get(i), (btn,val)->{});
-            this.addDrawableChild(toggle);
+
+            CyclingButtonWidget<Boolean> toggle = CyclingButtonWidget
+                    .onOffBuilder(isOn)
+                    .build(
+                            width/2 - 100, y,
+                            200, 20,
+                            TITLES.get(i),
+                            (btn,val)->{}  // no‐op
+                    );
+            addDrawableChild(toggle);
             toggles.add(toggle);
             y += 24;
         }
 
-        this.addDrawableChild(new SaveButton(
-                this.width/2 - 50, y + 10, 100, 20,
-                Text.translatable("button.challengecraft.save"),
-                btn -> saveAndClose()
+        addDrawableChild(new SaveButton(
+                width/2 - 50, y + 10, 100, 20,
+                Text.literal("Save"),
+                btn -> {
+                    // 1) Gather new list
+                    List<Integer> newActive = new ArrayList<>();
+                    for (int i = 0; i < IDS.size(); i++) {
+                        if (toggles.get(i).getValue()) newActive.add(IDS.get(i));
+                    }
+
+                    // 2) Serialize into a PacketByteBuf
+                    PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+                    buf.writeVarInt(newActive.size());
+                    for (int id : newActive) {
+                        buf.writeVarInt(id);
+                    }
+
+                    // 3) Send on the same channel your server handler is listening on:
+                    ClientPlayNetworking.send(
+                            new ChallengePacket(newActive)
+                    );
+
+                    // 4) Close the screen
+                    client.setScreen(null);
+                }
         ));
     }
 
 
-    private void saveAndClose() {
-        // Gather which IDs are toggled on
-        List<Integer> newActive = new ArrayList<>();
-        for (int i = 0; i < IDS.size(); i++) {
-            if (toggles.get(i).getValue()) {
-                newActive.add(IDS.get(i));
-            }
-        }
-
-        // Send our packet to the server
-        ClientPlayNetworking.send(new ChallengePacket(newActive));
-        // close screen
-        assert this.client != null;
-        this.client.setScreen(null);
+    public boolean isPauseScreen() {
+        return false;  // don’t pause the game
     }
 
     @Override
     public boolean shouldCloseOnEsc() {
-        // hitting ESC will also save & close
-        saveAndClose();
+        this.client.setScreen(null);
         return true;
     }
 
@@ -97,7 +102,6 @@ public class ChallengeSelectionScreen extends Screen {
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    // A tiny subclass just to expose ButtonWidget’s protected constructor
     private static class SaveButton extends ButtonWidget {
         public SaveButton(int x, int y, int w, int h, Text msg, PressAction onPress) {
             super(x, y, w, h, msg, onPress, ButtonWidget.DEFAULT_NARRATION_SUPPLIER);

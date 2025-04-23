@@ -18,21 +18,17 @@ public class ChallengePacket implements CustomPayload {
 
     public static final PacketCodec<PacketByteBuf, ChallengePacket> CODEC =
             CustomPayload.codecOf(
-                    // 1) encoder: write size + each challenge‑ID as a varint
+                    // 1) encoder: actually write your list!
                     new ValueFirstEncoder<PacketByteBuf, ChallengePacket>() {
                         @Override
-                        public void encode(ChallengePacket value, PacketByteBuf buf) {
-
-                        }
-
-                        public void encode(PacketByteBuf buf, ChallengePacket pkt) {
+                        public void encode(ChallengePacket pkt, PacketByteBuf buf) {
                             buf.writeVarInt(pkt.active.size());
                             for (int id : pkt.active) {
                                 buf.writeVarInt(id);
                             }
                         }
                     },
-                    // 2) decoder: read back size + that many varints into your List
+                    // 2) decoder: as you already had it
                     new PacketDecoder<PacketByteBuf, ChallengePacket>() {
                         @Override
                         public ChallengePacket decode(PacketByteBuf buf) {
