@@ -18,7 +18,7 @@ import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1, 2, 3, 4, 5);
+    private static final List<Integer> IDS = List.of(1, 2, 3, 4, 5, 6);
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
 

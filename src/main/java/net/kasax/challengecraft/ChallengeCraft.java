@@ -1,21 +1,13 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.kasax.challengecraft.challenges.Challenge1Handler;
-import net.kasax.challengecraft.client.ClientCommands;
-import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.kasax.challengecraft.challenges.Chal_1_LevelItem;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.PersistentStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 public class ChallengeCraft implements ModInitializer {
 	public static final String MOD_ID = "challengecraft";
@@ -29,7 +21,7 @@ public class ChallengeCraft implements ModInitializer {
 		ModItems.initialize();
 		ChallengeManager.register();
 		//ClientCommands.register();
-		Challenge1Handler.register();
+		Chal_1_LevelItem.register();
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()

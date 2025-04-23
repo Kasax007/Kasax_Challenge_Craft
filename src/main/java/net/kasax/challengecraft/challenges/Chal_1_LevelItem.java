@@ -4,7 +4,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.kasax.challengecraft.item.ModItems;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.registry.Registries;
@@ -13,7 +12,7 @@ import net.minecraft.item.Item;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class Challenge1Handler {
+public class Chal_1_LevelItem {
     private static boolean active = false;
     private static final List<Item> ALL_ITEMS = Registries.ITEM.stream().collect(Collectors.toList());
 

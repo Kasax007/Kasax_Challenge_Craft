@@ -42,8 +42,7 @@ public class ChallengeManager {
 
         // turn everything off
         LOGGER.info("ChallengeManager: turning all challenges OFF");
-        Challenge1Handler.setActive(false);
-        /* todo add Modifiers like: starting equipment like treasure chest, no block drops, no mob drops, no regeneration, hardcore, no villager trading */
+        Chal_1_LevelItem.setActive(false);
         //Challenge2Handler.setActive(false);
         //Challenge3Handler.setActive(false);
         //Challenge4Handler.setActive(false);
@@ -53,7 +52,7 @@ public class ChallengeManager {
         LOGGER.info("ChallengeManager: got actives → {}", saved);
         for (int id : saved) {
             switch (id) {
-                case 1 -> { Challenge1Handler.setActive(true); LOGGER.info("Challenge 1 ON"); }
+                case 1 -> { Chal_1_LevelItem.setActive(true); LOGGER.info("Challenge 1 ON"); }
                // case 2 -> { Challenge2Handler.setActive(true); LOGGER.info("Challenge 2 ON"); }
                // case 3 -> { Challenge3Handler.setActive(true); LOGGER.info("Challenge 3 ON"); }
                // case 4 -> { Challenge4Handler.setActive(true); LOGGER.info("Challenge 4 ON"); }

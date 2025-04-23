@@ -3,12 +3,17 @@
   "package": "net.kasax.challengecraft.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "ExampleMixin"
+    "ExampleMixin",
+    "LevelInfoAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
     "CreateWorldScreenMixin"
+  ],
+  "server": [
+    "NoBlockDropsMixin",
+    "NoMobDropsMixin"
   ]
 }

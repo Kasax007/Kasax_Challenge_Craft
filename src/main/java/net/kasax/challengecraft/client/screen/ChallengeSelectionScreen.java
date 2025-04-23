@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1,2,3,4,5);
+    private static final List<Integer> IDS = List.of(1,2,3,4,5,6);
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> Text.of(Text.translatable("challengecraft.worldcreate.challenge" + id)))
             .toList();

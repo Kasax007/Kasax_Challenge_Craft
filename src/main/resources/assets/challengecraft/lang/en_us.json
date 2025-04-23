@@ -2,8 +2,9 @@
   "item.challengecraft.challenge_stick": "Challenge Stick",
 
   "challengecraft.worldcreate.challenge1": "Level = Item",
-  "challengecraft.worldcreate.challenge2": "Another Fun Challenge",
-  "challengecraft.worldcreate.challenge3": "Yet Another One",
-  "challengecraft.worldcreate.challenge4": "Challenge #4 Title",
-  "challengecraft.worldcreate.challenge5": "Final Challenge"
+  "challengecraft.worldcreate.challenge2": "No Block Drops",
+  "challengecraft.worldcreate.challenge3": "No Mob Drops",
+  "challengecraft.worldcreate.challenge4": "Hardcore",
+  "challengecraft.worldcreate.challenge5": "No Regeneration",
+  "challengecraft.worldcreate.challenge6": "No Villager Trading"
 }
