@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,5 +63,15 @@ public class ChallengeManager {
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }
+        // now *after* you’ve turned your Chal_2 and Chal_3 on/off, do:
+        var rules = world.getGameRules();
+        var tileDropsRule = rules.get(GameRules.DO_TILE_DROPS);
+        var mobLootRule  = rules.get(GameRules.DO_MOB_LOOT);
+
+        // disable block drops if Challenge 2 is active, else enable them
+        tileDropsRule.set(!Chal_2_NoBlockDrops.isActive(), world.getServer());
+
+        // disable mob loot if Challenge 3 is active, else enable it
+        mobLootRule.set(!Chal_3_NoMobDrops.isActive(), world.getServer());
     }
 }

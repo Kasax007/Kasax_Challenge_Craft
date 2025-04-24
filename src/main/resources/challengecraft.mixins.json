@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ExampleMixin",
-    "LevelInfoAccessor"
+    "LevelInfoAccessor",
+    "NoBlockDropsMixin",
+    "NoMobDropsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

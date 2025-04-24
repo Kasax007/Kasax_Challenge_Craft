@@ -1,6 +1,8 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.MerchantScreenHandler;
 import net.minecraft.util.ActionResult;
@@ -11,17 +13,15 @@ public class Chal_6_NoVillagerTrading {
     public static void setActive(boolean on) {
         active = on;
     }
+    public static boolean isActive() { return active; }
 
     public static void register() {
-        // Prevent opening any villager trade UI
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (!active) return ActionResult.PASS;
-            ScreenHandler sh = player.currentScreenHandler;
-            if (sh instanceof MerchantScreenHandler) {
-                // cancel the trade screen
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
+            if (isActive() && entity instanceof VillagerEntity) {
                 return ActionResult.FAIL;
             }
             return ActionResult.PASS;
         });
     }
+
 }
