@@ -1,11 +1,16 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
+import net.kasax.challengecraft.network.PlayTimePacketHandler;
+import net.kasax.challengecraft.network.PlayTimeSyncPacket;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +36,14 @@ public class ChallengeCraft implements ModInitializer {
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
+		// inside onInitializeClient() or equivalent:
+		PayloadTypeRegistry.playS2C().register(
+				PlayTimeSyncPacket.ID,
+				PlayTimeSyncPacket.CODEC
+		);
 
 		// 2) Now hook up the handler:
 		PacketHandler.register();
-
+		PlayTimePacketHandler.register();
 	}
 }
