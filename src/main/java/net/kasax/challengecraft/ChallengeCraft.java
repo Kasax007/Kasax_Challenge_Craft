@@ -24,7 +24,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_1_LevelItem.register();
 		//Chal_2_NoBlockDrops.register();
 		//Chal_3_NoMobDrops.register();
-		Chal_4_Hardcore.register();
+		//Chal_4_NoChestLoot.register();
 		Chal_5_NoRegen.register();
 		Chal_6_NoVillagerTrading.register();
 

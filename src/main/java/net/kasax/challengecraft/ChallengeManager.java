@@ -46,7 +46,7 @@ public class ChallengeManager {
         Chal_1_LevelItem       .setActive(false);
         Chal_2_NoBlockDrops    .setActive(false);
         Chal_3_NoMobDrops      .setActive(false);
-        Chal_4_Hardcore        .setActive(false);
+        Chal_4_NoChestLoot.setActive(false);
         Chal_5_NoRegen         .setActive(false);
         Chal_6_NoVillagerTrading.setActive(false);
 
@@ -57,7 +57,7 @@ public class ChallengeManager {
                 case 1 -> { Chal_1_LevelItem       .setActive(true); LOGGER.info("Challenge 1 ON"); }
                 case 2 -> { Chal_2_NoBlockDrops    .setActive(true); LOGGER.info("Challenge 2 ON"); }
                 case 3 -> { Chal_3_NoMobDrops      .setActive(true); LOGGER.info("Challenge 3 ON"); }
-                case 4 -> { Chal_4_Hardcore        .setActive(true); LOGGER.info("Challenge 4 ON"); }
+                case 4 -> { Chal_4_NoChestLoot     .setActive(true);LOGGER.info("Challenge 4 ON"); }
                 case 5 -> { Chal_5_NoRegen         .setActive(true); LOGGER.info("Challenge 5 ON"); }
                 case 6 -> { Chal_6_NoVillagerTrading.setActive(true); LOGGER.info("Challenge 6 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);

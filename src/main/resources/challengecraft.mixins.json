@@ -6,6 +6,7 @@
     "ExampleMixin",
     "LevelInfoAccessor",
     "NoBlockDropsMixin",
+    "NoChestLootMixin",
     "NoMobDropsMixin"
   ],
   "injectors": {
@@ -16,6 +17,7 @@
   ],
   "server": [
     "NoBlockDropsMixin",
+    "NoChestLootMixin",
     "NoMobDropsMixin"
   ]
 }
