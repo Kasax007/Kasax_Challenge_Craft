@@ -32,6 +32,11 @@ public class ChallengeCraft implements ModInitializer {
 		//Chal_4_NoChestLoot.register();
 		Chal_5_NoRegen.register();
 		Chal_6_NoVillagerTrading.register();
+		Chal_7_MaxHealthModify.register();
+		Chal_8_NoCraftingTable.register();
+		Chal_9_ExpWorldBorder.register();
+		Chal_10_RandomItem.register();
+		Chal_11_SkyblockWorld.register();
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()

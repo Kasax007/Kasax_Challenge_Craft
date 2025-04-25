@@ -49,6 +49,12 @@ public class ChallengeManager {
         Chal_4_NoChestLoot.setActive(false);
         Chal_5_NoRegen         .setActive(false);
         Chal_6_NoVillagerTrading.setActive(false);
+        Chal_7_MaxHealthModify.setActive(false);
+        Chal_8_NoCraftingTable.setActive(false);
+        Chal_9_ExpWorldBorder.setActive(false);
+        Chal_10_RandomItem.setActive(false);
+        Chal_11_SkyblockWorld.setActive(false);
+
 
         // Turn on only those in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -60,6 +66,12 @@ public class ChallengeManager {
                 case 4 -> { Chal_4_NoChestLoot     .setActive(true);LOGGER.info("Challenge 4 ON"); }
                 case 5 -> { Chal_5_NoRegen         .setActive(true); LOGGER.info("Challenge 5 ON"); }
                 case 6 -> { Chal_6_NoVillagerTrading.setActive(true); LOGGER.info("Challenge 6 ON"); }
+                case 7 -> { Chal_7_MaxHealthModify .setActive(true); LOGGER.info("Challenge 7 ON"); }
+                case 8 -> { Chal_8_NoCraftingTable .setActive(true); LOGGER.info("Challenge 8 ON"); }
+                case 9 -> { Chal_9_ExpWorldBorder  .setActive(true); LOGGER.info("Challenge 9 ON"); }
+                case 10 -> { Chal_10_RandomItem    .setActive(true); LOGGER.info("Challenge 10 ON"); }
+                case 11 -> { Chal_11_SkyblockWorld .setActive(true); LOGGER.info("Challenge 11 ON"); }
+
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }

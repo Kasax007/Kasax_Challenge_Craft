@@ -6,6 +6,7 @@ import net.kasax.challengecraft.ChallengeCraftClient;
 import net.minecraft.client.gui.tab.GridScreenTab;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.GridWidget;
+import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.text.Text;
 
@@ -13,53 +14,75 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
-
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1, 2, 3, 4, 5, 6);
+    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11);
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
+    private final SliderWidget maxHealthSlider;
+    private double sliderValue = 0.5; // default (50%) → 5 hearts
 
     public ChallengeTab() {
         super(TITLE);
 
-        // lay out one widget per row, 8px spacing
-        GridWidget.Adder adder = this.grid.setRowSpacing(8).createAdder(1);
+        GridWidget.Adder adder = this.grid.setRowSpacing(4).createAdder(1);
 
+        SliderWidget slider7 = null;
         for (int id : IDS) {
-            // translation key: "challengecraft.worldcreate.challenge1", etc.
             Text label = Text.translatable("challengecraft.worldcreate.challenge" + id);
 
-            CyclingButtonWidget<Boolean> toggle = CyclingButtonWidget
-                    .onOffBuilder(false)  // default = off
-                    .build(
-                            0, 0,           // we'll let the GridWidget position it
-                            210, 20,        // match other world‐create tab widths
-                            label,
-                            (btn, val) -> {
-                                // no‐op; we just read getValue() later
-                            }
-                    );
+            if (id == 7) {
+                // 7) toggle
+                var toggle7 = CyclingButtonWidget
+                        .onOffBuilder(false)
+                        .build(0, 0, 210, 20, label, (b,v)->{});
+                adder.add(toggle7, adder.copyPositioner().alignHorizontalCenter());
+                toggles.add(toggle7);
 
-            // center‐align each toggle
-            adder.add(toggle, adder.copyPositioner().alignHorizontalCenter());
-            toggles.add(toggle);
+                //    slider under it
+                slider7 = new SliderWidget(
+                        0, 0, 210, 20,
+                        Text.literal("Max Health: 5.0❤"),
+                        sliderValue
+                ) {
+                    private int sliderTicks = (int) (Math.round(this.value * 19) + 1);
+
+                    @Override
+                    protected void updateMessage() {
+                        double hearts = 0.5 + (this.value * 9.5);
+                        setMessage(Text.literal(String.format("Max Health: %.1f❤", hearts)));
+                    }
+
+                    @Override
+                    protected void applyValue() {
+                        sliderTicks = (int) (Math.round(this.value * 19) + 1);
+                        this.value  = (sliderTicks - 1) / 19.0;
+                    }
+
+                    public int getSliderTicks() {
+                        return sliderTicks;
+                    }
+                };
+                adder.add(slider7, adder.copyPositioner().alignHorizontalCenter());
+            } else {
+                var toggle = CyclingButtonWidget
+                        .onOffBuilder(false)
+                        .build(0, 0, 210, 20, label, (b,v)->{});
+                adder.add(toggle, adder.copyPositioner().alignHorizontalCenter());
+                toggles.add(toggle);
+            }
         }
+
+        this.maxHealthSlider = slider7;
     }
 
     @Override
     public void forEachChild(Consumer<ClickableWidget> consumer) {
-        // register all of our toggles so they receive mouse/key events
-        for (var t : toggles) {
-            consumer.accept(t);
-        }
+        toggles.forEach(consumer);
+        if (maxHealthSlider != null) consumer.accept(maxHealthSlider);
     }
 
-    /**
-     * @return a list of challenge‐IDs (1–5) that are currently toggled “on.”
-     */
     public List<Integer> getActive() {
         List<Integer> active = new ArrayList<>();
         for (int i = 0; i < IDS.size(); i++) {
@@ -67,8 +90,13 @@ public class ChallengeTab extends GridScreenTab {
                 active.add(IDS.get(i));
             }
         }
-        LOGGER.info("Challenge Tab getActive result " + active);
-        ChallengeCraftClient.LAST_CHOSEN = List.copyOf(active);
+
+        // if challenge 7 is on, convert sliderValue (0.0–1.0) → 1–20 ticks (½♥–10♥)
+        if (maxHealthSlider != null && toggles.get(6).getValue()) {
+            int sliderTicks = (int)Math.round(1 + sliderValue * 19);
+            ChallengeCraftClient.SELECTED_MAX_HEARTS = sliderTicks;
+        }
+
         return active;
     }
 }

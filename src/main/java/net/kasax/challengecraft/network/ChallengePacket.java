@@ -12,23 +12,25 @@ import java.util.List;
 
 public class ChallengePacket implements CustomPayload {
     public final List<Integer> active;
+    public final int           maxHearts;
 
+    // your channel ID
     public static final Id<ChallengePacket> ID =
             new Id<>(Identifier.of("challengecraft", "update_challenges"));
 
+    // the codec that Fabric will use if you register it via PayloadTypeRegistry
     public static final PacketCodec<PacketByteBuf, ChallengePacket> CODEC =
             CustomPayload.codecOf(
-                    // 1) encoder: actually write your list!
+                    // 1) encoder writes list size, each id, then maxHearts
                     new ValueFirstEncoder<PacketByteBuf, ChallengePacket>() {
                         @Override
                         public void encode(ChallengePacket pkt, PacketByteBuf buf) {
                             buf.writeVarInt(pkt.active.size());
-                            for (int id : pkt.active) {
-                                buf.writeVarInt(id);
-                            }
+                            for (int id : pkt.active) buf.writeVarInt(id);
+                            buf.writeVarInt(pkt.maxHearts);
                         }
                     },
-                    // 2) decoder: as you already had it
+                    // 2) decoder reads them back in the same order
                     new PacketDecoder<PacketByteBuf, ChallengePacket>() {
                         @Override
                         public ChallengePacket decode(PacketByteBuf buf) {
@@ -37,22 +39,26 @@ public class ChallengePacket implements CustomPayload {
                             for (int i = 0; i < size; i++) {
                                 list.add(buf.readVarInt());
                             }
-                            return new ChallengePacket(list);
+                            int hearts = buf.readVarInt();
+                            return new ChallengePacket(list, hearts);
                         }
                     }
             );
 
-    /** client or command code uses this to build the packet to send */
-    public ChallengePacket(List<Integer> active) {
-        this.active = List.copyOf(active);
+    /** Construct on the client when sending */
+    public ChallengePacket(List<Integer> active, int maxHearts) {
+        this.active    = active;
+        this.maxHearts = maxHearts;
     }
 
-    /** used if you ever call ClientPlayNetworking.send(...) directly */
+    /** Called by Fabric when it needs to serialize */
     public void write(PacketByteBuf buf) {
         buf.writeVarInt(active.size());
         for (int id : active) buf.writeVarInt(id);
+        buf.writeVarInt(maxHearts);
     }
 
+    /** Identify your channel */
     @Override
     public Id<? extends CustomPayload> getId() {
         return ID;

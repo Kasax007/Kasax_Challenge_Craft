@@ -10,6 +10,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.tab.Tab;
 import net.minecraft.client.gui.widget.TabNavigationWidget;
+import net.minecraft.network.PacketByteBuf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -53,7 +54,11 @@ public class CreateWorldScreenMixin {
 
         // if we’re on a real (integrated or remote) server, send them all:
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
-            ClientPlayNetworking.send(new ChallengePacket(chosen));
+            List<Integer> chosenList = ChallengeCraftClient.LAST_CHOSEN;
+            int maxHearts = ChallengeCraftClient.SELECTED_MAX_HEARTS;
+            ClientPlayNetworking.send(
+                    new ChallengePacket(chosenList, maxHearts)
+            );
         }
     }
 
