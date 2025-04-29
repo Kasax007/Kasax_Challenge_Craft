@@ -2,6 +2,7 @@ package net.kasax.challengecraft.client.screen;
 
 import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
@@ -26,7 +27,10 @@ public class ChallengeSelectionScreen extends Screen {
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
     private SliderWidget maxHealthSlider;
+    // sliderValue is the raw 0.0–1.0 knob position
     private double sliderValue;
+    // sliderTicks is 1–20 quantized half-heart steps
+    private int sliderTicks;
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Modify active Challenges (CAUTION: may break world)"));
@@ -36,9 +40,12 @@ public class ChallengeSelectionScreen extends Screen {
     protected void init() {
         super.init();
         toggles.clear();
-        sliderValue = ChallengeCraftClient.SELECTED_MAX_HEARTS > 0
+
+        // initialize sliderValue & sliderTicks from the last saved hearts
+        sliderValue  = ChallengeCraftClient.SELECTED_MAX_HEARTS > 0
                 ? (ChallengeCraftClient.SELECTED_MAX_HEARTS - 1) / 19.0
                 : 0.5;
+        sliderTicks  = (int)(Math.round(sliderValue * 19) + 1);
 
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
@@ -48,24 +55,25 @@ public class ChallengeSelectionScreen extends Screen {
 
         int y = height / 4;
         for (int i = 0; i < IDS.size(); i++) {
-            int id = IDS.get(i);
+            int id     = IDS.get(i);
             boolean isOn = active.contains(id);
 
             if (id == 7) {
+                // toggle for challenge #7
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
-                        .build(width/2 - 100, y, 200, 20, TITLES.get(i), (b,v)->{});
+                        .build(width/2 - 100, y, 200, 20,
+                                TITLES.get(i), (btn,val)->{});
                 addDrawableChild(toggle);
                 toggles.add(toggle);
                 y += 24;
 
+                // slider under it
                 maxHealthSlider = new SliderWidget(
                         width/2 - 100, y, 200, 20,
                         Text.literal("Max Health: 5.0❤"),
                         sliderValue
                 ) {
-                    private int sliderTicks = (int) (Math.round(this.value * 19) + 1);
-
                     @Override
                     protected void updateMessage() {
                         double hearts = 0.5 + (this.value * 9.5);
@@ -74,61 +82,66 @@ public class ChallengeSelectionScreen extends Screen {
 
                     @Override
                     protected void applyValue() {
-                        sliderTicks = (int) (Math.round(this.value * 19) + 1);
-                        this.value  = (sliderTicks - 1) / 19.0;
-                    }
-
-                    public int getSliderTicks() {
-                        return sliderTicks;
+                        // quantize to half-heart steps
+                        ChallengeSelectionScreen.this.sliderTicks =
+                                (int)(Math.round(this.value * 19) + 1);
+                        // snap the knob exactly onto that step
+                        this.value = (ChallengeSelectionScreen.this.sliderTicks - 1) / 19.0;
                     }
                 };
                 addDrawableChild(maxHealthSlider);
-
-
                 y += 24;
+
             } else {
+                // other toggles
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
-                        .build(width/2 - 100, y, 200, 20, TITLES.get(i), (b,v)->{});
+                        .build(width/2 - 100, y, 200, 20,
+                                TITLES.get(i), (btn,val)->{});
                 addDrawableChild(toggle);
                 toggles.add(toggle);
                 y += 24;
             }
         }
 
+        // the Save button
         addDrawableChild(new SaveButton(
                 width/2 - 50, y + 10, 100, 20,
                 Text.literal("Save"),
                 btn -> {
-                    // 1) gather the toggles
+                    // 1) Gather active IDs
                     List<Integer> newActive = new ArrayList<>();
-                    for (int i = 0; i < IDS.size(); i++) {
-                        if (toggles.get(i).getValue()) newActive.add(IDS.get(i));
+                    for (int j = 0; j < IDS.size(); j++) {
+                        if (toggles.get(j).getValue()) {
+                            newActive.add(IDS.get(j));
+                        }
                     }
 
-                    // 2) build buf
+                    // 2) Prepare buffer
                     PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
                     buf.writeVarInt(newActive.size());
                     for (int id : newActive) buf.writeVarInt(id);
 
-                    // ← Right here you do:
+                    // 3) Grab quantized ticks from our field
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
-                        // sliderValue runs from 0.0 → 1.0, so:
-                        ticks = (int) (Math.round(sliderValue * 19) + 1);  // 1 … 20
+                        ticks = this.sliderTicks;  // 1…20
                     }
+
+                    ChallengeCraft.LOGGER.info(
+                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}",
+                            newActive, ticks
+                    );
                     buf.writeVarInt(ticks);
 
-                    // 3) send
+                    // 4) Send packet
                     ClientPlayNetworking.send(new ChallengePacket(newActive, ticks));
+                    ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
+
+                    // 5) Close the screen
                     client.setScreen(null);
                 }
         ));
-
-    }
-
-    public boolean isPauseScreen() {
-        return false;
     }
 
     @Override
@@ -144,8 +157,10 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     private static class SaveButton extends ButtonWidget {
-        public SaveButton(int x, int y, int w, int h, Text msg, PressAction onPress) {
-            super(x, y, w, h, msg, onPress, ButtonWidget.DEFAULT_NARRATION_SUPPLIER);
+        public SaveButton(int x, int y, int w, int h,
+                          Text msg, PressAction onPress) {
+            super(x, y, w, h, msg, onPress,
+                    ButtonWidget.DEFAULT_NARRATION_SUPPLIER);
         }
     }
 }

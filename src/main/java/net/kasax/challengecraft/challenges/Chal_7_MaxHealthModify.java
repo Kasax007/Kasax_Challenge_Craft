@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.kasax.challengecraft.ChallengeCraft;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.util.Identifier;
@@ -27,6 +28,9 @@ public class Chal_7_MaxHealthModify {
                 float newMax = maxHearts * 2f;
                 attr.addPersistentModifier(new EntityAttributeModifier(
                         MAX_HEALTH_MOD_ID, newMax - attr.getBaseValue(), EntityAttributeModifier.Operation.ADD_VALUE));
+                ChallengeCraft.LOGGER.info("[Server:Chal7] applied maxHealth = {} (HP={}) to player {}",
+                        maxHearts, newMax, player.getName().getString()
+                );
                 if (player.getHealth() > newMax) {
                     player.setHealth(newMax);
                 }

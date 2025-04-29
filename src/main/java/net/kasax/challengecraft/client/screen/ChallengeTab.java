@@ -21,7 +21,10 @@ public class ChallengeTab extends GridScreenTab {
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
     private final SliderWidget maxHealthSlider;
-    private double sliderValue = 0.5; // default (50%) → 5 hearts
+
+    // sliderValue from 0.0 to 1.0, sliderTicks from 1..20 (½♥ to 10♥)
+    private double sliderValue = 0.5;
+    private int sliderTicks = (int)(Math.round(sliderValue * 19) + 1);
 
     public ChallengeTab() {
         super(TITLE);
@@ -33,21 +36,19 @@ public class ChallengeTab extends GridScreenTab {
             Text label = Text.translatable("challengecraft.worldcreate.challenge" + id);
 
             if (id == 7) {
-                // 7) toggle
+                // challenge 7 toggle
                 var toggle7 = CyclingButtonWidget
                         .onOffBuilder(false)
                         .build(0, 0, 210, 20, label, (b,v)->{});
                 adder.add(toggle7, adder.copyPositioner().alignHorizontalCenter());
                 toggles.add(toggle7);
 
-                //    slider under it
+                // challenge 7 slider
                 slider7 = new SliderWidget(
                         0, 0, 210, 20,
                         Text.literal("Max Health: 5.0❤"),
                         sliderValue
                 ) {
-                    private int sliderTicks = (int) (Math.round(this.value * 19) + 1);
-
                     @Override
                     protected void updateMessage() {
                         double hearts = 0.5 + (this.value * 9.5);
@@ -56,12 +57,9 @@ public class ChallengeTab extends GridScreenTab {
 
                     @Override
                     protected void applyValue() {
-                        sliderTicks = (int) (Math.round(this.value * 19) + 1);
+                        // quantize to half-heart increments
+                        sliderTicks = (int)(Math.round(this.value * 19) + 1);
                         this.value  = (sliderTicks - 1) / 19.0;
-                    }
-
-                    public int getSliderTicks() {
-                        return sliderTicks;
                     }
                 };
                 adder.add(slider7, adder.copyPositioner().alignHorizontalCenter());
@@ -91,9 +89,8 @@ public class ChallengeTab extends GridScreenTab {
             }
         }
 
-        // if challenge 7 is on, convert sliderValue (0.0–1.0) → 1–20 ticks (½♥–10♥)
+        // if challenge 7 is enabled, store the quantized tick count
         if (maxHealthSlider != null && toggles.get(6).getValue()) {
-            int sliderTicks = (int)Math.round(1 + sliderValue * 19);
             ChallengeCraftClient.SELECTED_MAX_HEARTS = sliderTicks;
         }
 

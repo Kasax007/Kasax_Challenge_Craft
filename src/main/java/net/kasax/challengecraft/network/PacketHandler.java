@@ -18,10 +18,20 @@ public class PacketHandler {
 
                     // schedule on the main thread
                     server.execute(() -> {
+                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , maxHearts ticks = {}",
+                                context.player().getName().getString(),
+                                packet.active,
+                                packet.maxHearts
+                        );
                         var world = player.getWorld();
                         // overwrite your active list
                         ChallengeSavedData.get((ServerWorld) world).setActive(packet.active);
-                        Chal_7_MaxHealthModify.setMaxHearts(packet.maxHearts);
+                        ChallengeSavedData.get((ServerWorld) world).setMaxHeartsTicks(packet.maxHearts);
+                        if (packet.active.contains(7)) {
+                            float hearts = packet.maxHearts * 0.5f;
+                            Chal_7_MaxHealthModify.setMaxHearts(hearts);
+                            ChallengeCraft.LOGGER.info("[Server] set Chal_7 maxHearts = {}", hearts);
+                        }
                         // re‑apply all active challenges
                         ChallengeManager.applyAll((ServerWorld) world);
                         ChallengeCraft.LOGGER.info("Packet Handler applyAll " + packet );

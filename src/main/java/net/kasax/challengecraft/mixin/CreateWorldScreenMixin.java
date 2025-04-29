@@ -4,6 +4,7 @@ package net.kasax.challengecraft.mixin;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.MinecraftClient;
@@ -48,7 +49,8 @@ public class CreateWorldScreenMixin {
     private void onCreateLevel(CallbackInfo ci) {
         // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
-
+        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , maxHearts = {}",
+                chosen, ChallengeCraftClient.SELECTED_MAX_HEARTS);
         // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
 
@@ -59,6 +61,7 @@ public class CreateWorldScreenMixin {
             ClientPlayNetworking.send(
                     new ChallengePacket(chosenList, maxHearts)
             );
+            ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }
     }
 

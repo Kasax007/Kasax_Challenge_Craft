@@ -17,6 +17,19 @@ public class ChallengeManager {
     public static void register() {
         ServerWorldEvents.LOAD.register((server, world) -> {
             if (world.getRegistryKey() != World.OVERWORLD) return;
+            // 1) pull your saved data
+            var data = ChallengeSavedData.get(world);
+
+            // 2) if challenge 7 is in the saved “active” list, restore its slider value:
+            if (data.getActive().contains(7)) {
+                int savedTicks = data.getMaxHeartsTicks();        // 1…20
+                float hearts   = savedTicks * 0.5f;               // 0.5–10.0
+                Chal_7_MaxHealthModify.setMaxHearts(hearts);
+                LOGGER.info("[Manager] restored Chal7 maxHearts = {} hearts ({} ticks)",
+                        hearts, savedTicks);
+            }
+
+            // 3) now go ahead and apply *all* challenges according to the saved list
             applyTo(world);
         });
     }
@@ -38,6 +51,12 @@ public class ChallengeManager {
                 && !ChallengeCraftClient.LAST_CHOSEN.equals(List.of(1))) {
             LOGGER.info("ChallengeManager: seeding from client LAST_CHOSEN {}", ChallengeCraftClient.LAST_CHOSEN);
             data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
+            // after data.setActive(...)
+            int savedTicks = data.getMaxHeartsTicks();
+            float hearts   = savedTicks * 0.5f;
+            Chal_7_MaxHealthModify.setMaxHearts(hearts);
+            LOGGER.info("ChallengeManager: seeded maxHearts from savedData → {} ticks = {} hearts",
+                    savedTicks, hearts);
             saved = data.getActive();
         }
 
