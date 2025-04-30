@@ -1,17 +1,16 @@
 // src/main/java/net/kasax/challengecraft/mixin/CreateWorldMixinIntegratedServer.java
 package net.kasax.challengecraft.mixin;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld;
+import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.world.SkyblockChunkGenerator;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
-import net.minecraft.client.gui.screen.world.CreateWorldCallback;
 import net.minecraft.client.gui.screen.world.WorldCreator;
 import net.minecraft.client.world.GeneratorOptionsHolder;
 import net.minecraft.registry.*;
 import net.minecraft.server.integrated.IntegratedServerLoader;
 import net.minecraft.structure.StructureSet;
+import net.minecraft.world.biome.source.BiomeSource;
+import net.minecraft.world.dimension.DimensionOptions;
 import net.minecraft.world.dimension.DimensionOptionsRegistryHolder;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,76 +18,74 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 @Mixin(CreateWorldScreen.class)
-@Environment(EnvType.CLIENT)
 public class CreateWorldMixinIntegratedServer {
-    // Pull the screen’s private WorldCreator so we can get at the GeneratorOptionsHolder
     @Shadow private WorldCreator worldCreator;
 
-    /**
-     * Intercept the invoke of CreateWorldCallback.create(this, combinedRegistries, levelProperties, tempDir)
-     * in CreateWorldScreen#createAndClearTempDir(...) and replace the 2nd argument (the CombinedDynamicRegistries)
-     * with one whose OVERWORLD generator has been swapped to our void‐+‐island SkyblockChunkGenerator.
-     */
     @ModifyArg(
-            method = "createAndClearTempDir(Lnet/minecraft/registry/CombinedDynamicRegistries;Lnet/minecraft/world/level/LevelProperties;)V",
+            method = "createAndClearTempDir(Lnet/minecraft/registry/CombinedDynamicRegistries;"
+                    + "Lnet/minecraft/world/level/LevelProperties;)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/screen/world/CreateWorldCallback;" +
-                            "create(Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;" +
-                            "Lnet/minecraft/registry/CombinedDynamicRegistries;" +
-                            "Lnet/minecraft/world/level/LevelProperties;" +
-                            "Ljava/nio/file/Path;)Z"
+                    target = "Lnet/minecraft/client/gui/screen/world/CreateWorldCallback;"
+                            + "create(Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;"
+                            + "Lnet/minecraft/registry/CombinedDynamicRegistries;"
+                            + "Lnet/minecraft/world/level/LevelProperties;"
+                            + "Ljava/nio/file/Path;)Z"
             ),
             index = 1
     )
     private CombinedDynamicRegistries<ServerDynamicRegistryType> swapInSkyblockGenerator(
             CombinedDynamicRegistries<ServerDynamicRegistryType> original
     ) {
-        // only when the Skyblock challenge is active
-        if (!Chal_11_SkyblockWorld.isActive()) {
+        // only swap if challenge #11 is active
+        if (!ChallengeCraftClient.LAST_CHOSEN.contains(11)) {
             return original;
         }
 
-        // 1) grab the GeneratorOptionsHolder the screen built earlier
-        GeneratorOptionsHolder opts = this.worldCreator.getGeneratorOptionsHolder();
-
-        // 2) pull out its DimensionOptionsRegistryHolder (which holds the vanilla Overworld generator)
+        // grab what the screen built
+        GeneratorOptionsHolder opts      = this.worldCreator.getGeneratorOptionsHolder();
         DimensionOptionsRegistryHolder oldHolder = opts.selectedDimensions();
 
-        // 3) extract the vanilla Overworld generator and its BiomeSource
-        ChunkGenerator vanillaOverworld = oldHolder.getChunkGenerator();
-        var vanillaBiomeSource = vanillaOverworld.getBiomeSource();
-
-        // 4) fetch the live StructureSet lookup
-        DynamicRegistryManager.Immutable dyn = original.getCombinedRegistryManager();
+        // fetch the live StructureSet lookup from the same registry context
+        var dyn = original.getCombinedRegistryManager();
+        @SuppressWarnings("unchecked")
         RegistryEntryLookup<StructureSet> structLookup =
-                dyn.getOrThrow(RegistryKeys.STRUCTURE_SET);
+                ((RegistryEntryLookup.RegistryLookup) dyn)
+                        .getOrThrow(RegistryKeys.STRUCTURE_SET);
 
-        // 5) build our SkyblockChunkGenerator re‐using the vanilla biome source
-        ChunkGenerator skyOverworld = new SkyblockChunkGenerator(
-                structLookup,
-                vanillaBiomeSource,
-                false
-        );
+        // 1) Overworld → skyblock
+        DimensionOptions overworldOpt = oldHolder
+                .getOrEmpty(DimensionOptions.OVERWORLD)
+                .orElseThrow(() -> new IllegalStateException("Missing overworld options"));
+        ChunkGenerator vanillaOW     = overworldOpt.chunkGenerator();
+        BiomeSource biomeOW         = vanillaOW.getBiomeSource();
+        ChunkGenerator skyOW        = new SkyblockChunkGenerator(structLookup, biomeOW, /*isNether=*/false);
+        DimensionOptions newOW       = new DimensionOptions(overworldOpt.dimensionTypeEntry(), skyOW);
 
-        // 6) produce a new DimensionOptionsRegistryHolder override _only_ the overworld
-        //    we pass in the same DimensionType registry wrapper that the screen used
-        DimensionOptionsRegistryHolder newHolder = oldHolder.with(
-                (RegistryWrapper.WrapperLookup) opts.dimensionOptionsRegistry(), // registry of DimensionType
-                skyOverworld
-        );
+        // 2) Nether → void Nether
+        DimensionOptions netherOpt   = oldHolder
+                .getOrEmpty(DimensionOptions.NETHER)
+                .orElseThrow(() -> new IllegalStateException("Missing nether options"));
+        ChunkGenerator vanillaNether = netherOpt.chunkGenerator();
+        BiomeSource biomeNether      = vanillaNether.getBiomeSource();
+        ChunkGenerator skyNether     = new SkyblockChunkGenerator(structLookup, biomeNether, /*isNether=*/true);
+        DimensionOptions newNether   = new DimensionOptions(netherOpt.dimensionTypeEntry(), skyNether);
 
-        // 7) turn that into a DimensionsConfig and then into a DynamicRegistryManager slice
-        var dimsConfig = newHolder.toConfig(opts.dimensionOptionsRegistry());
-        var newDimRegistryMgr = dimsConfig.toDynamicRegistryManager();
+        // 3) Copy the old map, overwrite both keys
+        Map<RegistryKey<DimensionOptions>, DimensionOptions> map = new HashMap<>(oldHolder.dimensions());
+        map.put(DimensionOptions.OVERWORLD, newOW);
+        map.put(DimensionOptions.NETHER,   newNether);
 
-        // 8) finally, swap _just_ the DIMENSIONS slice in the CombinedDynamicRegistries
-        return original.with(
-                ServerDynamicRegistryType.DIMENSIONS,
-                newDimRegistryMgr
-        );
+        // 4) Rebuild holder & registry‐manager
+        DimensionOptionsRegistryHolder newHolder = new DimensionOptionsRegistryHolder(map);
+        var cfg    = newHolder.toConfig(opts.dimensionOptionsRegistry());
+        var newMgr = cfg.toDynamicRegistryManager();
+
+        // 5) Swap just the DIMENSIONS registry in the combined registries
+        return original.with(ServerDynamicRegistryType.DIMENSIONS, newMgr);
     }
 }
