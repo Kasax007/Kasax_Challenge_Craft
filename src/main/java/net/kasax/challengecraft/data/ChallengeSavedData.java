@@ -57,6 +57,8 @@ public class ChallengeSavedData extends PersistentState {
 
     public NbtCompound writeNbt(NbtCompound tag) {
         // Codec will write both “active” and “maxHeartsTicks” fields for you.
+        tag.putIntArray("active", active.stream().mapToInt(i -> i).toArray());
+        tag.putInt("maxHeartsTicks", maxHeartsTicks);
         return tag;
     }
 
