@@ -64,5 +64,4 @@ public class CreateWorldScreenMixin {
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }
     }
-
 }

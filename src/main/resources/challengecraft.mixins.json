@@ -5,6 +5,7 @@
   "mixins": [
     "ExampleMixin",
     "LevelInfoAccessor",
+    "MixinServerPropertiesHandler",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
     "NoMobDropsMixin"

@@ -9,7 +9,11 @@ import net.kasax.challengecraft.network.ChallengePacket;
 import net.kasax.challengecraft.network.PacketHandler;
 import net.kasax.challengecraft.network.PlayTimePacketHandler;
 import net.kasax.challengecraft.network.PlayTimeSyncPacket;
+import net.kasax.challengecraft.world.SkyblockChunkGenerator;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +40,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_8_NoCraftingTable.register();
 		Chal_9_ExpWorldBorder.register();
 		Chal_10_RandomItem.register();
-		Chal_11_SkyblockWorld.register();
+		//Chal_11_SkyblockWorld.register();
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()
@@ -50,5 +54,13 @@ public class ChallengeCraft implements ModInitializer {
 		// 2) Now hook up the handler:
 		PacketHandler.register();
 		PlayTimePacketHandler.register();
+
+		// Chunk Generator Register
+		Registry.register(
+				Registries.CHUNK_GENERATOR,
+				Identifier.of("challengecraft", "skyblock_chunk_generator"),
+				SkyblockChunkGenerator.MAP_CODEC
+		);
+
 	}
 }

@@ -28,9 +28,9 @@ public class Chal_7_MaxHealthModify {
                 float newMax = maxHearts * 2f;
                 attr.addPersistentModifier(new EntityAttributeModifier(
                         MAX_HEALTH_MOD_ID, newMax - attr.getBaseValue(), EntityAttributeModifier.Operation.ADD_VALUE));
-                ChallengeCraft.LOGGER.info("[Server:Chal7] applied maxHealth = {} (HP={}) to player {}",
-                        maxHearts, newMax, player.getName().getString()
-                );
+                //ChallengeCraft.LOGGER.info("[Server:Chal7] applied maxHealth = {} (HP={}) to player {}",
+                //        maxHearts, newMax, player.getName().getString()
+                //);
                 if (player.getHealth() > newMax) {
                     player.setHealth(newMax);
                 }
