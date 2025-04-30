@@ -3,15 +3,20 @@ package net.kasax.challengecraft.world;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.registry.RegistryEntryLookup;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryOps;
+import net.minecraft.registry.*;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.structure.StructureSet;
+import net.minecraft.structure.StructureStart;
+import net.minecraft.structure.StructureTemplateManager;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.ChunkRegion;
 import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.Heightmap;
+import net.minecraft.world.World;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.chunk.Chunk;
 
@@ -20,9 +25,14 @@ import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 
 import net.minecraft.world.gen.chunk.VerticalBlockSample;
+import net.minecraft.world.gen.chunk.placement.StructurePlacement;
+import net.minecraft.world.gen.chunk.placement.StructurePlacementCalculator;
 import net.minecraft.world.gen.noise.NoiseConfig;
+import net.minecraft.world.gen.structure.Structure;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
 
 public class SkyblockChunkGenerator extends ChunkGenerator {
     private final RegistryEntryLookup<StructureSet> structureSets;
@@ -205,18 +215,56 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         return new VerticalBlockSample(minY, states);
     }
 
-//    // 9) Only allow strongholds (or nether complexes):
-//    // --- filter which structure sets will generate ---
-//    @Override
-//    public Stream<RegistryEntry<StructureSet>> streamStructureSets() {
-//        return structureSets.streamEntries().filter(entry -> {
-//            var key = entry.getKey().orElse(null);
-//            if (key == null) return false;
-//            return isNether
-//                    ? key.equals(RegistryKeys.NETHER_COMPLEXES)
-//                    : key.equals(RegistryKeys.STRONGHOLDS);
-//        });
-//    }
+    // 9) Only allow strongholds (or nether complexes):
+    // --- filter which structure sets will generate ---
+    @Override
+    public StructurePlacementCalculator createStructurePlacementCalculator(
+            RegistryWrapper<StructureSet> registry,
+            NoiseConfig noiseConfig,
+            long seed
+    ) {
+        // cast to the Impl so we can delegate
+        RegistryWrapper.Impl<StructureSet> base = (RegistryWrapper.Impl<StructureSet>) registry;
+
+        // prepare the two keys we actually want
+        RegistryKey<StructureSet> OVERWORLD_STRONGHOLDS =
+                RegistryKey.of(RegistryKeys.STRUCTURE_SET, Identifier.of("minecraft", "strongholds"));
+        RegistryKey<StructureSet> NETHER_COMPLEXES =
+                RegistryKey.of(RegistryKeys.STRUCTURE_SET, Identifier.of("minecraft", "nether_complexes"));
+
+        // build a tiny delegating wrapper that only "sees" our one desired set
+        RegistryWrapper.Impl<StructureSet> filtered = new RegistryWrapper.Impl.Delegating<StructureSet>() {
+            @Override
+            public RegistryWrapper.Impl<StructureSet> getBase() {
+                return base;
+            }
+
+            @Override
+            public Stream<RegistryEntry.Reference<StructureSet>> streamEntries() {
+                return base.streamEntries().filter(entry -> {
+                    RegistryKey<StructureSet> key = entry.registryKey();
+                    if (isNether) {
+                        return key.equals(NETHER_COMPLEXES);
+                    } else {
+                        return key.equals(OVERWORLD_STRONGHOLDS);
+                    }
+                });
+            }
+
+            // we don’t need tags, so just pass through
+            @Override public Stream<RegistryEntryList.Named<StructureSet>> getTags() {
+                return base.getTags();
+            }
+        };
+
+        // now hand *that* filtered wrapper to the vanilla placement calculator
+        return StructurePlacementCalculator.create(
+                noiseConfig,
+                seed,
+                this.biomeSource,
+                filtered
+        );
+    }
 
     // 10) Debug HUD (no extra info):
     @Override
