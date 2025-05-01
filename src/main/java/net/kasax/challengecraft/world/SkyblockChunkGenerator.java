@@ -114,17 +114,6 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         StructureTemplateManager stm = serverWorld.getServer().getStructureTemplateManager();
         Identifier id = Identifier.of("challengecraft", "classic_skyblock");
         StructureTemplate template = stm.getTemplateOrBlank(id);
-        ChallengeCraft.LOGGER.error(String.valueOf("template" + template));
-        ChallengeCraft.LOGGER.error(String.valueOf("id" + id));
-        if (template.getSize().equals(Vec3i.ZERO)) {
-            ChallengeCraft.LOGGER.error("❌ classic_skyblock.nbt was NOT found or is empty—size=0");
-            return; // bail out so you don’t keep stamping down nothing
-        } else {
-            ChallengeCraft.LOGGER.info("✅ Loaded skyblock template '{}' size={}x{}x{}",
-                    id,
-                    template.getSize().getX(), template.getSize().getY(), template.getSize().getZ()
-            );
-        }
 
         // build your placement data (no rotation/mirror in this case)
         StructurePlacementData placement = new StructurePlacementData()
