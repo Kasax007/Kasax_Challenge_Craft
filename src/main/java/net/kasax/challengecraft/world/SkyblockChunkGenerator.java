@@ -3,20 +3,24 @@ package net.kasax.challengecraft.world;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.kasax.challengecraft.ChallengeCraft;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.ChestBlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.registry.*;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.structure.StructureSet;
-import net.minecraft.structure.StructureStart;
-import net.minecraft.structure.StructureTemplateManager;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.structure.*;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.BlockRotation;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.world.ChunkRegion;
-import net.minecraft.world.HeightLimitView;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.World;
+import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.*;
 import net.minecraft.world.biome.source.BiomeSource;
 import net.minecraft.world.chunk.Chunk;
 
@@ -101,53 +105,45 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         ChunkPos pos = chunk.getPos();
         if (pos.x != 0 || pos.z != 0) return;
 
-        int y = 64;
-        BlockPos.Mutable m = new BlockPos.Mutable();
+        // 1) view the region as a ServerWorldAccess
+        ServerWorldAccess worldAccess = (ServerWorldAccess) region;
+        // 2) pull out the real ServerWorld so we can get at server.getStructureTemplateManager() & a Random
+        ServerWorld serverWorld = worldAccess.toServerWorld();
 
-        // 3×3 dirt platform with grass in center
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                m.set(dx, y - 1, dz);
-                region.setBlockState(m,
-                        dx == 0 && dz == 0
-                                ? net.minecraft.block.Blocks.GRASS_BLOCK.getDefaultState()
-                                : net.minecraft.block.Blocks.DIRT.getDefaultState(),
-                        0);
-            }
-        }
-
-        // Oak log trunk
-        for (int dy = 0; dy < 4; dy++) {
-            m.set(0, y + dy, 0);
-            region.setBlockState(m, net.minecraft.block.Blocks.OAK_LOG.getDefaultState(), 0);
-        }
-
-        // Leaves—simple layers
-        int leafY = y + 3;
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                if (Math.abs(dx) + Math.abs(dz) <= 3) {
-                    m.set(dx, leafY, dz);
-                    region.setBlockState(m, net.minecraft.block.Blocks.OAK_LEAVES.getDefaultState(), 0);
-                }
-            }
-        }
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                m.set(dx, leafY - 1, dz);
-                region.setBlockState(m, net.minecraft.block.Blocks.OAK_LEAVES.getDefaultState(), 0);
-            }
+        // load your structure from data/challengecraft/structures/classic_skyblock.nbt
+        StructureTemplateManager stm = serverWorld.getServer().getStructureTemplateManager();
+        Identifier id = Identifier.of("challengecraft", "classic_skyblock");
+        StructureTemplate template = stm.getTemplateOrBlank(id);
+        ChallengeCraft.LOGGER.error(String.valueOf("template" + template));
+        ChallengeCraft.LOGGER.error(String.valueOf("id" + id));
+        if (template.getSize().equals(Vec3i.ZERO)) {
+            ChallengeCraft.LOGGER.error("❌ classic_skyblock.nbt was NOT found or is empty—size=0");
+            return; // bail out so you don’t keep stamping down nothing
+        } else {
+            ChallengeCraft.LOGGER.info("✅ Loaded skyblock template '{}' size={}x{}x{}",
+                    id,
+                    template.getSize().getX(), template.getSize().getY(), template.getSize().getZ()
+            );
         }
 
-        // Chest with starter items
-        m.set(1, y - 1, 0);
-        region.setBlockState(m, net.minecraft.block.Blocks.CHEST.getDefaultState(), 0);
-        var be = region.getBlockEntity(m);
-        if (be instanceof net.minecraft.block.entity.ChestBlockEntity chest) {
-            chest.setStack(0, new net.minecraft.item.ItemStack(net.minecraft.item.Items.LAVA_BUCKET));
-            chest.setStack(1, new net.minecraft.item.ItemStack(net.minecraft.item.Items.ICE));
-        }
+        // build your placement data (no rotation/mirror in this case)
+        StructurePlacementData placement = new StructurePlacementData()
+                .setIgnoreEntities(false)
+                .setRotation(BlockRotation.NONE)
+                .setMirror(BlockMirror.NONE)
+                .setPosition(new BlockPos(0, 64, 0));
+
+        // stamp it down at world-coords (0,64,0), both as origin and pivot
+        template.place(
+                worldAccess,              // -> ServerWorldAccess
+                new BlockPos(0, 64, 0),   // -> structure origin
+                new BlockPos(0, 64, 0),   // -> pivot (for rotation/mirror)
+                placement,                // -> our StructurePlacementData
+                serverWorld.getRandom(),  // -> a Random
+                2                         // -> flags (update neighbors, notify physics)
+        );
     }
+
 
     // 3) No caves/carvers:
     @Override
