@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class ChallengeCraftClient implements ClientModInitializer {
+    public static int SELECTED_LIMITED_INVENTORY = 36;
     /** Used for single‐player: last value chosen on the Create World screen */
     public static List<Integer> LAST_CHOSEN = Collections.singletonList(1);
     public static int SELECTED_MAX_HEARTS = 0;

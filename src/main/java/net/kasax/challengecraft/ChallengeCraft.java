@@ -41,6 +41,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_9_ExpWorldBorder.register();
 		Chal_10_RandomItem.register();
 		//Chal_11_SkyblockWorld.register();
+		Chal_12_LimitedInventory.register();
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()

@@ -49,8 +49,8 @@ public class CreateWorldScreenMixin {
     private void onCreateLevel(CallbackInfo ci) {
         // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
-        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , maxHearts = {}",
-                chosen, ChallengeCraftClient.SELECTED_MAX_HEARTS);
+        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , maxHearts = {}, Inventory = {}",
+                chosen, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
         // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
 
@@ -58,8 +58,9 @@ public class CreateWorldScreenMixin {
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
             List<Integer> chosenList = ChallengeCraftClient.LAST_CHOSEN;
             int maxHearts = ChallengeCraftClient.SELECTED_MAX_HEARTS;
+            int limitedInventorySlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             ClientPlayNetworking.send(
-                    new ChallengePacket(chosenList, maxHearts)
+                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots)
             );
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }

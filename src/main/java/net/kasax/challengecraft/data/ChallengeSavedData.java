@@ -27,12 +27,16 @@ public class ChallengeSavedData extends PersistentState {
                     .forGetter(ps -> List.copyOf(ps.active)),
             Codec.INT
                     .fieldOf("maxHeartsTicks")
-                    .forGetter(ps -> ps.maxHeartsTicks)
-    ).apply(instance, (activeList, maxHeartsTicks) -> {
+                    .forGetter(ps -> ps.maxHeartsTicks),
+            Codec.INT
+                    .fieldOf("limitedInventorySlots")
+                    .forGetter(ps -> ps.limitedInventorySlots)
+    ).apply(instance, (activeList, maxHeartsTicks, limitedInventorySlots) -> {
         var d = new ChallengeSavedData();
         d.active.clear();
         d.active.addAll(activeList);
         d.maxHeartsTicks = maxHeartsTicks;
+        d.limitedInventorySlots = limitedInventorySlots;
         return d;
     }));
 
@@ -47,6 +51,8 @@ public class ChallengeSavedData extends PersistentState {
     /** Max-health slider in half-heart “ticks” (1…20). Default = 20 (10 hearts). */
     private int maxHeartsTicks;
 
+    private int limitedInventorySlots = 36;
+
     private ChallengeSavedData() {}
 
     /** Retrieve (or create) for this world. */
@@ -59,6 +65,7 @@ public class ChallengeSavedData extends PersistentState {
         // Codec will write both “active” and “maxHeartsTicks” fields for you.
         tag.putIntArray("active", active.stream().mapToInt(i -> i).toArray());
         tag.putInt("maxHeartsTicks", maxHeartsTicks);
+        tag.putInt("LimitedInventorySlots", limitedInventorySlots);
         return tag;
     }
 
@@ -87,5 +94,13 @@ public class ChallengeSavedData extends PersistentState {
             LOGGER.info("setMaxHeartsTicks ChallengeSavedData → " + ticks);
             markDirty();
         }
+    }
+    public int getLimitedInventorySlots() {
+        return limitedInventorySlots;
+    }
+
+    public void setLimitedInventorySlots(int slots) {
+        this.limitedInventorySlots = slots;
+        this.markDirty();
     }
 }

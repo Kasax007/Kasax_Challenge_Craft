@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.network;
 
+import net.kasax.challengecraft.ChallengeCraftClient;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.network.codec.PacketCodec;
@@ -13,6 +14,8 @@ import java.util.List;
 public class ChallengePacket implements CustomPayload {
     public final List<Integer> active;
     public final int           maxHearts;
+    public final int          limitedInventorySlots;
+
 
     // your channel ID
     public static final Id<ChallengePacket> ID =
@@ -28,6 +31,7 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeVarInt(pkt.active.size());
                             for (int id : pkt.active) buf.writeVarInt(id);
                             buf.writeVarInt(pkt.maxHearts);
+                            buf.writeVarInt(pkt.limitedInventorySlots);
                         }
                     },
                     // 2) decoder reads them back in the same order
@@ -40,15 +44,17 @@ public class ChallengePacket implements CustomPayload {
                                 list.add(buf.readVarInt());
                             }
                             int hearts = buf.readVarInt();
-                            return new ChallengePacket(list, hearts);
+                            int slots = buf.readVarInt();
+                            return new ChallengePacket(list, hearts, slots);
                         }
                     }
             );
 
     /** Construct on the client when sending */
-    public ChallengePacket(List<Integer> active, int maxHearts) {
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots) {
         this.active    = active;
         this.maxHearts = maxHearts;
+        this.limitedInventorySlots = slots;
     }
 
     /** Called by Fabric when it needs to serialize */
@@ -56,6 +62,7 @@ public class ChallengePacket implements CustomPayload {
         buf.writeVarInt(active.size());
         for (int id : active) buf.writeVarInt(id);
         buf.writeVarInt(maxHearts);
+        buf.writeVarInt(limitedInventorySlots);
     }
 
     /** Identify your channel */

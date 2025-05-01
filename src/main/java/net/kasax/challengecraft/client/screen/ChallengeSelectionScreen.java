@@ -20,17 +20,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11);
+    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11,12);
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> Text.of(Text.translatable("challengecraft.worldcreate.challenge" + id)))
             .toList();
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
     private SliderWidget maxHealthSlider;
+    private SliderWidget slotsSlider;
     // sliderValue is the raw 0.0–1.0 knob position
     private double sliderValue;
     // sliderTicks is 1–20 quantized half-heart steps
     private int sliderTicks;
+    private double slotsSliderValue;
+    private int slotsSliderTicks;
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Modify active Challenges (CAUTION: may break world)"));
@@ -46,6 +49,11 @@ public class ChallengeSelectionScreen extends Screen {
                 ? (ChallengeCraftClient.SELECTED_MAX_HEARTS - 1) / 19.0
                 : 0.5;
         sliderTicks  = (int)(Math.round(sliderValue * 19) + 1);
+        // initialize slots
+        slotsSliderValue  = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY > 0
+                ? (ChallengeCraftClient.SELECTED_LIMITED_INVENTORY - 1) / 35.0
+                : 1;
+        slotsSliderTicks  = (int)(Math.round(slotsSliderValue * 19) + 1);
 
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
@@ -92,7 +100,41 @@ public class ChallengeSelectionScreen extends Screen {
                 addDrawableChild(maxHealthSlider);
                 y += 24;
 
-            } else {
+            } if (id == 12) {
+                // toggle for challenge #7
+                var toggle = CyclingButtonWidget
+                        .onOffBuilder(isOn)
+                        .build(width/2 - 100, y, 200, 20,
+                                TITLES.get(i), (btn,val)->{});
+                addDrawableChild(toggle);
+                toggles.add(toggle);
+                y += 24;
+
+                // slider under it
+                slotsSlider = new SliderWidget(
+                        width/2 - 100, y, 200, 20,
+                        Text.literal("Inventory Slots: 18"),
+                        slotsSliderValue
+                ) {
+                    @Override
+                    protected void updateMessage() {
+                        double slots = 1 + (this.value * 35);
+                        setMessage(Text.literal(String.format("Inventory Slots: %.1f", slots)));
+                    }
+
+                    @Override
+                    protected void applyValue() {
+                        // quantize to half-heart increments
+                        slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
+                        this.value  = (slotsSliderTicks - 1) / 35.0;
+                    }
+                };
+                addDrawableChild(slotsSlider);
+                y += 24;
+
+            }
+
+            else {
                 // other toggles
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
@@ -126,16 +168,20 @@ public class ChallengeSelectionScreen extends Screen {
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
                         ticks = this.sliderTicks;  // 1…20
+                    }int slotticks = 0;
+                    if (newActive.contains(12) && slotsSlider != null) {
+                        slotticks = this.slotsSliderTicks;  // 1…20
                     }
 
                     ChallengeCraft.LOGGER.info(
-                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}",
-                            newActive, ticks
+                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}, slots = {}",
+                            newActive, ticks, slotticks
                     );
                     buf.writeVarInt(ticks);
+                    buf.writeVarInt(slotticks);
 
                     // 4) Send packet
-                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks));
+                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks));
                     ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
 
                     // 5) Close the screen

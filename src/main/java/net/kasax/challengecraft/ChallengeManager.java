@@ -29,6 +29,11 @@ public class ChallengeManager {
                 LOGGER.info("[Manager] restored Chal7 maxHearts = {} hearts ({} ticks)",
                         hearts, savedTicks);
             }
+            if (data.getActive().contains(12)) {
+                int saved = data.getLimitedInventorySlots();
+                Chal_12_LimitedInventory.setLimitedSlots(saved);
+                ChallengeCraft.LOGGER.info("[Manager] restored limited inventory slots = {}", saved);
+            }
 
             // 3) now go ahead and apply *all* challenges according to the saved list
             applyTo(world);
@@ -69,6 +74,10 @@ public class ChallengeManager {
             Chal_7_MaxHealthModify.setMaxHearts(clientHearts);
             LOGGER.info("ChallengeManager: seeded maxHearts from client → {} ticks = {} hearts",
                     clientTicks, clientHearts);
+            data.setLimitedInventorySlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+            Chal_12_LimitedInventory.setLimitedSlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+            ChallengeCraft.LOGGER.info("[Manager] seeded limited inventory slots = {}", ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+
 
             // re-read the saved list
             saved = data.getActive();
@@ -87,6 +96,7 @@ public class ChallengeManager {
         Chal_9_ExpWorldBorder   .setActive(false);
         Chal_10_RandomItem      .setActive(false);
         Chal_11_SkyblockWorld   .setActive(false);
+        Chal_12_LimitedInventory.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -103,6 +113,7 @@ public class ChallengeManager {
                 case 9  -> { Chal_9_ExpWorldBorder   .setActive(true); LOGGER.info("Challenge 9 ON"); }
                 case 10 -> { Chal_10_RandomItem      .setActive(true); LOGGER.info("Challenge 10 ON"); }
                 case 11 -> { Chal_11_SkyblockWorld   .setActive(true); LOGGER.info("Challenge 11 ON"); }
+                case 12 -> { Chal_12_LimitedInventory.setActive(true); LOGGER.info("Challenge 12 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }
