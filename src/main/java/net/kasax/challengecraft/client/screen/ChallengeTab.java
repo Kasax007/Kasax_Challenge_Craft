@@ -71,7 +71,7 @@ public class ChallengeTab extends GridScreenTab {
                 adder.add(slider7, adder.copyPositioner().alignHorizontalCenter());
 
 
-            } if (id == 12) {
+            } else if (id == 12) {
                 // challenge 12 toggle
                 var toggle8 = CyclingButtonWidget
                         .onOffBuilder(false)

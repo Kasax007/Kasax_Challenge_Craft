@@ -2,9 +2,11 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.ChallengeCraft;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.text.Text;
 
 import java.util.stream.IntStream;
 
@@ -53,7 +55,9 @@ public class Chal_12_LimitedInventory {
 
         // 1) Place a barrier in the first `toDisable` slots (per our order)
         for (int i = 0; i < toDisable; i++) {
-            mainInv.set(DEACTIVATION_ORDER[i], new ItemStack(Items.BARRIER));
+            ItemStack blocked = new ItemStack(Items.BARRIER);
+            blocked.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Blocked"));
+            mainInv.set(DEACTIVATION_ORDER[i], blocked);
         }
 
         // 2) Clear out any remaining barriers beyond that point
@@ -65,4 +69,19 @@ public class Chal_12_LimitedInventory {
             }
         }
     }
+    /** Used by our Mixin to decide if we’re currently enforcing limits. */
+    public static boolean isActive() {
+        return active;
+    }
+
+    /** How many real slots the player may use. */
+    public static int getLimitedSlots() {
+        return limitedSlots;
+    }
+
+    /** The exact order in which slots were deactivated. */
+    public static int[] getDeactivationOrder() {
+        return DEACTIVATION_ORDER;
+    }
+
 }

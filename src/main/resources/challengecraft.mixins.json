@@ -3,10 +3,13 @@
   "package": "net.kasax.challengecraft.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "CreateWorldMixinIntegratedServer",
     "ExampleMixin",
     "LevelInfoAccessor",
+    "MixinPlayerEntityDrop",
+    "MixinPlayerEntityPreventBarrierDrop",
+    "MixinScreenHandler",
     "MixinServerPropertiesHandler",
-    "CreateWorldMixinIntegratedServer",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
     "NoMobDropsMixin"

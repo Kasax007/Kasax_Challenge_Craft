@@ -100,7 +100,7 @@ public class ChallengeSelectionScreen extends Screen {
                 addDrawableChild(maxHealthSlider);
                 y += 24;
 
-            } if (id == 12) {
+            } else if (id == 12) {
                 // toggle for challenge #7
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)

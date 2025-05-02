@@ -35,7 +35,7 @@ public class PacketHandler {
                             Chal_7_MaxHealthModify.setMaxHearts(hearts);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_7 maxHearts = {}", hearts);
                         }
-                        if (packet.active.contains(12)) {
+                        else if (packet.active.contains(12)) {
                             float slots = packet.limitedInventorySlots * 1f;
                             Chal_12_LimitedInventory.setLimitedSlots((int) slots);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_12 slots = {}", slots);

@@ -51,7 +51,7 @@ public class ChallengeSavedData extends PersistentState {
     /** Max-health slider in half-heart “ticks” (1…20). Default = 20 (10 hearts). */
     private int maxHeartsTicks;
 
-    private int limitedInventorySlots = 36;
+    private int limitedInventorySlots;
 
     private ChallengeSavedData() {}
 
@@ -65,7 +65,7 @@ public class ChallengeSavedData extends PersistentState {
         // Codec will write both “active” and “maxHeartsTicks” fields for you.
         tag.putIntArray("active", active.stream().mapToInt(i -> i).toArray());
         tag.putInt("maxHeartsTicks", maxHeartsTicks);
-        tag.putInt("LimitedInventorySlots", limitedInventorySlots);
+        tag.putInt("limitedInventorySlots", limitedInventorySlots);
         return tag;
     }
 
@@ -101,6 +101,6 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setLimitedInventorySlots(int slots) {
         this.limitedInventorySlots = slots;
-        this.markDirty();
+        markDirty();
     }
 }
