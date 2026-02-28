@@ -98,6 +98,7 @@ public class ChallengeManager {
         Chal_11_SkyblockWorld   .setActive(false);
         Chal_12_LimitedInventory.setActive(false);
         Chal_13_RandomEnchantment.setActive(false);
+        Chal_14_RandomBlockDrops.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -116,6 +117,7 @@ public class ChallengeManager {
                 case 11 -> { Chal_11_SkyblockWorld   .setActive(true); LOGGER.info("Challenge 11 ON"); }
                 case 12 -> { Chal_12_LimitedInventory.setActive(true); LOGGER.info("Challenge 12 ON"); }
                 case 13 -> { Chal_13_RandomEnchantment.setActive(true); LOGGER.info("Challenge 13 ON"); }
+                case 14 -> { Chal_14_RandomBlockDrops.setActive(true); LOGGER.info("Challenge 14 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }
