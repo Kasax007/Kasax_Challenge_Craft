@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "CreateWorldMixinIntegratedServer",
+    "EntityTypeMixin",
     "ExampleMixin",
     "LevelInfoAccessor",
     "MixinPlayerEntityDrop",
@@ -12,7 +13,8 @@
     "MixinServerPropertiesHandler",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
-    "NoMobDropsMixin"
+    "NoMobDropsMixin",
+    "RandomMobDropsMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -21,8 +23,10 @@
     "CreateWorldScreenMixin"
   ],
   "server": [
+    "EntityTypeMixin",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
-    "NoMobDropsMixin"
+    "NoMobDropsMixin",
+    "RandomMobDropsMixin"
   ]
 }
