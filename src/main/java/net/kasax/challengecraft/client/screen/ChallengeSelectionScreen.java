@@ -28,6 +28,9 @@ public class ChallengeSelectionScreen extends Screen {
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
     private SliderWidget maxHealthSlider;
     private SliderWidget slotsSlider;
+
+    private WidgetScrollPanel scrollPanel;
+
     // sliderValue is the raw 0.0–1.0 knob position
     private double sliderValue;
     // sliderTicks is 1–20 quantized half-heart steps
@@ -44,42 +47,59 @@ public class ChallengeSelectionScreen extends Screen {
         super.init();
         toggles.clear();
 
-        // initialize sliderValue & sliderTicks from the last saved hearts
-        sliderValue  = ChallengeCraftClient.SELECTED_MAX_HEARTS > 0
-                ? (ChallengeCraftClient.SELECTED_MAX_HEARTS - 1) / 19.0
-                : 0.5;
-        sliderTicks  = (int)(Math.round(sliderValue * 19) + 1);
-        // initialize slots
-        slotsSliderValue  = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY > 0
-                ? (ChallengeCraftClient.SELECTED_LIMITED_INVENTORY - 1) / 35.0
-                : 1;
-        slotsSliderTicks  = (int)(Math.round(slotsSliderValue * 19) + 1);
-
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
+
         List<Integer> active = server != null
                 ? ChallengeSavedData.get(server.getOverworld()).getActive()
                 : List.of();
 
-        int y = height / 4;
+        // Read the CURRENT saved slider settings from the world (fallback to sane defaults)
+        int savedMaxHeartsTicks = server != null
+                ? ChallengeSavedData.get(server.getOverworld()).getMaxHeartsTicks()
+                : 0;
+        if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20; // default 10 hearts
+
+        int savedSlots = server != null
+                ? ChallengeSavedData.get(server.getOverworld()).getLimitedInventorySlots()
+                : 0;
+        if (savedSlots <= 0) savedSlots = 36; // default full inventory
+
+        // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)
+        sliderTicks = savedMaxHeartsTicks;                  // 1..20
+        sliderValue = (sliderTicks - 1) / 19.0;
+
+        slotsSliderTicks = savedSlots;                      // 1..36
+        slotsSliderValue = (slotsSliderTicks - 1) / 35.0;
+
+        int panelWidth = 240;
+        int panelX = width / 2 - panelWidth / 2;
+        int panelTop = 40;
+        int panelBottomReserved = 44; // space for Save button
+        int panelHeight = Math.max(60, height - panelTop - panelBottomReserved);
+
+        this.scrollPanel = new WidgetScrollPanel(panelX, panelTop, panelWidth, panelHeight, Text.empty());
+        addDrawableChild(this.scrollPanel);
+
+        int x = panelX + (panelWidth / 2) - 100;
+        int y = panelTop + 6;
+
         for (int i = 0; i < IDS.size(); i++) {
-            int id     = IDS.get(i);
+            int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
             if (id == 7) {
-                // toggle for challenge #7
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
-                        .build(width/2 - 100, y, 200, 20,
-                                TITLES.get(i), (btn,val)->{});
-                addDrawableChild(toggle);
+                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
+                scrollPanel.addChild(toggle);
                 y += 24;
 
-                // slider under it
+                double initialHearts = 0.5 + (sliderValue * 9.5);
                 maxHealthSlider = new SliderWidget(
-                        width/2 - 100, y, 200, 20,
-                        Text.literal("Max Health: 5.0❤"),
+                        x, y, 200, 20,
+                        Text.literal(String.format("Max Health: %.1f❤", initialHearts)),
                         sliderValue
                 ) {
                     @Override
@@ -90,68 +110,59 @@ public class ChallengeSelectionScreen extends Screen {
 
                     @Override
                     protected void applyValue() {
-                        // quantize to half-heart steps
                         ChallengeSelectionScreen.this.sliderTicks =
                                 (int)(Math.round(this.value * 19) + 1);
-                        // snap the knob exactly onto that step
                         this.value = (ChallengeSelectionScreen.this.sliderTicks - 1) / 19.0;
                     }
                 };
-                addDrawableChild(maxHealthSlider);
+                scrollPanel.addChild(maxHealthSlider);
                 y += 24;
 
             } else if (id == 12) {
-                // toggle for challenge #7
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
-                        .build(width/2 - 100, y, 200, 20,
-                                TITLES.get(i), (btn,val)->{});
-                addDrawableChild(toggle);
+                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
+                scrollPanel.addChild(toggle);
                 y += 24;
 
-                // slider under it
+                double initialSlots = 1 + (slotsSliderValue * 35);
                 slotsSlider = new SliderWidget(
-                        width/2 - 100, y, 200, 20,
-                        Text.literal("Inventory Slots: 18"),
+                        x, y, 200, 20,
+                        Text.literal(String.format("Inventory Slots: %.0f", initialSlots)),
                         slotsSliderValue
                 ) {
                     @Override
                     protected void updateMessage() {
                         double slots = 1 + (this.value * 35);
-                        setMessage(Text.literal(String.format("Inventory Slots: %.1f", slots)));
+                        setMessage(Text.literal(String.format("Inventory Slots: %.0f", slots)));
                     }
 
                     @Override
                     protected void applyValue() {
-                        // quantize to half-heart increments
                         slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
                         this.value  = (slotsSliderTicks - 1) / 35.0;
                     }
                 };
-                addDrawableChild(slotsSlider);
+                scrollPanel.addChild(slotsSlider);
                 y += 24;
 
-            }
-
-            else {
-                // other toggles
+            } else {
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
-                        .build(width/2 - 100, y, 200, 20,
-                                TITLES.get(i), (btn,val)->{});
-                addDrawableChild(toggle);
+                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
+                scrollPanel.addChild(toggle);
                 y += 24;
             }
         }
 
-        // the Save button
+        // Save button anchored at bottom (not inside the scroll area)
+        int saveY = panelTop + panelHeight + 10;
         addDrawableChild(new SaveButton(
-                width/2 - 50, y + 10, 100, 20,
+                width / 2 - 50, saveY, 100, 20,
                 Text.literal("Save"),
                 btn -> {
-                    // 1) Gather active IDs
                     List<Integer> newActive = new ArrayList<>();
                     for (int j = 0; j < IDS.size(); j++) {
                         if (toggles.get(j).getValue()) {
@@ -159,18 +170,18 @@ public class ChallengeSelectionScreen extends Screen {
                         }
                     }
 
-                    // 2) Prepare buffer
                     PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
                     buf.writeVarInt(newActive.size());
-                    for (int id : newActive) buf.writeVarInt(id);
+                    for (int cid : newActive) buf.writeVarInt(cid);
 
-                    // 3) Grab quantized ticks from our field
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
-                        ticks = this.sliderTicks;  // 1…20
-                    }int slotticks = 0;
+                        ticks = this.sliderTicks;
+                    }
+
+                    int slotticks = 0;
                     if (newActive.contains(12) && slotsSlider != null) {
-                        slotticks = this.slotsSliderTicks;  // 1…20
+                        slotticks = this.slotsSliderTicks;
                     }
 
                     ChallengeCraft.LOGGER.info(
@@ -180,11 +191,9 @@ public class ChallengeSelectionScreen extends Screen {
                     buf.writeVarInt(ticks);
                     buf.writeVarInt(slotticks);
 
-                    // 4) Send packet
                     ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks));
                     ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
 
-                    // 5) Close the screen
                     client.setScreen(null);
                 }
         ));
