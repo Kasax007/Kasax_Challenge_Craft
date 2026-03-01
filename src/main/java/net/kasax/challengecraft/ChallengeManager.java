@@ -17,25 +17,6 @@ public class ChallengeManager {
 
     public static void register() {
         ServerWorldEvents.LOAD.register((server, world) -> {
-            if (world.getRegistryKey() != World.OVERWORLD) return;
-            // 1) pull your saved data
-            var data = ChallengeSavedData.get(world);
-
-            // 2) if challenge 7 is in the saved “active” list, restore its slider value:
-            if (data.getActive().contains(7)) {
-                int savedTicks = data.getMaxHeartsTicks();        // 1…20
-                float hearts   = savedTicks * 0.5f;               // 0.5–10.0
-                Chal_7_MaxHealthModify.setMaxHearts(hearts);
-                LOGGER.info("[Manager] restored Chal7 maxHearts = {} hearts ({} ticks)",
-                        hearts, savedTicks);
-            }
-            if (data.getActive().contains(12)) {
-                int saved = data.getLimitedInventorySlots();
-                Chal_12_LimitedInventory.setLimitedSlots(saved);
-                ChallengeCraft.LOGGER.info("[Manager] restored limited inventory slots = {}", saved);
-            }
-
-            // 3) now go ahead and apply *all* challenges according to the saved list
             applyTo(world);
         });
     }
@@ -43,44 +24,51 @@ public class ChallengeManager {
     /**
      * Force-reapply all active challenges (e.g. after /reload).
      */
-    public static void applyAll(ServerWorld world) {
-        LOGGER.info("ChallengeManager.applyAll: re-applying");
-        applyTo(world);
+    public static void applyAll(net.minecraft.server.MinecraftServer server) {
+        LOGGER.info("ChallengeManager.applyAll: re-applying to all worlds");
+        for (ServerWorld world : server.getWorlds()) {
+            applyTo(world);
+        }
     }
 
     private static void applyTo(ServerWorld world) {
-        // 1) load or create our per-world saved data
-        ChallengeSavedData data = ChallengeSavedData.get(world);
+        // 1) Always load or create our saved data from the OVERWORLD
+        ServerWorld overworld = world.getServer().getOverworld();
+        ChallengeSavedData data = ChallengeSavedData.get(overworld);
         List<Integer> saved = data.getActive();
 
-        // 2) On very first boot (when the only saved challenge is the dummy ID 1),
-        //    seed both the chosen challenge IDs AND the chosen max-hearts slider
-        if (saved.size() == 1 && saved.get(0) == 1
-                && !ChallengeCraftClient.LAST_CHOSEN.equals(List.of(1))) {
-            // SELECTED_MAX_HEARTS is the number of hearts chosen on the client (e.g. 4)
-            int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
-            float clientHearts = clientTicks * 0.5f;
+        // 2) On Overworld load, restore specific settings and handle seeding
+        if (world.getRegistryKey() == World.OVERWORLD) {
+            // Restore slider values for specific challenges
+            if (saved.contains(7)) {
+                int savedTicks = data.getMaxHeartsTicks();
+                float hearts   = savedTicks * 0.5f;
+                Chal_7_MaxHealthModify.setMaxHearts(hearts);
+                LOGGER.info("[Manager] restored Chal7 maxHearts = {} hearts", hearts);
+            }
+            if (saved.contains(12)) {
+                int savedSlots = data.getLimitedInventorySlots();
+                Chal_12_LimitedInventory.setLimitedSlots(savedSlots);
+                LOGGER.info("[Manager] restored limited inventory slots = {}", savedSlots);
+            }
 
-            LOGGER.info("ChallengeManager: seeding from client LAST_CHOSEN {} (ticks={})",
-                    ChallengeCraftClient.LAST_CHOSEN, clientTicks);
+            // Seed from client if first boot
+            if (saved.size() == 1 && saved.get(0) == 1
+                    && !ChallengeCraftClient.LAST_CHOSEN.equals(List.of(1))) {
+                
+                int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
+                data.setMaxHeartsTicks(clientTicks);
+                data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
+                data.setLimitedInventorySlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
 
-            // persist the client’s HP choice
-            data.setMaxHeartsTicks(clientTicks);
-
-            // persist the client’s challenge selection
-            data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
-
-            // apply immediately into our runtime modifier
-            Chal_7_MaxHealthModify.setMaxHearts(clientHearts);
-            LOGGER.info("ChallengeManager: seeded maxHearts from client → {} ticks = {} hearts",
-                    clientTicks, clientHearts);
-            data.setLimitedInventorySlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
-            Chal_12_LimitedInventory.setLimitedSlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
-            ChallengeCraft.LOGGER.info("[Manager] seeded limited inventory slots = {}", ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
-
-
-            // re-read the saved list
-            saved = data.getActive();
+                Chal_7_MaxHealthModify.setMaxHearts(clientTicks * 0.5f);
+                Chal_12_LimitedInventory.setLimitedSlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+                
+                LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}", ChallengeCraftClient.LAST_CHOSEN);
+                
+                // re-read the saved list
+                saved = data.getActive();
+            }
         }
 
         // 3) Turn everything off
@@ -100,6 +88,7 @@ public class ChallengeManager {
         Chal_13_RandomEnchantment.setActive(false);
         Chal_14_RandomBlockDrops.setActive(false);
         Chal_15_RandomMobDrops.setActive(false);
+        Chal_16_RandomChunkBlocks.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -120,6 +109,7 @@ public class ChallengeManager {
                 case 13 -> { Chal_13_RandomEnchantment.setActive(true); LOGGER.info("Challenge 13 ON"); }
                 case 14 -> { Chal_14_RandomBlockDrops.setActive(true); LOGGER.info("Challenge 14 ON"); }
                 case 15 -> { Chal_15_RandomMobDrops.setActive(true); LOGGER.info("Challenge 15 ON"); }
+                case 16 -> { Chal_16_RandomChunkBlocks.setActive(true); LOGGER.info("Challenge 16 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }

@@ -14,7 +14,9 @@
     "NoBlockDropsMixin",
     "NoChestLootMixin",
     "NoMobDropsMixin",
-    "RandomMobDropsMixin"
+    "RandomMobDropsMixin",
+    "RandomChunkBlocksMixin",
+    "ChunkRegionMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -27,6 +29,8 @@
     "NoBlockDropsMixin",
     "NoChestLootMixin",
     "NoMobDropsMixin",
-    "RandomMobDropsMixin"
+    "RandomMobDropsMixin",
+    "RandomChunkBlocksMixin",
+    "ChunkRegionMixin"
   ]
 }

@@ -25,11 +25,11 @@ public class PacketHandler {
                                 packet.maxHearts,
                                 packet.limitedInventorySlots
                         );
-                        var world = player.getWorld();
+                        var world = server.getOverworld();
                         // overwrite your active list
-                        ChallengeSavedData.get((ServerWorld) world).setActive(packet.active);
-                        ChallengeSavedData.get((ServerWorld) world).setMaxHeartsTicks(packet.maxHearts);
-                        ChallengeSavedData.get((ServerWorld) world).setLimitedInventorySlots(packet.limitedInventorySlots);
+                        ChallengeSavedData.get(world).setActive(packet.active);
+                        ChallengeSavedData.get(world).setMaxHeartsTicks(packet.maxHearts);
+                        ChallengeSavedData.get(world).setLimitedInventorySlots(packet.limitedInventorySlots);
                         if (packet.active.contains(7)) {
                             float hearts = packet.maxHearts * 0.5f;
                             Chal_7_MaxHealthModify.setMaxHearts(hearts);
@@ -41,7 +41,7 @@ public class PacketHandler {
                             ChallengeCraft.LOGGER.info("[Server] set Chal_12 slots = {}", slots);
                         }
                         // re‑apply all active challenges
-                        ChallengeManager.applyAll((ServerWorld) world);
+                        ChallengeManager.applyAll(server);
                         ChallengeCraft.LOGGER.info("Packet Handler applyAll " + packet );
                     });
                 }
