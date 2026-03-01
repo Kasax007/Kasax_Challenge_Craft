@@ -30,13 +30,29 @@ public class ChallengeSavedData extends PersistentState {
                     .forGetter(ps -> ps.maxHeartsTicks),
             Codec.INT
                     .fieldOf("limitedInventorySlots")
-                    .forGetter(ps -> ps.limitedInventorySlots)
-    ).apply(instance, (activeList, maxHeartsTicks, limitedInventorySlots) -> {
+                    .forGetter(ps -> ps.limitedInventorySlots),
+            Codec.DOUBLE
+                    .fieldOf("initialDifficulty")
+                    .forGetter(ps -> ps.initialDifficulty),
+            Codec.BOOL
+                    .fieldOf("tainted")
+                    .forGetter(ps -> ps.tainted),
+            Codec.BOOL
+                    .fieldOf("xpAwarded")
+                    .forGetter(ps -> ps.xpAwarded),
+            Codec.BOOL
+                    .fieldOf("difficultySet")
+                    .forGetter(ps -> ps.difficultySet)
+    ).apply(instance, (activeList, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, xpAwarded, difficultySet) -> {
         var d = new ChallengeSavedData();
         d.active.clear();
         d.active.addAll(activeList);
         d.maxHeartsTicks = maxHeartsTicks;
         d.limitedInventorySlots = limitedInventorySlots;
+        d.initialDifficulty = initialDifficulty;
+        d.tainted = tainted;
+        d.xpAwarded = xpAwarded;
+        d.difficultySet = difficultySet;
         return d;
     }));
 
@@ -53,6 +69,17 @@ public class ChallengeSavedData extends PersistentState {
 
     private int limitedInventorySlots;
 
+    /** The difficulty rating calculated when world was created. */
+    private double initialDifficulty = 0;
+
+    /** If true, player changed challenges mid-game, so difficulty becomes 0. */
+    private boolean tainted = false;
+
+    /** To prevent multiple awards for the same achievement in one world. */
+    private boolean xpAwarded = false;
+
+    private boolean difficultySet = false;
+
     private ChallengeSavedData() {}
 
     /** Retrieve (or create) for this world. */
@@ -66,6 +93,10 @@ public class ChallengeSavedData extends PersistentState {
         tag.putIntArray("active", active.stream().mapToInt(i -> i).toArray());
         tag.putInt("maxHeartsTicks", maxHeartsTicks);
         tag.putInt("limitedInventorySlots", limitedInventorySlots);
+        tag.putDouble("initialDifficulty", initialDifficulty);
+        tag.putBoolean("tainted", tainted);
+        tag.putBoolean("xpAwarded", xpAwarded);
+        tag.putBoolean("difficultySet", difficultySet);
         return tag;
     }
 
@@ -101,6 +132,42 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setLimitedInventorySlots(int slots) {
         this.limitedInventorySlots = slots;
+        markDirty();
+    }
+
+    public double getInitialDifficulty() {
+        return initialDifficulty;
+    }
+
+    public void setInitialDifficulty(double difficulty) {
+        this.initialDifficulty = difficulty;
+        markDirty();
+    }
+
+    public boolean isTainted() {
+        return tainted;
+    }
+
+    public void setTainted(boolean tainted) {
+        this.tainted = tainted;
+        markDirty();
+    }
+
+    public boolean isXpAwarded() {
+        return xpAwarded;
+    }
+
+    public void setXpAwarded(boolean xpAwarded) {
+        this.xpAwarded = xpAwarded;
+        markDirty();
+    }
+
+    public boolean isDifficultySet() {
+        return difficultySet;
+    }
+
+    public void setDifficultySet(boolean difficultySet) {
+        this.difficultySet = difficultySet;
         markDirty();
     }
 }

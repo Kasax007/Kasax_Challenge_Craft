@@ -9,6 +9,7 @@ import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
@@ -20,9 +21,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16);
+    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
     private static final List<Text> TITLES = IDS.stream()
-            .map(id -> Text.of(Text.translatable("challengecraft.worldcreate.challenge" + id)))
+            .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
+            .toList();
+
+    private static final List<Text> DESCRIPTIONS = IDS.stream()
+            .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc"))
             .toList();
 
     private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
@@ -85,12 +90,14 @@ public class ChallengeSelectionScreen extends Screen {
         int y = panelTop + 6;
 
         for (int i = 0; i < IDS.size(); i++) {
+            final int index = i;
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
             if (id == 7) {
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
+                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
                         .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
                 scrollPanel.addChild(toggle);
@@ -121,6 +128,7 @@ public class ChallengeSelectionScreen extends Screen {
             } else if (id == 12) {
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
+                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
                         .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
                 scrollPanel.addChild(toggle);
@@ -150,6 +158,7 @@ public class ChallengeSelectionScreen extends Screen {
             } else {
                 var toggle = CyclingButtonWidget
                         .onOffBuilder(isOn)
+                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
                         .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
                 toggles.add(toggle);
                 scrollPanel.addChild(toggle);
@@ -209,6 +218,11 @@ public class ChallengeSelectionScreen extends Screen {
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
         this.renderBackground(ctx, mouseX, mouseY, delta);
         super.render(ctx, mouseX, mouseY, delta);
+
+        // Render the warning message
+        Text warning = Text.translatable("challengecraft.warning.tainted");
+        int textWidth = this.textRenderer.getWidth(warning);
+        ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 20, 0xFF5555);
     }
 
     private static class SaveButton extends ButtonWidget {

@@ -26,10 +26,12 @@ public class PacketHandler {
                                 packet.limitedInventorySlots
                         );
                         var world = server.getOverworld();
+                        ChallengeSavedData data = ChallengeSavedData.get(world);
                         // overwrite your active list
-                        ChallengeSavedData.get(world).setActive(packet.active);
-                        ChallengeSavedData.get(world).setMaxHeartsTicks(packet.maxHearts);
-                        ChallengeSavedData.get(world).setLimitedInventorySlots(packet.limitedInventorySlots);
+                        data.setActive(packet.active);
+                        data.setMaxHeartsTicks(packet.maxHearts);
+                        data.setLimitedInventorySlots(packet.limitedInventorySlots);
+                        data.setTainted(true); // Mark as tainted because challenges changed mid-game
                         if (packet.active.contains(7)) {
                             float hearts = packet.maxHearts * 0.5f;
                             Chal_7_MaxHealthModify.setMaxHearts(hearts);

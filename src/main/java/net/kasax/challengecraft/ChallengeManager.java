@@ -1,8 +1,10 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.GameRules;
@@ -19,6 +21,12 @@ public class ChallengeManager {
         ServerWorldEvents.LOAD.register((server, world) -> {
             applyTo(world);
         });
+
+        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                Chal_19_MinePotionEffect.applyEffect(serverPlayer, state.getBlock());
+            }
+        });
     }
 
     /**
@@ -29,6 +37,40 @@ public class ChallengeManager {
         for (ServerWorld world : server.getWorlds()) {
             applyTo(world);
         }
+    }
+
+    public static double getDifficulty(int id, int ticks, int slots) {
+        return switch (id) {
+            case 1 -> 0.5;  // LevelItem (Harder)
+            case 2 -> 0.3;  // NoBlockDrops
+            case 3 -> 0.3;  // NoMobDrops
+            case 4 -> 0.3;  // NoChestLoot
+            case 5 -> 0.5;  // NoRegen
+            case 6 -> 0.5;  // NoVillagerTrading
+            case 7 -> (20.0 - ticks) / 19.0; // MaxHealthModify: 20 ticks=0, 1 tick=1.0
+            case 8 -> 1.0;  // NoCraftingTable
+            case 9 -> 5.0;  // ExpWorldBorder
+            case 10 -> -0.5; // RandomItem
+            case 11 -> 1.5; // SkyblockWorld
+            case 12 -> (36.0 - slots) / 35.0; // LimitedInventory: 36 slots=0, 1 slot=1.0
+            case 13 -> -0.5; // RandomEnchantment (Easier)
+            case 14 -> 0.4;  // RandomBlockDrops
+            case 15 -> 0.6;  // RandomMobDrops
+            case 16 -> 0.2; // RandomChunkBlocks (Easier)
+            case 17 -> 0.4; // WalkRandomItem
+            case 18 -> 0.4; // DamageRandomItem
+            case 19 -> 0.5; // MinePotionEffect
+            case 20 -> 0.8; // RandomizedCrafting
+            default -> 0.0;
+        };
+    }
+
+    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots) {
+        double total = 0;
+        for (int id : ids) {
+            total += getDifficulty(id, heartsTicks, inventorySlots);
+        }
+        return Math.max(0, total); // Ensure it's not negative
     }
 
     private static void applyTo(ServerWorld world) {
@@ -53,18 +95,25 @@ public class ChallengeManager {
             }
 
             // Seed from client if first boot
-            if (saved.size() == 1 && saved.get(0) == 1
-                    && !ChallengeCraftClient.LAST_CHOSEN.equals(List.of(1))) {
+            // We check if it's a fresh save. By default 'active' is [1].
+            // If the client has something else or if it's truly the first time.
+            if (!data.isDifficultySet() && !ChallengeCraftClient.LAST_CHOSEN.isEmpty()) {
                 
                 int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
+                int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
+
                 data.setMaxHeartsTicks(clientTicks);
                 data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
-                data.setLimitedInventorySlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+                data.setLimitedInventorySlots(clientSlots);
+                
+                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots);
+                data.setInitialDifficulty(initialDiff);
+                data.setDifficultySet(true);
 
                 Chal_7_MaxHealthModify.setMaxHearts(clientTicks * 0.5f);
-                Chal_12_LimitedInventory.setLimitedSlots(ChallengeCraftClient.SELECTED_LIMITED_INVENTORY);
+                Chal_12_LimitedInventory.setLimitedSlots(clientSlots);
                 
-                LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}", ChallengeCraftClient.LAST_CHOSEN);
+                LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
                 
                 // re-read the saved list
                 saved = data.getActive();
@@ -89,6 +138,10 @@ public class ChallengeManager {
         Chal_14_RandomBlockDrops.setActive(false);
         Chal_15_RandomMobDrops.setActive(false);
         Chal_16_RandomChunkBlocks.setActive(false);
+        Chal_17_WalkRandomItem.setActive(false);
+        Chal_18_DamageRandomItem.setActive(false);
+        Chal_19_MinePotionEffect.setActive(false);
+        Chal_20_RandomizedCrafting.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -110,6 +163,10 @@ public class ChallengeManager {
                 case 14 -> { Chal_14_RandomBlockDrops.setActive(true); LOGGER.info("Challenge 14 ON"); }
                 case 15 -> { Chal_15_RandomMobDrops.setActive(true); LOGGER.info("Challenge 15 ON"); }
                 case 16 -> { Chal_16_RandomChunkBlocks.setActive(true); LOGGER.info("Challenge 16 ON"); }
+                case 17 -> { Chal_17_WalkRandomItem.setActive(true); LOGGER.info("Challenge 17 ON"); }
+                case 18 -> { Chal_18_DamageRandomItem.setActive(true); LOGGER.info("Challenge 18 ON"); }
+                case 19 -> { Chal_19_MinePotionEffect.setActive(true); LOGGER.info("Challenge 19 ON"); }
+                case 20 -> { Chal_20_RandomizedCrafting.setActive(true); LOGGER.info("Challenge 20 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }

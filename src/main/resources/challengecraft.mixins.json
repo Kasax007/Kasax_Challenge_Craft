@@ -16,13 +16,17 @@
     "NoMobDropsMixin",
     "RandomMobDropsMixin",
     "RandomChunkBlocksMixin",
-    "ChunkRegionMixin"
+    "ChunkRegionMixin",
+    "PlayerAdvancementTrackerMixin",
+    "MovementAndDamageMixin",
+    "ServerRecipeManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "client": [
-    "CreateWorldScreenMixin"
+    "CreateWorldScreenMixin",
+    "TitleScreenMixin"
   ],
   "server": [
     "EntityTypeMixin",
