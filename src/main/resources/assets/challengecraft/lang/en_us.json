@@ -44,6 +44,7 @@
   "challengecraft.worldcreate.difficulty": "Difficulty Rating: %s",
   "challengecraft.mainmenu.lifetime_xp": "Total Lifetime XP: %d",
   "challengecraft.warning.tainted": "Warning: Changing challenges mid-game sets difficulty to 0!",
+  "challengecraft.warning.conflict": "Warning: Mutually exclusive challenges are active! (e.g. No Drops + Random Drops)",
   "challengecraft.reward.xp_earned": "Congratulations! You earned %d lifetime XP!",
   "challengecraft.reward.no_xp": "No XP earned because challenges were changed in-game.",
   "challengecraft.reward.title": "Challenge successfully completed!",
@@ -61,5 +62,7 @@
   "challengecraft.all_entities_list.title": "Entities to Kill",
   "challengecraft.completed": "Challenge Completed!",
   "challengecraft.worldcreate.challenge24": "Mob Health Multiplier",
-  "challengecraft.worldcreate.challenge24.desc": "Allows you to multiply the health of all mobs."
+  "challengecraft.worldcreate.challenge24.desc": "Allows you to multiply the health of all mobs.",
+  "challengecraft.worldcreate.challenge25": "Damage = Border",
+  "challengecraft.worldcreate.challenge25.desc": "Taking damage expands the world border."
 }

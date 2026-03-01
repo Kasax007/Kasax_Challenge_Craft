@@ -88,6 +88,7 @@ public class ChallengeManager {
             case 22 -> 30.0; // All Items (Very Hard!)
             case 23 -> 15.0; // All Entities (Very Hard!)
             case 24 -> (mobHealthMult - 1) / 99.0 * 10.0;
+            case 25 -> 2.0; // DamageWorldBorder
             default -> 0.0;
         };
     }
@@ -100,11 +101,22 @@ public class ChallengeManager {
         return Math.max(0, total); // Ensure it's not negative
     }
 
+    public static boolean hasConflict(List<Integer> ids) {
+        if (ids.contains(2) && ids.contains(14)) return true; // No Block Drops + Random Block Drops
+        if (ids.contains(3) && ids.contains(15)) return true; // No Mob Drops + Random Mob Drops
+        if (ids.contains(8) && ids.contains(20)) return true; // No Crafting Table + Randomized Crafting
+        if (ids.contains(9) && ids.contains(25)) return true; // ExpWorldBorder + DamageWorldBorder
+        return false;
+    }
+
     private static void applyTo(ServerWorld world) {
         // 1) Always load or create our saved data from the OVERWORLD
         ServerWorld overworld = world.getServer().getOverworld();
         ChallengeSavedData data = ChallengeSavedData.get(overworld);
         List<Integer> saved = data.getActive();
+
+        boolean wasExpBorderActive = Chal_9_ExpWorldBorder.isActive();
+        boolean wasDamageBorderActive = Chal_25_DamageWorldBorder.isActive();
 
         // 2) On Overworld load, restore specific settings and handle seeding
         if (world.getRegistryKey() == World.OVERWORLD) {
@@ -124,6 +136,11 @@ public class ChallengeManager {
                 int savedMult = data.getMobHealthMultiplier();
                 Chal_24_MobHealthMultiply.setMultiplier(savedMult);
                 LOGGER.info("[Manager] restored mob health multiplier = {}", savedMult);
+            }
+            if (saved.contains(25)) {
+                double savedSize = data.getDamageWorldBorderSize();
+                Chal_25_DamageWorldBorder.setDiameter(savedSize);
+                LOGGER.info("[Manager] restored damage world border size = {}", savedSize);
             }
 
             // Seed from client if first boot
@@ -147,7 +164,16 @@ public class ChallengeManager {
                 Chal_7_MaxHealthModify.setMaxHearts(clientTicks * 0.5f);
                 Chal_12_LimitedInventory.setLimitedSlots(clientSlots);
                 Chal_24_MobHealthMultiply.setMultiplier(clientMult);
-                
+                Chal_25_DamageWorldBorder.setDiameter(data.getDamageWorldBorderSize());
+
+                // Force spawn to 0,0 for border challenges in new world
+                if (ChallengeCraftClient.LAST_CHOSEN.contains(9) || ChallengeCraftClient.LAST_CHOSEN.contains(25)) {
+                    int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, 0, 0);
+                    world.setSpawnPos(new net.minecraft.util.math.BlockPos(0, y, 0), 0.0f);
+                    world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
+                    LOGGER.info("Forced world spawn to 0, {}, 0 and spawnRadius to 0 due to border challenge", y);
+                }
+
                 LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
                 
                 // re-read the saved list
@@ -181,6 +207,7 @@ public class ChallengeManager {
         Chal_22_AllItems.setActive(false);
         Chal_23_AllEntities.setActive(false);
         Chal_24_MobHealthMultiply.setActive(false);
+        Chal_25_DamageWorldBorder.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -221,8 +248,28 @@ public class ChallengeManager {
                     Chal_24_MobHealthMultiply.setActive(true);
                     LOGGER.info("Challenge 24 ON");
                 }
+                case 25 -> {
+                    Chal_25_DamageWorldBorder.setActive(true);
+                    Chal_25_DamageWorldBorder.updateWorldBorder(world);
+                    LOGGER.info("Challenge 25 ON");
+                }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
+        }
+
+        // 4.5) Reset border if deactivated
+        if (wasExpBorderActive && !Chal_9_ExpWorldBorder.isActive()) {
+            resetWorldBorder(world);
+        }
+        if (wasDamageBorderActive && !Chal_25_DamageWorldBorder.isActive()) {
+            resetWorldBorder(world);
+        }
+
+        // 4.6) Set center for border challenges
+        if (Chal_9_ExpWorldBorder.isActive() || Chal_25_DamageWorldBorder.isActive()) {
+            world.getWorldBorder().setCenter(0.5, 0.5);
+            // Force 0 spawn radius so players don't spawn outside the tiny initial border
+            world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
         }
 
         // 5) Finally, update game rules for block/mob drops
@@ -234,4 +281,9 @@ public class ChallengeManager {
         mobLootRule .set(!Chal_3_NoMobDrops    .isActive(), world.getServer());
     }
 
+    private static void resetWorldBorder(ServerWorld world) {
+        world.getWorldBorder().setSize(6.0E7);
+        // Restore default spawn radius when border challenge is off
+        world.getGameRules().get(GameRules.SPAWN_RADIUS).set(10, world.getServer());
+    }
 }

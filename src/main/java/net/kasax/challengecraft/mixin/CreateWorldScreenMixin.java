@@ -45,10 +45,17 @@ public class CreateWorldScreenMixin {
         return extended;
     }
 
-    @Inject(method = "createLevel", at = @At("HEAD"))
+    @Inject(method = "createLevel", at = @At("HEAD"), cancellable = true)
     private void onCreateLevel(CallbackInfo ci) {
         // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
+
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(chosen)) {
+            ChallengeCraft.LOGGER.info("[Client:CreateWorld] Blocked world creation due to challenge conflicts: {}", chosen);
+            ci.cancel();
+            return;
+        }
+
         ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , maxHearts = {}, Inventory = {}, MobHealth = {}",
                 chosen, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER);
         // stash for SP:

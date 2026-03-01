@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 24, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 25, 5, 6, 4, 16, 10, 13, 7, 12, 24, 2, 14, 3, 15, 8, 20, 17, 18, 19, 21, 22, 23);
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
             .toList();
@@ -35,6 +35,7 @@ public class ChallengeSelectionScreen extends Screen {
     private SliderWidget mobHealthSlider;
 
     private WidgetScrollPanel scrollPanel;
+    private ButtonWidget saveButton;
 
     // sliderValue is the raw 0.0–1.0 knob position
     private double sliderValue;
@@ -119,7 +120,7 @@ public class ChallengeSelectionScreen extends Screen {
             int currentX = (col == 0) ? x0 : x1;
             int currentY = y;
 
-            ChallengeCardWidget card = new ChallengeCardWidget(currentX, currentY, cardWidth, cardHeight, id, isOn, val -> {});
+            ChallengeCardWidget card = new ChallengeCardWidget(currentX, currentY, cardWidth, cardHeight, id, isOn, val -> updateSaveButton());
             cards.add(card);
             scrollPanel.addChild(card);
 
@@ -209,17 +210,12 @@ public class ChallengeSelectionScreen extends Screen {
 
         // Save button anchored at bottom (not inside the scroll area)
         int saveY = panelTop + panelHeight + 10;
-        addDrawableChild(new SaveButton(
+        this.saveButton = new SaveButton(
                 width / 2 - 50, saveY, 100, 20,
                 Text.literal("Save"),
                 btn -> {
-                    List<Integer> newActive = new ArrayList<>();
-                    for (int j = 0; j < IDS.size(); j++) {
-                        if (cards.get(j).isActive()) {
-                            newActive.add(IDS.get(j));
-                        }
-                    }
-
+                    List<Integer> newActive = getActiveIds();
+                    // ...
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
                         ticks = this.sliderTicks;
@@ -245,7 +241,25 @@ public class ChallengeSelectionScreen extends Screen {
 
                     client.setScreen(null);
                 }
-        ));
+        );
+        addDrawableChild(this.saveButton);
+        updateSaveButton();
+    }
+
+    private List<Integer> getActiveIds() {
+        List<Integer> ids = new ArrayList<>();
+        for (ChallengeCardWidget card : cards) {
+            if (card.isActive()) {
+                ids.add(card.getChallengeId());
+            }
+        }
+        return ids;
+    }
+
+    private void updateSaveButton() {
+        if (saveButton != null) {
+            saveButton.active = !net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds());
+        }
     }
 
     @Override
@@ -263,8 +277,13 @@ public class ChallengeSelectionScreen extends Screen {
         ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, width / 2, 10, 0xFFFF55);
 
         // Render the warning message
-        Text warning = Text.translatable("challengecraft.warning.tainted");
-        ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 24, 0xFF5555);
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds())) {
+            Text conflictWarning = Text.translatable("challengecraft.warning.conflict");
+            ctx.drawCenteredTextWithShadow(this.textRenderer, conflictWarning, width / 2, 24, 0xFF5555);
+        } else {
+            Text warning = Text.translatable("challengecraft.warning.tainted");
+            ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 24, 0xFF5555);
+        }
     }
 
     private static class SaveButton extends ButtonWidget {

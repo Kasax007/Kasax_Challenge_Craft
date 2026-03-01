@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 24, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 25, 5, 6, 4, 16, 10, 13, 7, 12, 24, 2, 14, 3, 15, 8, 20, 17, 18, 19, 21, 22, 23);
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final SliderWidget maxHealthSlider;
@@ -121,8 +121,12 @@ public class ChallengeTab extends GridScreenTab {
                 activeIds.add(IDS.get(i));
             }
         }
-        double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier);
-        this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds)) {
+            this.difficultyText = Text.translatable("challengecraft.warning.conflict");
+        } else {
+            double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier);
+            this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
+        }
     }
 
     @Override
@@ -159,7 +163,8 @@ public class ChallengeTab extends GridScreenTab {
             }
             @Override
             protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, 0xFFFF55);
+                int color = getMessage().getString().contains("Warning") ? 0xFF5555 : 0xFFFF55;
+                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
             }
             @Override
             protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}

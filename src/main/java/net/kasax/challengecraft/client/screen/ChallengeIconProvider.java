@@ -10,7 +10,7 @@ public class ChallengeIconProvider {
 
     static {
         ICONS.put(1, new ItemStack(Items.EXPERIENCE_BOTTLE));
-        ICONS.put(2, new ItemStack(Items.BARRIER));
+        ICONS.put(2, new ItemStack(Items.COBWEB));
         ICONS.put(3, new ItemStack(Items.ZOMBIE_SPAWN_EGG));
         ICONS.put(4, new ItemStack(Items.CHEST));
         ICONS.put(5, new ItemStack(Items.GOLDEN_APPLE));
@@ -31,7 +31,9 @@ public class ChallengeIconProvider {
         ICONS.put(20, new ItemStack(Items.KNOWLEDGE_BOOK));
         ICONS.put(21, new ItemStack(Items.TOTEM_OF_UNDYING));
         ICONS.put(22, new ItemStack(Items.NETHER_STAR));
-        ICONS.put(23, new ItemStack(Items.ZOMBIE_SPAWN_EGG));
+        ICONS.put(23, new ItemStack(Items.CREEPER_SPAWN_EGG));
+        ICONS.put(24, new ItemStack(Items.GLISTERING_MELON_SLICE));
+        ICONS.put(25, new ItemStack(Items.HEART_OF_THE_SEA));
     }
 
     public static ItemStack getIcon(int id) {

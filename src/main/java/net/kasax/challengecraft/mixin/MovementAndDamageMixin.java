@@ -3,6 +3,7 @@ package net.kasax.challengecraft.mixin;
 import net.kasax.challengecraft.challenges.Chal_17_WalkRandomItem;
 import net.kasax.challengecraft.challenges.Chal_18_DamageRandomItem;
 import net.kasax.challengecraft.challenges.Chal_21_Hardcore;
+import net.kasax.challengecraft.challenges.Chal_25_DamageWorldBorder;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -58,17 +59,40 @@ public abstract class MovementAndDamageMixin {
 
     @Inject(method = "damage", at = @At("RETURN"), cancellable = true)
     private void onDamage(ServerWorld world, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (cir.getReturnValue() && Chal_18_DamageRandomItem.isActive()) {
-            ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
-            damageAccumulator += amount;
+        if (cir.getReturnValue()) {
+            if (Chal_18_DamageRandomItem.isActive()) {
+                ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+                damageAccumulator += amount;
 
-            if (damageAccumulator >= 2.0f) {
-                int hearts = (int)(damageAccumulator / 2.0f);
-                damageAccumulator %= 2.0f;
+                if (damageAccumulator >= 2.0f) {
+                    int hearts = (int) (damageAccumulator / 2.0f);
+                    damageAccumulator %= 2.0f;
 
-                ItemStack reward = Chal_18_DamageRandomItem.getRandomItem(player.getRandom());
-                reward.setCount(hearts);
-                player.getInventory().insertStack(reward);
+                    ItemStack reward = Chal_18_DamageRandomItem.getRandomItem(player.getRandom());
+                    reward.setCount(hearts);
+                    player.getInventory().insertStack(reward);
+                }
+            }
+            if (Chal_25_DamageWorldBorder.isActive()) {
+                ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+                double current = Chal_25_DamageWorldBorder.getDiameter();
+                double next = current + amount;
+                Chal_25_DamageWorldBorder.setDiameter(next);
+
+                // Sync to all world borders
+                player.getServer().getWorlds().forEach(w -> {
+                    double currentSize = w.getWorldBorder().getSize();
+                    if (next > currentSize) {
+                        // Gradual growth: 1 block per second
+                        w.getWorldBorder().interpolateSize(currentSize, next, (long)((next - currentSize) * 1000));
+                    } else {
+                        w.getWorldBorder().setSize(next);
+                    }
+                });
+
+                // Persist to saved data
+                ChallengeSavedData data = ChallengeSavedData.get(world.getServer().getOverworld());
+                data.setDamageWorldBorderSize(next);
             }
         }
     }

@@ -111,4 +111,8 @@ public class ChallengeCardWidget extends ClickableWidget {
     public void setActive(boolean active) {
         this.active = active;
     }
+
+    public int getChallengeId() {
+        return challengeId;
+    }
 }

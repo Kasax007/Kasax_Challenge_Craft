@@ -36,7 +36,8 @@ public class ChallengeSavedData extends PersistentState {
             Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeSavedData::getAllItemsIndex),
             Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
             Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex),
-            Codec.INT.optionalFieldOf("mobHealthMultiplier", 1).forGetter(ChallengeSavedData::getMobHealthMultiplier)
+            Codec.INT.optionalFieldOf("mobHealthMultiplier", 1).forGetter(ChallengeSavedData::getMobHealthMultiplier),
+            Codec.DOUBLE.optionalFieldOf("damageWorldBorderSize", 2.0).forGetter(ChallengeSavedData::getDamageWorldBorderSize)
     ).apply(instance, ChallengeSavedData::new));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -70,10 +71,11 @@ public class ChallengeSavedData extends PersistentState {
     private int allEntitiesIndex = 0;
 
     private int mobHealthMultiplier = 1;
+    private double damageWorldBorderSize = 2.0;
 
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -89,6 +91,7 @@ public class ChallengeSavedData extends PersistentState {
         this.allEntitiesOrder.addAll(allEntitiesOrder);
         this.allEntitiesIndex = allEntitiesIndex;
         this.mobHealthMultiplier = mobHealthMultiplier;
+        this.damageWorldBorderSize = damageWorldBorderSize;
     }
 
     /** Retrieve (or create) for this world. */
@@ -218,6 +221,15 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setMobHealthMultiplier(int multiplier) {
         this.mobHealthMultiplier = multiplier;
+        markDirty();
+    }
+
+    public double getDamageWorldBorderSize() {
+        return damageWorldBorderSize;
+    }
+
+    public void setDamageWorldBorderSize(double size) {
+        this.damageWorldBorderSize = size;
         markDirty();
     }
 }

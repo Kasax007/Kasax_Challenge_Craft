@@ -54,6 +54,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_15_RandomMobDrops.register();
 		Chal_22_AllItems.register();
 		Chal_23_AllEntities.register();
+		Chal_25_DamageWorldBorder.register();
 
 		// Register Hidden Skip Command
 		net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
