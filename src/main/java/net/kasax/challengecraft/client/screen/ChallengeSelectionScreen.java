@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 24, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
             .toList();
@@ -32,6 +32,7 @@ public class ChallengeSelectionScreen extends Screen {
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private SliderWidget maxHealthSlider;
     private SliderWidget slotsSlider;
+    private SliderWidget mobHealthSlider;
 
     private WidgetScrollPanel scrollPanel;
 
@@ -41,6 +42,8 @@ public class ChallengeSelectionScreen extends Screen {
     private int sliderTicks;
     private double slotsSliderValue;
     private int slotsSliderTicks;
+    private double mobHealthSliderValue;
+    private int mobHealthMultiplier;
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Challenge Selection"));
@@ -69,12 +72,20 @@ public class ChallengeSelectionScreen extends Screen {
                 : 0;
         if (savedSlots <= 0) savedSlots = 36; // default full inventory
 
+        int savedMobHealthMult = server != null
+                ? ChallengeSavedData.get(server.getOverworld()).getMobHealthMultiplier()
+                : 0;
+        if (savedMobHealthMult <= 0) savedMobHealthMult = 1;
+
         // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)
         sliderTicks = savedMaxHeartsTicks;                  // 1..20
         sliderValue = (sliderTicks - 1) / 19.0;
 
         slotsSliderTicks = savedSlots;                      // 1..36
         slotsSliderValue = (slotsSliderTicks - 1) / 35.0;
+
+        mobHealthMultiplier = savedMobHealthMult;
+        mobHealthSliderValue = (mobHealthMultiplier - 1) / 99.0;
 
         int panelWidth = 260;
         int panelX = width / 2 - panelWidth / 2;
@@ -100,7 +111,7 @@ public class ChallengeSelectionScreen extends Screen {
 
             // If we have a special case (slider) and we are currently on the right (col == 1),
             // move to the next row to ensure the card starts on the left.
-            if ((id == 7 || id == 12) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24) && col == 1) {
                 y += cardHeight + spacing;
                 col = 0;
             }
@@ -169,6 +180,29 @@ public class ChallengeSelectionScreen extends Screen {
                 
                 y += cardHeight + spacing;
                 col = 0;
+            } else if (id == 24) {
+                double initialMult = 1 + (mobHealthSliderValue * 99);
+                mobHealthSlider = new SliderWidget(
+                        x1, y, cardWidth, cardHeight,
+                        Text.literal(String.format("Mob Health: %.0fx", initialMult)),
+                        mobHealthSliderValue
+                ) {
+                    @Override
+                    protected void updateMessage() {
+                        double mult = 1 + (this.value * 99);
+                        setMessage(Text.literal(String.format("Mob Health: %.0fx", mult)));
+                    }
+
+                    @Override
+                    protected void applyValue() {
+                        mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
+                        this.value = (mobHealthMultiplier - 1) / 99.0;
+                    }
+                };
+                scrollPanel.addChild(mobHealthSlider);
+
+                y += cardHeight + spacing;
+                col = 0;
             }
         }
         if (col == 1) y += cardHeight + spacing;
@@ -186,10 +220,6 @@ public class ChallengeSelectionScreen extends Screen {
                         }
                     }
 
-                    PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
-                    buf.writeVarInt(newActive.size());
-                    for (int cid : newActive) buf.writeVarInt(cid);
-
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
                         ticks = this.sliderTicks;
@@ -200,14 +230,17 @@ public class ChallengeSelectionScreen extends Screen {
                         slotticks = this.slotsSliderTicks;
                     }
 
-                    ChallengeCraft.LOGGER.info(
-                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}, slots = {}",
-                            newActive, ticks, slotticks
-                    );
-                    buf.writeVarInt(ticks);
-                    buf.writeVarInt(slotticks);
+                    int mobHealthMult = 1;
+                    if (newActive.contains(24) && mobHealthSlider != null) {
+                        mobHealthMult = this.mobHealthMultiplier;
+                    }
 
-                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks));
+                    ChallengeCraft.LOGGER.info(
+                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}, slots = {}, mobHealth = {}",
+                            newActive, ticks, slotticks, mobHealthMult
+                    );
+
+                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult));
                     ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
 
                     client.setScreen(null);

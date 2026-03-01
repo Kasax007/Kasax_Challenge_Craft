@@ -15,6 +15,7 @@ public class ChallengePacket implements CustomPayload {
     public final List<Integer> active;
     public final int           maxHearts;
     public final int          limitedInventorySlots;
+    public final int          mobHealthMultiplier;
 
 
     // your channel ID
@@ -32,6 +33,7 @@ public class ChallengePacket implements CustomPayload {
                             for (int id : pkt.active) buf.writeVarInt(id);
                             buf.writeVarInt(pkt.maxHearts);
                             buf.writeVarInt(pkt.limitedInventorySlots);
+                            buf.writeVarInt(pkt.mobHealthMultiplier);
                         }
                     },
                     // 2) decoder reads them back in the same order
@@ -45,16 +47,18 @@ public class ChallengePacket implements CustomPayload {
                             }
                             int hearts = buf.readVarInt();
                             int slots = buf.readVarInt();
-                            return new ChallengePacket(list, hearts, slots);
+                            int mobHealth = buf.readVarInt();
+                            return new ChallengePacket(list, hearts, slots, mobHealth);
                         }
                     }
             );
 
     /** Construct on the client when sending */
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots) {
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth) {
         this.active    = active;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
+        this.mobHealthMultiplier = mobHealth;
     }
 
     /** Called by Fabric when it needs to serialize */
@@ -63,6 +67,7 @@ public class ChallengePacket implements CustomPayload {
         for (int id : active) buf.writeVarInt(id);
         buf.writeVarInt(maxHearts);
         buf.writeVarInt(limitedInventorySlots);
+        buf.writeVarInt(mobHealthMultiplier);
     }
 
     /** Identify your channel */

@@ -26,11 +26,12 @@ public class PacketHandler {
 
                     // schedule on the main thread
                     server.execute(() -> {
-                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , maxHearts ticks = {}, slots = {}",
+                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , maxHearts ticks = {}, slots = {}, mobHealth = {}",
                                 context.player().getName().getString(),
                                 packet.active,
                                 packet.maxHearts,
-                                packet.limitedInventorySlots
+                                packet.limitedInventorySlots,
+                                packet.mobHealthMultiplier
                         );
                         var world = server.getOverworld();
                         ChallengeSavedData data = ChallengeSavedData.get(world);
@@ -38,6 +39,7 @@ public class PacketHandler {
                         data.setActive(packet.active);
                         data.setMaxHeartsTicks(packet.maxHearts);
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
+                        data.setMobHealthMultiplier(packet.mobHealthMultiplier);
                         
                         if (!data.isTainted()) {
                             data.setTainted(true);
@@ -54,13 +56,18 @@ public class PacketHandler {
                         }
                         if (packet.active.contains(7)) {
                             float hearts = packet.maxHearts * 0.5f;
-                            Chal_7_MaxHealthModify.setMaxHearts(hearts);
+                            net.kasax.challengecraft.challenges.Chal_7_MaxHealthModify.setMaxHearts(hearts);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_7 maxHearts = {}", hearts);
                         }
-                        else if (packet.active.contains(12)) {
-                            float slots = packet.limitedInventorySlots * 1f;
-                            Chal_12_LimitedInventory.setLimitedSlots((int) slots);
+                        if (packet.active.contains(12)) {
+                            int slots = packet.limitedInventorySlots;
+                            net.kasax.challengecraft.challenges.Chal_12_LimitedInventory.setLimitedSlots(slots);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_12 slots = {}", slots);
+                        }
+                        if (packet.active.contains(24)) {
+                            int mult = packet.mobHealthMultiplier;
+                            net.kasax.challengecraft.challenges.Chal_24_MobHealthMultiply.setMultiplier(mult);
+                            ChallengeCraft.LOGGER.info("[Server] set Chal_24 multiplier = {}", mult);
                         }
                         // re‑apply all active challenges
                         ChallengeManager.applyAll(server);

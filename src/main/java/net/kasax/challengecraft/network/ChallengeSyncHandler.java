@@ -30,6 +30,7 @@ public class ChallengeSyncHandler {
                 Chal_21_Hardcore.setActive(false);
                 Chal_22_AllItems.setActive(false);
                 Chal_23_AllEntities.setActive(false);
+                Chal_24_MobHealthMultiply.setActive(false);
                 AllItemsHUD.setActive(false);
                 AllEntitiesHUD.setActive(false);
 
@@ -59,6 +60,7 @@ public class ChallengeSyncHandler {
                             Chal_23_AllEntities.setActive(true);
                             AllEntitiesHUD.setActive(true);
                         }
+                        case 24 -> Chal_24_MobHealthMultiply.setActive(true);
                     }
                 }
             });

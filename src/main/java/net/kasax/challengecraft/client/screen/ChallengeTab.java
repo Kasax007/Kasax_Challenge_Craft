@@ -18,11 +18,12 @@ import java.util.function.Consumer;
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 24, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final SliderWidget maxHealthSlider;
     private final SliderWidget inventorySlider;
+    private final SliderWidget mobHealthSlider;
     private Text difficultyText = Text.empty();
 
     private WidgetScrollPanel scrollPanel;
@@ -34,6 +35,10 @@ public class ChallengeTab extends GridScreenTab {
     // sliderValue from 0.0 to 1.0, sliderTicks from 1..36 (1..36 slots)
     private double inventorySliderValue = 1.0;
     private int inventorysliderTicks = (int)(Math.round(inventorySliderValue * 35) + 1);
+
+    // sliderValue from 0.0 to 1.0, multiplier from 1..100
+    private double mobHealthSliderValue = 0.0;
+    private int mobHealthMultiplier = 1;
 
     public ChallengeTab() {
         super(TITLE);
@@ -84,6 +89,26 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
+        // Challenge 24
+        this.mobHealthSlider = new SliderWidget(
+                0, 0, 210, 20,
+                Text.literal("Mob Health: 1x"),
+                mobHealthSliderValue
+        ) {
+            @Override
+            protected void updateMessage() {
+                double mult = 1 + (this.value * 99);
+                setMessage(Text.literal(String.format("Mob Health: %.0fx", mult)));
+            }
+
+            @Override
+            protected void applyValue() {
+                mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
+                this.value = (mobHealthMultiplier - 1) / 99.0;
+                updateDifficultyText();
+            }
+        };
+
         // Create ONCE. Do NOT replace this instance later, or CreateWorldScreen will keep the old reference.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
         updateDifficultyText();
@@ -96,7 +121,7 @@ public class ChallengeTab extends GridScreenTab {
                 activeIds.add(IDS.get(i));
             }
         }
-        double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks);
+        double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier);
         this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
     }
 
@@ -144,7 +169,7 @@ public class ChallengeTab extends GridScreenTab {
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
 
-            if ((id == 7 || id == 12) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24) && col == 1) {
                 y += cardH + spacing;
                 col = 0;
             }
@@ -182,6 +207,16 @@ public class ChallengeTab extends GridScreenTab {
                 y += cardH + spacing;
                 col = 0;
             }
+
+            if (id == 24 && mobHealthSlider != null) {
+                mobHealthSlider.setX(x1);
+                mobHealthSlider.setY(y);
+                mobHealthSlider.setWidth(cardW);
+                mobHealthSlider.setHeight(cardH);
+                this.scrollPanel.addChild(mobHealthSlider);
+                y += cardH + spacing;
+                col = 0;
+            }
         }
     }
 
@@ -208,6 +243,12 @@ public class ChallengeTab extends GridScreenTab {
             ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = inventorysliderTicks;
         } else {
             ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36; // Default if OFF
+        }
+
+        if (mobHealthSlider != null && active.contains(24)) {
+            ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = mobHealthMultiplier;
+        } else {
+            ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = 1;
         }
 
         return active;

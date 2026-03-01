@@ -59,5 +59,7 @@
   "challengecraft.worldcreate.challenge23": "All Entities",
   "challengecraft.worldcreate.challenge23.desc": "Kill every entity which has a spawn egg in a random order to complete the challenge.",
   "challengecraft.all_entities_list.title": "Entities to Kill",
-  "challengecraft.completed": "Challenge Completed!"
+  "challengecraft.completed": "Challenge Completed!",
+  "challengecraft.worldcreate.challenge24": "Mob Health Multiplier",
+  "challengecraft.worldcreate.challenge24.desc": "Allows you to multiply the health of all mobs."
 }

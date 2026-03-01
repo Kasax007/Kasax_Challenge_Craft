@@ -19,7 +19,8 @@
     "ChunkRegionMixin",
     "PlayerAdvancementTrackerMixin",
     "MovementAndDamageMixin",
-    "ServerRecipeManagerMixin"
+    "ServerRecipeManagerMixin",
+    "MobHealthMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -34,8 +34,9 @@ public class ChallengeSavedData extends PersistentState {
             Codec.BOOL.fieldOf("difficultySet").forGetter(ChallengeSavedData::isDifficultySet),
             Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeSavedData::getAllItemsOrder),
             Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeSavedData::getAllItemsIndex),
-            Registries.ENTITY_TYPE.getCodec().listOf().optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
-            Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex)
+            Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
+            Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex),
+            Codec.INT.optionalFieldOf("mobHealthMultiplier", 1).forGetter(ChallengeSavedData::getMobHealthMultiplier)
     ).apply(instance, ChallengeSavedData::new));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -68,9 +69,11 @@ public class ChallengeSavedData extends PersistentState {
     private final List<EntityType<?>> allEntitiesOrder = new ArrayList<>();
     private int allEntitiesIndex = 0;
 
+    private int mobHealthMultiplier = 1;
+
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -85,6 +88,7 @@ public class ChallengeSavedData extends PersistentState {
         this.allEntitiesOrder.clear();
         this.allEntitiesOrder.addAll(allEntitiesOrder);
         this.allEntitiesIndex = allEntitiesIndex;
+        this.mobHealthMultiplier = mobHealthMultiplier;
     }
 
     /** Retrieve (or create) for this world. */
@@ -205,6 +209,15 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setAllEntitiesIndex(int index) {
         this.allEntitiesIndex = index;
+        markDirty();
+    }
+
+    public int getMobHealthMultiplier() {
+        return mobHealthMultiplier;
+    }
+
+    public void setMobHealthMultiplier(int multiplier) {
+        this.mobHealthMultiplier = multiplier;
         markDirty();
     }
 }

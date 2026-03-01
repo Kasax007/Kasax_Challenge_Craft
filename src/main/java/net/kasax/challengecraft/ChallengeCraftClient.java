@@ -10,9 +10,10 @@ import java.util.List;
 
 public class ChallengeCraftClient implements ClientModInitializer {
     public static int SELECTED_LIMITED_INVENTORY = 36;
+    public static int SELECTED_MOB_HEALTH_MULTIPLIER = 1;
     /** Used for single‐player: last value chosen on the Create World screen */
     public static List<Integer> LAST_CHOSEN = Collections.singletonList(1);
-    public static int SELECTED_MAX_HEARTS = 0;
+    public static int SELECTED_MAX_HEARTS = 20;
 
 
     @Override
@@ -21,5 +22,6 @@ public class ChallengeCraftClient implements ClientModInitializer {
         ChallengeSyncHandler.register();
         net.kasax.challengecraft.client.screen.AllItemsHUD.register();
         net.kasax.challengecraft.client.screen.AllEntitiesHUD.register();
+        net.kasax.challengecraft.client.screen.MobHealthHUD.register();
     }
 }

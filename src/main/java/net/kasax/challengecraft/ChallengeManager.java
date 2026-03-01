@@ -62,7 +62,7 @@ public class ChallengeManager {
         }
     }
 
-    public static double getDifficulty(int id, int ticks, int slots) {
+    public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult) {
         return switch (id) {
             case 1 -> 0.5;  // LevelItem (Harder)
             case 2 -> 0.3;  // NoBlockDrops
@@ -87,14 +87,15 @@ public class ChallengeManager {
             case 21 -> 1.0; // Hardcore
             case 22 -> 30.0; // All Items (Very Hard!)
             case 23 -> 15.0; // All Entities (Very Hard!)
+            case 24 -> (mobHealthMult - 1) / 99.0 * 10.0;
             default -> 0.0;
         };
     }
 
-    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots) {
+    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult) {
         double total = 0;
         for (int id : ids) {
-            total += getDifficulty(id, heartsTicks, inventorySlots);
+            total += getDifficulty(id, heartsTicks, inventorySlots, mobHealthMult);
         }
         return Math.max(0, total); // Ensure it's not negative
     }
@@ -119,6 +120,11 @@ public class ChallengeManager {
                 Chal_12_LimitedInventory.setLimitedSlots(savedSlots);
                 LOGGER.info("[Manager] restored limited inventory slots = {}", savedSlots);
             }
+            if (saved.contains(24)) {
+                int savedMult = data.getMobHealthMultiplier();
+                Chal_24_MobHealthMultiply.setMultiplier(savedMult);
+                LOGGER.info("[Manager] restored mob health multiplier = {}", savedMult);
+            }
 
             // Seed from client if first boot
             // We check if it's a fresh save. By default 'active' is [1].
@@ -127,17 +133,20 @@ public class ChallengeManager {
                 
                 int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                 int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
+                int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
 
                 data.setMaxHeartsTicks(clientTicks);
                 data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
                 data.setLimitedInventorySlots(clientSlots);
+                data.setMobHealthMultiplier(clientMult);
                 
-                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots);
+                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult);
                 data.setInitialDifficulty(initialDiff);
                 data.setDifficultySet(true);
 
                 Chal_7_MaxHealthModify.setMaxHearts(clientTicks * 0.5f);
                 Chal_12_LimitedInventory.setLimitedSlots(clientSlots);
+                Chal_24_MobHealthMultiply.setMultiplier(clientMult);
                 
                 LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
                 
@@ -171,6 +180,7 @@ public class ChallengeManager {
         Chal_21_Hardcore.setActive(false);
         Chal_22_AllItems.setActive(false);
         Chal_23_AllEntities.setActive(false);
+        Chal_24_MobHealthMultiply.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -206,6 +216,10 @@ public class ChallengeManager {
                     Chal_23_AllEntities.setActive(true);
                     Chal_23_AllEntities.syncProgressToAll(world.getServer(), data);
                     LOGGER.info("Challenge 23 ON");
+                }
+                case 24 -> {
+                    Chal_24_MobHealthMultiply.setActive(true);
+                    LOGGER.info("Challenge 24 ON");
                 }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
