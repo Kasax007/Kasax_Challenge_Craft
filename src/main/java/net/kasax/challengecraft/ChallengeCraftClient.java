@@ -19,5 +19,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
     public void onInitializeClient() {
         TimerOverlay.register();
         ChallengeSyncHandler.register();
+        net.kasax.challengecraft.client.screen.AllItemsHUD.register();
+        net.kasax.challengecraft.client.screen.AllEntitiesHUD.register();
     }
 }

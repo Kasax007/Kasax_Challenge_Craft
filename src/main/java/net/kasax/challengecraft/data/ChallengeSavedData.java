@@ -3,7 +3,10 @@ package net.kasax.challengecraft.data;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.datafixer.DataFixTypes;
+import net.minecraft.entity.EntityType;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateManager;
@@ -22,39 +25,18 @@ public class ChallengeSavedData extends PersistentState {
      * “ticks” (1–20 = half-hearts).
      */
     private static final Codec<ChallengeSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.list(Codec.INT)
-                    .fieldOf("active")
-                    .forGetter(ps -> List.copyOf(ps.active)),
-            Codec.INT
-                    .fieldOf("maxHeartsTicks")
-                    .forGetter(ps -> ps.maxHeartsTicks),
-            Codec.INT
-                    .fieldOf("limitedInventorySlots")
-                    .forGetter(ps -> ps.limitedInventorySlots),
-            Codec.DOUBLE
-                    .fieldOf("initialDifficulty")
-                    .forGetter(ps -> ps.initialDifficulty),
-            Codec.BOOL
-                    .fieldOf("tainted")
-                    .forGetter(ps -> ps.tainted),
-            Codec.BOOL
-                    .fieldOf("xpAwarded")
-                    .forGetter(ps -> ps.xpAwarded),
-            Codec.BOOL
-                    .fieldOf("difficultySet")
-                    .forGetter(ps -> ps.difficultySet)
-    ).apply(instance, (activeList, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, xpAwarded, difficultySet) -> {
-        var d = new ChallengeSavedData();
-        d.active.clear();
-        d.active.addAll(activeList);
-        d.maxHeartsTicks = maxHeartsTicks;
-        d.limitedInventorySlots = limitedInventorySlots;
-        d.initialDifficulty = initialDifficulty;
-        d.tainted = tainted;
-        d.xpAwarded = xpAwarded;
-        d.difficultySet = difficultySet;
-        return d;
-    }));
+            Codec.list(Codec.INT).fieldOf("active").forGetter(ChallengeSavedData::getActive),
+            Codec.INT.fieldOf("maxHeartsTicks").forGetter(ChallengeSavedData::getMaxHeartsTicks),
+            Codec.INT.fieldOf("limitedInventorySlots").forGetter(ChallengeSavedData::getLimitedInventorySlots),
+            Codec.DOUBLE.fieldOf("initialDifficulty").forGetter(ChallengeSavedData::getInitialDifficulty),
+            Codec.BOOL.fieldOf("tainted").forGetter(ChallengeSavedData::isTainted),
+            Codec.BOOL.fieldOf("xpAwarded").forGetter(ChallengeSavedData::isXpAwarded),
+            Codec.BOOL.fieldOf("difficultySet").forGetter(ChallengeSavedData::isDifficultySet),
+            Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeSavedData::getAllItemsOrder),
+            Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeSavedData::getAllItemsIndex),
+            Registries.ENTITY_TYPE.getCodec().listOf().optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
+            Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex)
+    ).apply(instance, ChallengeSavedData::new));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
             new PersistentStateType<>(KEY, ChallengeSavedData::new, CODEC, DataFixTypes.LEVEL);
@@ -80,7 +62,30 @@ public class ChallengeSavedData extends PersistentState {
 
     private boolean difficultySet = false;
 
+    private final List<ItemStack> allItemsOrder = new ArrayList<>();
+    private int allItemsIndex = 0;
+
+    private final List<EntityType<?>> allEntitiesOrder = new ArrayList<>();
+    private int allEntitiesIndex = 0;
+
     private ChallengeSavedData() {}
+
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex) {
+        this.active.clear();
+        this.active.addAll(active);
+        this.maxHeartsTicks = maxHeartsTicks;
+        this.limitedInventorySlots = limitedInventorySlots;
+        this.initialDifficulty = initialDifficulty;
+        this.tainted = tainted;
+        this.xpAwarded = xpAwarded;
+        this.difficultySet = difficultySet;
+        this.allItemsOrder.clear();
+        this.allItemsOrder.addAll(allItemsOrder);
+        this.allItemsIndex = allItemsIndex;
+        this.allEntitiesOrder.clear();
+        this.allEntitiesOrder.addAll(allEntitiesOrder);
+        this.allEntitiesIndex = allEntitiesIndex;
+    }
 
     /** Retrieve (or create) for this world. */
     public static ChallengeSavedData get(ServerWorld world) {
@@ -89,14 +94,8 @@ public class ChallengeSavedData extends PersistentState {
     }
 
     public NbtCompound writeNbt(NbtCompound tag) {
-        // Codec will write both “active” and “maxHeartsTicks” fields for you.
-        tag.putIntArray("active", active.stream().mapToInt(i -> i).toArray());
-        tag.putInt("maxHeartsTicks", maxHeartsTicks);
-        tag.putInt("limitedInventorySlots", limitedInventorySlots);
-        tag.putDouble("initialDifficulty", initialDifficulty);
-        tag.putBoolean("tainted", tainted);
-        tag.putBoolean("xpAwarded", xpAwarded);
-        tag.putBoolean("difficultySet", difficultySet);
+        // Codec-based PersistentState usually doesn't need manual writeNbt if using the constructor that takes CODEC.
+        // But for compatibility or if manual NBT is needed:
         return tag;
     }
 
@@ -168,6 +167,44 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDifficultySet(boolean difficultySet) {
         this.difficultySet = difficultySet;
+        markDirty();
+    }
+
+    public List<ItemStack> getAllItemsOrder() {
+        return List.copyOf(allItemsOrder);
+    }
+
+    public void setAllItemsOrder(List<ItemStack> order) {
+        this.allItemsOrder.clear();
+        this.allItemsOrder.addAll(order);
+        markDirty();
+    }
+
+    public int getAllItemsIndex() {
+        return allItemsIndex;
+    }
+
+    public void setAllItemsIndex(int index) {
+        this.allItemsIndex = index;
+        markDirty();
+    }
+
+    public List<EntityType<?>> getAllEntitiesOrder() {
+        return allEntitiesOrder;
+    }
+
+    public void setAllEntitiesOrder(List<EntityType<?>> order) {
+        this.allEntitiesOrder.clear();
+        this.allEntitiesOrder.addAll(order);
+        markDirty();
+    }
+
+    public int getAllEntitiesIndex() {
+        return allEntitiesIndex;
+    }
+
+    public void setAllEntitiesIndex(int index) {
+        this.allEntitiesIndex = index;
         markDirty();
     }
 }

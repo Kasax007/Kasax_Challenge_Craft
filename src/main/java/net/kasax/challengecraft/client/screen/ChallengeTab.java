@@ -18,7 +18,7 @@ import java.util.function.Consumer;
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21, 22, 23);
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final SliderWidget maxHealthSlider;

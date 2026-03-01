@@ -30,6 +30,8 @@ public class ChallengeIconProvider {
         ICONS.put(19, new ItemStack(Items.IRON_PICKAXE));
         ICONS.put(20, new ItemStack(Items.KNOWLEDGE_BOOK));
         ICONS.put(21, new ItemStack(Items.TOTEM_OF_UNDYING));
+        ICONS.put(22, new ItemStack(Items.NETHER_STAR));
+        ICONS.put(23, new ItemStack(Items.ZOMBIE_SPAWN_EGG));
     }
 
     public static ItemStack getIcon(int id) {

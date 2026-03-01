@@ -2,6 +2,10 @@ package net.kasax.challengecraft.network;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.challenges.*;
+import net.kasax.challengecraft.client.screen.AllEntitiesHUD;
+import net.kasax.challengecraft.client.screen.AllEntitiesScreen;
+import net.kasax.challengecraft.client.screen.AllItemsHUD;
+import net.kasax.challengecraft.client.screen.AllItemsScreen;
 
 public class ChallengeSyncHandler {
     public static void register() {
@@ -24,6 +28,10 @@ public class ChallengeSyncHandler {
                 Chal_19_MinePotionEffect.setActive(false);
                 Chal_20_RandomizedCrafting.setActive(false);
                 Chal_21_Hardcore.setActive(false);
+                Chal_22_AllItems.setActive(false);
+                Chal_23_AllEntities.setActive(false);
+                AllItemsHUD.setActive(false);
+                AllEntitiesHUD.setActive(false);
 
                 for (int id : payload.active) {
                     switch (id) {
@@ -43,8 +51,40 @@ public class ChallengeSyncHandler {
                         case 19 -> Chal_19_MinePotionEffect.setActive(true);
                         case 20 -> Chal_20_RandomizedCrafting.setActive(true);
                         case 21 -> Chal_21_Hardcore.setActive(true);
+                        case 22 -> {
+                            Chal_22_AllItems.setActive(true);
+                            AllItemsHUD.setActive(true);
+                        }
+                        case 23 -> {
+                            Chal_23_AllEntities.setActive(true);
+                            AllEntitiesHUD.setActive(true);
+                        }
                     }
                 }
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllItemsSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                AllItemsHUD.update(payload.currentItem, payload.currentIndex, payload.totalItems);
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllItemsListPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreen(new AllItemsScreen(payload.items, payload.currentIndex));
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllEntitiesSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                AllEntitiesHUD.update(payload.currentEntity, payload.currentIndex, payload.totalEntities);
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllEntitiesListPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreen(new AllEntitiesScreen(payload.entities, payload.currentIndex));
             });
         });
     }

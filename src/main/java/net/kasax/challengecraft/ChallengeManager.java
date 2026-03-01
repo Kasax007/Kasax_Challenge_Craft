@@ -48,10 +48,17 @@ public class ChallengeManager {
     }
 
     public static void syncToAll(net.minecraft.server.MinecraftServer server) {
-        List<Integer> active = ChallengeSavedData.get(server.getOverworld()).getActive();
+        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        List<Integer> active = data.getActive();
         ChallengeSyncPacket pkt = new ChallengeSyncPacket(active);
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, pkt);
+        }
+        if (active.contains(22)) {
+            net.kasax.challengecraft.challenges.Chal_22_AllItems.syncProgressToAll(server, data);
+        }
+        if (active.contains(23)) {
+            net.kasax.challengecraft.challenges.Chal_23_AllEntities.syncProgressToAll(server, data);
         }
     }
 
@@ -78,6 +85,8 @@ public class ChallengeManager {
             case 19 -> 0.5; // MinePotionEffect
             case 20 -> 0.8; // RandomizedCrafting
             case 21 -> 1.0; // Hardcore
+            case 22 -> 30.0; // All Items (Very Hard!)
+            case 23 -> 15.0; // All Entities (Very Hard!)
             default -> 0.0;
         };
     }
@@ -160,6 +169,8 @@ public class ChallengeManager {
         Chal_19_MinePotionEffect.setActive(false);
         Chal_20_RandomizedCrafting.setActive(false);
         Chal_21_Hardcore.setActive(false);
+        Chal_22_AllItems.setActive(false);
+        Chal_23_AllEntities.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -186,6 +197,16 @@ public class ChallengeManager {
                 case 19 -> { Chal_19_MinePotionEffect.setActive(true); LOGGER.info("Challenge 19 ON"); }
                 case 20 -> { Chal_20_RandomizedCrafting.setActive(true); LOGGER.info("Challenge 20 ON"); }
                 case 21 -> { Chal_21_Hardcore.setActive(true); LOGGER.info("Challenge 21 ON"); }
+                case 22 -> {
+                    Chal_22_AllItems.setActive(true);
+                    Chal_22_AllItems.syncProgressToAll(world.getServer(), data);
+                    LOGGER.info("Challenge 22 ON");
+                }
+                case 23 -> {
+                    Chal_23_AllEntities.setActive(true);
+                    Chal_23_AllEntities.syncProgressToAll(world.getServer(), data);
+                    LOGGER.info("Challenge 23 ON");
+                }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }

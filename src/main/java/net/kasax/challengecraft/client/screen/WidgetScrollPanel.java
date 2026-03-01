@@ -51,7 +51,7 @@ public class WidgetScrollPanel extends ScrollableWidget {
     @Override
     protected int getContentsHeightWithPadding() {
         // small padding so the last widget isn't glued to the bottom
-        return Math.max(this.contentHeight + 6, this.height);
+        return Math.max(this.contentHeight + 20, this.height);
     }
 
     @Override

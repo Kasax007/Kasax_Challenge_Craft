@@ -52,5 +52,12 @@
   "challengecraft.hardcore.failed": "CHALLENGE FAILED",
   "challengecraft.hardcore.failed.desc": "Player died in Hardcore Challenge. No XP can be earned from now on.",
   "challengecraft.tainted.failed": "CHALLENGES MODIFIED",
-  "challengecraft.tainted.failed.desc": "No XP can be earned due to mid-game challenge changes."
+  "challengecraft.tainted.failed.desc": "No XP can be earned due to mid-game challenge changes.",
+  "challengecraft.worldcreate.challenge22": "All Items",
+  "challengecraft.worldcreate.challenge22.desc": "Obtain every survival-obtainable item in a random order to complete the challenge.",
+  "challengecraft.all_items_list.title": "Items to Collect",
+  "challengecraft.worldcreate.challenge23": "All Entities",
+  "challengecraft.worldcreate.challenge23.desc": "Kill every entity which has a spawn egg in a random order to complete the challenge.",
+  "challengecraft.all_entities_list.title": "Entities to Kill",
+  "challengecraft.completed": "Challenge Completed!"
 }
