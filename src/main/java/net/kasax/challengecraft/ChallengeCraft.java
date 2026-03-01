@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.ChallengePacket;
+import net.kasax.challengecraft.network.ChallengeSyncPacket;
 import net.kasax.challengecraft.network.PacketHandler;
 import net.kasax.challengecraft.network.PlayTimePacketHandler;
 import net.kasax.challengecraft.network.PlayTimeSyncPacket;
@@ -49,7 +50,10 @@ public class ChallengeCraft implements ModInitializer {
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
-		// inside onInitializeClient() or equivalent:
+		PayloadTypeRegistry.playS2C().register(
+				ChallengeSyncPacket.ID,
+				ChallengeSyncPacket.CODEC
+		);
 		PayloadTypeRegistry.playS2C().register(
 				PlayTimeSyncPacket.ID,
 				PlayTimeSyncPacket.CODEC

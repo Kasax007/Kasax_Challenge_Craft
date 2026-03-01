@@ -45,5 +45,12 @@
   "challengecraft.mainmenu.lifetime_xp": "Total Lifetime XP: %d",
   "challengecraft.warning.tainted": "Warning: Changing challenges mid-game sets difficulty to 0!",
   "challengecraft.reward.xp_earned": "Congratulations! You earned %d lifetime XP!",
-  "challengecraft.reward.no_xp": "No XP earned because challenges were changed in-game."
+  "challengecraft.reward.no_xp": "No XP earned because challenges were changed in-game.",
+  "challengecraft.reward.title": "Challenge successfully completed!",
+  "challengecraft.worldcreate.challenge21": "Hardcore Challenge",
+  "challengecraft.worldcreate.challenge21.desc": "No death allowed. If the player dies, the challenge fails and difficulty multiplier is set to 0.",
+  "challengecraft.hardcore.failed": "CHALLENGE FAILED",
+  "challengecraft.hardcore.failed.desc": "Player died in Hardcore Challenge. No XP can be earned from now on.",
+  "challengecraft.tainted.failed": "CHALLENGES MODIFIED",
+  "challengecraft.tainted.failed.desc": "No XP can be earned due to mid-game challenge changes."
 }

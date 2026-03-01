@@ -1,10 +1,17 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.advancement.PlayerAdvancementTracker;
+import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.slf4j.Logger;
@@ -36,14 +43,33 @@ public class PlayerAdvancementTrackerMixin {
                     LOGGER.info("[Advancement] Free the End completed. Tainted: {}, Initial Difficulty: {}", data.isTainted(), data.getInitialDifficulty());
 
                     if (!data.isXpAwarded()) {
+                        // Record completion for all active challenges
+                        int playTicks = owner.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                        for (int cid : data.getActive()) {
+                            StatsManager.recordCompletion(cid, playTicks);
+                        }
+
                         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
                         long xpAmount = Math.round(100.0 * difficulty);
                         
                         if (xpAmount > 0) {
                             XpManager.addXp(xpAmount);
-                            owner.sendMessage(Text.translatable("challengecraft.reward.xp_earned", xpAmount)
-                                    .formatted(Formatting.GOLD, Formatting.BOLD), false);
-                            LOGGER.info("[Advancement] Awarded {} XP to {}", xpAmount, owner.getName().getString());
+                            
+                            Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
+                                    .formatted(Formatting.GOLD, Formatting.BOLD);
+                            owner.getServer().getPlayerManager().broadcast(chatMsg, false);
+                            
+                            // Visual and Audio reward for everyone
+                            owner.getWorld().playSound(null, owner.getX(), owner.getY(), owner.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
+                            
+                            Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
+                            Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
+                            
+                            owner.getServer().getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
+                            owner.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
+                            owner.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+
+                            LOGGER.info("[Advancement] Awarded {} XP to all players (triggered by {})", xpAmount, owner.getName().getString());
                         } else {
                             if (data.isTainted()) {
                                 owner.sendMessage(Text.translatable("challengecraft.reward.no_xp")

@@ -1,0 +1,38 @@
+package net.kasax.challengecraft.client.screen;
+
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ChallengeIconProvider {
+    private static final Map<Integer, ItemStack> ICONS = new HashMap<>();
+
+    static {
+        ICONS.put(1, new ItemStack(Items.EXPERIENCE_BOTTLE));
+        ICONS.put(2, new ItemStack(Items.BARRIER));
+        ICONS.put(3, new ItemStack(Items.ZOMBIE_SPAWN_EGG));
+        ICONS.put(4, new ItemStack(Items.CHEST));
+        ICONS.put(5, new ItemStack(Items.GOLDEN_APPLE));
+        ICONS.put(6, new ItemStack(Items.EMERALD));
+        ICONS.put(7, new ItemStack(Items.APPLE));
+        ICONS.put(8, new ItemStack(Items.CRAFTING_TABLE));
+        ICONS.put(9, new ItemStack(Items.MAP));
+        ICONS.put(10, new ItemStack(Items.CLOCK));
+        ICONS.put(11, new ItemStack(Items.GRASS_BLOCK));
+        ICONS.put(12, new ItemStack(Items.BUNDLE));
+        ICONS.put(13, new ItemStack(Items.ENCHANTED_BOOK));
+        ICONS.put(14, new ItemStack(Items.COBBLESTONE));
+        ICONS.put(15, new ItemStack(Items.BONE));
+        ICONS.put(16, new ItemStack(Items.BEDROCK));
+        ICONS.put(17, new ItemStack(Items.DIAMOND_BOOTS));
+        ICONS.put(18, new ItemStack(Items.IRON_SWORD));
+        ICONS.put(19, new ItemStack(Items.IRON_PICKAXE));
+        ICONS.put(20, new ItemStack(Items.KNOWLEDGE_BOOK));
+        ICONS.put(21, new ItemStack(Items.TOTEM_OF_UNDYING));
+    }
+
+    public static ItemStack getIcon(int id) {
+        return ICONS.getOrDefault(id, new ItemStack(Items.BARRIER));
+    }
+}

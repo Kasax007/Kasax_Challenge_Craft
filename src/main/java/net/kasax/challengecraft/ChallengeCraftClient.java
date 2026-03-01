@@ -3,6 +3,7 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.kasax.challengecraft.client.screen.TimerOverlay;
+import net.kasax.challengecraft.network.ChallengeSyncHandler;
 
 import java.util.Collections;
 import java.util.List;
@@ -17,5 +18,6 @@ public class ChallengeCraftClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         TimerOverlay.register();
+        ChallengeSyncHandler.register();
     }
 }

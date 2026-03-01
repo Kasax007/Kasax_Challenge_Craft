@@ -2,11 +2,20 @@ package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_17_WalkRandomItem;
 import net.kasax.challengecraft.challenges.Chal_18_DamageRandomItem;
+import net.kasax.challengecraft.challenges.Chal_21_Hardcore;
+import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.item.ItemStack;
+import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -60,6 +69,31 @@ public abstract class MovementAndDamageMixin {
                 ItemStack reward = Chal_18_DamageRandomItem.getRandomItem(player.getRandom());
                 reward.setCount(hearts);
                 player.getInventory().insertStack(reward);
+            }
+        }
+    }
+
+    @Inject(method = "onDeath", at = @At("HEAD"))
+    private void onDeath(DamageSource source, CallbackInfo ci) {
+        if (Chal_21_Hardcore.isActive()) {
+            ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+            ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+
+            // Only fail if not already failed (difficulty > 0)
+            if (data.getInitialDifficulty() > 0) {
+                data.setInitialDifficulty(0);
+                data.setTainted(true);
+
+                Text title = Text.translatable("challengecraft.hardcore.failed").formatted(Formatting.RED, Formatting.BOLD);
+                Text subtitle = Text.translatable("challengecraft.hardcore.failed.desc").formatted(Formatting.GRAY);
+
+                player.getServer().getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
+                player.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
+                player.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+
+                player.getServer().getWorlds().forEach(world -> {
+                    world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, SoundCategory.MASTER, 1.0f, 1.0f);
+                });
             }
         }
     }

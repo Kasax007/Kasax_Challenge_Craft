@@ -8,7 +8,6 @@ import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.tab.GridScreenTab;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.text.Text;
 
@@ -19,9 +18,9 @@ import java.util.function.Consumer;
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
-    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21);
 
-    private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
+    private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final SliderWidget maxHealthSlider;
     private final SliderWidget inventorySlider;
     private Text difficultyText = Text.empty();
@@ -39,79 +38,51 @@ public class ChallengeTab extends GridScreenTab {
     public ChallengeTab() {
         super(TITLE);
 
-        SliderWidget slider7 = null;
-        SliderWidget slider8 = null;
-
         for (int id : IDS) {
-            Text label = Text.translatable("challengecraft.worldcreate.challenge" + id);
-            Text desc = Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc");
-
-            if (id == 7) {
-                // challenge 7 toggle
-                var toggle7 = CyclingButtonWidget
-                        .onOffBuilder(false)
-                        .tooltip(val -> Tooltip.of(desc))
-                        .build(0, 0, 210, 20, label, (b, v) -> updateDifficultyText());
-                toggles.add(toggle7);
-
-                // challenge 7 slider
-                slider7 = new SliderWidget(
-                        0, 0, 210, 20,
-                        Text.literal("Max Health: 5.0❤"),
-                        sliderValue
-                ) {
-                    @Override
-                    protected void updateMessage() {
-                        double hearts = 0.5 + (this.value * 9.5);
-                        setMessage(Text.literal(String.format("Max Health: %.1f❤", hearts)));
-                    }
-
-                    @Override
-                    protected void applyValue() {
-                        // quantize to half-heart increments
-                        sliderTicks = (int)(Math.round(this.value * 19) + 1);
-                        this.value  = (sliderTicks - 1) / 19.0;
-                        updateDifficultyText();
-                    }
-                };
-
-            } else if (id == 12) {
-                var toggle12 = CyclingButtonWidget
-                        .onOffBuilder(false)
-                        .tooltip(val -> Tooltip.of(desc))
-                        .build(0, 0, 210, 20, label, (b, v) -> updateDifficultyText());
-                toggles.add(toggle12);
-
-                slider8 = new SliderWidget(
-                        0, 0, 210, 20,
-                        Text.literal("Inventory Slots: 36"),
-                        inventorySliderValue
-                ) {
-                    @Override
-                    protected void updateMessage() {
-                        double slots = 1 + (this.value * 35);
-                        setMessage(Text.literal(String.format("Inventory Slots: %.1f", slots)));
-                    }
-
-                    @Override
-                    protected void applyValue() {
-                        inventorysliderTicks = (int)(Math.round(this.value * 35) + 1);
-                        this.value  = (inventorysliderTicks - 1) / 35.0;
-                        updateDifficultyText();
-                    }
-                };
-
-            } else {
-                var toggle = CyclingButtonWidget
-                        .onOffBuilder(false)
-                        .tooltip(val -> Tooltip.of(desc))
-                        .build(0, 0, 210, 20, label, (b, v) -> updateDifficultyText());
-                toggles.add(toggle);
-            }
+            ChallengeCardWidget card = new ChallengeCardWidget(0, 0, 100, 20, id, false, val -> updateDifficultyText());
+            cards.add(card);
         }
 
-        this.maxHealthSlider = slider7;
-        this.inventorySlider = slider8;
+        // Challenge 7 is at index 6
+        this.maxHealthSlider = new SliderWidget(
+                0, 0, 210, 20,
+                Text.literal(String.format("Health: %.1f❤", 0.5 + (sliderValue * 9.5))),
+                sliderValue
+        ) {
+            @Override
+            protected void updateMessage() {
+                double hearts = 0.5 + (this.value * 9.5);
+                setMessage(Text.literal(String.format("Health: %.1f❤", hearts)));
+            }
+
+            @Override
+            protected void applyValue() {
+                // quantize to half-heart increments
+                sliderTicks = (int)(Math.round(this.value * 19) + 1);
+                this.value  = (sliderTicks - 1) / 19.0;
+                updateDifficultyText();
+            }
+        };
+
+        // Challenge 12 is at index 7
+        this.inventorySlider = new SliderWidget(
+                0, 0, 210, 20,
+                Text.literal("Slots: 36"),
+                inventorySliderValue
+        ) {
+            @Override
+            protected void updateMessage() {
+                double slots = 1 + (this.value * 35);
+                setMessage(Text.literal(String.format("Slots: %.0f", slots)));
+            }
+
+            @Override
+            protected void applyValue() {
+                inventorysliderTicks = (int)(Math.round(this.value * 35) + 1);
+                this.value  = (inventorysliderTicks - 1) / 35.0;
+                updateDifficultyText();
+            }
+        };
 
         // Create ONCE. Do NOT replace this instance later, or CreateWorldScreen will keep the old reference.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
@@ -121,7 +92,7 @@ public class ChallengeTab extends GridScreenTab {
     private void updateDifficultyText() {
         List<Integer> activeIds = new ArrayList<>();
         for (int i = 0; i < IDS.size(); i++) {
-            if (toggles.get(i).getValue()) {
+            if (cards.get(i).isActive()) {
                 activeIds.add(IDS.get(i));
             }
         }
@@ -147,12 +118,16 @@ public class ChallengeTab extends GridScreenTab {
         // Rebuild panel contents for this size
         this.scrollPanel.clearChildren();
 
-        int widgetW = Math.min(210, panelW - 12); // room for scrollbar + padding
-        int x = panelX + (panelW / 2) - (widgetW / 2);
+        int cardW = (panelW - 24) / 2;
+        int cardH = 26;
+        int spacing = 4;
+        int x0 = panelX + 8;
+        int x1 = x0 + cardW + spacing;
+        int col = 0;
         int y = panelY + 4;
 
         // Add Difficulty Text at the top
-        this.scrollPanel.addChild(new ClickableWidget(x, y, widgetW, 20, Text.empty()) {
+        this.scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, Text.empty()) {
             @Override
             public Text getMessage() {
                 return difficultyText;
@@ -169,30 +144,43 @@ public class ChallengeTab extends GridScreenTab {
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
 
-            CyclingButtonWidget<Boolean> toggle = toggles.get(i);
-            toggle.setX(x);
-            toggle.setY(y);
-            toggle.setWidth(widgetW);
-            toggle.setHeight(20);
-            this.scrollPanel.addChild(toggle);
-            y += 24;
+            if ((id == 7 || id == 12) && col == 1) {
+                y += cardH + spacing;
+                col = 0;
+            }
+
+            ChallengeCardWidget card = cards.get(i);
+            card.setX((col == 0) ? x0 : x1);
+            card.setY(y);
+            card.setWidth(cardW);
+            card.setHeight(cardH);
+            this.scrollPanel.addChild(card);
+
+            if (col == 1) {
+                y += cardH + spacing;
+                col = 0;
+            } else {
+                col = 1;
+            }
 
             if (id == 7 && maxHealthSlider != null) {
-                maxHealthSlider.setX(x);
+                maxHealthSlider.setX(x1);
                 maxHealthSlider.setY(y);
-                maxHealthSlider.setWidth(widgetW);
-                maxHealthSlider.setHeight(20);
+                maxHealthSlider.setWidth(cardW);
+                maxHealthSlider.setHeight(cardH);
                 this.scrollPanel.addChild(maxHealthSlider);
-                y += 24;
+                y += cardH + spacing;
+                col = 0;
             }
 
             if (id == 12 && inventorySlider != null) {
-                inventorySlider.setX(x);
+                inventorySlider.setX(x1);
                 inventorySlider.setY(y);
-                inventorySlider.setWidth(widgetW);
-                inventorySlider.setHeight(20);
+                inventorySlider.setWidth(cardW);
+                inventorySlider.setHeight(cardH);
                 this.scrollPanel.addChild(inventorySlider);
-                y += 24;
+                y += cardH + spacing;
+                col = 0;
             }
         }
     }
@@ -205,19 +193,18 @@ public class ChallengeTab extends GridScreenTab {
     public List<Integer> getActive() {
         List<Integer> active = new ArrayList<>();
         for (int i = 0; i < IDS.size(); i++) {
-            if (toggles.get(i).getValue()) {
+            if (cards.get(i).isActive()) {
                 active.add(IDS.get(i));
             }
         }
 
-        // IDS.get(6) is challenge 7, IDS.get(11) is challenge 12
-        if (maxHealthSlider != null && toggles.get(6).getValue()) {
+        if (maxHealthSlider != null && active.contains(7)) {
             ChallengeCraftClient.SELECTED_MAX_HEARTS = sliderTicks;
         } else {
             ChallengeCraftClient.SELECTED_MAX_HEARTS = 20; // Default if OFF
         }
         
-        if (inventorySlider != null && toggles.get(11).getValue()) {
+        if (inventorySlider != null && active.contains(12)) {
             ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = inventorysliderTicks;
         } else {
             ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36; // Default if OFF

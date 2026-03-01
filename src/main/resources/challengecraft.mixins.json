@@ -26,7 +26,8 @@
   },
   "client": [
     "CreateWorldScreenMixin",
-    "TitleScreenMixin"
+    "TitleScreenMixin",
+    "InGameHudMixin"
   ],
   "server": [
     "EntityTypeMixin",

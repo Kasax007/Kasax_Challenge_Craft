@@ -2,8 +2,11 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.kasax.challengecraft.network.ChallengeSyncPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.MathHelper;
@@ -22,6 +25,10 @@ public class ChallengeManager {
             applyTo(world);
         });
 
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            server.execute(() -> syncToAll(server));
+        });
+
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
             if (player instanceof ServerPlayerEntity serverPlayer) {
                 Chal_19_MinePotionEffect.applyEffect(serverPlayer, state.getBlock());
@@ -36,6 +43,15 @@ public class ChallengeManager {
         LOGGER.info("ChallengeManager.applyAll: re-applying to all worlds");
         for (ServerWorld world : server.getWorlds()) {
             applyTo(world);
+        }
+        syncToAll(server);
+    }
+
+    public static void syncToAll(net.minecraft.server.MinecraftServer server) {
+        List<Integer> active = ChallengeSavedData.get(server.getOverworld()).getActive();
+        ChallengeSyncPacket pkt = new ChallengeSyncPacket(active);
+        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            ServerPlayNetworking.send(player, pkt);
         }
     }
 
@@ -61,6 +77,7 @@ public class ChallengeManager {
             case 18 -> 0.4; // DamageRandomItem
             case 19 -> 0.5; // MinePotionEffect
             case 20 -> 0.8; // RandomizedCrafting
+            case 21 -> 1.0; // Hardcore
             default -> 0.0;
         };
     }
@@ -142,6 +159,7 @@ public class ChallengeManager {
         Chal_18_DamageRandomItem.setActive(false);
         Chal_19_MinePotionEffect.setActive(false);
         Chal_20_RandomizedCrafting.setActive(false);
+        Chal_21_Hardcore.setActive(false);
 
         // 4) Turn back on only the ones in the saved list
         LOGGER.info("ChallengeManager: got actives → {}", saved);
@@ -167,6 +185,7 @@ public class ChallengeManager {
                 case 18 -> { Chal_18_DamageRandomItem.setActive(true); LOGGER.info("Challenge 18 ON"); }
                 case 19 -> { Chal_19_MinePotionEffect.setActive(true); LOGGER.info("Challenge 19 ON"); }
                 case 20 -> { Chal_20_RandomizedCrafting.setActive(true); LOGGER.info("Challenge 20 ON"); }
+                case 21 -> { Chal_21_Hardcore.setActive(true); LOGGER.info("Challenge 21 ON"); }
                 default -> LOGGER.warn("Unknown challenge id {}", id);
             }
         }

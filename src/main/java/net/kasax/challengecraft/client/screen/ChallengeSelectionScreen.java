@@ -11,7 +11,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
@@ -21,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20);
+    private static final List<Integer> IDS = List.of(1, 11, 9, 5, 6, 8, 7, 12, 2, 3, 4, 14, 15, 16, 10, 13, 17, 18, 19, 20, 21);
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
             .toList();
@@ -30,7 +29,7 @@ public class ChallengeSelectionScreen extends Screen {
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc"))
             .toList();
 
-    private final List<CyclingButtonWidget<Boolean>> toggles = new ArrayList<>();
+    private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private SliderWidget maxHealthSlider;
     private SliderWidget slotsSlider;
 
@@ -44,13 +43,13 @@ public class ChallengeSelectionScreen extends Screen {
     private int slotsSliderTicks;
 
     public ChallengeSelectionScreen() {
-        super(Text.literal("Modify active Challenges (CAUTION: may break world)"));
+        super(Text.literal("Challenge Selection"));
     }
 
     @Override
     protected void init() {
         super.init();
-        toggles.clear();
+        cards.clear();
 
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
@@ -77,42 +76,62 @@ public class ChallengeSelectionScreen extends Screen {
         slotsSliderTicks = savedSlots;                      // 1..36
         slotsSliderValue = (slotsSliderTicks - 1) / 35.0;
 
-        int panelWidth = 240;
+        int panelWidth = 260;
         int panelX = width / 2 - panelWidth / 2;
         int panelTop = 40;
-        int panelBottomReserved = 44; // space for Save button
+        int panelBottomReserved = 48; // space for Save button
         int panelHeight = Math.max(60, height - panelTop - panelBottomReserved);
 
         this.scrollPanel = new WidgetScrollPanel(panelX, panelTop, panelWidth, panelHeight, Text.empty());
         addDrawableChild(this.scrollPanel);
 
-        int x = panelX + (panelWidth / 2) - 100;
+        int cardWidth = 115;
+        int cardHeight = 26;
+        int spacing = 4;
+
+        int x0 = panelX + 8;
+        int x1 = x0 + cardWidth + spacing;
+        int col = 0;
         int y = panelTop + 6;
 
         for (int i = 0; i < IDS.size(); i++) {
-            final int index = i;
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
-            if (id == 7) {
-                var toggle = CyclingButtonWidget
-                        .onOffBuilder(isOn)
-                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
-                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
-                toggles.add(toggle);
-                scrollPanel.addChild(toggle);
-                y += 24;
+            // If we have a special case (slider) and we are currently on the right (col == 1),
+            // move to the next row to ensure the card starts on the left.
+            if ((id == 7 || id == 12) && col == 1) {
+                y += cardHeight + spacing;
+                col = 0;
+            }
 
+            int currentX = (col == 0) ? x0 : x1;
+            int currentY = y;
+
+            ChallengeCardWidget card = new ChallengeCardWidget(currentX, currentY, cardWidth, cardHeight, id, isOn, val -> {});
+            cards.add(card);
+            scrollPanel.addChild(card);
+
+            // Handle standard card col increment for the card we just added
+            if (col == 1) {
+                y += cardHeight + spacing;
+                col = 0;
+            } else {
+                col = 1;
+            }
+
+            if (id == 7) {
+                // Now col should be 1 (because 7 was at col 0), so the slider goes to the right of the card.
                 double initialHearts = 0.5 + (sliderValue * 9.5);
                 maxHealthSlider = new SliderWidget(
-                        x, y, 200, 20,
-                        Text.literal(String.format("Max Health: %.1f❤", initialHearts)),
+                        x1, y, cardWidth, cardHeight,
+                        Text.literal(String.format("Health: %.1f❤", initialHearts)),
                         sliderValue
                 ) {
                     @Override
                     protected void updateMessage() {
                         double hearts = 0.5 + (this.value * 9.5);
-                        setMessage(Text.literal(String.format("Max Health: %.1f❤", hearts)));
+                        setMessage(Text.literal(String.format("Health: %.1f❤", hearts)));
                     }
 
                     @Override
@@ -123,27 +142,21 @@ public class ChallengeSelectionScreen extends Screen {
                     }
                 };
                 scrollPanel.addChild(maxHealthSlider);
-                y += 24;
-
+                
+                // Since we manually filled col 1 with a slider, move to next row
+                y += cardHeight + spacing;
+                col = 0;
             } else if (id == 12) {
-                var toggle = CyclingButtonWidget
-                        .onOffBuilder(isOn)
-                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
-                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
-                toggles.add(toggle);
-                scrollPanel.addChild(toggle);
-                y += 24;
-
                 double initialSlots = 1 + (slotsSliderValue * 35);
                 slotsSlider = new SliderWidget(
-                        x, y, 200, 20,
-                        Text.literal(String.format("Inventory Slots: %.0f", initialSlots)),
+                        x1, y, cardWidth, cardHeight,
+                        Text.literal(String.format("Slots: %.0f", initialSlots)),
                         slotsSliderValue
                 ) {
                     @Override
                     protected void updateMessage() {
                         double slots = 1 + (this.value * 35);
-                        setMessage(Text.literal(String.format("Inventory Slots: %.0f", slots)));
+                        setMessage(Text.literal(String.format("Slots: %.0f", slots)));
                     }
 
                     @Override
@@ -153,18 +166,12 @@ public class ChallengeSelectionScreen extends Screen {
                     }
                 };
                 scrollPanel.addChild(slotsSlider);
-                y += 24;
-
-            } else {
-                var toggle = CyclingButtonWidget
-                        .onOffBuilder(isOn)
-                        .tooltip(val -> Tooltip.of(DESCRIPTIONS.get(index)))
-                        .build(x, y, 200, 20, TITLES.get(i), (btn, val) -> {});
-                toggles.add(toggle);
-                scrollPanel.addChild(toggle);
-                y += 24;
+                
+                y += cardHeight + spacing;
+                col = 0;
             }
         }
+        if (col == 1) y += cardHeight + spacing;
 
         // Save button anchored at bottom (not inside the scroll area)
         int saveY = panelTop + panelHeight + 10;
@@ -174,7 +181,7 @@ public class ChallengeSelectionScreen extends Screen {
                 btn -> {
                     List<Integer> newActive = new ArrayList<>();
                     for (int j = 0; j < IDS.size(); j++) {
-                        if (toggles.get(j).getValue()) {
+                        if (cards.get(j).isActive()) {
                             newActive.add(IDS.get(j));
                         }
                     }
@@ -219,10 +226,12 @@ public class ChallengeSelectionScreen extends Screen {
         this.renderBackground(ctx, mouseX, mouseY, delta);
         super.render(ctx, mouseX, mouseY, delta);
 
+        // Title
+        ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, width / 2, 10, 0xFFFF55);
+
         // Render the warning message
         Text warning = Text.translatable("challengecraft.warning.tainted");
-        int textWidth = this.textRenderer.getWidth(warning);
-        ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 20, 0xFF5555);
+        ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 24, 0xFF5555);
     }
 
     private static class SaveButton extends ButtonWidget {

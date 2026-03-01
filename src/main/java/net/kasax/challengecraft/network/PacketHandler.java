@@ -6,7 +6,14 @@ import net.kasax.challengecraft.ChallengeManager;
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
 import net.kasax.challengecraft.challenges.Chal_7_MaxHealthModify;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
+import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 public class PacketHandler {
     public static void register() {
@@ -31,7 +38,20 @@ public class PacketHandler {
                         data.setActive(packet.active);
                         data.setMaxHeartsTicks(packet.maxHearts);
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
-                        data.setTainted(true); // Mark as tainted because challenges changed mid-game
+                        
+                        if (!data.isTainted()) {
+                            data.setTainted(true);
+                            Text title = Text.translatable("challengecraft.tainted.failed").formatted(Formatting.RED, Formatting.BOLD);
+                            Text subtitle = Text.translatable("challengecraft.tainted.failed.desc").formatted(Formatting.GRAY);
+
+                            server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
+                            server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
+                            server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+
+                            server.getWorlds().forEach(w -> {
+                                w.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, SoundCategory.MASTER, 1.0f, 1.0f);
+                            });
+                        }
                         if (packet.active.contains(7)) {
                             float hearts = packet.maxHearts * 0.5f;
                             Chal_7_MaxHealthModify.setMaxHearts(hearts);
