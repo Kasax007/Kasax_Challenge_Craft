@@ -11,6 +11,9 @@ import net.kasax.challengecraft.client.screen.ChallengeSelectionScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.CommandRegistryAccess;
 
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+
 public class ClientCommands implements ClientModInitializer {
     // a simple flag that we flip when /challenges is run
     private static boolean openOnNextTick = false;
@@ -36,10 +39,15 @@ public class ClientCommands implements ClientModInitializer {
         dispatcher.register(
                 ClientCommandManager.literal("challenges")
                         .executes(ctx -> {
-                            // just set our flag—don't call setScreen() here
-                            ChallengeCraft.LOGGER.info("'/challenges' received, scheduling UI open");
-                            openOnNextTick = true;
-                            return 1;
+                            if (ctx.getSource().getClient().player != null && ctx.getSource().getClient().player.hasPermissionLevel(2)) {
+                                // just set our flag—don't call setScreen() here
+                                ChallengeCraft.LOGGER.info("'/challenges' received, scheduling UI open");
+                                openOnNextTick = true;
+                                return 1;
+                            } else {
+                                ctx.getSource().sendFeedback(Text.literal("You do not have permission to use this command.").formatted(Formatting.RED));
+                                return 0;
+                            }
                         })
         );
     }

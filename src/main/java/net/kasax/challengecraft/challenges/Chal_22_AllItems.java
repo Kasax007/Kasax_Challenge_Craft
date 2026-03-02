@@ -188,7 +188,12 @@ public class Chal_22_AllItems {
     }
 
     private static void completeChallenge(MinecraftServer server, ChallengeSavedData data) {
-        if (data.isXpAwarded()) return;
+        // Find players who haven't received the XP yet
+        List<ServerPlayerEntity> eligiblePlayers = server.getPlayerManager().getPlayerList().stream()
+                .filter(p -> !data.isXpAwarded(p.getUuid()))
+                .toList();
+
+        if (eligiblePlayers.isEmpty()) return;
 
         // If All Entities challenge is active, ensure it is also completed
         if (data.getActive().contains(23)) {
@@ -197,13 +202,11 @@ public class Chal_22_AllItems {
             }
         }
 
-        int playTicks = 0;
-        if (!server.getPlayerManager().getPlayerList().isEmpty()) {
-            playTicks = server.getPlayerManager().getPlayerList().get(0).getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
-        }
-
         for (int cid : data.getActive()) {
-            StatsManager.recordCompletion(cid, playTicks);
+            eligiblePlayers.forEach(p -> {
+                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
+            });
         }
 
         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
@@ -216,17 +219,17 @@ public class Chal_22_AllItems {
             }
 
             final boolean finalIsGameComp = isGameComp;
-            server.getPlayerManager().getPlayerList().forEach(p -> {
+            eligiblePlayers.forEach(p -> {
                 LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
+                data.setXpAwarded(p.getUuid(), true);
                 ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, finalIsGameComp));
+                
+                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
             });
+            
             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
                     .formatted(Formatting.GOLD, Formatting.BOLD);
             server.getPlayerManager().broadcast(chatMsg, false);
-
-            server.getPlayerManager().getPlayerList().forEach(p -> {
-                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
-            });
 
             Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
             Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
@@ -235,8 +238,6 @@ public class Chal_22_AllItems {
             server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
             server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
         }
-
-        data.setXpAwarded(true);
     }
 
     public static void skipItem(MinecraftServer server, int amount) {

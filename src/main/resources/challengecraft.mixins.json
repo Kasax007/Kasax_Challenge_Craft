@@ -22,7 +22,9 @@
     "ServerRecipeManagerMixin",
     "MobHealthMixin",
     "ScholarPerkMixin",
-    "PlayerNameMixin"
+    "PlayerNameMixin",
+    "MinecraftServerMixin",
+    "MinecraftServerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -31,7 +33,8 @@
     "CreateWorldScreenMixin",
     "TitleScreenMixin",
     "InGameHudMixin",
-    "GameMenuScreenMixin"
+    "GameMenuScreenMixin",
+    "MinecraftClientMixin"
   ],
   "server": [
     "EntityTypeMixin",

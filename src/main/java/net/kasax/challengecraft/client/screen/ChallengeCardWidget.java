@@ -40,7 +40,12 @@ public class ChallengeCardWidget extends ClickableWidget {
         }
         this.active = active;
         this.onToggle = onToggle;
-        this.pbTicks = StatsManager.getBestTimes().get(challengeId);
+        
+        String uuid = "global";
+        if (MinecraftClient.getInstance().getSession() != null && MinecraftClient.getInstance().getSession().getUuidOrNull() != null) {
+            uuid = MinecraftClient.getInstance().getSession().getUuidOrNull().toString();
+        }
+        this.pbTicks = StatsManager.getBestTimes(uuid).get(challengeId);
         
         long currentXp = ChallengeCraftClient.LOCAL_PLAYER_XP;
         int currentLevel = LevelManager.getLevelForXp(currentXp);

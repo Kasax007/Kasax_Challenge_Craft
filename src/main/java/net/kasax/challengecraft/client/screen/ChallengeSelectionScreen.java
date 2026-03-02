@@ -38,6 +38,7 @@ public class ChallengeSelectionScreen extends Screen {
 
     private WidgetScrollPanel scrollPanel;
     private ButtonWidget saveButton;
+    private ButtonWidget saveAndRestartButton;
 
     // sliderValue is the raw 0.0–1.0 knob position
     private double sliderValue;
@@ -215,44 +216,56 @@ public class ChallengeSelectionScreen extends Screen {
             }
         }
         if (col == 1) y += cardHeight + spacing;
-
-        // Save button anchored at bottom (not inside the scroll area)
+        
         int saveY = panelTop + panelHeight + 10;
+        // Save and Restart button
         this.saveButton = new SaveButton(
-                width / 2 - 50, saveY, 100, 20,
+                width / 2 - 125, saveY, 120, 20,
                 Text.literal("Save"),
                 btn -> {
-                    List<Integer> newActive = getActiveIds();
-                    List<Integer> newPerks = getActivePerks();
-                    // ...
-                    int ticks = 0;
-                    if (newActive.contains(7) && maxHealthSlider != null) {
-                        ticks = this.sliderTicks;
-                    }
-
-                    int slotticks = 0;
-                    if (newActive.contains(12) && slotsSlider != null) {
-                        slotticks = this.slotsSliderTicks;
-                    }
-
-                    int mobHealthMult = 1;
-                    if (newActive.contains(24) && mobHealthSlider != null) {
-                        mobHealthMult = this.mobHealthMultiplier;
-                    }
-
-                    ChallengeCraft.LOGGER.info(
-                            "[Client:Selection] Save pressed → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}",
-                            newActive, newPerks, ticks, slotticks, mobHealthMult
-                    );
-
-                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult, newPerks));
-                    ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
-
+                    sendChallengePacket(false);
                     client.setScreen(null);
                 }
         );
+        this.saveAndRestartButton = new SaveButton(
+                width / 2 + 5, saveY, 120, 20,
+                Text.literal("Save and Restart"),
+                btn -> {
+                    client.setScreen(new ConfirmRestartScreen(this, () -> {
+                        sendChallengePacket(true);
+                    }));
+                }
+        );
         addDrawableChild(this.saveButton);
+        addDrawableChild(this.saveAndRestartButton);
         updateSaveButton();
+    }
+
+    private void sendChallengePacket(boolean restart) {
+        List<Integer> newActive = getActiveIds();
+        List<Integer> newPerks = getActivePerks();
+
+        int ticks = 0;
+        if (newActive.contains(7) && maxHealthSlider != null) {
+            ticks = this.sliderTicks;
+        }
+
+        int slotticks = 0;
+        if (newActive.contains(12) && slotsSlider != null) {
+            slotticks = this.slotsSliderTicks;
+        }
+
+        int mobHealthMult = 1;
+        if (newActive.contains(24) && mobHealthSlider != null) {
+            mobHealthMult = this.mobHealthMultiplier;
+        }
+
+        ChallengeCraft.LOGGER.info(
+                "[Client:Selection] sending ChallengePacket → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, restart = {}",
+                newActive, newPerks, ticks, slotticks, mobHealthMult, restart
+        );
+
+        ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult, newPerks, restart));
     }
 
     private List<Integer> getActiveIds() {
@@ -276,8 +289,12 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     private void updateSaveButton() {
+        boolean noConflict = !net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks());
         if (saveButton != null) {
-            saveButton.active = !net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks());
+            saveButton.active = noConflict;
+        }
+        if (saveAndRestartButton != null) {
+            saveAndRestartButton.active = noConflict;
         }
     }
 

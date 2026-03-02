@@ -15,6 +15,8 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
@@ -48,11 +50,18 @@ public class PlayerAdvancementTrackerMixin {
                         return;
                     }
 
-                    if (!data.isXpAwarded()) {
-                        // Record completion for all active challenges
-                        int playTicks = owner.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                    // Find players who haven't received the XP yet
+                    List<ServerPlayerEntity> eligiblePlayers = owner.getServer().getPlayerManager().getPlayerList().stream()
+                            .filter(p -> !data.isXpAwarded(p.getUuid()))
+                            .toList();
+
+                    if (!eligiblePlayers.isEmpty()) {
+                        // Record completion for all active challenges for all eligible players
                         for (int cid : data.getActive()) {
-                            StatsManager.recordCompletion(cid, playTicks);
+                            eligiblePlayers.forEach(p -> {
+                                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                                StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
+                            });
                         }
 
                         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
@@ -60,18 +69,19 @@ public class PlayerAdvancementTrackerMixin {
                         
                         if (xpAmount > 0) {
                             final long baseAmount = xpAmount;
-                            owner.getServer().getPlayerManager().getPlayerList().forEach(p -> {
+                            eligiblePlayers.forEach(p -> {
                                 LevelManager.XpResult res = LevelManager.addXp(p, baseAmount);
+                                data.setXpAwarded(p.getUuid(), true);
                                 // Advancement rewards are NOT game completions
                                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, false));
+                                
+                                // Visual and Audio reward for everyone who got it
+                                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
                             });
                             
                             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
                                     .formatted(Formatting.GOLD, Formatting.BOLD);
                             owner.getServer().getPlayerManager().broadcast(chatMsg, false);
-                            
-                            // Visual and Audio reward for everyone
-                            owner.getWorld().playSound(null, owner.getX(), owner.getY(), owner.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
                             
                             Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
                             Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
@@ -80,7 +90,7 @@ public class PlayerAdvancementTrackerMixin {
                             owner.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
                             owner.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
                             
-                            LOGGER.info("[Advancement] Awarded {} XP to all players (triggered by {})", xpAmount, owner.getName().getString());
+                            LOGGER.info("[Advancement] Awarded {} XP to eligible players (triggered by {})", xpAmount, owner.getName().getString());
                         } else {
                             if (data.isTainted()) {
                                 owner.sendMessage(Text.translatable("challengecraft.reward.no_xp")
@@ -90,8 +100,6 @@ public class PlayerAdvancementTrackerMixin {
                                 LOGGER.info("[Advancement] No XP awarded (difficulty was 0 or negative: {})", difficulty);
                             }
                         }
-                        
-                        data.setXpAwarded(true);
                     } else {
                         LOGGER.info("[Advancement] XP already awarded for this world.");
                     }

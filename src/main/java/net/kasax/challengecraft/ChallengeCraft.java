@@ -2,6 +2,16 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.World;
+import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.dimension.DimensionTypes;
+import net.minecraft.world.gen.chunk.FlatChunkGenerator;
+import net.minecraft.world.gen.chunk.FlatChunkGeneratorConfig;
+import net.minecraft.world.gen.FlatLevelGeneratorPresets;
+import java.util.Optional;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.*;
@@ -21,6 +31,8 @@ import org.slf4j.LoggerFactory;
 public class ChallengeCraft implements ModInitializer {
 	public static final String MOD_ID = "challengecraft";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+	public static final RegistryKey<World> LIMBO_KEY = RegistryKey.of(RegistryKeys.WORLD, Identifier.of(MOD_ID, "limbo"));
 
 	@Override
 	public void onInitialize() {
@@ -144,6 +156,10 @@ public class ChallengeCraft implements ModInitializer {
 				net.kasax.challengecraft.network.AllEntitiesListPacket.ID,
 				net.kasax.challengecraft.network.AllEntitiesListPacket.CODEC
 		);
+		PayloadTypeRegistry.playS2C().register(
+				net.kasax.challengecraft.network.RestartPendingPacket.ID,
+				net.kasax.challengecraft.network.RestartPendingPacket.CODEC
+		);
 
 		// 2) Now hook up the handler:
 		PacketHandler.register();
@@ -155,6 +171,5 @@ public class ChallengeCraft implements ModInitializer {
 				Identifier.of("challengecraft", "skyblock_chunk_generator"),
 				SkyblockChunkGenerator.MAP_CODEC
 		);
-
 	}
 }

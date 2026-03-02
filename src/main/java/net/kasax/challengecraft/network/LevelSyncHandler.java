@@ -7,7 +7,10 @@ public class LevelSyncHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(LevelSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                ChallengeCraftClient.LOCAL_PLAYER_XP = payload.xp;
+                if (context.player().getUuid().equals(payload.uuid)) {
+                    ChallengeCraftClient.LOCAL_PLAYER_XP = payload.xp;
+                }
+                ChallengeCraftClient.PLAYER_XP_MAP.put(payload.uuid, payload.xp);
             });
         });
     }

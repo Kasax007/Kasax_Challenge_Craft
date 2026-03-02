@@ -71,7 +71,11 @@ public class LevelXpListener {
 
         // Sync on join
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            LevelManager.sync(handler.player);
+            // Send new player their own level and everyone else's level
+            for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
+                LevelManager.sync(p);
+            }
+            
             // Grant Infinity Weapon on join if perk is active and player eligible, only if they don't already have it
             var overworld = server.getOverworld();
             ChallengeSavedData data = ChallengeSavedData.get(overworld);
@@ -86,16 +90,7 @@ public class LevelXpListener {
         List<Integer> activePerks = data.getActivePerks();
         long totalXp = XpManager.getXp(player.getUuid());
         int level = LevelManager.getLevelForXp(totalXp);
-        int stars = LevelManager.getStars(totalXp);
         
-        // Sync level and stars for name coloring and chat
-        if (player.getDataTracker().get(LevelManager.INFINITY_STARS) != stars) {
-             player.getDataTracker().set(LevelManager.INFINITY_STARS, stars);
-        }
-        if (player.getDataTracker().get(LevelManager.LEVEL) != level) {
-             player.getDataTracker().set(LevelManager.LEVEL, level);
-        }
-
         // Level 3: Night Vision
         if (activePerks.contains(LevelManager.PERK_NIGHT_VISION) && level >= LevelManager.getRequiredLevel(LevelManager.PERK_NIGHT_VISION)) {
             if (!player.hasStatusEffect(StatusEffects.NIGHT_VISION) || player.getStatusEffect(StatusEffects.NIGHT_VISION).getDuration() < 1200) {

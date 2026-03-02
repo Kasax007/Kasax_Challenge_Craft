@@ -4,15 +4,12 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.PacketByteBuf;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.LevelSyncPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.text.Text;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,9 +18,6 @@ import java.util.UUID;
 
 public class LevelManager {
     public static final int MAX_LEVEL = 20;
-    
-    public static final TrackedData<Integer> INFINITY_STARS = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
-    public static final TrackedData<Integer> LEVEL = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     public static final int PERK_NIGHT_VISION = 101;
     public static final int PERK_SWIFT_FOOTING = 102;
@@ -102,29 +96,38 @@ public class LevelManager {
     }
 
     private static void onLevelUp(ServerPlayerEntity player, int newLevel) {
-        player.sendMessage(net.minecraft.text.Text.literal("§6§lLevel Up! §rYou are now level §b" + newLevel), false);
+        player.sendMessage(Text.literal("Level Up! ").formatted(Formatting.GOLD, Formatting.BOLD)
+                .append(Text.literal("You are now level ").formatted(Formatting.RESET))
+                .append(Text.literal(String.valueOf(newLevel)).formatted(Formatting.AQUA)), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
         
         // Check for perk unlocks
         for (int perkId : ALL_PERKS) {
             if (getRequiredLevel(perkId) == newLevel) {
-                String name = net.minecraft.text.Text.translatable("challengecraft.perk." + perkId).getString();
-                player.sendMessage(net.minecraft.text.Text.literal("§aUnlocked Perk: §e" + name), false);
+                String name = Text.translatable("challengecraft.perk." + perkId).getString();
+                player.sendMessage(Text.literal("Unlocked Perk: ").formatted(Formatting.GREEN)
+                        .append(Text.literal(name).formatted(Formatting.YELLOW)), false);
             }
         }
 
         if (newLevel == 20) {
-            player.sendMessage(net.minecraft.text.Text.literal("§d§lMASTER ACHIEVED! §rYou have reached the maximum level!"), false);
+            player.sendMessage(Text.literal("MASTER ACHIEVED! ").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD)
+                    .append(Text.literal("You have reached the maximum level!").formatted(Formatting.RESET)), false);
         }
     }
 
     private static void onStarGain(ServerPlayerEntity player, int starCount, long oldXp, long newXp) {
-        player.sendMessage(net.minecraft.text.Text.literal("§e§l+1 Infinity Star! §rTotal Stars: §6" + starCount), false);
+        player.sendMessage(Text.literal("+1 Infinity Star! ").formatted(Formatting.YELLOW, Formatting.BOLD)
+                .append(Text.literal("Total Stars: ").formatted(Formatting.RESET))
+                .append(Text.literal(String.valueOf(starCount)).formatted(Formatting.GOLD)), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
         
         // Handle new rewards
         if (starCount == 20) {
-             player.sendMessage(net.minecraft.text.Text.literal("§d§lSECRET UNLOCKED! §rYou have unlocked the §6Infinity Weapon §rperk!"), false);
+             player.sendMessage(Text.literal("SECRET UNLOCKED! ").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD)
+                     .append(Text.literal("You have unlocked the ").formatted(Formatting.RESET))
+                     .append(Text.literal("Infinity Weapon").formatted(Formatting.GOLD))
+                     .append(Text.literal(" perk!").formatted(Formatting.RESET)), false);
         }
 
         // Show overlay
@@ -156,18 +159,12 @@ public class LevelManager {
 
     public static void sync(ServerPlayerEntity player) {
         long xp = XpManager.getXp(player.getUuid());
-        int stars = getStars(xp);
-        int level = getLevelForXp(xp);
         
-        // Sync DataTracker for name coloring and chat
-        if (player.getDataTracker().get(INFINITY_STARS) != stars) {
-             player.getDataTracker().set(INFINITY_STARS, stars);
+        // Broadcast to all players so they know this player's level/stars (for name tags)
+        LevelSyncPacket pkt = new LevelSyncPacket(xp, player.getUuid());
+        for (ServerPlayerEntity p : player.getServer().getPlayerManager().getPlayerList()) {
+            ServerPlayNetworking.send(p, pkt);
         }
-        if (player.getDataTracker().get(LEVEL) != level) {
-             player.getDataTracker().set(LEVEL, level);
-        }
-
-        ServerPlayNetworking.send(player, new LevelSyncPacket(xp));
     }
 
     public static boolean isChallengeUnlocked(int id, int level) {

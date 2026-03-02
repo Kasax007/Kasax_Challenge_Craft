@@ -17,24 +17,25 @@ public class StatsManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Stats");
     private static final Path STATS_FILE = FabricLoader.getInstance().getGameDir().resolve("challengecraft_stats.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static Map<Integer, Integer> bestTimes = new HashMap<>(); // challengeId -> bestTime in ticks
+    private static Map<String, Map<Integer, Integer>> bestTimes = new HashMap<>(); // uuid -> (challengeId -> bestTime in ticks)
     private static boolean loaded = false;
 
-    public static synchronized Map<Integer, Integer> getBestTimes() {
+    public static synchronized Map<Integer, Integer> getBestTimes(String uuid) {
         if (!loaded) {
             load();
         }
-        return new HashMap<>(bestTimes);
+        return new HashMap<>(bestTimes.getOrDefault(uuid, new HashMap<>()));
     }
 
-    public static synchronized void recordCompletion(int challengeId, int ticks) {
+    public static synchronized void recordCompletion(String uuid, int challengeId, int ticks) {
         if (!loaded) {
             load();
         }
-        int currentBest = bestTimes.getOrDefault(challengeId, Integer.MAX_VALUE);
+        Map<Integer, Integer> playerTimes = bestTimes.computeIfAbsent(uuid, k -> new HashMap<>());
+        int currentBest = playerTimes.getOrDefault(challengeId, Integer.MAX_VALUE);
         if (ticks < currentBest) {
-            bestTimes.put(challengeId, ticks);
-            LOGGER.info("New best time for challenge {}: {} ticks", challengeId, ticks);
+            playerTimes.put(challengeId, ticks);
+            LOGGER.info("New best time for player {} challenge {}: {} ticks", uuid, challengeId, ticks);
             save();
         }
     }
@@ -43,9 +44,25 @@ public class StatsManager {
         if (Files.exists(STATS_FILE)) {
             try {
                 String content = Files.readString(STATS_FILE);
-                bestTimes = GSON.fromJson(content, new TypeToken<Map<Integer, Integer>>() {}.getType());
-                if (bestTimes == null) bestTimes = new HashMap<>();
-                LOGGER.info("Loaded {} best times", bestTimes.size());
+                try {
+                    bestTimes = GSON.fromJson(content, new TypeToken<Map<String, Map<Integer, Integer>>>() {}.getType());
+                    if (bestTimes == null) bestTimes = new HashMap<>();
+                } catch (Exception e) {
+                    LOGGER.warn("Old stats format or corrupt JSON, attempting conversion or reset: {}", e.getMessage());
+                    // Try to see if it's the old Map<Integer, Integer> format
+                    try {
+                        Map<Integer, Integer> oldMap = GSON.fromJson(content, new TypeToken<Map<Integer, Integer>>() {}.getType());
+                        bestTimes = new HashMap<>();
+                        if (oldMap != null && !oldMap.isEmpty()) {
+                            // We don't know the UUID, so we can't really migrate it properly.
+                            // But we'll at least not crash.
+                            LOGGER.info("Discarded old format stats (UUID mapping unknown)");
+                        }
+                    } catch (Exception ex) {
+                        bestTimes = new HashMap<>();
+                    }
+                }
+                LOGGER.info("Loaded best times for {} players", bestTimes.size());
             } catch (Exception e) {
                 LOGGER.error("Failed to load stats file", e);
                 bestTimes = new HashMap<>();

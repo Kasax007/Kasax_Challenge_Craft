@@ -26,6 +26,11 @@ public class PacketHandler {
 
                     // schedule on the main thread
                     server.execute(() -> {
+                        if (!player.hasPermissionLevel(2)) {
+                            ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (no permission)", player.getName().getString());
+                            player.sendMessage(Text.literal("You don't have permission to change challenges.").formatted(Formatting.RED), false);
+                            return;
+                        }
                         ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , maxHearts ticks = {}, slots = {}, mobHealth = {}",
                                 context.player().getName().getString(),
                                 packet.active,
@@ -84,6 +89,10 @@ public class PacketHandler {
                         // re‑apply all active challenges
                         ChallengeManager.applyAll(server);
                         ChallengeCraft.LOGGER.info("Packet Handler applyAll " + packet );
+
+                        if (packet.restart) {
+                            ChallengeWorldRestarter.initiateRestart(server);
+                        }
                     });
                 }
         );

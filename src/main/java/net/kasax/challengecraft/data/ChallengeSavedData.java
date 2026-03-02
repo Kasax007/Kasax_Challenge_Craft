@@ -33,7 +33,11 @@ public class ChallengeSavedData extends PersistentState {
             Codec.INT.fieldOf("limitedInventorySlots").forGetter(ChallengeSavedData::getLimitedInventorySlots),
             Codec.DOUBLE.fieldOf("initialDifficulty").forGetter(ChallengeSavedData::getInitialDifficulty),
             Codec.BOOL.fieldOf("tainted").forGetter(ChallengeSavedData::isTainted),
-            Codec.BOOL.fieldOf("xpAwarded").forGetter(ChallengeSavedData::isXpAwarded),
+            Codec.unboundedMap(Codec.STRING, Codec.BOOL).optionalFieldOf("playerXpAwarded", Map.of()).forGetter(data -> {
+                Map<String, Boolean> map = new HashMap<>();
+                data.playerXpAwarded.forEach((k, v) -> map.put(k.toString(), v));
+                return map;
+            }),
             Codec.BOOL.fieldOf("difficultySet").forGetter(ChallengeSavedData::isDifficultySet),
             Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeSavedData::getAllItemsOrder),
             Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeSavedData::getAllItemsIndex),
@@ -46,7 +50,8 @@ public class ChallengeSavedData extends PersistentState {
                 data.playerXp.forEach((k, v) -> map.put(k.toString(), v));
                 return map;
             }),
-            Codec.list(Codec.INT).optionalFieldOf("activePerks", List.of()).forGetter(ChallengeSavedData::getActivePerks)
+            Codec.list(Codec.INT).optionalFieldOf("activePerks", List.of()).forGetter(ChallengeSavedData::getActivePerks),
+            Codec.INT.optionalFieldOf("runIndex", 0).forGetter(ChallengeSavedData::getRunIndex)
     ).apply(instance, ChallengeSavedData::new));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -69,7 +74,7 @@ public class ChallengeSavedData extends PersistentState {
     private boolean tainted = false;
 
     /** To prevent multiple awards for the same achievement in one world. */
-    private boolean xpAwarded = false;
+    private final Map<UUID, Boolean> playerXpAwarded = new HashMap<>();
 
     private boolean difficultySet = false;
 
@@ -86,16 +91,19 @@ public class ChallengeSavedData extends PersistentState {
 
     private final Map<UUID, Long> playerXp = new HashMap<>();
 
+    private int runIndex = 0;
+
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
         this.limitedInventorySlots = limitedInventorySlots;
         this.initialDifficulty = initialDifficulty;
         this.tainted = tainted;
-        this.xpAwarded = xpAwarded;
+        this.playerXpAwarded.clear();
+        playerXpAwarded.forEach((k, v) -> this.playerXpAwarded.put(UUID.fromString(k), v));
         this.difficultySet = difficultySet;
         this.allItemsOrder.clear();
         this.allItemsOrder.addAll(allItemsOrder);
@@ -109,6 +117,7 @@ public class ChallengeSavedData extends PersistentState {
         playerXp.forEach((k, v) -> this.playerXp.put(UUID.fromString(k), v));
         this.activePerks.clear();
         this.activePerks.addAll(activePerks);
+        this.runIndex = runIndex;
     }
 
     /** Retrieve (or create) for this world. */
@@ -176,12 +185,24 @@ public class ChallengeSavedData extends PersistentState {
         markDirty();
     }
 
-    public boolean isXpAwarded() {
-        return xpAwarded;
+    public boolean isXpAwarded(UUID uuid) {
+        return playerXpAwarded.getOrDefault(uuid, false);
     }
 
-    public void setXpAwarded(boolean xpAwarded) {
-        this.xpAwarded = xpAwarded;
+    public void setXpAwarded(UUID uuid, boolean xpAwarded) {
+        this.playerXpAwarded.put(uuid, xpAwarded);
+        markDirty();
+    }
+
+    public void resetForNewWorld() {
+        this.playerXpAwarded.clear();
+        this.allItemsIndex = 0;
+        this.allEntitiesIndex = 0;
+        this.allItemsOrder.clear();
+        this.allEntitiesOrder.clear();
+        this.tainted = false;
+        this.difficultySet = false;
+        this.runIndex++;
         markDirty();
     }
 
@@ -266,6 +287,15 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setPlayerXp(UUID uuid, long xp) {
         playerXp.put(uuid, xp);
+        markDirty();
+    }
+
+    public int getRunIndex() {
+        return runIndex;
+    }
+
+    public void setRunIndex(int runIndex) {
+        this.runIndex = runIndex;
         markDirty();
     }
 }
