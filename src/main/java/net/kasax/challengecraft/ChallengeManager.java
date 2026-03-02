@@ -50,7 +50,8 @@ public class ChallengeManager {
     public static void syncToAll(net.minecraft.server.MinecraftServer server) {
         ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
         List<Integer> active = data.getActive();
-        ChallengeSyncPacket pkt = new ChallengeSyncPacket(active);
+        List<Integer> perks = data.getActivePerks();
+        ChallengeSyncPacket pkt = new ChallengeSyncPacket(active, perks);
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, pkt);
         }
@@ -63,6 +64,9 @@ public class ChallengeManager {
     }
 
     public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult) {
+        if (LevelManager.ALL_PERKS.contains(id)) {
+            return -0.5;
+        }
         return switch (id) {
             case 1 -> 0.5;  // LevelItem (Harder)
             case 2 -> 0.3;  // NoBlockDrops
@@ -93,10 +97,13 @@ public class ChallengeManager {
         };
     }
 
-    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult) {
+    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult, List<Integer> perks) {
         double total = 0;
         for (int id : ids) {
             total += getDifficulty(id, heartsTicks, inventorySlots, mobHealthMult);
+        }
+        for (int perkId : perks) {
+            total += getDifficulty(perkId, heartsTicks, inventorySlots, mobHealthMult);
         }
         return Math.max(0, total); // Ensure it's not negative
     }
@@ -154,10 +161,11 @@ public class ChallengeManager {
 
                 data.setMaxHeartsTicks(clientTicks);
                 data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
+                data.setActivePerks(List.copyOf(ChallengeCraftClient.SELECTED_PERKS));
                 data.setLimitedInventorySlots(clientSlots);
                 data.setMobHealthMultiplier(clientMult);
                 
-                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult);
+                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, ChallengeCraftClient.SELECTED_PERKS);
                 data.setInitialDifficulty(initialDiff);
                 data.setDifficultySet(true);
 

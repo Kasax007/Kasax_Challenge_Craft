@@ -1,8 +1,9 @@
 package net.kasax.challengecraft.mixin;
 
+import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
-import net.kasax.challengecraft.data.XpManager;
+import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.advancement.PlayerAdvancementTracker;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
@@ -58,7 +59,11 @@ public class PlayerAdvancementTrackerMixin {
                         long xpAmount = Math.round(100.0 * difficulty);
                         
                         if (xpAmount > 0) {
-                            XpManager.addXp(xpAmount);
+                            final long baseAmount = xpAmount;
+                            owner.getServer().getPlayerManager().getPlayerList().forEach(p -> {
+                                LevelManager.XpResult res = LevelManager.addXp(p, baseAmount);
+                                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount));
+                            });
                             
                             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
                                     .formatted(Formatting.GOLD, Formatting.BOLD);
@@ -73,7 +78,7 @@ public class PlayerAdvancementTrackerMixin {
                             owner.getServer().getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
                             owner.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
                             owner.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
-
+                            
                             LOGGER.info("[Advancement] Awarded {} XP to all players (triggered by {})", xpAmount, owner.getName().getString());
                         } else {
                             if (data.isTainted()) {

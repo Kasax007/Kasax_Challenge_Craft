@@ -13,7 +13,10 @@ import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.PersistentStateType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
 
@@ -37,7 +40,13 @@ public class ChallengeSavedData extends PersistentState {
             Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
             Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex),
             Codec.INT.optionalFieldOf("mobHealthMultiplier", 1).forGetter(ChallengeSavedData::getMobHealthMultiplier),
-            Codec.DOUBLE.optionalFieldOf("damageWorldBorderSize", 2.0).forGetter(ChallengeSavedData::getDamageWorldBorderSize)
+            Codec.DOUBLE.optionalFieldOf("damageWorldBorderSize", 2.0).forGetter(ChallengeSavedData::getDamageWorldBorderSize),
+            Codec.unboundedMap(Codec.STRING, Codec.LONG).optionalFieldOf("playerXp", Map.of()).forGetter(data -> {
+                Map<String, Long> map = new HashMap<>();
+                data.playerXp.forEach((k, v) -> map.put(k.toString(), v));
+                return map;
+            }),
+            Codec.list(Codec.INT).optionalFieldOf("activePerks", List.of()).forGetter(ChallengeSavedData::getActivePerks)
     ).apply(instance, ChallengeSavedData::new));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -73,9 +82,13 @@ public class ChallengeSavedData extends PersistentState {
     private int mobHealthMultiplier = 1;
     private double damageWorldBorderSize = 2.0;
 
+    private final List<Integer> activePerks = new ArrayList<>();
+
+    private final Map<UUID, Long> playerXp = new HashMap<>();
+
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, boolean xpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -92,6 +105,10 @@ public class ChallengeSavedData extends PersistentState {
         this.allEntitiesIndex = allEntitiesIndex;
         this.mobHealthMultiplier = mobHealthMultiplier;
         this.damageWorldBorderSize = damageWorldBorderSize;
+        this.playerXp.clear();
+        playerXp.forEach((k, v) -> this.playerXp.put(UUID.fromString(k), v));
+        this.activePerks.clear();
+        this.activePerks.addAll(activePerks);
     }
 
     /** Retrieve (or create) for this world. */
@@ -230,6 +247,25 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDamageWorldBorderSize(double size) {
         this.damageWorldBorderSize = size;
+        markDirty();
+    }
+
+    public List<Integer> getActivePerks() {
+        return activePerks;
+    }
+
+    public void setActivePerks(List<Integer> newPerks) {
+        this.activePerks.clear();
+        this.activePerks.addAll(newPerks);
+        markDirty();
+    }
+
+    public long getPlayerXp(UUID uuid) {
+        return playerXp.getOrDefault(uuid, 0L);
+    }
+
+    public void setPlayerXp(UUID uuid, long xp) {
+        playerXp.put(uuid, xp);
         markDirty();
     }
 }

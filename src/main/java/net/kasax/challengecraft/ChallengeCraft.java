@@ -1,17 +1,10 @@
 package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
-import net.kasax.challengecraft.network.AllItemsListPacket;
-import net.kasax.challengecraft.network.AllItemsSyncPacket;
-import net.kasax.challengecraft.network.ChallengePacket;
-import net.kasax.challengecraft.network.ChallengeSyncPacket;
-import net.kasax.challengecraft.network.PacketHandler;
-import net.kasax.challengecraft.network.PlayTimePacketHandler;
-import net.kasax.challengecraft.network.PlayTimeSyncPacket;
+import net.kasax.challengecraft.network.*;
 import net.kasax.challengecraft.world.SkyblockChunkGenerator;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
@@ -55,6 +48,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_22_AllItems.register();
 		Chal_23_AllEntities.register();
 		Chal_25_DamageWorldBorder.register();
+		LevelXpListener.register();
 
 		// Register Hidden Skip Command
 		net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -123,6 +117,10 @@ public class ChallengeCraft implements ModInitializer {
 				ChallengeSyncPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
+				LevelSyncPacket.ID,
+				LevelSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
 				PlayTimeSyncPacket.ID,
 				PlayTimeSyncPacket.CODEC
 		);
@@ -137,6 +135,10 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(
 				net.kasax.challengecraft.network.AllEntitiesSyncPacket.ID,
 				net.kasax.challengecraft.network.AllEntitiesSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				ChallengeRewardPacket.ID,
+				ChallengeRewardPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
 				net.kasax.challengecraft.network.AllEntitiesListPacket.ID,

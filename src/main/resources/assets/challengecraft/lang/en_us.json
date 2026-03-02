@@ -43,6 +43,7 @@
   "challengecraft.worldcreate.challenge20.desc": "All crafting recipes are randomized and switched.",
   "challengecraft.worldcreate.difficulty": "Difficulty Rating: %s",
   "challengecraft.mainmenu.lifetime_xp": "Total Lifetime XP: %d",
+  "challengecraft.mainmenu.leveling_button": "Leveling & Rewards",
   "challengecraft.warning.tainted": "Warning: Changing challenges mid-game sets difficulty to 0!",
   "challengecraft.warning.conflict": "Warning: Mutually exclusive challenges are active! (e.g. No Drops + Random Drops)",
   "challengecraft.reward.xp_earned": "Congratulations! You earned %d lifetime XP!",
@@ -64,5 +65,20 @@
   "challengecraft.worldcreate.challenge24": "Mob Health Multiplier",
   "challengecraft.worldcreate.challenge24.desc": "Allows you to multiply the health of all mobs.",
   "challengecraft.worldcreate.challenge25": "Damage = Border",
-  "challengecraft.worldcreate.challenge25.desc": "Taking damage expands the world border."
+  "challengecraft.worldcreate.challenge25.desc": "Taking damage expands the world border.",
+  
+  "challengecraft.perk.101": "Night Vision",
+  "challengecraft.perk.101.desc": "Grants permanent Night Vision.",
+  "challengecraft.perk.102": "Swift Footing",
+  "challengecraft.perk.102.desc": "Grants permanent Speed I.",
+  "challengecraft.perk.103": "Tough Skin",
+  "challengecraft.perk.103.desc": "Grants +2 permanent Max Hearts.",
+  "challengecraft.perk.104": "Fire Resistance",
+  "challengecraft.perk.104.desc": "Grants permanent Fire Resistance.",
+  "challengecraft.perk.105": "Strength",
+  "challengecraft.perk.105.desc": "Grants +3 permanent Attack Damage.",
+  "challengecraft.perk.106": "Scholar",
+  "challengecraft.perk.106.desc": "Grants +50% XP gain from all sources.",
+  "challengecraft.perk.107": "Resistance",
+  "challengecraft.perk.107.desc": "Grants +4 permanent Armor points."
 }

@@ -21,6 +21,7 @@ public class ChallengeTab extends GridScreenTab {
     private static final List<Integer> IDS = List.of(1, 11, 9, 25, 5, 6, 4, 16, 10, 13, 7, 12, 24, 2, 14, 3, 15, 8, 20, 17, 18, 19, 21, 22, 23);
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
+    private final List<ChallengeCardWidget> perkCards = new ArrayList<>();
     private final SliderWidget maxHealthSlider;
     private final SliderWidget inventorySlider;
     private final SliderWidget mobHealthSlider;
@@ -46,6 +47,11 @@ public class ChallengeTab extends GridScreenTab {
         for (int id : IDS) {
             ChallengeCardWidget card = new ChallengeCardWidget(0, 0, 100, 20, id, false, val -> updateDifficultyText());
             cards.add(card);
+        }
+
+        for (int perkId : net.kasax.challengecraft.LevelManager.ALL_PERKS) {
+            ChallengeCardWidget perkCard = new ChallengeCardWidget(0, 0, 100, 20, perkId, false, val -> updateDifficultyText());
+            perkCards.add(perkCard);
         }
 
         // Challenge 7 is at index 6
@@ -121,10 +127,12 @@ public class ChallengeTab extends GridScreenTab {
                 activeIds.add(IDS.get(i));
             }
         }
+        List<Integer> activePerks = getSelectedPerks();
+
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds)) {
             this.difficultyText = Text.translatable("challengecraft.warning.conflict");
         } else {
-            double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier);
+            double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, activePerks);
             this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
@@ -223,11 +231,53 @@ public class ChallengeTab extends GridScreenTab {
                 col = 0;
             }
         }
+        
+        // Perks section
+        if (col == 1) y += cardH + spacing;
+        y += 15;
+        Text perkTitle = Text.literal("--- Perks (-0.5 Difficulty each) ---");
+        scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, perkTitle) {
+            @Override
+            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
+                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
+            }
+            @Override
+            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+        });
+        y += 24;
+
+        col = 0;
+        for (ChallengeCardWidget perkCard : perkCards) {
+            perkCard.setX((col == 0) ? x0 : x1);
+            perkCard.setY(y);
+            perkCard.setWidth(cardW);
+            perkCard.setHeight(cardH);
+            this.scrollPanel.addChild(perkCard);
+
+            if (col == 1) {
+                y += cardH + spacing;
+                col = 0;
+            } else {
+                col = 1;
+            }
+        }
+        if (col == 1) y += cardH + spacing;
     }
 
     @Override
     public void forEachChild(Consumer<ClickableWidget> consumer) {
         consumer.accept(this.scrollPanel);
+    }
+
+    public List<Integer> getSelectedPerks() {
+        List<Integer> active = new ArrayList<>();
+        for (ChallengeCardWidget card : perkCards) {
+            if (card.isActive()) {
+                active.add(card.getChallengeId());
+            }
+        }
+        ChallengeCraftClient.SELECTED_PERKS = active;
+        return active;
     }
 
     public List<Integer> getActive() {

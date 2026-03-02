@@ -16,6 +16,7 @@ public class ChallengePacket implements CustomPayload {
     public final int           maxHearts;
     public final int          limitedInventorySlots;
     public final int          mobHealthMultiplier;
+    public final List<Integer> perks;
 
 
     // your channel ID
@@ -34,6 +35,8 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeVarInt(pkt.maxHearts);
                             buf.writeVarInt(pkt.limitedInventorySlots);
                             buf.writeVarInt(pkt.mobHealthMultiplier);
+                            buf.writeVarInt(pkt.perks.size());
+                            for (int id : pkt.perks) buf.writeVarInt(id);
                         }
                     },
                     // 2) decoder reads them back in the same order
@@ -48,17 +51,23 @@ public class ChallengePacket implements CustomPayload {
                             int hearts = buf.readVarInt();
                             int slots = buf.readVarInt();
                             int mobHealth = buf.readVarInt();
-                            return new ChallengePacket(list, hearts, slots, mobHealth);
+                            int perkSize = buf.readVarInt();
+                            List<Integer> perks = new ArrayList<>(perkSize);
+                            for (int i = 0; i < perkSize; i++) {
+                                perks.add(buf.readVarInt());
+                            }
+                            return new ChallengePacket(list, hearts, slots, mobHealth, perks);
                         }
                     }
             );
 
     /** Construct on the client when sending */
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth) {
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, List<Integer> perks) {
         this.active    = active;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
         this.mobHealthMultiplier = mobHealth;
+        this.perks = perks;
     }
 
     /** Called by Fabric when it needs to serialize */
@@ -68,6 +77,8 @@ public class ChallengePacket implements CustomPayload {
         buf.writeVarInt(maxHearts);
         buf.writeVarInt(limitedInventorySlots);
         buf.writeVarInt(mobHealthMultiplier);
+        buf.writeVarInt(perks.size());
+        for (int id : perks) buf.writeVarInt(id);
     }
 
     /** Identify your channel */

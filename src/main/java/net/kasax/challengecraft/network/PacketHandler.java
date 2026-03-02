@@ -37,6 +37,7 @@ public class PacketHandler {
                         ChallengeSavedData data = ChallengeSavedData.get(world);
                         // overwrite your active list
                         data.setActive(packet.active);
+                        data.setActivePerks(packet.perks);
                         data.setMaxHeartsTicks(packet.maxHearts);
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
                         data.setMobHealthMultiplier(packet.mobHealthMultiplier);

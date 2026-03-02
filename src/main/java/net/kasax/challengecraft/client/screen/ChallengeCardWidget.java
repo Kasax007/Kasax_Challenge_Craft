@@ -1,5 +1,7 @@
 package net.kasax.challengecraft.client.screen;
 
+import net.kasax.challengecraft.ChallengeCraftClient;
+import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.StatsManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -22,17 +24,33 @@ public class ChallengeCardWidget extends ClickableWidget {
     private boolean active;
     private final Consumer<Boolean> onToggle;
     private final Integer pbTicks;
+    private final boolean locked;
+    private final int requiredLevel;
 
     public ChallengeCardWidget(int x, int y, int width, int height, int challengeId, boolean active, Consumer<Boolean> onToggle) {
         super(x, y, width, height, Text.empty());
         this.challengeId = challengeId;
         this.icon = ChallengeIconProvider.getIcon(challengeId);
-        this.title = Text.translatable("challengecraft.worldcreate.challenge" + challengeId);
-        this.description = Text.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc");
+        if (challengeId > 100) {
+            this.title = Text.translatable("challengecraft.perk." + challengeId);
+            this.description = Text.translatable("challengecraft.perk." + challengeId + ".desc");
+        } else {
+            this.title = Text.translatable("challengecraft.worldcreate.challenge" + challengeId);
+            this.description = Text.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc");
+        }
         this.active = active;
         this.onToggle = onToggle;
         this.pbTicks = StatsManager.getBestTimes().get(challengeId);
-        setTooltip(Tooltip.of(description));
+        
+        int currentLevel = LevelManager.getLevelForXp(ChallengeCraftClient.LOCAL_PLAYER_XP);
+        this.requiredLevel = LevelManager.getRequiredLevel(challengeId);
+        this.locked = currentLevel < requiredLevel;
+        
+        if (locked) {
+            setTooltip(Tooltip.of(Text.literal("§cLocked! §7Requires Level §b" + requiredLevel).append("\n").append(description)));
+        } else {
+            setTooltip(Tooltip.of(description));
+        }
     }
 
     @Override
@@ -45,37 +63,45 @@ public class ChallengeCardWidget extends ClickableWidget {
     protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
         int textColor = active ? 0xFFFFFFFF : 0xFFA0A0A0;
         int bgColor = active ? 0x6000FF00 : 0x60000000;
-        if (isHovered()) {
+        if (locked) {
+            textColor = 0xFF555555;
+            bgColor = 0x80222222;
+        } else if (isHovered()) {
             bgColor = active ? 0x9000FF00 : 0x90555555;
         }
 
         context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), bgColor);
         context.drawBorder(getX(), getY(), getWidth(), getHeight(), isFocused() ? 0xFFFFFFFF : 0xFFAAAAAA);
 
-        context.drawItem(icon, getX() + 4, getY() + (getHeight() - 16) / 2);
+        if (locked) {
+            context.drawText(MinecraftClient.getInstance().textRenderer, "§c🔒 Lvl " + requiredLevel, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
+        } else {
+            context.drawItem(icon, getX() + 4, getY() + (getHeight() - 16) / 2);
+        }
 
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
         
         // Truncate text if it's too long
         Text renderedTitle = title;
-        if (tr.getWidth(title) > getWidth() - 28) {
-             String s = tr.trimToWidth(title.getString(), getWidth() - 36) + "...";
+        int xOffset = locked ? 48 : 24;
+        if (tr.getWidth(title) > getWidth() - xOffset - 4) {
+             String s = tr.trimToWidth(title.getString(), getWidth() - xOffset - 12) + "...";
              renderedTitle = Text.literal(s);
         }
 
-        if (pbTicks != null) {
+        if (pbTicks != null && !locked) {
             int titleY = getY() + (getHeight() / 2) - 9;
-            context.drawText(tr, renderedTitle, getX() + 24, titleY, textColor, true);
+            context.drawText(tr, renderedTitle, getX() + xOffset, titleY, textColor, true);
             
             String timeStr = formatTicks(pbTicks);
             MutableText pbText = Text.literal("COMPLETED: ").formatted(Formatting.GREEN)
                     .append(Text.literal(timeStr).formatted(Formatting.WHITE));
             
             int pbY = getY() + (getHeight() / 2) + 1;
-            context.drawText(tr, pbText, getX() + 24, pbY, 0xFFFFFF, true);
+            context.drawText(tr, pbText, getX() + xOffset, pbY, 0xFFFFFF, true);
         } else {
             int textY = getY() + (getHeight() - 8) / 2;
-            context.drawText(tr, renderedTitle, getX() + 24, textY, textColor, true);
+            context.drawText(tr, renderedTitle, getX() + xOffset, textY, textColor, true);
         }
     }
 
@@ -93,6 +119,7 @@ public class ChallengeCardWidget extends ClickableWidget {
 
     @Override
     public void onClick(double mouseX, double mouseY) {
+        if (locked) return;
         active = !active;
         if (onToggle != null) {
             onToggle.accept(active);

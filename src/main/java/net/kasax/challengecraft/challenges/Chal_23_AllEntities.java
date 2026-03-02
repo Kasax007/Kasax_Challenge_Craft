@@ -2,10 +2,13 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.AllEntitiesSyncPacket;
+import net.kasax.challengecraft.network.ChallengeRewardPacket;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -114,7 +117,10 @@ public class Chal_23_AllEntities {
         long xpAmount = Math.round(100.0 * difficulty);
 
         if (xpAmount > 0) {
-            XpManager.addXp(xpAmount);
+            server.getPlayerManager().getPlayerList().forEach(p -> {
+                LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
+                ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount));
+            });
             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
                     .formatted(Formatting.GOLD, Formatting.BOLD);
             server.getPlayerManager().broadcast(chatMsg, false);
@@ -141,7 +147,7 @@ public class Chal_23_AllEntities {
         
         AllEntitiesSyncPacket packet = new AllEntitiesSyncPacket(current, index, order.size());
         server.getPlayerManager().getPlayerList().forEach(player -> {
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
+            ServerPlayNetworking.send(player, packet);
         });
     }
 

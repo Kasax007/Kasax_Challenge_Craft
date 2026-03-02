@@ -4,6 +4,7 @@ import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeCraftClient;
+import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.MinecraftClient;
@@ -30,6 +31,7 @@ public class ChallengeSelectionScreen extends Screen {
             .toList();
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
+    private final List<ChallengeCardWidget> perkCards = new ArrayList<>();
     private SliderWidget maxHealthSlider;
     private SliderWidget slotsSlider;
     private SliderWidget mobHealthSlider;
@@ -54,12 +56,17 @@ public class ChallengeSelectionScreen extends Screen {
     protected void init() {
         super.init();
         cards.clear();
+        perkCards.clear();
 
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
 
         List<Integer> active = server != null
                 ? ChallengeSavedData.get(server.getOverworld()).getActive()
+                : List.of();
+
+        List<Integer> activePerks = server != null
+                ? ChallengeSavedData.get(server.getOverworld()).getActivePerks()
                 : List.of();
 
         // Read the CURRENT saved slider settings from the world (fallback to sane defaults)
@@ -97,6 +104,7 @@ public class ChallengeSelectionScreen extends Screen {
         this.scrollPanel = new WidgetScrollPanel(panelX, panelTop, panelWidth, panelHeight, Text.empty());
         addDrawableChild(this.scrollPanel);
 
+
         int cardWidth = 115;
         int cardHeight = 26;
         int spacing = 4;
@@ -106,25 +114,43 @@ public class ChallengeSelectionScreen extends Screen {
         int col = 0;
         int y = panelTop + 6;
 
+        // Initialize sliders
+        this.maxHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Health: %.1f❤", 0.5 + (sliderValue * 9.5))), sliderValue) {
+            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Health: %.1f❤", 0.5 + (this.value * 9.5)))); }
+            @Override protected void applyValue() {
+                sliderTicks = (int)(Math.round(this.value * 19) + 1);
+                this.value = (sliderTicks - 1) / 19.0;
+            }
+        };
+        this.slotsSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Slots: %d", slotsSliderTicks)), slotsSliderValue) {
+            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Slots: %d", (int)(1 + (this.value * 35))))); }
+            @Override protected void applyValue() {
+                slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
+                this.value = (slotsSliderTicks - 1) / 35.0;
+            }
+        };
+        this.mobHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Mob Health: %dx", mobHealthMultiplier)), mobHealthSliderValue) {
+            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Mob Health: %.0fx", 1 + (this.value * 99)))); }
+            @Override protected void applyValue() {
+                mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
+                this.value = (mobHealthMultiplier - 1) / 99.0;
+            }
+        };
+
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
-            // If we have a special case (slider) and we are currently on the right (col == 1),
-            // move to the next row to ensure the card starts on the left.
             if ((id == 7 || id == 12 || id == 24) && col == 1) {
                 y += cardHeight + spacing;
                 col = 0;
             }
 
             int currentX = (col == 0) ? x0 : x1;
-            int currentY = y;
-
-            ChallengeCardWidget card = new ChallengeCardWidget(currentX, currentY, cardWidth, cardHeight, id, isOn, val -> updateSaveButton());
+            ChallengeCardWidget card = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, id, isOn, val -> updateSaveButton());
             cards.add(card);
             scrollPanel.addChild(card);
 
-            // Handle standard card col increment for the card we just added
             if (col == 1) {
                 y += cardHeight + spacing;
                 col = 0;
@@ -132,78 +158,54 @@ public class ChallengeSelectionScreen extends Screen {
                 col = 1;
             }
 
-            if (id == 7) {
-                // Now col should be 1 (because 7 was at col 0), so the slider goes to the right of the card.
-                double initialHearts = 0.5 + (sliderValue * 9.5);
-                maxHealthSlider = new SliderWidget(
-                        x1, y, cardWidth, cardHeight,
-                        Text.literal(String.format("Health: %.1f❤", initialHearts)),
-                        sliderValue
-                ) {
-                    @Override
-                    protected void updateMessage() {
-                        double hearts = 0.5 + (this.value * 9.5);
-                        setMessage(Text.literal(String.format("Health: %.1f❤", hearts)));
-                    }
-
-                    @Override
-                    protected void applyValue() {
-                        ChallengeSelectionScreen.this.sliderTicks =
-                                (int)(Math.round(this.value * 19) + 1);
-                        this.value = (ChallengeSelectionScreen.this.sliderTicks - 1) / 19.0;
-                    }
-                };
+            if (id == 7 && maxHealthSlider != null) {
+                maxHealthSlider.setX(x1);
+                maxHealthSlider.setY(y);
                 scrollPanel.addChild(maxHealthSlider);
-                
-                // Since we manually filled col 1 with a slider, move to next row
                 y += cardHeight + spacing;
                 col = 0;
-            } else if (id == 12) {
-                double initialSlots = 1 + (slotsSliderValue * 35);
-                slotsSlider = new SliderWidget(
-                        x1, y, cardWidth, cardHeight,
-                        Text.literal(String.format("Slots: %.0f", initialSlots)),
-                        slotsSliderValue
-                ) {
-                    @Override
-                    protected void updateMessage() {
-                        double slots = 1 + (this.value * 35);
-                        setMessage(Text.literal(String.format("Slots: %.0f", slots)));
-                    }
-
-                    @Override
-                    protected void applyValue() {
-                        slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
-                        this.value  = (slotsSliderTicks - 1) / 35.0;
-                    }
-                };
+            }
+            if (id == 12 && slotsSlider != null) {
+                slotsSlider.setX(x1);
+                slotsSlider.setY(y);
                 scrollPanel.addChild(slotsSlider);
-                
                 y += cardHeight + spacing;
                 col = 0;
-            } else if (id == 24) {
-                double initialMult = 1 + (mobHealthSliderValue * 99);
-                mobHealthSlider = new SliderWidget(
-                        x1, y, cardWidth, cardHeight,
-                        Text.literal(String.format("Mob Health: %.0fx", initialMult)),
-                        mobHealthSliderValue
-                ) {
-                    @Override
-                    protected void updateMessage() {
-                        double mult = 1 + (this.value * 99);
-                        setMessage(Text.literal(String.format("Mob Health: %.0fx", mult)));
-                    }
-
-                    @Override
-                    protected void applyValue() {
-                        mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
-                        this.value = (mobHealthMultiplier - 1) / 99.0;
-                    }
-                };
+            }
+            if (id == 24 && mobHealthSlider != null) {
+                mobHealthSlider.setX(x1);
+                mobHealthSlider.setY(y);
                 scrollPanel.addChild(mobHealthSlider);
-
                 y += cardHeight + spacing;
                 col = 0;
+            }
+        }
+        if (col == 1) y += cardHeight + spacing;
+        y += 15;
+        Text perkTitle = Text.literal("--- Perks (-0.5 Difficulty each) ---");
+        scrollPanel.addChild(new net.minecraft.client.gui.widget.ClickableWidget(panelX, y, panelWidth, 20, perkTitle) {
+            @Override
+            protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+                context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
+            }
+            @Override
+            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+        });
+        y += 20;
+
+        col = 0;
+        for (int perkId : LevelManager.ALL_PERKS) {
+            boolean isOn = activePerks.contains(perkId);
+            int currentX = (col == 0) ? x0 : x1;
+            ChallengeCardWidget perkCard = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, perkId, isOn, val -> updateSaveButton());
+            perkCards.add(perkCard);
+            scrollPanel.addChild(perkCard);
+
+            if (col == 1) {
+                y += cardHeight + spacing;
+                col = 0;
+            } else {
+                col = 1;
             }
         }
         if (col == 1) y += cardHeight + spacing;
@@ -215,6 +217,7 @@ public class ChallengeSelectionScreen extends Screen {
                 Text.literal("Save"),
                 btn -> {
                     List<Integer> newActive = getActiveIds();
+                    List<Integer> newPerks = getActivePerks();
                     // ...
                     int ticks = 0;
                     if (newActive.contains(7) && maxHealthSlider != null) {
@@ -232,11 +235,11 @@ public class ChallengeSelectionScreen extends Screen {
                     }
 
                     ChallengeCraft.LOGGER.info(
-                            "[Client:Selection] Save pressed → active = {} , maxHearts ticks = {}, slots = {}, mobHealth = {}",
-                            newActive, ticks, slotticks, mobHealthMult
+                            "[Client:Selection] Save pressed → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}",
+                            newActive, newPerks, ticks, slotticks, mobHealthMult
                     );
 
-                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult));
+                    ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult, newPerks));
                     ChallengeCraft.LOGGER.info("[Client:Selection] sent ChallengePacket");
 
                     client.setScreen(null);
@@ -249,6 +252,16 @@ public class ChallengeSelectionScreen extends Screen {
     private List<Integer> getActiveIds() {
         List<Integer> ids = new ArrayList<>();
         for (ChallengeCardWidget card : cards) {
+            if (card.isActive()) {
+                ids.add(card.getChallengeId());
+            }
+        }
+        return ids;
+    }
+
+    private List<Integer> getActivePerks() {
+        List<Integer> ids = new ArrayList<>();
+        for (ChallengeCardWidget card : perkCards) {
             if (card.isActive()) {
                 ids.add(card.getChallengeId());
             }

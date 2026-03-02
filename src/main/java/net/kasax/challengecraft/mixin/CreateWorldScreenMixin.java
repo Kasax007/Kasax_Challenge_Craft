@@ -49,6 +49,7 @@ public class CreateWorldScreenMixin {
     private void onCreateLevel(CallbackInfo ci) {
         // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
+        List<Integer> perks = this.challengeTab.getSelectedPerks();
 
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(chosen)) {
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] Blocked world creation due to challenge conflicts: {}", chosen);
@@ -56,19 +57,21 @@ public class CreateWorldScreenMixin {
             return;
         }
 
-        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , maxHearts = {}, Inventory = {}, MobHealth = {}",
-                chosen, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER);
+        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , perks = {}, maxHearts = {}, Inventory = {}, MobHealth = {}",
+                chosen, perks, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER);
         // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
+        ChallengeCraftClient.SELECTED_PERKS = List.copyOf(perks);
 
         // if we’re on a real (integrated or remote) server, send them all:
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
             List<Integer> chosenList = ChallengeCraftClient.LAST_CHOSEN;
+            List<Integer> perkList = ChallengeCraftClient.SELECTED_PERKS;
             int maxHearts = ChallengeCraftClient.SELECTED_MAX_HEARTS;
             int limitedInventorySlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             int mobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
             ClientPlayNetworking.send(
-                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult)
+                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, perkList)
             );
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }

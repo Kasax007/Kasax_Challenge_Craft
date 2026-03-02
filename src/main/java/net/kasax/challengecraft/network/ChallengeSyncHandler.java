@@ -65,6 +65,9 @@ public class ChallengeSyncHandler {
                         case 25 -> Chal_25_DamageWorldBorder.setActive(true);
                     }
                 }
+
+                net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN = payload.active;
+                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_PERKS = payload.perks;
             });
         });
 
