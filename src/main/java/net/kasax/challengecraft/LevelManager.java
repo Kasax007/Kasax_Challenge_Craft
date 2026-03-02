@@ -4,6 +4,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.kasax.challengecraft.data.XpManager;
@@ -19,6 +22,9 @@ import java.util.UUID;
 public class LevelManager {
     public static final int MAX_LEVEL = 20;
     
+    public static final TrackedData<Integer> INFINITY_STARS = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    public static final TrackedData<Integer> LEVEL = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+
     public static final int PERK_NIGHT_VISION = 101;
     public static final int PERK_SWIFT_FOOTING = 102;
     public static final int PERK_TOUGH_SKIN = 103;
@@ -26,6 +32,7 @@ public class LevelManager {
     public static final int PERK_STRENGTH = 105;
     public static final int PERK_SCHOLAR = 106;
     public static final int PERK_RESISTANCE = 107;
+    public static final int PERK_INFINITY_WEAPON = 108;
 
     public static final List<Integer> ALL_PERKS = List.of(
             PERK_NIGHT_VISION,
@@ -34,14 +41,15 @@ public class LevelManager {
             PERK_FIRE_RESISTANCE,
             PERK_STRENGTH,
             PERK_SCHOLAR,
-            PERK_RESISTANCE
+            PERK_RESISTANCE,
+            PERK_INFINITY_WEAPON
     );
 
     public static int getLevelForXp(long totalXp) {
         // TotalXP = 50 * L * (L-1) => L^2 - L - TotalXP/50 = 0
         // L = (1 + sqrt(1 + 4 * TotalXP / 50)) / 2
         int level = (int) ((1 + Math.sqrt(1 + 0.08 * totalXp)) / 2);
-        return Math.max(1, level);
+        return Math.min(MAX_LEVEL, Math.max(1, level));
     }
 
     public static long getXpForLevel(int level) {
@@ -76,13 +84,8 @@ public class LevelManager {
         long currentXp = XpManager.getXp(player.getUuid());
         int oldLevel = getLevelForXp(currentXp);
         
-        ChallengeSavedData data = ChallengeSavedData.get(player.getServerWorld());
+        ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
         List<Integer> activePerks = data.getActivePerks();
-
-        // Level 15 Perk: +50% XP Gain
-        if (activePerks.contains(PERK_SCHOLAR) && oldLevel >= getRequiredLevel(PERK_SCHOLAR)) {
-            amount = (long) (amount * 1.5);
-        }
 
         XpManager.addXp(player.getUuid(), amount);
         long newXp = XpManager.getXp(player.getUuid());
@@ -91,7 +94,7 @@ public class LevelManager {
         if (newLevel > oldLevel && newLevel <= MAX_LEVEL) {
             onLevelUp(player, newLevel);
         } else if (getStars(newXp) > getStars(currentXp)) {
-            onStarGain(player, getStars(newXp));
+            onStarGain(player, getStars(newXp), currentXp, newXp);
         }
         
         sync(player);
@@ -115,13 +118,55 @@ public class LevelManager {
         }
     }
 
-    private static void onStarGain(ServerPlayerEntity player, int starCount) {
+    private static void onStarGain(ServerPlayerEntity player, int starCount, long oldXp, long newXp) {
         player.sendMessage(net.minecraft.text.Text.literal("§e§l+1 Infinity Star! §rTotal Stars: §6" + starCount), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
+        
+        // Handle new rewards
+        if (starCount == 20) {
+             player.sendMessage(net.minecraft.text.Text.literal("§d§lSECRET UNLOCKED! §rYou have unlocked the §6Infinity Weapon §rperk!"), false);
+        }
+
+        // Show overlay
+        ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.ChallengeRewardPacket(oldXp, newXp, newXp - oldXp, false));
+    }
+
+    public static String getStarReward(int stars) {
+        return switch (stars) {
+            case 1 -> "green";
+            case 3 -> "blue";
+            case 5 -> "red";
+            case 8 -> "purple";
+            case 10 -> "gold";
+            case 15 -> "rainbow";
+            case 20 -> "perk_infinity_weapon";
+            default -> null;
+        };
+    }
+
+    public static String getNameColor(int stars) {
+        if (stars >= 15) return "rainbow";
+        if (stars >= 10) return "gold";
+        if (stars >= 8) return "purple";
+        if (stars >= 5) return "red";
+        if (stars >= 3) return "blue";
+        if (stars >= 1) return "green";
+        return null;
     }
 
     public static void sync(ServerPlayerEntity player) {
         long xp = XpManager.getXp(player.getUuid());
+        int stars = getStars(xp);
+        int level = getLevelForXp(xp);
+        
+        // Sync DataTracker for name coloring and chat
+        if (player.getDataTracker().get(INFINITY_STARS) != stars) {
+             player.getDataTracker().set(INFINITY_STARS, stars);
+        }
+        if (player.getDataTracker().get(LEVEL) != level) {
+             player.getDataTracker().set(LEVEL, level);
+        }
+
         ServerPlayNetworking.send(player, new LevelSyncPacket(xp));
     }
 
@@ -131,7 +176,7 @@ public class LevelManager {
 
     public static int getRequiredLevel(int id) {
         return switch (id) {
-            case 1, 2, 3, 10, 14, 15, 16, 17, 18, 19 -> 1;
+            case 1, 10, 16, 17, 18 -> 1;
             case 4, 5 -> 2;
             case 6, 7 -> 3;
             case 8, 13 -> 4;
@@ -141,6 +186,11 @@ public class LevelManager {
             case 24 -> 8;
             case 25 -> 9;
             case 9 -> 10;
+            case 2 -> 12;
+            case 3 -> 13;
+            case 14 -> 16;
+            case 15 -> 17;
+            case 19 -> 19;
             case 22 -> 20;
             case 23 -> 15;
             
@@ -152,6 +202,7 @@ public class LevelManager {
             case PERK_STRENGTH -> 14;
             case PERK_SCHOLAR -> 15;
             case PERK_RESISTANCE -> 18;
+            case PERK_INFINITY_WEAPON -> 999; // Special handling for Infinity Weapon (Star 20)
 
             default -> 1;
         };

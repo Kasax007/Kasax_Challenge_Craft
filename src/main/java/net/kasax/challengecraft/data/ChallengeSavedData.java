@@ -54,8 +54,8 @@ public class ChallengeSavedData extends PersistentState {
 
     // ---- your actual state ----
 
-    /** Active challenge IDs (default = [1]) */
-    private final List<Integer> active = new ArrayList<>(List.of(1));
+    /** Active challenge IDs (default = []) */
+    private final List<Integer> active = new ArrayList<>();
 
     /** Max-health slider in half-heart “ticks” (1…20). Default = 20 (10 hearts). */
     private int maxHeartsTicks;

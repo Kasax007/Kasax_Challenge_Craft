@@ -17,6 +17,7 @@ public class ChallengeRewardOverlay {
     private static long startTime = -1;
     private static long xpGained = 0;
     private static long oldXp = 0;
+    private static boolean isGameComp = false;
     private static final long DELAY_MS = 5000;
     private static final long DURATION_MS = 8000;
 
@@ -26,10 +27,11 @@ public class ChallengeRewardOverlay {
         });
     }
 
-    public static void start(long oldXpVal, long newXpVal, long gain) {
+    public static void start(long oldXpVal, long newXpVal, long gain, boolean gameComp) {
         startTime = System.currentTimeMillis() + DELAY_MS;
         xpGained = gain;
         oldXp = oldXpVal;
+        isGameComp = gameComp;
     }
 
     private static void render(DrawContext context, float delta) {
@@ -57,7 +59,8 @@ public class ChallengeRewardOverlay {
         int baseAlpha = (int)(alpha * 255) << 24;
 
         // 2. Title: XP REWARDED
-        context.drawCenteredTextWithShadow(tr, Text.literal("§6§l★ CHALLENGE COMPLETE ★"), width / 2, centerY - 40, baseAlpha | 0xFFAA00);
+        String titleText = isGameComp ? "§d§l§k!!§r §d§lGAME COMPLETED §k!!§r" : "§6§l★ CHALLENGE COMPLETE ★";
+        context.drawCenteredTextWithShadow(tr, Text.literal(titleText), width / 2, centerY - 40, baseAlpha | (isGameComp ? 0xFF55FF : 0xFFAA00));
 
         // 3. XP Count animation
         float countProgress = MathHelper.clamp(progress * 2.0f, 0, 1);
@@ -117,22 +120,33 @@ public class ChallengeRewardOverlay {
         }
         context.drawCenteredTextWithShadow(tr, Text.literal(xpText), width / 2, barY + 2, baseAlpha | 0xFFFFFF);
 
-        if (currentLevel > oldLevel) {
+        int oldStarsDisplay = LevelManager.getStars(oldXp);
+        int currentStarsDisplay = LevelManager.getStars(currentXpDisplay);
+
+        if (currentLevel > oldLevel || currentStarsDisplay > oldStarsDisplay) {
             float lvPulse = (float) Math.sin(progress * 20) * 0.1f + 1.0f;
             context.getMatrices().push();
             context.getMatrices().translate(width / 2f, centerY + 55, 0);
             context.getMatrices().scale(lvPulse, lvPulse, 1);
             context.getMatrices().translate(-(width / 2f), -(centerY + 55), 0);
-            context.drawCenteredTextWithShadow(tr, Text.literal("§d§lLEVEL UP!"), width / 2, centerY + 50, baseAlpha | 0xFF55FF);
+            
+            if (currentLevel > oldLevel && currentLevel <= LevelManager.MAX_LEVEL) {
+                context.drawCenteredTextWithShadow(tr, Text.literal("§d§lLEVEL UP!"), width / 2, centerY + 50, baseAlpha | 0xFF55FF);
+            } else if (currentStarsDisplay > oldStarsDisplay) {
+                context.drawCenteredTextWithShadow(tr, Text.literal("§e§l+1 INFINITY STAR!"), width / 2, centerY + 50, baseAlpha | 0xFFFF55);
+            }
             context.getMatrices().pop();
 
             // Unlocks - show all cumulative rewards
             List<Object> rewards = new ArrayList<>();
-            for (int l = oldLevel + 1; l <= currentLevel; l++) {
+            // Only show level rewards up to MAX_LEVEL
+            for (int l = oldLevel + 1; l <= Math.min(currentLevel, LevelManager.MAX_LEVEL); l++) {
                  // Perks
-                 if (l == 5) rewards.add("SWIFT_FOOTING");
-                 if (l == 10) rewards.add("TOUGH_SKIN");
-                 if (l == 15) rewards.add("SCHOLAR");
+                 for (int perkId : LevelManager.ALL_PERKS) {
+                     if (LevelManager.getRequiredLevel(perkId) == l) {
+                         rewards.add("PERK_" + perkId);
+                     }
+                 }
                  if (l == 20) rewards.add("MASTER");
                  
                  // Challenges
@@ -141,6 +155,19 @@ public class ChallengeRewardOverlay {
                          rewards.add(id);
                      }
                  }
+            }
+
+            for (int s = oldStarsDisplay + 1; s <= currentStarsDisplay; s++) {
+                String starReward = LevelManager.getStarReward(s);
+                if (starReward != null) {
+                    if (starReward.startsWith("perk_")) {
+                        rewards.add("PERK_" + LevelManager.PERK_INFINITY_WEAPON);
+                    } else {
+                        rewards.add("STAR_COLOR_" + starReward);
+                    }
+                } else {
+                    rewards.add("STAR");
+                }
             }
             
             if (!rewards.isEmpty()) {
@@ -165,8 +192,29 @@ public class ChallengeRewardOverlay {
                         ItemStack icon = ChallengeIconProvider.getIcon(cid);
                         context.drawItem(icon, x, y);
                     } else if (reward instanceof String s) {
-                        // Draw Star for perks
-                        context.drawCenteredTextWithShadow(tr, Text.literal("§e★"), x + 8, y + 4, baseAlpha | 0xFFFF55);
+                        if (s.startsWith("PERK_")) {
+                            int perkId = Integer.parseInt(s.substring(5));
+                            ItemStack icon = ChallengeIconProvider.getIcon(perkId);
+                            context.drawItem(icon, x, y);
+                            context.drawText(tr, "★", x + 12, y + 8, baseAlpha | 0xFFFF55, true);
+                        } else if (s.startsWith("STAR_COLOR_")) {
+                             String color = s.substring(11);
+                             int c = switch (color) {
+                                 case "green" -> 0x55FF55;
+                                 case "blue" -> 0x5555FF;
+                                 case "red" -> 0xFF5555;
+                                 case "purple" -> 0xAA00FF;
+                                 case "gold" -> 0xFFAA00;
+                                 case "rainbow" -> 0x55FFFF;
+                                 default -> 0xFFFFFF;
+                             };
+                             context.drawText(tr, "✪", x + 4, y + 4, baseAlpha | c, true);
+                        } else if (s.equals("STAR")) {
+                             context.drawText(tr, "✪", x + 4, y + 4, baseAlpha | 0x888888, true);
+                        } else {
+                             // MASTER or other strings
+                             context.drawText(tr, "★", x + 4, y + 4, baseAlpha | 0xFFFF55, true);
+                        }
                     }
                     context.getMatrices().pop();
                 }

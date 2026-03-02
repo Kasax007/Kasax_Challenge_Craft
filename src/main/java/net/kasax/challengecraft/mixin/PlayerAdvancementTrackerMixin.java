@@ -56,13 +56,14 @@ public class PlayerAdvancementTrackerMixin {
                         }
 
                         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-                        long xpAmount = Math.round(100.0 * difficulty);
+                        long xpAmount = Math.round(100.0 * difficulty); // Increased award
                         
                         if (xpAmount > 0) {
                             final long baseAmount = xpAmount;
                             owner.getServer().getPlayerManager().getPlayerList().forEach(p -> {
                                 LevelManager.XpResult res = LevelManager.addXp(p, baseAmount);
-                                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount));
+                                // Advancement rewards are NOT game completions
+                                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, false));
                             });
                             
                             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)

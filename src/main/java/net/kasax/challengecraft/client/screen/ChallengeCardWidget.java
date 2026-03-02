@@ -42,12 +42,19 @@ public class ChallengeCardWidget extends ClickableWidget {
         this.onToggle = onToggle;
         this.pbTicks = StatsManager.getBestTimes().get(challengeId);
         
-        int currentLevel = LevelManager.getLevelForXp(ChallengeCraftClient.LOCAL_PLAYER_XP);
+        long currentXp = ChallengeCraftClient.LOCAL_PLAYER_XP;
+        int currentLevel = LevelManager.getLevelForXp(currentXp);
         this.requiredLevel = LevelManager.getRequiredLevel(challengeId);
-        this.locked = currentLevel < requiredLevel;
+        
+        if (challengeId == LevelManager.PERK_INFINITY_WEAPON) {
+            this.locked = LevelManager.getStars(currentXp) < 20;
+        } else {
+            this.locked = currentLevel < requiredLevel;
+        }
         
         if (locked) {
-            setTooltip(Tooltip.of(Text.literal("§cLocked! §7Requires Level §b" + requiredLevel).append("\n").append(description)));
+            String req = challengeId == LevelManager.PERK_INFINITY_WEAPON ? "20 Infinity Stars" : "Level " + requiredLevel;
+            setTooltip(Tooltip.of(Text.literal("§cLocked! §7Requires §b" + req).append("\n").append(description)));
         } else {
             setTooltip(Tooltip.of(description));
         }
@@ -74,7 +81,8 @@ public class ChallengeCardWidget extends ClickableWidget {
         context.drawBorder(getX(), getY(), getWidth(), getHeight(), isFocused() ? 0xFFFFFFFF : 0xFFAAAAAA);
 
         if (locked) {
-            context.drawText(MinecraftClient.getInstance().textRenderer, "§c🔒 Lvl " + requiredLevel, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
+            String label = challengeId == LevelManager.PERK_INFINITY_WEAPON ? "§c🔒 ★ 20" : "§c🔒 Lvl " + requiredLevel;
+            context.drawText(MinecraftClient.getInstance().textRenderer, label, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
         } else {
             context.drawItem(icon, getX() + 4, getY() + (getHeight() - 16) / 2);
         }

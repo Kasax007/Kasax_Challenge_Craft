@@ -64,40 +64,42 @@ public class ChallengeManager {
     }
 
     public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult) {
+        if (id == LevelManager.PERK_INFINITY_WEAPON) return 0.0;
         if (LevelManager.ALL_PERKS.contains(id)) {
             return -0.5;
         }
         return switch (id) {
-            case 1 -> 0.5;  // LevelItem (Harder)
-            case 2 -> 0.3;  // NoBlockDrops
-            case 3 -> 0.3;  // NoMobDrops
-            case 4 -> 0.3;  // NoChestLoot
-            case 5 -> 0.5;  // NoRegen
-            case 6 -> 0.5;  // NoVillagerTrading
-            case 7 -> (20.0 - ticks) / 19.0; // MaxHealthModify: 20 ticks=0, 1 tick=1.0
-            case 8 -> 1.0;  // NoCraftingTable
-            case 9 -> 5.0;  // ExpWorldBorder
-            case 10 -> -0.5; // RandomItem
-            case 11 -> 1.5; // SkyblockWorld
-            case 12 -> (36.0 - slots) / 35.0; // LimitedInventory: 36 slots=0, 1 slot=1.0
-            case 13 -> -0.5; // RandomEnchantment (Easier)
-            case 14 -> 0.4;  // RandomBlockDrops
-            case 15 -> 0.6;  // RandomMobDrops
-            case 16 -> 0.2; // RandomChunkBlocks (Easier)
+            case 1 -> 0.8;  // LevelItem (Harder)
+            case 2 -> 1.0;  // NoBlockDrops (Very Hard)
+            case 3 -> 0.8;  // NoMobDrops
+            case 4 -> 0.5;  // NoChestLoot
+            case 5 -> 1.5;  // NoRegen (Hard)
+            case 6 -> 0.7;  // NoVillagerTrading
+            case 7 -> (20.0 - ticks) / 19.0 * 5.0; // MaxHealthModify: increased weight
+            case 8 -> 2.0;  // NoCraftingTable (Massive impact)
+            case 9 -> 3.0;  // ExpWorldBorder
+            case 10 -> -0.5; // RandomItem (Helpful)
+            case 11 -> 2.5; // SkyblockWorld (Hard)
+            case 12 -> (36.0 - slots) / 35.0 * 5.0; // LimitedInventory: increased weight
+            case 13 -> -0.5; // RandomEnchantment (Helpful)
+            case 14 -> 0.5;  // RandomBlockDrops
+            case 15 -> 0.7;  // RandomMobDrops
+            case 16 -> 0.2; // RandomChunkBlocks
             case 17 -> 0.4; // WalkRandomItem
             case 18 -> 0.4; // DamageRandomItem
-            case 19 -> 0.5; // MinePotionEffect
-            case 20 -> 0.8; // RandomizedCrafting
-            case 21 -> 1.0; // Hardcore
-            case 22 -> 30.0; // All Items (Very Hard!)
-            case 23 -> 15.0; // All Entities (Very Hard!)
-            case 24 -> (mobHealthMult - 1) / 99.0 * 10.0;
-            case 25 -> 2.0; // DamageWorldBorder
+            case 19 -> 0.6; // MinePotionEffect
+            case 20 -> 1.5; // RandomizedCrafting (Hard)
+            case 21 -> 3.0; // Hardcore (One life)
+            case 22 -> 15.0; // All Items (Gives XP per item now)
+            case 23 -> 10.0; // All Entities (Gives XP per entity now)
+            case 24 -> (mobHealthMult - 1) / 99.0 * 15.0; // Mob Health
+            case 25 -> 4.0; // DamageWorldBorder
             default -> 0.0;
         };
     }
 
     public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult, List<Integer> perks) {
+        if (perks.contains(LevelManager.PERK_INFINITY_WEAPON)) return 0.0;
         double total = 0;
         for (int id : ids) {
             total += getDifficulty(id, heartsTicks, inventorySlots, mobHealthMult);
@@ -108,11 +110,15 @@ public class ChallengeManager {
         return Math.max(0, total); // Ensure it's not negative
     }
 
-    public static boolean hasConflict(List<Integer> ids) {
+    public static boolean hasConflict(List<Integer> ids, List<Integer> perks) {
         if (ids.contains(2) && ids.contains(14)) return true; // No Block Drops + Random Block Drops
         if (ids.contains(3) && ids.contains(15)) return true; // No Mob Drops + Random Mob Drops
         if (ids.contains(8) && ids.contains(20)) return true; // No Crafting Table + Randomized Crafting
         if (ids.contains(9) && ids.contains(25)) return true; // ExpWorldBorder + DamageWorldBorder
+        
+        // Added Max Hearts (Perk 103) + Max Health Modifier (Challenge 7) conflict
+        if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
+
         return false;
     }
 
@@ -151,9 +157,7 @@ public class ChallengeManager {
             }
 
             // Seed from client if first boot
-            // We check if it's a fresh save. By default 'active' is [1].
-            // If the client has something else or if it's truly the first time.
-            if (!data.isDifficultySet() && !ChallengeCraftClient.LAST_CHOSEN.isEmpty()) {
+            if (!data.isDifficultySet()) {
                 
                 int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                 int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
@@ -173,6 +177,13 @@ public class ChallengeManager {
                 Chal_12_LimitedInventory.setLimitedSlots(clientSlots);
                 Chal_24_MobHealthMultiply.setMultiplier(clientMult);
                 Chal_25_DamageWorldBorder.setDiameter(data.getDamageWorldBorderSize());
+
+                // If Infinity Weapon perk is included at world creation, grant it once to eligible online players
+                if (ChallengeCraftClient.SELECTED_PERKS.contains(LevelManager.PERK_INFINITY_WEAPON)) {
+                    for (var p : world.getServer().getPlayerManager().getPlayerList()) {
+                        net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
+                    }
+                }
 
                 // Force spawn to 0,0 for border challenges in new world
                 if (ChallengeCraftClient.LAST_CHOSEN.contains(9) || ChallengeCraftClient.LAST_CHOSEN.contains(25)) {

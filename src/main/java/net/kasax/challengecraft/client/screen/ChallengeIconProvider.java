@@ -43,6 +43,7 @@ public class ChallengeIconProvider {
         ICONS.put(105, new ItemStack(Items.DIAMOND_SWORD));
         ICONS.put(106, new ItemStack(Items.BOOK));
         ICONS.put(107, new ItemStack(Items.SHIELD));
+        ICONS.put(108, new ItemStack(Items.GOLDEN_SWORD));
     }
 
     public static ItemStack getIcon(int id) {

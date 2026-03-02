@@ -20,7 +20,9 @@
     "PlayerAdvancementTrackerMixin",
     "MovementAndDamageMixin",
     "ServerRecipeManagerMixin",
-    "MobHealthMixin"
+    "MobHealthMixin",
+    "ScholarPerkMixin",
+    "PlayerNameMixin"
   ],
   "injectors": {
     "defaultRequire": 1

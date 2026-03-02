@@ -129,7 +129,7 @@ public class ChallengeTab extends GridScreenTab {
         }
         List<Integer> activePerks = getSelectedPerks();
 
-        if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds)) {
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.difficultyText = Text.translatable("challengecraft.warning.conflict");
         } else {
             double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, activePerks);
@@ -248,6 +248,13 @@ public class ChallengeTab extends GridScreenTab {
 
         col = 0;
         for (ChallengeCardWidget perkCard : perkCards) {
+            // Hide Infinity Weapon perk if not unlocked (20 stars)
+            if (perkCard.getChallengeId() == net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON) {
+                if (net.kasax.challengecraft.LevelManager.getStars(ChallengeCraftClient.LOCAL_PLAYER_XP) < 20) {
+                    continue;
+                }
+            }
+            
             perkCard.setX((col == 0) ? x0 : x1);
             perkCard.setY(y);
             perkCard.setWidth(cardW);

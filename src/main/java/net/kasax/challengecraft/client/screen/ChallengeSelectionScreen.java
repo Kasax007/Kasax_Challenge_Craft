@@ -195,6 +195,12 @@ public class ChallengeSelectionScreen extends Screen {
 
         col = 0;
         for (int perkId : LevelManager.ALL_PERKS) {
+            // Hide Infinity Weapon perk if not unlocked (20 stars)
+            if (perkId == LevelManager.PERK_INFINITY_WEAPON) {
+                if (LevelManager.getStars(ChallengeCraftClient.LOCAL_PLAYER_XP) < 20) {
+                    continue;
+                }
+            }
             boolean isOn = activePerks.contains(perkId);
             int currentX = (col == 0) ? x0 : x1;
             ChallengeCardWidget perkCard = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, perkId, isOn, val -> updateSaveButton());
@@ -271,7 +277,7 @@ public class ChallengeSelectionScreen extends Screen {
 
     private void updateSaveButton() {
         if (saveButton != null) {
-            saveButton.active = !net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds());
+            saveButton.active = !net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks());
         }
     }
 
@@ -290,7 +296,7 @@ public class ChallengeSelectionScreen extends Screen {
         ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, width / 2, 10, 0xFFFF55);
 
         // Render the warning message
-        if (net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds())) {
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks())) {
             Text conflictWarning = Text.translatable("challengecraft.warning.conflict");
             ctx.drawCenteredTextWithShadow(this.textRenderer, conflictWarning, width / 2, 24, 0xFF5555);
         } else {

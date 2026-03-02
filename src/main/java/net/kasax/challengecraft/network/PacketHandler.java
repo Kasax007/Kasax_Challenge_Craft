@@ -35,12 +35,23 @@ public class PacketHandler {
                         );
                         var world = server.getOverworld();
                         ChallengeSavedData data = ChallengeSavedData.get(world);
+                        // capture previous perks to detect first-time activation
+                        java.util.List<Integer> prevPerks = new java.util.ArrayList<>(data.getActivePerks());
                         // overwrite your active list
                         data.setActive(packet.active);
                         data.setActivePerks(packet.perks);
                         data.setMaxHeartsTicks(packet.maxHearts);
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
                         data.setMobHealthMultiplier(packet.mobHealthMultiplier);
+
+                        // If Infinity Weapon perk is newly activated via in-game selection, grant it once to eligible players
+                        boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
+                        boolean hasAfter  = packet.perks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
+                        if (!hadBefore && hasAfter) {
+                            for (var p : server.getPlayerManager().getPlayerList()) {
+                                net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
+                            }
+                        }
                         
                         if (!data.isTainted()) {
                             data.setTainted(true);

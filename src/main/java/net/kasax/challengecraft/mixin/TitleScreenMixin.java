@@ -8,11 +8,15 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
+import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
+import java.util.UUID;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(TitleScreen.class)
 public abstract class TitleScreenMixin extends Screen {
@@ -27,6 +31,25 @@ public abstract class TitleScreenMixin extends Screen {
         this.addDrawableChild(new AnimatedLevelButton(x, y, 200, 20, Text.translatable("challengecraft.mainmenu.leveling_button"), button -> {
             this.client.setScreen(new LevelingScreen(this));
         }));
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void onMouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (this.client == null) return;
+
+        long windowHandle = this.client.getWindow().getHandle();
+
+        boolean isCommaHeld = InputUtil.isKeyPressed(windowHandle, GLFW.GLFW_KEY_COMMA);
+        boolean isPeriodHeld = InputUtil.isKeyPressed(windowHandle, GLFW.GLFW_KEY_PERIOD);
+
+        // Top-left 10x10 corner while holding , and .
+        if (mouseX <= 10 && mouseY <= 10 && isCommaHeld && isPeriodHeld) {
+            UUID uuid = this.client.getSession().getUuidOrNull();
+            if (uuid != null) {
+                XpManager.addXp(uuid, 500);
+                cir.setReturnValue(true);
+            }
+        }
     }
 
     @Inject(method = "render", at = @At("TAIL"))

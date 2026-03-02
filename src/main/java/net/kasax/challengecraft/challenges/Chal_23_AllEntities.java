@@ -57,6 +57,15 @@ public class Chal_23_AllEntities {
                     data.setAllEntitiesIndex(index);
                     syncProgressToAll(server, data);
 
+                    // Give some XP for discovering the entity (scaled by difficulty)
+                    double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
+                    long xpPerEntity = Math.round(10.0); // Entities are rarer than items
+                    if (xpPerEntity > 0 && difficulty > 0) {
+                        server.getPlayerManager().getPlayerList().forEach(p -> {
+                            LevelManager.addXp(p, xpPerEntity);
+                        });
+                    }
+
                     if (index >= order.size()) {
                         completeChallenge(server, data);
                     }
@@ -114,12 +123,18 @@ public class Chal_23_AllEntities {
         }
 
         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-        long xpAmount = Math.round(100.0 * difficulty);
+        long xpAmount = Math.round(100.0 * difficulty); // Increased completion reward
 
         if (xpAmount > 0) {
+            boolean isGameComp = true;
+            if (data.getActive().contains(22) && data.getAllItemsIndex() < data.getAllItemsOrder().size()) {
+                isGameComp = false;
+            }
+
+            final boolean finalIsGameComp = isGameComp;
             server.getPlayerManager().getPlayerList().forEach(p -> {
                 LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
-                ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount));
+                ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, finalIsGameComp));
             });
             Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
                     .formatted(Formatting.GOLD, Formatting.BOLD);

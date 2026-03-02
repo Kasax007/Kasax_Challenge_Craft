@@ -51,8 +51,8 @@ public class CreateWorldScreenMixin {
         List<Integer> chosen = this.challengeTab.getActive();
         List<Integer> perks = this.challengeTab.getSelectedPerks();
 
-        if (net.kasax.challengecraft.ChallengeManager.hasConflict(chosen)) {
-            ChallengeCraft.LOGGER.info("[Client:CreateWorld] Blocked world creation due to challenge conflicts: {}", chosen);
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(chosen, perks)) {
+            ChallengeCraft.LOGGER.info("[Client:CreateWorld] Blocked world creation due to challenge conflicts: challenges={}, perks={}", chosen, perks);
             ci.cancel();
             return;
         }

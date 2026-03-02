@@ -78,7 +78,9 @@
   "challengecraft.perk.105": "Strength",
   "challengecraft.perk.105.desc": "Grants +3 permanent Attack Damage.",
   "challengecraft.perk.106": "Scholar",
-  "challengecraft.perk.106.desc": "Grants +50% XP gain from all sources.",
+  "challengecraft.perk.106.desc": "Grants +50% in-game experience gain from all sources.",
   "challengecraft.perk.107": "Resistance",
-  "challengecraft.perk.107.desc": "Grants +4 permanent Armor points."
+  "challengecraft.perk.107.desc": "Grants +4 permanent Armor points.",
+  "challengecraft.perk.108": "Infinity Weapon",
+  "challengecraft.perk.108.desc": "Grants a special sword, but sets difficulty to 0."
 }

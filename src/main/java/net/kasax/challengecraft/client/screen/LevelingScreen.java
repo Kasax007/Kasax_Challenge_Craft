@@ -49,10 +49,32 @@ public class LevelingScreen extends Screen {
 
         // Populate levels
         int currentY = panelY + 5;
+        long xp = ChallengeCraftClient.LOCAL_PLAYER_XP;
+        int level = LevelManager.getLevelForXp(xp);
+
+        // Show all levels up to MAX_LEVEL
         for (int l = 1; l <= LevelManager.MAX_LEVEL; l++) {
-            LevelEntryWidget entry = new LevelEntryWidget(panelX + 5, currentY, panelWidth - 25, l);
+            LevelEntryWidget entry = new LevelEntryWidget(panelX + 5, currentY, panelWidth - 25, l, false);
             scrollPanel.addChild(entry);
             currentY += entry.getHeight() + 5;
+        }
+
+        // Only show infinity rewards if level 20 is reached
+        if (level >= LevelManager.MAX_LEVEL) {
+            // Show only infinity stars that have a reward, up to at least the player's current star count + next one
+            int currentStars = LevelManager.getStars(xp);
+            int maxStarToShow = currentStars + 1;
+
+            for (int s = 1; s <= maxStarToShow; s++) {
+                if (LevelManager.getStarReward(s) != null) {
+                    // Hide star 20 until actually reached
+                    if (s == 20 && currentStars < 20) continue;
+                    
+                    LevelEntryWidget entry = new LevelEntryWidget(panelX + 5, currentY, panelWidth - 25, s, true);
+                    scrollPanel.addChild(entry);
+                    currentY += entry.getHeight() + 5;
+                }
+            }
         }
 
         addDrawableChild(ButtonWidget.builder(Text.literal("Back"), btn -> client.setScreen(parent))
@@ -107,38 +129,71 @@ public class LevelingScreen extends Screen {
 
     private static class LevelEntryWidget extends net.minecraft.client.gui.widget.ClickableWidget {
         private final int level;
+        private final boolean isStar;
         private final boolean unlocked;
         private final List<Reward> rewards = new ArrayList<>();
 
-        public LevelEntryWidget(int x, int y, int width, int level) {
+        public LevelEntryWidget(int x, int y, int width, int val, boolean isStar) {
             super(x, y, width, 0, Text.empty());
-            this.level = level;
+            this.level = val;
+            this.isStar = isStar;
             long currentXp = ChallengeCraftClient.LOCAL_PLAYER_XP;
-            this.unlocked = LevelManager.getLevelForXp(currentXp) >= level;
-
-            // Determine rewards
-            for (int perkId : LevelManager.ALL_PERKS) {
-                if (LevelManager.getRequiredLevel(perkId) == level) {
-                    Text name = Text.translatable("challengecraft.perk." + perkId);
-                    Text desc = Text.translatable("challengecraft.perk." + perkId + ".desc");
-                    ItemStack icon = ChallengeIconProvider.getIcon(perkId);
-                    rewards.add(new Reward(Text.literal("§aPerk: ").append(name), desc, icon, true));
-                }
+            
+            if (!isStar) {
+                this.unlocked = LevelManager.getLevelForXp(currentXp) >= level;
+            } else {
+                this.unlocked = LevelManager.getStars(currentXp) >= level;
             }
 
-            for (int id = 1; id <= 25; id++) {
-                if (LevelManager.getRequiredLevel(id) == level) {
-                    Text name = Text.translatable("challengecraft.worldcreate.challenge" + id);
-                    Text desc = Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc");
-                    ItemStack icon = ChallengeIconProvider.getIcon(id);
-                    rewards.add(new Reward(name, desc, icon, false));
+            // Determine rewards
+            if (!isStar) {
+                for (int perkId : LevelManager.ALL_PERKS) {
+                    if (LevelManager.getRequiredLevel(perkId) == level) {
+                        Text name = Text.translatable("challengecraft.perk." + perkId);
+                        Text desc = Text.translatable("challengecraft.perk." + perkId + ".desc");
+                        ItemStack icon = ChallengeIconProvider.getIcon(perkId);
+                        rewards.add(new Reward(Text.literal("§aPerk: ").append(name), desc, icon, true));
+                    }
+                }
+
+                for (int id = 1; id <= 25; id++) {
+                    if (LevelManager.getRequiredLevel(id) == level) {
+                        Text name = Text.translatable("challengecraft.worldcreate.challenge" + id);
+                        Text desc = Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc");
+                        ItemStack icon = ChallengeIconProvider.getIcon(id);
+                        rewards.add(new Reward(name, desc, icon, false));
+                    }
+                }
+            } else {
+                // Infinity Star rewards
+                String rewardId = LevelManager.getStarReward(level);
+                if (rewardId != null) {
+                    if (rewardId.startsWith("perk_")) {
+                        int perkId = LevelManager.PERK_INFINITY_WEAPON;
+                        Text name = Text.translatable("challengecraft.perk." + perkId);
+                        Text desc = Text.translatable("challengecraft.perk." + perkId + ".desc");
+                        ItemStack icon = ChallengeIconProvider.getIcon(perkId);
+                        rewards.add(new Reward(Text.literal("§dSECRET: ").append(name), desc, icon, true));
+                    } else {
+                        String colorCode = switch (rewardId) {
+                            case "green" -> "§aGreen";
+                            case "blue" -> "§9Blue";
+                            case "red" -> "§cRed";
+                            case "purple" -> "§5Purple";
+                            case "gold" -> "§6Gold";
+                            case "rainbow" -> "§b§lR§a§la§e§li§c§ln§d§lb§9§lo§b§lw";
+                            default -> rewardId;
+                        };
+                        rewards.add(new Reward(Text.literal("§e" + colorCode + " Name Color"), 
+                                Text.literal("Your name will be displayed in " + rewardId + "."), ItemStack.EMPTY, true));
+                    }
                 }
             }
             
             // Calculate height
             int h = 20; // Level header
             for (Reward r : rewards) {
-                h += r.isPerk ? 25 : 30; // space for icon and description
+                h += 30; // standardized space for icon and description
             }
             if (rewards.isEmpty()) h += 15;
             this.height = Math.max(40, h);
@@ -153,12 +208,18 @@ public class LevelingScreen extends Screen {
             context.drawBorder(getX(), getY(), getWidth(), getHeight(), 0xFFAAAAAA);
 
             var tr = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-            context.drawText(tr, "Level " + level, getX() + 5, getY() + 5, unlocked ? 0xFFFFFF : 0xAAAAAA, true);
+            String label = isStar ? "Infinity Star " + level : "Level " + level;
+            context.drawText(tr, label, getX() + 5, getY() + 5, unlocked ? 0xFFFFFF : 0xAAAAAA, true);
             
             if (unlocked) {
                 context.drawText(tr, "§a✓ UNLOCKED", getX() + getWidth() - 65, getY() + 5, 0xFFFFFF, true);
             } else {
-                long needed = LevelManager.getXpForLevel(level);
+                long needed;
+                if (!isStar) {
+                    needed = LevelManager.getXpForLevel(level);
+                } else {
+                    needed = LevelManager.getXpForLevel(LevelManager.MAX_LEVEL) + (long) level * 1000;
+                }
                 context.drawText(tr, "§cLocked (" + needed + " XP)", getX() + getWidth() - 95, getY() + 5, 0xFFFFFF, true);
             }
 
@@ -167,23 +228,25 @@ public class LevelingScreen extends Screen {
                 context.drawText(tr, "§8No specific unlocks", getX() + 15, ry, 0x888888, false);
             } else {
                 for (Reward reward : rewards) {
-                    if (reward.isPerk) {
-                        context.drawText(tr, "★ " + reward.name.getString(), getX() + 10, ry, 0xFFFF55, true);
-                        ry += 10;
-                        context.drawText(tr, "  §7" + reward.description.getString(), getX() + 10, ry, 0xAAAAAA, false);
-                        ry += 15;
-                    } else {
+                    int textX = getX() + 30;
+                    if (!reward.icon.isEmpty()) {
                         context.drawItem(reward.icon, getX() + 10, ry);
-                        context.drawText(tr, reward.name, getX() + 30, ry, 0xFFFFFF, true);
-                        ry += 10;
-                        
-                        String descStr = reward.description.getString();
-                        if (tr.getWidth(descStr) > getWidth() - 40) {
-                            descStr = tr.trimToWidth(descStr, getWidth() - 50) + "...";
-                        }
-                        context.drawText(tr, "§7" + descStr, getX() + 30, ry, 0xAAAAAA, false);
-                        ry += 20;
+                    } else if (reward.isPerk) {
+                        context.drawText(tr, "★", getX() + 12, ry, 0xFFFF55, true);
+                    } else {
+                        textX = getX() + 10;
                     }
+
+                    context.drawText(tr, reward.name, textX, ry, reward.isPerk ? 0xFFFF55 : 0xFFFFFF, true);
+                    ry += 10;
+                    
+                    String descStr = reward.description.getString();
+                    int maxW = getWidth() - (textX - getX()) - 10;
+                    if (tr.getWidth(descStr) > maxW) {
+                        descStr = tr.trimToWidth(descStr, maxW - 10) + "...";
+                    }
+                    context.drawText(tr, "§7" + descStr, textX, ry, 0xAAAAAA, false);
+                    ry += 20;
                 }
             }
         }

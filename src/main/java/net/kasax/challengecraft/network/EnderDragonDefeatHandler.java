@@ -7,7 +7,7 @@ public class EnderDragonDefeatHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(ChallengeRewardPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                ChallengeRewardOverlay.start(payload.oldXp, payload.newXp, payload.xpGained);
+                ChallengeRewardOverlay.start(payload.oldXp, payload.newXp, payload.xpGained, payload.isGameCompletion);
             });
         });
     }
