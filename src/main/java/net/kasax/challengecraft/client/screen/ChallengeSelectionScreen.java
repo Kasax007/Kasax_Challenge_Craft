@@ -62,28 +62,30 @@ public class ChallengeSelectionScreen extends Screen {
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
 
-        List<Integer> active = server != null
-                ? ChallengeSavedData.get(server.getOverworld()).getActive()
-                : List.of();
+        List<Integer> active;
+        List<Integer> activePerks;
+        int savedMaxHeartsTicks;
+        int savedSlots;
+        int savedMobHealthMult;
 
-        List<Integer> activePerks = server != null
-                ? ChallengeSavedData.get(server.getOverworld()).getActivePerks()
-                : List.of();
+        if (server != null) {
+            ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+            active = data.getActive();
+            activePerks = data.getActivePerks();
+            savedMaxHeartsTicks = data.getMaxHeartsTicks();
+            savedSlots = data.getLimitedInventorySlots();
+            savedMobHealthMult = data.getMobHealthMultiplier();
+        } else {
+            // Client side on dedicated server
+            active = ChallengeCraftClient.LAST_CHOSEN;
+            activePerks = ChallengeCraftClient.SELECTED_PERKS;
+            savedMaxHeartsTicks = ChallengeCraftClient.SELECTED_MAX_HEARTS;
+            savedSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
+            savedMobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
+        }
 
-        // Read the CURRENT saved slider settings from the world (fallback to sane defaults)
-        int savedMaxHeartsTicks = server != null
-                ? ChallengeSavedData.get(server.getOverworld()).getMaxHeartsTicks()
-                : 0;
-        if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20; // default 10 hearts
-
-        int savedSlots = server != null
-                ? ChallengeSavedData.get(server.getOverworld()).getLimitedInventorySlots()
-                : 0;
-        if (savedSlots <= 0) savedSlots = 36; // default full inventory
-
-        int savedMobHealthMult = server != null
-                ? ChallengeSavedData.get(server.getOverworld()).getMobHealthMultiplier()
-                : 0;
+        if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20;
+        if (savedSlots <= 0) savedSlots = 36;
         if (savedMobHealthMult <= 0) savedMobHealthMult = 1;
 
         // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)

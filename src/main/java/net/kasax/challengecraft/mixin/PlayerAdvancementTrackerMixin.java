@@ -63,9 +63,12 @@ public class PlayerAdvancementTrackerMixin {
                                 StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
                             });
                         }
+                        
+                        // Sync stats to all eligible players after recording
+                        eligiblePlayers.forEach(LevelManager::sync);
 
                         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-                        long xpAmount = Math.round(100.0 * difficulty); // Increased award
+                        long xpAmount = Math.round(100.0 * difficulty); // Adjusted award as requested
                         
                         if (xpAmount > 0) {
                             final long baseAmount = xpAmount;

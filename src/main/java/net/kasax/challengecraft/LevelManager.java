@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.LevelSyncPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -159,12 +160,18 @@ public class LevelManager {
 
     public static void sync(ServerPlayerEntity player) {
         long xp = XpManager.getXp(player.getUuid());
+        ChallengeCraft.LOGGER.info("[Server] Syncing XP for {} (UUID: {}): {}", player.getName().getString(), player.getUuid(), xp);
         
         // Broadcast to all players so they know this player's level/stars (for name tags)
         LevelSyncPacket pkt = new LevelSyncPacket(xp, player.getUuid());
         for (ServerPlayerEntity p : player.getServer().getPlayerManager().getPlayerList()) {
-            ServerPlayNetworking.send(p, pkt);
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, pkt);
         }
+
+        // Also sync personal bests and completions
+        java.util.Map<Integer, Integer> times = StatsManager.getBestTimes(player.getUuidAsString());
+        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.StatsSyncPacket(times));
+        ChallengeCraft.LOGGER.info("[Server] Synced Level ({}) and Stats ({}) to player {}", getLevelForXp(xp), times.size(), player.getName().getString());
     }
 
     public static boolean isChallengeUnlocked(int id, int level) {
@@ -203,5 +210,10 @@ public class LevelManager {
 
             default -> 1;
         };
+    }
+
+    public static long getPlayerXp(net.minecraft.entity.player.PlayerEntity player) {
+        if (player == null) return 0;
+        return net.kasax.challengecraft.util.XpLookupProxy.getXp(player.getUuid());
     }
 }

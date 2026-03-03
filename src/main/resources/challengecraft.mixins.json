@@ -3,7 +3,6 @@
   "package": "net.kasax.challengecraft.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "CreateWorldMixinIntegratedServer",
     "EntityTypeMixin",
     "ExampleMixin",
     "LevelInfoAccessor",
@@ -30,6 +29,7 @@
     "defaultRequire": 1
   },
   "client": [
+    "CreateWorldMixinIntegratedServer",
     "CreateWorldScreenMixin",
     "TitleScreenMixin",
     "InGameHudMixin",

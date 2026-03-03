@@ -124,9 +124,15 @@ public class ChallengeCraft implements ModInitializer {
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
+		PayloadTypeRegistry.playC2S()
+				.register(ClientXpSyncPacket.ID, ClientXpSyncPacket.CODEC);
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				StatsSyncPacket.ID,
+				StatsSyncPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
 				LevelSyncPacket.ID,
@@ -163,7 +169,7 @@ public class ChallengeCraft implements ModInitializer {
 
 		// 2) Now hook up the handler:
 		PacketHandler.register();
-		PlayTimePacketHandler.register();
+		PlayTimePacketHandler.registerServer();
 
 		// Chunk Generator Register
 		Registry.register(

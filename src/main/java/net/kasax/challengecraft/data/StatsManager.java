@@ -40,6 +40,27 @@ public class StatsManager {
         }
     }
 
+    public static synchronized void updateStatsFromServer(String uuid, Map<Integer, Integer> serverTimes) {
+        if (!loaded) {
+            load();
+        }
+        Map<Integer, Integer> playerTimes = bestTimes.computeIfAbsent(uuid, k -> new HashMap<>());
+        boolean changed = false;
+        for (var entry : serverTimes.entrySet()) {
+            int cid = entry.getKey();
+            int ticks = entry.getValue();
+            int currentBest = playerTimes.getOrDefault(cid, Integer.MAX_VALUE);
+            if (ticks < currentBest) {
+                playerTimes.put(cid, ticks);
+                changed = true;
+            }
+        }
+        if (changed) {
+            LOGGER.info("Updated stats for player {} from server", uuid);
+            save();
+        }
+    }
+
     private static void load() {
         if (Files.exists(STATS_FILE)) {
             try {

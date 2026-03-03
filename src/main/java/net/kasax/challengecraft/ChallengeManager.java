@@ -51,7 +51,13 @@ public class ChallengeManager {
         ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
         List<Integer> active = data.getActive();
         List<Integer> perks = data.getActivePerks();
-        ChallengeSyncPacket pkt = new ChallengeSyncPacket(active, perks);
+        ChallengeSyncPacket pkt = new ChallengeSyncPacket(
+                active,
+                perks,
+                data.getMaxHeartsTicks(),
+                data.getLimitedInventorySlots(),
+                data.getMobHealthMultiplier()
+        );
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, pkt);
         }
@@ -156,44 +162,57 @@ public class ChallengeManager {
                 LOGGER.info("[Manager] restored damage world border size = {}", savedSize);
             }
 
-            // Seed from client if first boot
+            // Seed from client if first boot and we are in singleplayer/integrated server
             if (!data.isDifficultySet()) {
+                boolean serverSide = world.getServer().isDedicated();
                 
-                int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
-                int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
-                int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
+                if (serverSide) {
+                    // On dedicated server, if we already have some active challenges, just calculate difficulty and mark set
+                    if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36) {
+                        double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getActivePerks());
+                        data.setInitialDifficulty(initialDiff);
+                        data.setDifficultySet(true);
+                        LOGGER.info("ChallengeManager: seeded from existing data (dedicated server). Initial Difficulty: {}", initialDiff);
+                    }
+                } else {
+                    // Singleplayer: use client's last choices
+                    int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
+                    int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
+                    int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
 
-                data.setMaxHeartsTicks(clientTicks);
-                data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
-                data.setActivePerks(List.copyOf(ChallengeCraftClient.SELECTED_PERKS));
-                data.setLimitedInventorySlots(clientSlots);
-                data.setMobHealthMultiplier(clientMult);
-                
-                double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, ChallengeCraftClient.SELECTED_PERKS);
-                data.setInitialDifficulty(initialDiff);
-                data.setDifficultySet(true);
+                    data.setMaxHeartsTicks(clientTicks);
+                    data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
+                    data.setActivePerks(List.copyOf(ChallengeCraftClient.SELECTED_PERKS));
+                    data.setLimitedInventorySlots(clientSlots);
+                    data.setMobHealthMultiplier(clientMult);
+                    
+                    double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, ChallengeCraftClient.SELECTED_PERKS);
+                    data.setInitialDifficulty(initialDiff);
+                    data.setDifficultySet(true);
 
-                Chal_7_MaxHealthModify.setMaxHearts(clientTicks * 0.5f);
-                Chal_12_LimitedInventory.setLimitedSlots(clientSlots);
-                Chal_24_MobHealthMultiply.setMultiplier(clientMult);
+                    LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
+                }
+
+                // Apply current settings to challenge classes
+                Chal_7_MaxHealthModify.setMaxHearts(data.getMaxHeartsTicks() * 0.5f);
+                Chal_12_LimitedInventory.setLimitedSlots(data.getLimitedInventorySlots());
+                Chal_24_MobHealthMultiply.setMultiplier(data.getMobHealthMultiplier());
                 Chal_25_DamageWorldBorder.setDiameter(data.getDamageWorldBorderSize());
 
                 // If Infinity Weapon perk is included at world creation, grant it once to eligible online players
-                if (ChallengeCraftClient.SELECTED_PERKS.contains(LevelManager.PERK_INFINITY_WEAPON)) {
+                if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
                     for (var p : world.getServer().getPlayerManager().getPlayerList()) {
                         net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
                     }
                 }
 
                 // Force spawn to 0,0 for border challenges in new world
-                if (ChallengeCraftClient.LAST_CHOSEN.contains(9) || ChallengeCraftClient.LAST_CHOSEN.contains(25)) {
+                if (data.getActive().contains(9) || data.getActive().contains(25)) {
                     int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, 0, 0);
                     world.setSpawnPos(new net.minecraft.util.math.BlockPos(0, y, 0), 0.0f);
                     world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
                     LOGGER.info("Forced world spawn to 0, {}, 0 and spawnRadius to 0 due to border challenge", y);
                 }
-
-                LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
                 
                 // re-read the saved list
                 saved = data.getActive();

@@ -31,9 +31,36 @@ public class PacketHandler {
                             player.sendMessage(Text.literal("You don't have permission to change challenges.").formatted(Formatting.RED), false);
                             return;
                         }
-                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , maxHearts ticks = {}, slots = {}, mobHealth = {}",
+
+                        // Level Check
+                        int playerLevel = net.kasax.challengecraft.LevelManager.getLevelForXp(net.kasax.challengecraft.data.XpManager.getXp(player.getUuid()));
+                        long playerXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
+                        
+                        for (int cid : packet.active) {
+                            if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(cid, playerLevel)) {
+                                ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (challenge {} locked for level {})", player.getName().getString(), cid, playerLevel);
+                                player.sendMessage(Text.literal("You don't have the required level for challenge " + cid).formatted(Formatting.RED), false);
+                                return;
+                            }
+                        }
+                        for (int pid : packet.perks) {
+                            if (pid == net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON) {
+                                if (net.kasax.challengecraft.LevelManager.getStars(playerXp) < 20) {
+                                    ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (Infinity Weapon perk locked)", player.getName().getString());
+                                    player.sendMessage(Text.literal("You don't have enough Infinity Stars for Infinity Weapon perk").formatted(Formatting.RED), false);
+                                    return;
+                                }
+                            } else if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(pid, playerLevel)) {
+                                ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (perk {} locked for level {})", player.getName().getString(), pid, playerLevel);
+                                player.sendMessage(Text.literal("You don't have the required level for perk " + pid).formatted(Formatting.RED), false);
+                                return;
+                            }
+                        }
+
+                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}",
                                 context.player().getName().getString(),
                                 packet.active,
+                                packet.perks,
                                 packet.maxHearts,
                                 packet.limitedInventorySlots,
                                 packet.mobHealthMultiplier
@@ -92,6 +119,25 @@ public class PacketHandler {
 
                         if (packet.restart) {
                             ChallengeWorldRestarter.initiateRestart(server);
+                        }
+                    });
+                }
+        );
+
+        ServerPlayNetworking.registerGlobalReceiver(
+                ClientXpSyncPacket.ID,
+                (packet, context) -> {
+                    var server = context.server();
+                    var player = context.player();
+                    server.execute(() -> {
+                        if (player.getUuid().equals(packet.uuid)) {
+                            long serverXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
+                            if (packet.xp > serverXp) {
+                                ChallengeCraft.LOGGER.info("[Server] Received XP sync from client {}: {} (current server XP: {})", player.getName().getString(), packet.xp, serverXp);
+                                net.kasax.challengecraft.data.XpManager.setXp(player.getUuid(), packet.xp);
+                            }
+                            // Always sync back to confirm or correct the client
+                            net.kasax.challengecraft.LevelManager.sync(player);
                         }
                     });
                 }

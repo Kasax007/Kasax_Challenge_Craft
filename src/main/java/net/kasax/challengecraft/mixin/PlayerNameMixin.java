@@ -15,35 +15,37 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class PlayerNameMixin {
     @Inject(method = "getDisplayName", at = @At("RETURN"), cancellable = true)
     private void onGetDisplayName(CallbackInfoReturnable<Text> cir) {
-        PlayerEntity player = (PlayerEntity) (Object) this;
-        long xp = 0;
-        if (player.getWorld().isClient()) {
-            xp = net.kasax.challengecraft.ChallengeCraftClient.PLAYER_XP_MAP.getOrDefault(player.getUuid(), 0L);
-        } else {
-            // On server, we can access XpManager directly
-            xp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
-        }
+        try {
+            PlayerEntity player = (PlayerEntity) (Object) this;
+            if (player == null || player.getUuid() == null || player.getWorld() == null) return;
+            
+            long xp = LevelManager.getPlayerXp(player);
 
-        int stars = LevelManager.getStars(xp);
-        int level = LevelManager.getLevelForXp(xp);
-        
-        Text original = cir.getReturnValue();
-        // Avoid double adding if somehow called recursively or by other mods
-        if (original.getString().contains("[Lvl ")) return;
+            int stars = LevelManager.getStars(xp);
+            int level = LevelManager.getLevelForXp(xp);
+            
+            Text original = cir.getReturnValue();
+            if (original == null) return;
+            
+            // Avoid double adding if somehow called recursively or by other mods
+            if (original.getString().contains("[Lvl ")) return;
 
-        Text colored = original;
-        String colorName = LevelManager.getNameColor(stars);
-        if (colorName != null) {
-            colored = applyColor(original, colorName);
-        }
+            Text colored = original;
+            String colorName = LevelManager.getNameColor(stars);
+            if (colorName != null) {
+                colored = applyColor(original, colorName);
+            }
 
-        MutableText prefix = Text.literal("[Lvl " + level).formatted(Formatting.GRAY);
-        if (stars > 0) {
-            prefix.append(Text.literal(" ★" + stars).formatted(Formatting.YELLOW));
+            MutableText prefix = Text.literal("[Lvl " + level).formatted(Formatting.GRAY);
+            if (stars > 0) {
+                prefix.append(Text.literal(" ★" + stars).formatted(Formatting.YELLOW));
+            }
+            prefix.append(Text.literal("] ").formatted(Formatting.GRAY));
+            
+            cir.setReturnValue(prefix.append(colored));
+        } catch (Throwable t) {
+            // Silently fail to not break game logic if display name fails
         }
-        prefix.append(Text.literal("] ").formatted(Formatting.GRAY));
-        
-        cir.setReturnValue(prefix.append(colored));
     }
 
     @Unique

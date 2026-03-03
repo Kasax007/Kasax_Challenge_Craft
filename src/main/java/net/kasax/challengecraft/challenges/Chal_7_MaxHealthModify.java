@@ -21,16 +21,20 @@ public class Chal_7_MaxHealthModify {
             if (!active) return;
             server.getPlayerManager().getPlayerList().forEach(player -> {
                 var attr = player.getAttributeInstance(EntityAttributes.MAX_HEALTH);
-                // remove previous modifier
-                assert attr != null;
-                attr.removeModifier(MAX_HEALTH_MOD_ID);
-                // add new base maxHealth = hearts * 2
+                if (attr == null) return;
+                
                 float newMax = maxHearts * 2f;
-                attr.addPersistentModifier(new EntityAttributeModifier(
-                        MAX_HEALTH_MOD_ID, newMax - attr.getBaseValue(), EntityAttributeModifier.Operation.ADD_VALUE));
-                //ChallengeCraft.LOGGER.info("[Server:Chal7] applied maxHealth = {} (HP={}) to player {}",
-                //        maxHearts, newMax, player.getName().getString()
-                //);
+                double expectedAmount = newMax - attr.getBaseValue();
+                
+                var existing = attr.getModifier(MAX_HEALTH_MOD_ID);
+                if (existing != null && Math.abs(existing.value() - expectedAmount) < 0.001) {
+                    // already correct
+                } else {
+                    if (existing != null) attr.removeModifier(MAX_HEALTH_MOD_ID);
+                    attr.addPersistentModifier(new EntityAttributeModifier(
+                            MAX_HEALTH_MOD_ID, expectedAmount, EntityAttributeModifier.Operation.ADD_VALUE));
+                }
+                
                 if (player.getHealth() > newMax) {
                     player.setHealth(newMax);
                 }

@@ -15,6 +15,9 @@ public class ChallengeSyncPacket implements CustomPayload {
     
     public final List<Integer> active;
     public final List<Integer> perks;
+    public final int maxHearts;
+    public final int limitedInventorySlots;
+    public final int mobHealthMultiplier;
 
     public static final PacketCodec<PacketByteBuf, ChallengeSyncPacket> CODEC = CustomPayload.codecOf(
             new ValueFirstEncoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -24,6 +27,9 @@ public class ChallengeSyncPacket implements CustomPayload {
                     for (int id : pkt.active) buf.writeVarInt(id);
                     buf.writeVarInt(pkt.perks.size());
                     for (int id : pkt.perks) buf.writeVarInt(id);
+                    buf.writeVarInt(pkt.maxHearts);
+                    buf.writeVarInt(pkt.limitedInventorySlots);
+                    buf.writeVarInt(pkt.mobHealthMultiplier);
                 }
             },
             new PacketDecoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -35,14 +41,20 @@ public class ChallengeSyncPacket implements CustomPayload {
                     int perkSize = buf.readVarInt();
                     List<Integer> perks = new ArrayList<>(perkSize);
                     for (int i = 0; i < perkSize; i++) perks.add(buf.readVarInt());
-                    return new ChallengeSyncPacket(list, perks);
+                    int maxHearts = buf.readVarInt();
+                    int slots = buf.readVarInt();
+                    int mobMult = buf.readVarInt();
+                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult);
                 }
             }
     );
 
-    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks) {
+    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult) {
         this.active = active;
         this.perks = perks;
+        this.maxHearts = maxHearts;
+        this.limitedInventorySlots = slots;
+        this.mobHealthMultiplier = mobMult;
     }
 
     @Override

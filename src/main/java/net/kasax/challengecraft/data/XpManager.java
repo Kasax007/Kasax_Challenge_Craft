@@ -30,8 +30,15 @@ public class XpManager {
             load();
         }
         long current = playerXp.getOrDefault(uuid, 0L);
-        playerXp.put(uuid, current + amount);
-        LOGGER.info("Adding {} XP to {}. New total: {}", amount, uuid, current + amount);
+        setXp(uuid, current + amount);
+    }
+
+    public static synchronized void setXp(UUID uuid, long xp) {
+        if (!loaded) {
+            load();
+        }
+        playerXp.put(uuid, xp);
+        LOGGER.info("Setting XP for {}. Total: {}", uuid, xp);
         save();
     }
     
@@ -73,7 +80,7 @@ public class XpManager {
         loaded = true;
     }
 
-    private static void save() {
+    public static synchronized void save() {
         try {
             StringBuilder sb = new StringBuilder();
             playerXp.forEach((u, x) -> sb.append(u.toString()).append("=").append(x).append("\n"));

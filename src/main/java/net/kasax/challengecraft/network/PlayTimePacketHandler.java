@@ -1,12 +1,9 @@
 package net.kasax.challengecraft.network;
 
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.PlayPayloadHandler;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.Context;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.kasax.challengecraft.ChallengeCraft;
-import net.kasax.challengecraft.client.screen.TimerOverlay;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -14,23 +11,21 @@ import net.minecraft.stat.Stats;
 import net.minecraft.util.Identifier;
 
 public class PlayTimePacketHandler {
-    public static void register() {
+
+    public static void registerServer() {
         //
-        // 1) CLIENT‐SIDE: receive our PlayTimeSyncPacket
+        // 1) Periodic sync: every second (20 ticks)
         //
-        ClientPlayNetworking.registerGlobalReceiver(
-                PlayTimeSyncPacket.ID,
-                new PlayPayloadHandler<PlayTimeSyncPacket>() {
-                    @Override
-                    public void receive(PlayTimeSyncPacket packet, Context context) {
-                        // schedule on the client thread
-                        context.client().execute(() -> {
-                            TimerOverlay.setBasePlayTicks(packet.playTicks);
-                            ChallengeCraft.LOGGER.info("→ synced playTicks = " + packet.playTicks);
-                        });
-                    }
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (server.getTicks() % 20 == 0) {
+                Identifier chosenId = Stats.PLAY_TIME;
+                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                    int playTicks = player.getStatHandler()
+                            .getStat(Stats.CUSTOM.getOrCreateStat(chosenId));
+                    ServerPlayNetworking.send(player, new PlayTimeSyncPacket(playTicks));
                 }
-        );
+            }
+        });
 
         //
         // 2) SERVER‐SIDE: when a player JOINS, read and send their play‐ticks
@@ -38,12 +33,8 @@ public class PlayTimePacketHandler {
         ServerPlayConnectionEvents.JOIN.register(
                 (ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server) -> {
                     // run on the server main thread
-                    // in your PlayTimePacketHandler, server-side:
                     server.execute(() -> {
                         ServerPlayerEntity player = handler.player;
-
-                        // pick one of these two registered IDs:
-                        // Identifier chosenId = Stats.PLAY_TIME;
                         Identifier chosenId = Stats.PLAY_TIME;
 
                         int playTicks = player.getStatHandler()
@@ -51,7 +42,6 @@ public class PlayTimePacketHandler {
 
                         sender.sendPacket(new PlayTimeSyncPacket(playTicks));
                     });
-
                 }
         );
     }

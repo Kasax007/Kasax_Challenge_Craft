@@ -6,9 +6,18 @@ import net.kasax.challengecraft.client.screen.AllEntitiesHUD;
 import net.kasax.challengecraft.client.screen.AllEntitiesScreen;
 import net.kasax.challengecraft.client.screen.AllItemsHUD;
 import net.kasax.challengecraft.client.screen.AllItemsScreen;
+import net.kasax.challengecraft.client.screen.TimerOverlay;
+import net.kasax.challengecraft.ChallengeCraft;
 
 public class ChallengeSyncHandler {
     public static void register() {
+        ClientPlayNetworking.registerGlobalReceiver(PlayTimeSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                TimerOverlay.setBasePlayTicks(payload.playTicks);
+                ChallengeCraft.LOGGER.info("→ synced playTicks = " + payload.playTicks);
+            });
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(ChallengeSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 // Clear all active first (on client)
@@ -68,6 +77,9 @@ public class ChallengeSyncHandler {
 
                 net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN = payload.active;
                 net.kasax.challengecraft.ChallengeCraftClient.SELECTED_PERKS = payload.perks;
+                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_MAX_HEARTS = payload.maxHearts;
+                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = payload.limitedInventorySlots;
+                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = payload.mobHealthMultiplier;
             });
         });
 
