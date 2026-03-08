@@ -19,12 +19,8 @@ import java.util.function.Consumer;
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26
+            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 28, 24, 25, 9, 2, 3, 23, 14, 15, 19, 22
     ));
-
-    static {
-        IDS.sort(java.util.Comparator.comparingInt(net.kasax.challengecraft.LevelManager::getRequiredLevel).thenComparingInt(id -> id));
-    }
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final List<ChallengeCardWidget> perkCards = new ArrayList<>();

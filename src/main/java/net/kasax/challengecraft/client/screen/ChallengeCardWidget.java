@@ -89,7 +89,7 @@ public class ChallengeCardWidget extends ClickableWidget {
             String label = challengeId == LevelManager.PERK_INFINITY_WEAPON ? "§c🔒 ★ 20" : "§c🔒 Lvl " + requiredLevel;
             context.drawText(MinecraftClient.getInstance().textRenderer, label, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
         } else {
-            context.drawItem(icon, getX() + 4, getY() + (getHeight() - 16) / 2);
+            ChallengeIconProvider.drawIcon(context, getX() + 4, getY() + (getHeight() - 16) / 2, challengeId);
         }
 
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;

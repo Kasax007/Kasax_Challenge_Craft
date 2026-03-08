@@ -150,7 +150,7 @@ public class ChallengeRewardOverlay {
                  if (l == 20) rewards.add("MASTER");
                  
                  // Challenges
-                 for (int id = 1; id <= 26; id++) {
+                 for (int id = 1; id <= 28; id++) {
                      if (LevelManager.getRequiredLevel(id) == l) {
                          rewards.add(id);
                      }
@@ -189,13 +189,11 @@ public class ChallengeRewardOverlay {
                     
                     Object reward = rewards.get(i);
                     if (reward instanceof Integer cid) {
-                        ItemStack icon = ChallengeIconProvider.getIcon(cid);
-                        context.drawItem(icon, x, y);
+                        ChallengeIconProvider.drawIcon(context, x, y, cid);
                     } else if (reward instanceof String s) {
                         if (s.startsWith("PERK_")) {
                             int perkId = Integer.parseInt(s.substring(5));
-                            ItemStack icon = ChallengeIconProvider.getIcon(perkId);
-                            context.drawItem(icon, x, y);
+                            ChallengeIconProvider.drawIcon(context, x, y, perkId);
                             context.drawText(tr, "★", x + 12, y + 8, baseAlpha | 0xFFFF55, true);
                         } else if (s.startsWith("STAR_COLOR_")) {
                              String color = s.substring(11);

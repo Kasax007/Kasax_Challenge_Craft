@@ -4,6 +4,7 @@ import net.kasax.challengecraft.challenges.Chal_17_WalkRandomItem;
 import net.kasax.challengecraft.challenges.Chal_18_DamageRandomItem;
 import net.kasax.challengecraft.challenges.Chal_21_Hardcore;
 import net.kasax.challengecraft.challenges.Chal_25_DamageWorldBorder;
+import net.kasax.challengecraft.challenges.Chal_28_WalkDamage;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -31,6 +32,8 @@ public abstract class MovementAndDamageMixin {
     @Unique
     private double walkDistanceAccumulator = 0;
     @Unique
+    private double walkDamageDistanceAccumulator = 0;
+    @Unique
     private Vec3d lastPos = null;
     @Unique
     private float damageAccumulator = 0;
@@ -39,21 +42,32 @@ public abstract class MovementAndDamageMixin {
     private void onTick(CallbackInfo ci) {
         ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
 
-        if (Chal_17_WalkRandomItem.isActive()) {
+        if (Chal_17_WalkRandomItem.isActive() || Chal_28_WalkDamage.isActive()) {
             Vec3d currentPos = player.getPos();
             if (lastPos != null) {
                 double dist = currentPos.distanceTo(lastPos);
-                walkDistanceAccumulator += dist;
+                
+                if (Chal_17_WalkRandomItem.isActive()) {
+                    walkDistanceAccumulator += dist;
+                    while (walkDistanceAccumulator >= 500.0) {
+                        walkDistanceAccumulator -= 500.0;
+                        player.getInventory().insertStack(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
+                    }
+                }
 
-                while (walkDistanceAccumulator >= 500.0) {
-                    walkDistanceAccumulator -= 500.0;
-                    player.getInventory().insertStack(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
+                if (Chal_28_WalkDamage.isActive()) {
+                    walkDamageDistanceAccumulator += dist;
+                    while (walkDamageDistanceAccumulator >= 1.0) {
+                        walkDamageDistanceAccumulator -= 1.0;
+                        player.damage(player.getServerWorld(), player.getWorld().getDamageSources().generic(), 2.0f);
+                    }
                 }
             }
             lastPos = currentPos;
         } else {
             lastPos = null;
             walkDistanceAccumulator = 0;
+            walkDamageDistanceAccumulator = 0;
         }
     }
 

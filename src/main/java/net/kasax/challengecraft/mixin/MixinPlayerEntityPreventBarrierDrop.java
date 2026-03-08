@@ -3,6 +3,7 @@ package net.kasax.challengecraft.mixin;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
+import net.kasax.challengecraft.challenges.Chal_27_NoArmor;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
@@ -27,22 +28,36 @@ public abstract class MixinPlayerEntityPreventBarrierDrop {
             at = @At("HEAD")
     )
     private void onDropInventory(ServerWorld world, CallbackInfo ci) {
-        if (!Chal_12_LimitedInventory.isActive()) return;
-
         PlayerInventory inv = ((PlayerEntity)(Object)this).getInventory();
-        var main = inv.getMainStacks();
-        int limited   = Chal_12_LimitedInventory.getLimitedSlots();
-        int toDisable = 36 - limited;
-        int[] order   = Chal_12_LimitedInventory.getDeactivationOrder();
 
-        for (int i = 0; i < toDisable; i++) {
-            int idx = order[i];
-            ItemStack s = main.get(idx);
-            // only clear the exact barrier we placed
-            if (s.getItem() == Items.BARRIER) {
-                Text name = s.get(DataComponentTypes.CUSTOM_NAME);
-                if (name != null && "Blocked".equals(name.getString())) {
-                    main.set(idx, ItemStack.EMPTY);
+        // 1) Challenge 12
+        if (Chal_12_LimitedInventory.isActive()) {
+            var main = inv.getMainStacks();
+            int limited   = Chal_12_LimitedInventory.getLimitedSlots();
+            int toDisable = 36 - limited;
+            int[] order   = Chal_12_LimitedInventory.getDeactivationOrder();
+
+            for (int i = 0; i < toDisable; i++) {
+                int idx = order[i];
+                ItemStack s = main.get(idx);
+                if (s.getItem() == Items.BARRIER) {
+                    Text name = s.get(DataComponentTypes.CUSTOM_NAME);
+                    if (name != null && "Blocked".equals(name.getString())) {
+                        main.set(idx, ItemStack.EMPTY);
+                    }
+                }
+            }
+        }
+
+        // 2) Challenge 27
+        if (Chal_27_NoArmor.isActive()) {
+            for (int i = 36; i <= 39; i++) {
+                ItemStack s = inv.getStack(i);
+                if (s.getItem() == Items.BARRIER) {
+                    Text name = s.get(DataComponentTypes.CUSTOM_NAME);
+                    if (name != null && "Blocked".equals(name.getString())) {
+                        inv.setStack(i, ItemStack.EMPTY);
+                    }
                 }
             }
         }

@@ -61,6 +61,8 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_23_AllEntities.register();
 		Chal_25_DamageWorldBorder.register();
 		Chal_26_AllAchievements.register();
+		Chal_27_NoArmor.register();
+		Chal_28_WalkDamage.register();
 		LevelXpListener.register();
 
 		// Register Hidden Skip Command

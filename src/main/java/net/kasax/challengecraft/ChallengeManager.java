@@ -109,6 +109,8 @@ public class ChallengeManager {
             case 24 -> (mobHealthMult - 1) / 99.0 * 15.0; // Mob Health
             case 25 -> 4.0; // DamageWorldBorder
             case 26 -> 12.0; // All Achievements
+            case 27 -> 1.3;  // No Armor
+            case 28 -> 5.0;  // Walk = Damage
             default -> 0.0;
         };
     }
@@ -133,6 +135,12 @@ public class ChallengeManager {
         
         // Added Max Hearts (Perk 103) + Max Health Modifier (Challenge 7) conflict
         if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
+
+        // No Armor (Challenge 27) + Resistance Perk (Perk 107) conflict
+        if (ids.contains(27) && perks.contains(LevelManager.PERK_RESISTANCE)) return true;
+
+        // Walk = Damage (Challenge 28) + Damage = Border (Challenge 25) conflict
+        if (ids.contains(28) && ids.contains(25)) return true;
 
         return false;
     }
@@ -388,6 +396,8 @@ public class ChallengeManager {
         if (Chal_24_MobHealthMultiply.isActive()) ids.add(24);
         if (Chal_25_DamageWorldBorder.isActive()) ids.add(25);
         if (Chal_26_AllAchievements.isActive()) ids.add(26);
+        if (Chal_27_NoArmor.isActive()) ids.add(27);
+        if (Chal_28_WalkDamage.isActive()) ids.add(28);
         return ids;
     }
 
@@ -418,6 +428,8 @@ public class ChallengeManager {
         Chal_24_MobHealthMultiply.setActive(active);
         Chal_25_DamageWorldBorder.setActive(active);
         Chal_26_AllAchievements.setActive(active);
+        Chal_27_NoArmor.setActive(active);
+        Chal_28_WalkDamage.setActive(active);
     }
 
     private static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -466,6 +478,14 @@ public class ChallengeManager {
                 Chal_26_AllAchievements.setActive(true);
                 if (world != null && data != null) Chal_26_AllAchievements.syncProgressToAll(world.getServer(), data);
                 LOGGER.info("Challenge 26 ON");
+            }
+            case 27 -> {
+                Chal_27_NoArmor.setActive(true);
+                LOGGER.info("Challenge 27 ON");
+            }
+            case 28 -> {
+                Chal_28_WalkDamage.setActive(true);
+                LOGGER.info("Challenge 28 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

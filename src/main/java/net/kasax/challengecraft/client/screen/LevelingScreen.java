@@ -152,16 +152,16 @@ public class LevelingScreen extends Screen {
                         Text name = Text.translatable("challengecraft.perk." + perkId);
                         Text desc = Text.translatable("challengecraft.perk." + perkId + ".desc");
                         ItemStack icon = ChallengeIconProvider.getIcon(perkId);
-                        rewards.add(new Reward(Text.literal("§aPerk: ").append(name), desc, icon, true));
+                        rewards.add(new Reward(Text.literal("§aPerk: ").append(name), desc, icon, true, perkId));
                     }
                 }
 
-                for (int id = 1; id <= 26; id++) {
+                for (int id = 1; id <= 28; id++) {
                     if (LevelManager.getRequiredLevel(id) == level) {
                         Text name = Text.translatable("challengecraft.worldcreate.challenge" + id);
                         Text desc = Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc");
                         ItemStack icon = ChallengeIconProvider.getIcon(id);
-                        rewards.add(new Reward(name, desc, icon, false));
+                        rewards.add(new Reward(name, desc, icon, false, id));
                     }
                 }
             } else {
@@ -173,7 +173,7 @@ public class LevelingScreen extends Screen {
                         Text name = Text.translatable("challengecraft.perk." + perkId);
                         Text desc = Text.translatable("challengecraft.perk." + perkId + ".desc");
                         ItemStack icon = ChallengeIconProvider.getIcon(perkId);
-                        rewards.add(new Reward(Text.literal("§dSECRET: ").append(name), desc, icon, true));
+                        rewards.add(new Reward(Text.literal("§dSECRET: ").append(name), desc, icon, true, perkId));
                     } else {
                         String colorCode = switch (rewardId) {
                             case "green" -> "§aGreen";
@@ -185,7 +185,7 @@ public class LevelingScreen extends Screen {
                             default -> rewardId;
                         };
                         rewards.add(new Reward(Text.literal("§e" + colorCode + " Name Color"), 
-                                Text.literal("Your name will be displayed in " + rewardId + "."), ItemStack.EMPTY, true));
+                                Text.literal("Your name will be displayed in " + rewardId + "."), ItemStack.EMPTY, true, -1));
                     }
                 }
             }
@@ -230,7 +230,7 @@ public class LevelingScreen extends Screen {
                 for (Reward reward : rewards) {
                     int textX = getX() + 30;
                     if (!reward.icon.isEmpty()) {
-                        context.drawItem(reward.icon, getX() + 10, ry);
+                        ChallengeIconProvider.drawIcon(context, getX() + 10, ry, reward.id);
                     } else if (reward.isPerk) {
                         context.drawText(tr, "★", getX() + 12, ry, 0xFFFF55, true);
                     } else {
@@ -256,12 +256,14 @@ public class LevelingScreen extends Screen {
             final Text description;
             final ItemStack icon;
             final boolean isPerk;
+            final int id;
 
-            Reward(Text name, Text description, ItemStack icon, boolean isPerk) {
+            Reward(Text name, Text description, ItemStack icon, boolean isPerk, int id) {
                 this.name = name;
                 this.description = description;
                 this.icon = icon;
                 this.isPerk = isPerk;
+                this.id = id;
             }
         }
 

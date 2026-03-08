@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.client.screen;
 
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import java.util.HashMap;
@@ -35,6 +36,8 @@ public class ChallengeIconProvider {
         ICONS.put(24, new ItemStack(Items.GLISTERING_MELON_SLICE));
         ICONS.put(25, new ItemStack(Items.HEART_OF_THE_SEA));
         ICONS.put(26, new ItemStack(Items.WRITABLE_BOOK));
+        ICONS.put(27, new ItemStack(Items.CHAINMAIL_CHESTPLATE));
+        ICONS.put(28, new ItemStack(Items.IRON_BOOTS));
         
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));
@@ -49,5 +52,14 @@ public class ChallengeIconProvider {
 
     public static ItemStack getIcon(int id) {
         return ICONS.getOrDefault(id, new ItemStack(Items.BARRIER));
+    }
+
+    public static void drawIcon(DrawContext context, int x, int y, int id) {
+        ItemStack stack = getIcon(id);
+        context.drawItem(stack, x, y);
+        if (id == 28) {
+            ItemStack barrier = new ItemStack(Items.BARRIER);
+            context.drawItem(barrier, x, y);
+        }
     }
 }

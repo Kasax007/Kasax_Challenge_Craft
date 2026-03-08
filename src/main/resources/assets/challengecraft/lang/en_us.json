@@ -68,6 +68,10 @@
   "challengecraft.worldcreate.challenge25.desc": "Taking damage expands the world border.",
   "challengecraft.worldcreate.challenge26": "All Achievements",
   "challengecraft.worldcreate.challenge26.desc": "Complete every Minecraft advancement to complete the challenge.",
+  "challengecraft.worldcreate.challenge27": "No Armor",
+  "challengecraft.worldcreate.challenge27.desc": "Blocks all armor slots, making it impossible to wear armor.",
+  "challengecraft.worldcreate.challenge28": "Walk = Damage",
+  "challengecraft.worldcreate.challenge28.desc": "Receive one heart of damage for every block walked.",
   "challengecraft.all_achievements_list.title": "Advancements to Complete",
   
   "challengecraft.perk.101": "Night Vision",
