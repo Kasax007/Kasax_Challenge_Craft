@@ -40,7 +40,7 @@ public class MobHealthHUD {
         int centerX = sw / 2;
 
         int y = 5;
-        if (AllItemsHUD.isActive() || AllEntitiesHUD.isActive()) {
+        if (AllItemsHUD.isActive() || AllEntitiesHUD.isActive() || AllAchievementsHUD.isActive()) {
             y = 45;
         }
 

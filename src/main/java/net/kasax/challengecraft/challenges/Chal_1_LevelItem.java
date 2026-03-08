@@ -53,4 +53,5 @@ public class Chal_1_LevelItem {
     public static void setActive(boolean flag) {
         active = flag;
     }
+    public static boolean isActive() { return active; }
 }

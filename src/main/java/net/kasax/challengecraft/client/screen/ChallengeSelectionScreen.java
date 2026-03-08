@@ -21,7 +21,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
-    private static final List<Integer> IDS = List.of(1, 11, 9, 25, 5, 6, 4, 16, 10, 13, 7, 12, 24, 2, 14, 3, 15, 8, 20, 17, 18, 19, 21, 22, 23);
+    private static final List<Integer> IDS = new ArrayList<>(List.of(
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26
+    ));
+    
+    static {
+        IDS.sort(java.util.Comparator.comparingInt(net.kasax.challengecraft.LevelManager::getRequiredLevel).thenComparingInt(id -> id));
+    }
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
             .toList();

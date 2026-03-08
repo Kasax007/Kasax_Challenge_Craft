@@ -9,7 +9,7 @@
     "MixinPlayerEntityDrop",
     "MixinPlayerEntityPreventBarrierDrop",
     "MixinScreenHandler",
-    "MixinServerPropertiesHandler",
+    "DimensionOptionsMixin",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
     "NoMobDropsMixin",
@@ -29,7 +29,6 @@
     "defaultRequire": 1
   },
   "client": [
-    "CreateWorldMixinIntegratedServer",
     "CreateWorldScreenMixin",
     "TitleScreenMixin",
     "InGameHudMixin",

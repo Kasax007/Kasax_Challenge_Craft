@@ -7,6 +7,7 @@ import net.minecraft.world.GameRules;
 public class Chal_5_NoRegen {
     private static boolean active = false;
     public static void setActive(boolean on) { active = on; }
+    public static boolean isActive() { return active; }
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {

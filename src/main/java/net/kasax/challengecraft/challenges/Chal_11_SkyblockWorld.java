@@ -4,9 +4,17 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
 
 public class Chal_11_SkyblockWorld {
     private static boolean active = false;
+    private static ChunkGenerator overworldGenerator = null;
+    private static ChunkGenerator netherGenerator = null;
+
+    public static void setOverworldGenerator(ChunkGenerator g) { overworldGenerator = g; }
+    public static void setNetherGenerator(ChunkGenerator g) { netherGenerator = g; }
+    public static ChunkGenerator getOverworldGenerator() { return overworldGenerator; }
+    public static ChunkGenerator getNetherGenerator() { return netherGenerator; }
 
     /** Call this method to activate the Skyblock challenge mode (Challenge 11). */
     public static void setActive(boolean v) { active = v; }

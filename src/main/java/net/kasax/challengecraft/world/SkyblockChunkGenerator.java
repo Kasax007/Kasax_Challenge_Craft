@@ -110,6 +110,11 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         // 2) pull out the real ServerWorld so we can get at server.getStructureTemplateManager() & a Random
         ServerWorld serverWorld = worldAccess.toServerWorld();
 
+        // 3) Manually place a block at 0,64,0 to guarantee a safe landing spot 
+        // even if the structure is offset or fails to load.
+        worldAccess.setBlockState(new BlockPos(0, 64, 0), Blocks.GRASS_BLOCK.getDefaultState(), 2);
+        worldAccess.setBlockState(new BlockPos(0, 63, 0), Blocks.DIRT.getDefaultState(), 2);
+
         // load your structure from data/challengecraft/structures/classic_skyblock.nbt
         StructureTemplateManager stm = serverWorld.getServer().getStructureTemplateManager();
         Identifier id = Identifier.of("challengecraft", "classic_skyblock");

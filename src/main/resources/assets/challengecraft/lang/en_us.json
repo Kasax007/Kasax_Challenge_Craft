@@ -66,6 +66,9 @@
   "challengecraft.worldcreate.challenge24.desc": "Allows you to multiply the health of all mobs.",
   "challengecraft.worldcreate.challenge25": "Damage = Border",
   "challengecraft.worldcreate.challenge25.desc": "Taking damage expands the world border.",
+  "challengecraft.worldcreate.challenge26": "All Achievements",
+  "challengecraft.worldcreate.challenge26.desc": "Complete every Minecraft advancement to complete the challenge.",
+  "challengecraft.all_achievements_list.title": "Advancements to Complete",
   
   "challengecraft.perk.101": "Night Vision",
   "challengecraft.perk.101.desc": "Grants permanent Night Vision.",

@@ -17,4 +17,5 @@ public class Chal_8_NoCraftingTable {
         });
     }
     public static void setActive(boolean v) { active = v; }
+    public static boolean isActive() { return active; }
 }

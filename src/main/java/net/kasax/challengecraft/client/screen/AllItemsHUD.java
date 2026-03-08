@@ -52,8 +52,14 @@ public class AllItemsHUD {
         Text progressText = Text.literal(progressStr).formatted(Formatting.GRAY);
 
         int centerX = sw / 2;
-        if (AllEntitiesHUD.isActive()) {
-            centerX = sw / 2 - 70;
+        int activeCount = (active ? 1 : 0) + (AllEntitiesHUD.isActive() ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);
+        
+        if (activeCount == 3) {
+            centerX = sw / 2 - 120;
+        } else if (activeCount == 2) {
+            if (AllEntitiesHUD.isActive() || AllAchievementsHUD.isActive()) {
+                centerX = sw / 2 - 70;
+            }
         }
         int y = 5;
 

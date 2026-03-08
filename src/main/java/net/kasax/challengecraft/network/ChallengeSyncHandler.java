@@ -2,6 +2,8 @@ package net.kasax.challengecraft.network;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.challenges.*;
+import net.kasax.challengecraft.client.screen.AllAchievementsHUD;
+import net.kasax.challengecraft.client.screen.AllAchievementsScreen;
 import net.kasax.challengecraft.client.screen.AllEntitiesHUD;
 import net.kasax.challengecraft.client.screen.AllEntitiesScreen;
 import net.kasax.challengecraft.client.screen.AllItemsHUD;
@@ -14,7 +16,7 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(PlayTimeSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 TimerOverlay.setBasePlayTicks(payload.playTicks);
-                ChallengeCraft.LOGGER.info("→ synced playTicks = " + payload.playTicks);
+                //ChallengeCraft.LOGGER.info("→ synced playTicks = " + payload.playTicks);
             });
         });
 
@@ -41,8 +43,10 @@ public class ChallengeSyncHandler {
                 Chal_23_AllEntities.setActive(false);
                 Chal_24_MobHealthMultiply.setActive(false);
                 Chal_25_DamageWorldBorder.setActive(false);
+                Chal_26_AllAchievements.setActive(false);
                 AllItemsHUD.setActive(false);
                 AllEntitiesHUD.setActive(false);
+                AllAchievementsHUD.setActive(false);
 
                 for (int id : payload.active) {
                     switch (id) {
@@ -53,6 +57,7 @@ public class ChallengeSyncHandler {
                         case 8 -> Chal_8_NoCraftingTable.setActive(true);
                         case 9 -> Chal_9_ExpWorldBorder.setActive(true);
                         case 10 -> Chal_10_RandomItem.setActive(true);
+                        case 11 -> Chal_11_SkyblockWorld.setActive(true);
                         case 12 -> Chal_12_LimitedInventory.setActive(true);
                         case 13 -> Chal_13_RandomEnchantment.setActive(true);
                         case 14 -> Chal_14_RandomBlockDrops.setActive(true);
@@ -72,6 +77,10 @@ public class ChallengeSyncHandler {
                         }
                         case 24 -> Chal_24_MobHealthMultiply.setActive(true);
                         case 25 -> Chal_25_DamageWorldBorder.setActive(true);
+                        case 26 -> {
+                            Chal_26_AllAchievements.setActive(true);
+                            AllAchievementsHUD.setActive(true);
+                        }
                     }
                 }
 
@@ -104,6 +113,18 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(AllEntitiesListPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 context.client().setScreen(new AllEntitiesScreen(payload.entities, payload.currentIndex));
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllAchievementsSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                AllAchievementsHUD.update(payload.currentAdvancement, payload.currentIndex, payload.total);
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllAchievementsListPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreen(new AllAchievementsScreen(payload.advancements, payload.currentIndex));
             });
         });
     }

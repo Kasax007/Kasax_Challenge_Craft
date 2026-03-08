@@ -43,5 +43,7 @@ public class Chal_7_MaxHealthModify {
     }
 
     public static void setActive(boolean v) { active = v; }
+    public static boolean isActive() { return active; }
     public static void setMaxHearts(float hearts) { maxHearts = MathHelper.clamp(hearts, 0.5f, 10f); }
+    public static float getMaxHearts() { return maxHearts; }
 }

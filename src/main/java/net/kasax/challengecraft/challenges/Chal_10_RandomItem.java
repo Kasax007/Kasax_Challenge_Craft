@@ -30,4 +30,5 @@ public class Chal_10_RandomItem {
         });
     }
     public static void setActive(boolean v) { active = v; }
+    public static boolean isActive() { return active; }
 }

@@ -60,8 +60,16 @@ public class AllEntitiesHUD {
         Text progressText = Text.literal(progressStr).formatted(Formatting.GRAY);
 
         int centerX = sw / 2;
-        if (AllItemsHUD.isActive()) {
-            centerX = sw / 2 + 70;
+        int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (active ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);
+        
+        if (activeCount == 3) {
+            centerX = sw / 2;
+        } else if (activeCount == 2) {
+            if (AllItemsHUD.isActive()) {
+                centerX = sw / 2 + 70; // AllItems is at -70
+            } else if (AllAchievementsHUD.isActive()) {
+                centerX = sw / 2 - 70; // AllAchievements is at +70
+            }
         }
         int y = 5;
 

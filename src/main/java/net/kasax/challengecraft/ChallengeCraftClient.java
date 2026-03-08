@@ -37,6 +37,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
         ChallengeRewardOverlay.register();
         net.kasax.challengecraft.client.screen.AllItemsHUD.register();
         net.kasax.challengecraft.client.screen.AllEntitiesHUD.register();
+        net.kasax.challengecraft.client.screen.AllAchievementsHUD.register();
         net.kasax.challengecraft.client.screen.MobHealthHUD.register();
 
         ClientPlayNetworking.registerGlobalReceiver(RestartPendingPacket.ID, (payload, context) -> {

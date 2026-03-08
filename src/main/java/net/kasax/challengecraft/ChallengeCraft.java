@@ -60,6 +60,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_22_AllItems.register();
 		Chal_23_AllEntities.register();
 		Chal_25_DamageWorldBorder.register();
+		Chal_26_AllAchievements.register();
 		LevelXpListener.register();
 
 		// Register Hidden Skip Command
@@ -119,6 +120,33 @@ public class ChallengeCraft implements ModInitializer {
 						}
 						return 1;
 					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_skip_advancement")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), 1);
+						context.getSource().sendFeedback(() -> Text.literal("Skipped current advancement."), true);
+						return 1;
+					})
+					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+							.executes(context -> {
+								int amount = IntegerArgumentType.getInteger(context, "amount");
+								Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), amount);
+								context.getSource().sendFeedback(() -> Text.literal("Skipped " + amount + " advancements."), true);
+								return 1;
+							}))
+			);
+
+			dispatcher.register(CommandManager.literal("challengecraft_all_advancements_list")
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						if (Chal_26_AllAchievements.isActive()) {
+							Chal_26_AllAchievements.sendListToPlayer(player);
+						} else {
+							context.getSource().sendFeedback(() -> Text.literal("All Achievements challenge is not active."), false);
+						}
+						return 1;
+					}));
 		});
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
@@ -163,6 +191,14 @@ public class ChallengeCraft implements ModInitializer {
 				net.kasax.challengecraft.network.AllEntitiesListPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
+				AllAchievementsSyncPacket.ID,
+				AllAchievementsSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				AllAchievementsListPacket.ID,
+				AllAchievementsListPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
 				net.kasax.challengecraft.network.RestartPendingPacket.ID,
 				net.kasax.challengecraft.network.RestartPendingPacket.CODEC
 		);
@@ -177,5 +213,9 @@ public class ChallengeCraft implements ModInitializer {
 				Identifier.of("challengecraft", "skyblock_chunk_generator"),
 				SkyblockChunkGenerator.MAP_CODEC
 		);
+
+		net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+			net.kasax.challengecraft.network.ChallengeWorldRestarter.handlePlayerTeleport(server);
+		});
 	}
 }

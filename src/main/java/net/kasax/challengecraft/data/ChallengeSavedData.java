@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.data;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.datafixer.DataFixTypes;
 import net.minecraft.entity.EntityType;
@@ -8,6 +9,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.PersistentState;
 import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.PersistentStateType;
@@ -39,10 +41,6 @@ public class ChallengeSavedData extends PersistentState {
                 return map;
             }),
             Codec.BOOL.fieldOf("difficultySet").forGetter(ChallengeSavedData::isDifficultySet),
-            Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeSavedData::getAllItemsOrder),
-            Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeSavedData::getAllItemsIndex),
-            Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeSavedData::getAllEntitiesOrder),
-            Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeSavedData::getAllEntitiesIndex),
             Codec.INT.optionalFieldOf("mobHealthMultiplier", 1).forGetter(ChallengeSavedData::getMobHealthMultiplier),
             Codec.DOUBLE.optionalFieldOf("damageWorldBorderSize", 2.0).forGetter(ChallengeSavedData::getDamageWorldBorderSize),
             Codec.unboundedMap(Codec.STRING, Codec.LONG).optionalFieldOf("playerXp", Map.of()).forGetter(data -> {
@@ -51,8 +49,11 @@ public class ChallengeSavedData extends PersistentState {
                 return map;
             }),
             Codec.list(Codec.INT).optionalFieldOf("activePerks", List.of()).forGetter(ChallengeSavedData::getActivePerks),
-            Codec.INT.optionalFieldOf("runIndex", 0).forGetter(ChallengeSavedData::getRunIndex)
-    ).apply(instance, ChallengeSavedData::new));
+            Codec.INT.optionalFieldOf("runIndex", 0).forGetter(ChallengeSavedData::getRunIndex),
+            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex))
+    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, progress) ->
+            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, progress.allAdvancementsOrder, progress.allAdvancementsIndex)
+    ));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
             new PersistentStateType<>(KEY, ChallengeSavedData::new, CODEC, DataFixTypes.LEVEL);
@@ -93,9 +94,12 @@ public class ChallengeSavedData extends PersistentState {
 
     private int runIndex = 0;
 
+    private final List<Identifier> allAdvancementsOrder = new ArrayList<>();
+    private int allAdvancementsIndex = 0;
+
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -118,6 +122,9 @@ public class ChallengeSavedData extends PersistentState {
         this.activePerks.clear();
         this.activePerks.addAll(activePerks);
         this.runIndex = runIndex;
+        this.allAdvancementsOrder.clear();
+        this.allAdvancementsOrder.addAll(allAdvancementsOrder);
+        this.allAdvancementsIndex = allAdvancementsIndex;
     }
 
     /** Retrieve (or create) for this world. */
@@ -198,8 +205,10 @@ public class ChallengeSavedData extends PersistentState {
         this.playerXpAwarded.clear();
         this.allItemsIndex = 0;
         this.allEntitiesIndex = 0;
+        this.allAdvancementsIndex = 0;
         this.allItemsOrder.clear();
         this.allEntitiesOrder.clear();
+        this.allAdvancementsOrder.clear();
         this.tainted = false;
         this.difficultySet = false;
         this.runIndex++;
@@ -297,5 +306,35 @@ public class ChallengeSavedData extends PersistentState {
     public void setRunIndex(int runIndex) {
         this.runIndex = runIndex;
         markDirty();
+    }
+
+    public List<Identifier> getAllAdvancementsOrder() {
+        return List.copyOf(allAdvancementsOrder);
+    }
+
+    public void setAllAdvancementsOrder(List<Identifier> order) {
+        this.allAdvancementsOrder.clear();
+        this.allAdvancementsOrder.addAll(order);
+        markDirty();
+    }
+
+    public int getAllAdvancementsIndex() {
+        return allAdvancementsIndex;
+    }
+
+    public void setAllAdvancementsIndex(int index) {
+        this.allAdvancementsIndex = index;
+        markDirty();
+    }
+
+    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
+        public static final MapCodec<ChallengeProgress> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeProgress::allItemsOrder),
+                Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeProgress::allItemsIndex),
+                Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeProgress::allEntitiesOrder),
+                Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeProgress::allEntitiesIndex),
+                Codec.list(Identifier.CODEC).optionalFieldOf("allAdvancementsOrder", List.of()).forGetter(ChallengeProgress::allAdvancementsOrder),
+                Codec.INT.optionalFieldOf("allAdvancementsIndex", 0).forGetter(ChallengeProgress::allAdvancementsIndex)
+        ).apply(instance, ChallengeProgress::new));
     }
 }

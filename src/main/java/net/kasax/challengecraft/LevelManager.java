@@ -185,7 +185,7 @@ public class LevelManager {
             case 6, 7 -> 3;
             case 8, 13 -> 4;
             case 11, 12 -> 5;
-            case 20 -> 6;
+            case 20, 26 -> 6;
             case 21 -> 7;
             case 24 -> 8;
             case 25 -> 9;

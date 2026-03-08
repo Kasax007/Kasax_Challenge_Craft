@@ -2,6 +2,7 @@ package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.LevelManager;
+import net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld;
 import net.kasax.challengecraft.mixin.MinecraftServerAccessor;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
@@ -27,6 +28,44 @@ import java.util.stream.Stream;
 
 public class ChallengeWorldRestarter {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Restarter");
+    private static boolean needsTeleport = false;
+    private static boolean rotationPending = false;
+
+    public static void setNeedsTeleport(boolean v) {
+        needsTeleport = v;
+        if (v) LOGGER.info("needsTeleport set to true for next join/tick");
+    }
+
+    public static void setRotationPending(boolean v) {
+        rotationPending = v;
+        if (v) LOGGER.info("rotationPending set to true for randomization");
+    }
+
+    public static boolean isRotationPending() {
+        return rotationPending;
+    }
+
+    public static void clearRotationPending() {
+        rotationPending = false;
+    }
+
+    public static void handlePlayerTeleport(MinecraftServer server) {
+        if (!needsTeleport) {
+            LOGGER.info("[Teleport] No teleport pending.");
+            return;
+        }
+        
+        server.execute(() -> {
+            needsTeleport = false; // Reset inside execute to avoid race if multiple JOINS happen fast
+            server.getPlayerManager().getPlayerList().forEach(player -> {
+                ServerWorld overworld = server.getOverworld();
+                net.minecraft.util.math.BlockPos spawn = overworld.getSpawnPos();
+                // Use requestTeleport which is safer across versions
+                player.requestTeleport(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
+                LOGGER.info("[Teleport] Teleported {} to safe spawn at {}", player.getName().getString(), spawn);
+            });
+        });
+    }
 
     public static void initiateRestart(MinecraftServer server) {
         LOGGER.info("Initiating world restart via offline rotation...");
@@ -69,9 +108,49 @@ public class ChallengeWorldRestarter {
         server.stop(false);
     }
 
+    public static void initializeGenerators(MinecraftServer server) {
+        // Pre-initialize Skyblock generators if active
+        net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(null);
+        net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(null);
+
+        if (net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.isActive()) {
+            try {
+                var registries = server.getRegistryManager();
+                var structLookup = registries.getOrThrow(net.minecraft.registry.RegistryKeys.STRUCTURE_SET);
+                var dimRegistry = registries.getOrThrow(net.minecraft.registry.RegistryKeys.DIMENSION);
+                
+                var overworldOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.OVERWORLD);
+                if (overworldOpt != null) {
+                    var biomeSource = overworldOpt.chunkGenerator().getBiomeSource();
+                    net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(
+                        new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, false)
+                    );
+                    LOGGER.info("Initialized Skyblock Overworld generator for session.");
+                }
+                
+                var netherOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.NETHER);
+                if (netherOpt != null) {
+                    var biomeSource = netherOpt.chunkGenerator().getBiomeSource();
+                    net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(
+                        new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, true)
+                    );
+                    LOGGER.info("Initialized Skyblock Nether generator for session.");
+                }
+            } catch (Exception e) {
+                LOGGER.error("Failed to pre-initialize Skyblock generators!", e);
+            }
+        }
+    }
+
     public static void randomizeSeed(MinecraftServer server) {
+        if (!rotationPending) return;
+        
         try {
             net.minecraft.world.SaveProperties properties = ((net.kasax.challengecraft.mixin.MinecraftServerAccessor) server).getSaveProperties();
+            if (properties == null) {
+                LOGGER.warn("SaveProperties is null during randomization!");
+                return;
+            }
             long newSeed = new java.util.Random().nextLong();
             LOGGER.info("Randomizing seed in memory for fresh world. New seed: {}", newSeed);
 
@@ -96,12 +175,27 @@ public class ChallengeWorldRestarter {
             } catch (Throwable ignored) {}
 
             // 5. Try to randomize all long fields in GeneratorOptions
-            GeneratorOptions options = properties.getGeneratorOptions();
+            net.minecraft.world.gen.GeneratorOptions options = properties.getGeneratorOptions();
             if (options != null) {
                 randomizeAllLongFields(options, newSeed);
             }
+
+            // 6. Force lifecycle to Stable to avoid "Experimental settings" warning
+            try {
+                for (java.lang.reflect.Field f : properties.getClass().getDeclaredFields()) {
+                    if (f.getType() == com.mojang.serialization.Lifecycle.class) {
+                        f.setAccessible(true);
+                        f.set(properties, com.mojang.serialization.Lifecycle.stable());
+                        LOGGER.info("[SeedReset] Forced world lifecycle to STABLE");
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.warn("[SeedReset] Could not force world lifecycle to stable: {}", e.getMessage());
+            }
             
             LOGGER.info("Seed randomization and state cleaning completed.");
+            rotationPending = false; // Successfully handled
         } catch (Exception e) {
             LOGGER.error("Critical failure during seed randomization!", e);
         }
@@ -132,8 +226,27 @@ public class ChallengeWorldRestarter {
         while (clazz != null && clazz != Object.class) {
             for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
                 String name = f.getName().toLowerCase();
-                // Target spawn coordinates and wandering trader state
-                if (name.contains("spawn") || name.contains("wandering") || name.equals("x") || name.equals("y") || name.equals("z")) {
+                
+                // Debug log all fields in LevelProperties to identify coordinate fields
+                if (clazz.getSimpleName().equals("LevelProperties") || clazz.getSimpleName().equals("class_31")) {
+                     try {
+                         f.setAccessible(true);
+                         Object val = f.get(obj);
+                         LOGGER.info("[SpawnDebug] Field: {} (type: {}, value: {})", f.getName(), f.getType().getSimpleName(), val);
+                         
+                         // In 1.21.5+, spawnPos might be a BlockPos field (e.g. field_48380)
+                         // We definitely want to AVOID resetting it to 0,0,0 here.
+                         if (f.getType().getSimpleName().contains("BlockPos") || f.getType().getSimpleName().contains("class_2338")) {
+                             LOGGER.info("[SpawnDebug] Identified BlockPos field '{}', skipping reset to keep safe spawn.", f.getName());
+                             continue;
+                         }
+                     } catch (Exception ignored) {}
+                }
+
+                // Target wandering trader state, but avoid resetting spawn coordinates directly to 0,0,0
+                // as this can spawn players in the void or inside blocks.
+                // We want to keep wandering trader reset but let Minecraft handle the spawn location.
+                if (name.contains("wandering") || name.contains("spawnangle") || name.contains("spawnforced")) {
                     try {
                         f.setAccessible(true);
                         if (f.getType() == int.class || f.getType() == Integer.class) {
@@ -142,9 +255,28 @@ public class ChallengeWorldRestarter {
                         } else if (f.getType() == float.class || f.getType() == Float.class) {
                             f.set(obj, 0.0f);
                             LOGGER.info("Reset float field '{}.{}' to 0.0", clazz.getSimpleName(), f.getName());
+                        } else if (f.getType() == boolean.class || f.getType() == Boolean.class) {
+                            f.set(obj, false);
+                            LOGGER.info("Reset boolean field '{}.{}' to false", clazz.getSimpleName(), f.getName());
                         }
                     } catch (Exception e) {
                         LOGGER.warn("Could not reset field '{}.{}'", clazz.getSimpleName(), f.getName());
+                    }
+                } else if (name.equals("x") || name.equals("y") || name.equals("z") || name.contains("center")) {
+                    // Only reset x, y, z if they belong to a WorldBorder-like object (handled via clearNbtFields call)
+                    // or if explicitly handled here for non-spawn objects.
+                    // When called on LevelProperties, we want to AVOID resetting spawnX, spawnY, spawnZ.
+                    if (!clazz.getSimpleName().contains("Properties") && !clazz.getSimpleName().contains("Level")) {
+                        try {
+                            f.setAccessible(true);
+                            if (f.getType() == int.class || f.getType() == Integer.class) {
+                                f.set(obj, 0);
+                                LOGGER.info("Reset coordinate field '{}.{}' to 0", clazz.getSimpleName(), f.getName());
+                            } else if (f.getType() == double.class || f.getType() == Double.class) {
+                                f.set(obj, 0.0);
+                                LOGGER.info("Reset coordinate field '{}.{}' to 0.0", clazz.getSimpleName(), f.getName());
+                            }
+                        } catch (Exception ignored) {}
                     }
                 }
             }
@@ -164,9 +296,23 @@ public class ChallengeWorldRestarter {
                 boolean isNbt = net.minecraft.nbt.NbtCompound.class.isAssignableFrom(type);
 
                 if (isNbt) {
+                    String name = f.getName().toLowerCase();
+                    // Avoid clearing playerdata in a way that breaks login ("Not a string" error)
+                    // Instead of new NbtCompound(), we'll just let Minecraft re-initialize it or clear it carefully
+                    if (name.contains("playerdata") || name.equals("field_169")) {
+                        try {
+                            f.setAccessible(true);
+                            // Set to null to force Minecraft to use world spawn instead of an empty record
+                            f.set(obj, null);
+                            LOGGER.info("[SeedReset] Set playerData field '{}.{}' to null", clazz.getSimpleName(), f.getName());
+                        } catch (Exception e) {
+                            LOGGER.warn("[SeedReset] Could not nullify playerData field '{}.{}'", clazz.getSimpleName(), f.getName());
+                        }
+                        continue;
+                    }
+                    
                     try {
                         f.setAccessible(true);
-                        // Using a new NbtCompound instead of null to avoid potential corruption/NPEs when saving
                         f.set(obj, new net.minecraft.nbt.NbtCompound());
                         LOGGER.info("[SeedReset] Reset NBT field '{}.{}' to empty compound", clazz.getSimpleName(), f.getName());
                     } catch (Exception e) {
@@ -194,7 +340,7 @@ public class ChallengeWorldRestarter {
                     String name = f.getName().toLowerCase();
                     // Reset 'initialized' and other flags to force fresh world/boss setup
                     if (name.equals("initialized") || name.contains("spawned") || name.contains("killed") || name.contains("dragon") || 
-                        name.equals("field_192") || name.equals("field_176")) { // Common obfuscated names for initialized/dragonKilled
+                        name.equals("field_192") || name.equals("field_176") || name.equals("field_185")) { // Common obfuscated names for initialized/dragonKilled
                         try {
                             f.setAccessible(true);
                             f.set(obj, false);
@@ -290,7 +436,7 @@ public class ChallengeWorldRestarter {
         // Files/Folders to move to archive
         String[] toMove = {
             "region", "poi", "entities", "DIM1", "DIM-1", 
-            "playerdata", "advancements", "stats", 
+            "playerdata", "advancements", "stats", "data",
             "level.dat", "level.dat_old", "uid.dat"
         };
 
