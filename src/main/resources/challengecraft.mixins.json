@@ -23,7 +23,11 @@
     "ScholarPerkMixin",
     "PlayerNameMixin",
     "MinecraftServerMixin",
-    "MinecraftServerAccessor"
+    "MinecraftServerAccessor",
+    "ToolUsageMixin",
+    "SizeMattersMixin",
+    "ItemEntityMixin",
+    "MobEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 1

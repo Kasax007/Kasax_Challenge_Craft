@@ -1,13 +1,12 @@
 package net.kasax.challengecraft.mixin;
 
-import net.kasax.challengecraft.challenges.Chal_17_WalkRandomItem;
-import net.kasax.challengecraft.challenges.Chal_18_DamageRandomItem;
-import net.kasax.challengecraft.challenges.Chal_21_Hardcore;
-import net.kasax.challengecraft.challenges.Chal_25_DamageWorldBorder;
-import net.kasax.challengecraft.challenges.Chal_28_WalkDamage;
+import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
@@ -18,6 +17,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -37,6 +37,12 @@ public abstract class MovementAndDamageMixin {
     private Vec3d lastPos = null;
     @Unique
     private float damageAccumulator = 0;
+    @Unique
+    private BlockPos lastBlockPos = null;
+    @Unique
+    private int standingTicks = 0;
+    @Unique
+    private static boolean sharingDamage = false;
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
@@ -69,13 +75,69 @@ public abstract class MovementAndDamageMixin {
             walkDistanceAccumulator = 0;
             walkDamageDistanceAccumulator = 0;
         }
+
+        // ID 29: The Floor is Lava
+        if (Chal_29_FloorIsLava.isActive() && !player.isCreative() && !player.isSpectator()) {
+            BlockPos currentBlockPos = player.getBlockPos();
+            net.minecraft.block.Block floorBlock = player.getWorld().getBlockState(currentBlockPos.down()).getBlock();
+
+            boolean onNatural = floorBlock == Blocks.GRASS_BLOCK || floorBlock == Blocks.STONE || floorBlock == Blocks.DEEPSLATE;
+
+            if (currentBlockPos.equals(lastBlockPos)) {
+                standingTicks++;
+            } else {
+                standingTicks = 0;
+                lastBlockPos = currentBlockPos;
+            }
+
+            if (onNatural || standingTicks > 60) { // 60 ticks = 3 seconds
+                player.setOnFireFor(3);
+                player.damage(player.getServerWorld(), player.getWorld().getDamageSources().onFire(), 1.0f);
+            }
+        } else {
+            standingTicks = 0;
+            lastBlockPos = null;
+        }
+
+        // ID 30: Heavy Pockets
+        if (Chal_30_HeavyPockets.isActive() && !player.isCreative() && !player.isSpectator()) {
+            int filledSlots = 0;
+            for (int i = 0; i < 36; i++) {
+                if (!player.getInventory().getStack(i).isEmpty()) {
+                    filledSlots++;
+                }
+            }
+
+            if (filledSlots > 0) {
+                if (filledSlots == 36) {
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, 5, false, false, true));
+                } else {
+                    int amplifier = (filledSlots / 6) - 1; // 6-11: 0, 12-17: 1, 18-23: 2, 24-29: 3, 30-35: 4
+                    if (amplifier >= 0) {
+                        player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, amplifier, false, false, true));
+                    }
+                }
+            }
+        }
     }
 
     @Inject(method = "damage", at = @At("RETURN"), cancellable = true)
     private void onDamage(ServerWorld world, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue()) {
+            ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+
+            // ID 32: Symbiotic Bond
+            if (Chal_32_SymbioticBond.isActive() && !sharingDamage) {
+                sharingDamage = true;
+                for (ServerPlayerEntity other : player.getServer().getPlayerManager().getPlayerList()) {
+                    if (other != player && !other.isCreative() && !other.isSpectator()) {
+                        other.damage(world, source, amount);
+                    }
+                }
+                sharingDamage = false;
+            }
+
             if (Chal_18_DamageRandomItem.isActive()) {
-                ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
                 damageAccumulator += amount;
 
                 if (damageAccumulator >= 2.0f) {
@@ -88,7 +150,6 @@ public abstract class MovementAndDamageMixin {
                 }
             }
             if (Chal_25_DamageWorldBorder.isActive()) {
-                ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
                 double current = Chal_25_DamageWorldBorder.getDiameter();
                 double next = current + amount;
                 Chal_25_DamageWorldBorder.setDiameter(next);

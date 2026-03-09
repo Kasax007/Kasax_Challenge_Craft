@@ -22,7 +22,7 @@ import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 28, 24, 25, 9, 2, 3, 23, 14, 15, 19, 22
+            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 15, 35, 19, 22
     ));
 
     static {
@@ -41,6 +41,7 @@ public class ChallengeSelectionScreen extends Screen {
     private SliderWidget maxHealthSlider;
     private SliderWidget slotsSlider;
     private SliderWidget mobHealthSlider;
+    private SliderWidget doubleTroubleSlider;
 
     private WidgetScrollPanel scrollPanel;
     private ButtonWidget saveButton;
@@ -54,6 +55,8 @@ public class ChallengeSelectionScreen extends Screen {
     private int slotsSliderTicks;
     private double mobHealthSliderValue;
     private int mobHealthMultiplier;
+    private double doubleTroubleSliderValue;
+    private int doubleTroubleMultiplier;
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Challenge Selection"));
@@ -73,6 +76,7 @@ public class ChallengeSelectionScreen extends Screen {
         int savedMaxHeartsTicks;
         int savedSlots;
         int savedMobHealthMult;
+        int savedDoubleTroubleMult;
 
         if (server != null) {
             ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
@@ -81,6 +85,7 @@ public class ChallengeSelectionScreen extends Screen {
             savedMaxHeartsTicks = data.getMaxHeartsTicks();
             savedSlots = data.getLimitedInventorySlots();
             savedMobHealthMult = data.getMobHealthMultiplier();
+            savedDoubleTroubleMult = data.getDoubleTroubleMultiplier();
         } else {
             // Client side on dedicated server
             active = ChallengeCraftClient.LAST_CHOSEN;
@@ -88,11 +93,13 @@ public class ChallengeSelectionScreen extends Screen {
             savedMaxHeartsTicks = ChallengeCraftClient.SELECTED_MAX_HEARTS;
             savedSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             savedMobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
+            savedDoubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
         }
 
         if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20;
         if (savedSlots <= 0) savedSlots = 36;
         if (savedMobHealthMult <= 0) savedMobHealthMult = 1;
+        if (savedDoubleTroubleMult <= 0) savedDoubleTroubleMult = 2;
 
         // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)
         sliderTicks = savedMaxHeartsTicks;                  // 1..20
@@ -103,6 +110,9 @@ public class ChallengeSelectionScreen extends Screen {
 
         mobHealthMultiplier = savedMobHealthMult;
         mobHealthSliderValue = (mobHealthMultiplier - 1) / 99.0;
+
+        doubleTroubleMultiplier = savedDoubleTroubleMult;
+        doubleTroubleSliderValue = (doubleTroubleMultiplier - 2) / 8.0;
 
         int panelWidth = 260;
         int panelX = width / 2 - panelWidth / 2;
@@ -145,12 +155,19 @@ public class ChallengeSelectionScreen extends Screen {
                 this.value = (mobHealthMultiplier - 1) / 99.0;
             }
         };
+        this.doubleTroubleSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Double Trouble: %dx", doubleTroubleMultiplier)), doubleTroubleSliderValue) {
+            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Double Trouble: %.0fx", 2 + (this.value * 8)))); }
+            @Override protected void applyValue() {
+                doubleTroubleMultiplier = (int)(Math.round(this.value * 8) + 2);
+                this.value = (doubleTroubleMultiplier - 2) / 8.0;
+            }
+        };
 
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
-            if ((id == 7 || id == 12 || id == 24) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24 || id == 35) && col == 1) {
                 y += cardHeight + spacing;
                 col = 0;
             }
@@ -185,6 +202,13 @@ public class ChallengeSelectionScreen extends Screen {
                 mobHealthSlider.setX(x1);
                 mobHealthSlider.setY(y);
                 scrollPanel.addChild(mobHealthSlider);
+                y += cardHeight + spacing;
+                col = 0;
+            }
+            if (id == 35 && doubleTroubleSlider != null) {
+                doubleTroubleSlider.setX(x1);
+                doubleTroubleSlider.setY(y);
+                scrollPanel.addChild(doubleTroubleSlider);
                 y += cardHeight + spacing;
                 col = 0;
             }
@@ -253,9 +277,9 @@ public class ChallengeSelectionScreen extends Screen {
         List<Integer> newActive = getActiveIds();
         List<Integer> newPerks = getActivePerks();
 
-        int ticks = 0;
+        int heartsTicks = 0;
         if (newActive.contains(7) && maxHealthSlider != null) {
-            ticks = this.sliderTicks;
+            heartsTicks = this.sliderTicks;
         }
 
         int slotticks = 0;
@@ -268,12 +292,17 @@ public class ChallengeSelectionScreen extends Screen {
             mobHealthMult = this.mobHealthMultiplier;
         }
 
+        int doubleMult = 2;
+        if (newActive.contains(35) && doubleTroubleSlider != null) {
+            doubleMult = this.doubleTroubleMultiplier;
+        }
+
         ChallengeCraft.LOGGER.info(
-                "[Client:Selection] sending ChallengePacket → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, restart = {}",
-                newActive, newPerks, ticks, slotticks, mobHealthMult, restart
+                "[Client:Selection] sending ChallengePacket → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, doubleTrouble = {}, restart = {}",
+                newActive, newPerks, heartsTicks, slotticks, mobHealthMult, doubleMult, restart
         );
 
-        ClientPlayNetworking.send(new ChallengePacket(newActive, ticks, slotticks, mobHealthMult, newPerks, restart));
+        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, newPerks, restart));
     }
 
     private List<Integer> getActiveIds() {

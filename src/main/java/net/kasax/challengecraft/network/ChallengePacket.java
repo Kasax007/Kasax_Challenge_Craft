@@ -16,6 +16,7 @@ public class ChallengePacket implements CustomPayload {
     public final int           maxHearts;
     public final int          limitedInventorySlots;
     public final int          mobHealthMultiplier;
+    public final int          doubleTroubleMultiplier;
     public final List<Integer> perks;
     public final boolean       restart;
 
@@ -36,6 +37,7 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeVarInt(pkt.maxHearts);
                             buf.writeVarInt(pkt.limitedInventorySlots);
                             buf.writeVarInt(pkt.mobHealthMultiplier);
+                            buf.writeVarInt(pkt.doubleTroubleMultiplier);
                             buf.writeVarInt(pkt.perks.size());
                             for (int id : pkt.perks) buf.writeVarInt(id);
                             buf.writeBoolean(pkt.restart);
@@ -53,30 +55,32 @@ public class ChallengePacket implements CustomPayload {
                             int hearts = buf.readVarInt();
                             int slots = buf.readVarInt();
                             int mobHealth = buf.readVarInt();
+                            int doubleTrouble = buf.readVarInt();
                             int perkSize = buf.readVarInt();
                             List<Integer> perks = new ArrayList<>(perkSize);
                             for (int i = 0; i < perkSize; i++) {
                                 perks.add(buf.readVarInt());
                             }
                             boolean restart = buf.readBoolean();
-                            return new ChallengePacket(list, hearts, slots, mobHealth, perks, restart);
+                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, perks, restart);
                         }
                     }
             );
 
     /** Construct on the client when sending */
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, List<Integer> perks, boolean restart) {
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, List<Integer> perks, boolean restart) {
         this.active    = active;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
         this.mobHealthMultiplier = mobHealth;
+        this.doubleTroubleMultiplier = doubleTrouble;
         this.perks = perks;
         this.restart = restart;
     }
 
     // Default constructor for standard update (no restart)
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, List<Integer> perks) {
-        this(active, maxHearts, slots, mobHealth, perks, false);
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, List<Integer> perks) {
+        this(active, maxHearts, slots, mobHealth, doubleTrouble, perks, false);
     }
 
     /** Called by Fabric when it needs to serialize */
@@ -86,6 +90,7 @@ public class ChallengePacket implements CustomPayload {
         buf.writeVarInt(maxHearts);
         buf.writeVarInt(limitedInventorySlots);
         buf.writeVarInt(mobHealthMultiplier);
+        buf.writeVarInt(doubleTroubleMultiplier);
         buf.writeVarInt(perks.size());
         for (int id : perks) buf.writeVarInt(id);
         buf.writeBoolean(restart);

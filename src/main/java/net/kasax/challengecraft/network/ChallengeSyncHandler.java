@@ -10,6 +10,8 @@ import net.kasax.challengecraft.client.screen.AllItemsHUD;
 import net.kasax.challengecraft.client.screen.AllItemsScreen;
 import net.kasax.challengecraft.client.screen.TimerOverlay;
 import net.kasax.challengecraft.ChallengeCraft;
+import net.kasax.challengecraft.ChallengeManager;
+import net.kasax.challengecraft.ChallengeCraftClient;
 
 public class ChallengeSyncHandler {
     public static void register() {
@@ -23,72 +25,29 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(ChallengeSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 // Clear all active first (on client)
-                Chal_1_LevelItem.setActive(false);
-                Chal_5_NoRegen.setActive(false);
-                Chal_6_NoVillagerTrading.setActive(false);
-                Chal_7_MaxHealthModify.setActive(false);
-                Chal_8_NoCraftingTable.setActive(false);
-                Chal_9_ExpWorldBorder.setActive(false);
-                Chal_10_RandomItem.setActive(false);
-                Chal_12_LimitedInventory.setActive(false);
-                Chal_13_RandomEnchantment.setActive(false);
-                Chal_14_RandomBlockDrops.setActive(false);
-                Chal_15_RandomMobDrops.setActive(false);
-                Chal_17_WalkRandomItem.setActive(false);
-                Chal_18_DamageRandomItem.setActive(false);
-                Chal_19_MinePotionEffect.setActive(false);
-                Chal_20_RandomizedCrafting.setActive(false);
-                Chal_21_Hardcore.setActive(false);
-                Chal_22_AllItems.setActive(false);
-                Chal_23_AllEntities.setActive(false);
-                Chal_24_MobHealthMultiply.setActive(false);
-                Chal_25_DamageWorldBorder.setActive(false);
-                Chal_26_AllAchievements.setActive(false);
+                ChallengeManager.setAllActive(false);
                 AllItemsHUD.setActive(false);
                 AllEntitiesHUD.setActive(false);
                 AllAchievementsHUD.setActive(false);
 
                 for (int id : payload.active) {
-                    switch (id) {
-                        case 1 -> Chal_1_LevelItem.setActive(true);
-                        case 5 -> Chal_5_NoRegen.setActive(true);
-                        case 6 -> Chal_6_NoVillagerTrading.setActive(true);
-                        case 7 -> Chal_7_MaxHealthModify.setActive(true);
-                        case 8 -> Chal_8_NoCraftingTable.setActive(true);
-                        case 9 -> Chal_9_ExpWorldBorder.setActive(true);
-                        case 10 -> Chal_10_RandomItem.setActive(true);
-                        case 11 -> Chal_11_SkyblockWorld.setActive(true);
-                        case 12 -> Chal_12_LimitedInventory.setActive(true);
-                        case 13 -> Chal_13_RandomEnchantment.setActive(true);
-                        case 14 -> Chal_14_RandomBlockDrops.setActive(true);
-                        case 15 -> Chal_15_RandomMobDrops.setActive(true);
-                        case 17 -> Chal_17_WalkRandomItem.setActive(true);
-                        case 18 -> Chal_18_DamageRandomItem.setActive(true);
-                        case 19 -> Chal_19_MinePotionEffect.setActive(true);
-                        case 20 -> Chal_20_RandomizedCrafting.setActive(true);
-                        case 21 -> Chal_21_Hardcore.setActive(true);
-                        case 22 -> {
-                            Chal_22_AllItems.setActive(true);
-                            AllItemsHUD.setActive(true);
-                        }
-                        case 23 -> {
-                            Chal_23_AllEntities.setActive(true);
-                            AllEntitiesHUD.setActive(true);
-                        }
-                        case 24 -> Chal_24_MobHealthMultiply.setActive(true);
-                        case 25 -> Chal_25_DamageWorldBorder.setActive(true);
-                        case 26 -> {
-                            Chal_26_AllAchievements.setActive(true);
-                            AllAchievementsHUD.setActive(true);
-                        }
-                    }
+                    ChallengeManager.applyActiveFlag(id, null, null);
+                    if (id == 22) AllItemsHUD.setActive(true);
+                    if (id == 23) AllEntitiesHUD.setActive(true);
+                    if (id == 26) AllAchievementsHUD.setActive(true);
                 }
 
-                net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN = payload.active;
-                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_PERKS = payload.perks;
-                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_MAX_HEARTS = payload.maxHearts;
-                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = payload.limitedInventorySlots;
-                net.kasax.challengecraft.ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = payload.mobHealthMultiplier;
+                ChallengeCraftClient.LAST_CHOSEN = payload.active;
+                ChallengeCraftClient.SELECTED_PERKS = payload.perks;
+                ChallengeCraftClient.SELECTED_MAX_HEARTS = payload.maxHearts;
+                ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = payload.limitedInventorySlots;
+                ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = payload.mobHealthMultiplier;
+                ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = payload.doubleTroubleMultiplier;
+                
+                Chal_24_MobHealthMultiply.setMultiplier(payload.mobHealthMultiplier);
+                Chal_35_DoubleTrouble.setMultiplier(payload.doubleTroubleMultiplier);
+                Chal_12_LimitedInventory.setLimitedSlots(payload.limitedInventorySlots);
+                Chal_7_MaxHealthModify.setMaxHearts(payload.maxHearts * 0.5f);
             });
         });
 

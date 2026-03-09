@@ -61,7 +61,8 @@ public class ChallengeManager {
                 perks,
                 data.getMaxHeartsTicks(),
                 data.getLimitedInventorySlots(),
-                data.getMobHealthMultiplier()
+                data.getMobHealthMultiplier(),
+                data.getDoubleTroubleMultiplier()
         );
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, pkt);
@@ -78,6 +79,10 @@ public class ChallengeManager {
     }
 
     public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult) {
+        return getDifficulty(id, ticks, slots, mobHealthMult, 2, 0);
+    }
+
+    public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult, int doubleTroubleMult, int playerCount) {
         if (id == LevelManager.PERK_INFINITY_WEAPON) return 0.0;
         if (LevelManager.ALL_PERKS.contains(id)) {
             return -0.5;
@@ -104,25 +109,36 @@ public class ChallengeManager {
             case 19 -> 0.6; // MinePotionEffect
             case 20 -> 1.5; // RandomizedCrafting (Hard)
             case 21 -> 3.0; // Hardcore (One life)
-            case 22 -> 15.0; // All Items (Gives XP per item now)
-            case 23 -> 10.0; // All Entities (Gives XP per entity now)
+            case 22 -> 15.0; // All Items
+            case 23 -> 10.0; // All Entities
             case 24 -> (mobHealthMult - 1) / 99.0 * 15.0; // Mob Health
             case 25 -> 4.0; // DamageWorldBorder
             case 26 -> 12.0; // All Achievements
             case 27 -> 1.3;  // No Armor
             case 28 -> 5.0;  // Walk = Damage
+            case 29 -> 2.5;  // Floor is Lava
+            case 30 -> 1.2;  // Heavy Pockets
+            case 31 -> 2.0;  // Corrosive Tools
+            case 32 -> (playerCount <= 1) ? 0.0 : (1.0 + playerCount); // Symbiotic Bond: 2p -> 3.0, 3p -> 4.0? 
+                             // Wait, user said "2.0x for two players (scales with player count +1 per player, 0 if solo)"
+                             // So 2p -> 2.0, 3p -> 3.0, etc.
+                             // Wait, (playerCount == 2) ? 2.0 : (playerCount > 2 ? 2.0 + (playerCount - 2) : 0.0)
+                             // Simplified: (playerCount >= 2) ? (double)playerCount : 0.0;
+            case 33 -> 1.5;  // Size Matters
+            case 34 -> 0.5;  // Upside Down Drops
+            case 35 -> 0.4 * doubleTroubleMult; // Double Trouble
             default -> 0.0;
         };
     }
 
-    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult, List<Integer> perks) {
+    public static double calculateTotalDifficulty(List<Integer> ids, int heartsTicks, int inventorySlots, int mobHealthMult, int doubleTroubleMult, int playerCount, List<Integer> perks) {
         if (perks.contains(LevelManager.PERK_INFINITY_WEAPON)) return 0.0;
         double total = 0;
         for (int id : ids) {
-            total += getDifficulty(id, heartsTicks, inventorySlots, mobHealthMult);
+            total += getDifficulty(id, heartsTicks, inventorySlots, mobHealthMult, doubleTroubleMult, playerCount);
         }
         for (int perkId : perks) {
-            total += getDifficulty(perkId, heartsTicks, inventorySlots, mobHealthMult);
+            total += getDifficulty(perkId, heartsTicks, inventorySlots, mobHealthMult, doubleTroubleMult, playerCount);
         }
         return Math.max(0, total); // Ensure it's not negative
     }
@@ -141,6 +157,9 @@ public class ChallengeManager {
 
         // Walk = Damage (Challenge 28) + Damage = Border (Challenge 25) conflict
         if (ids.contains(28) && ids.contains(25)) return true;
+
+        // Floor is Lava (Challenge 29) + Fire Resistance Perk (Perk 104) conflict
+        if (ids.contains(29) && perks.contains(LevelManager.PERK_FIRE_RESISTANCE)) return true;
 
         return false;
     }
@@ -178,6 +197,11 @@ public class ChallengeManager {
                 Chal_25_DamageWorldBorder.setDiameter(savedSize);
                 LOGGER.info("[Manager] restored damage world border size = {}", savedSize);
             }
+            if (saved.contains(35)) {
+                int savedMult = data.getDoubleTroubleMultiplier();
+                Chal_35_DoubleTrouble.setMultiplier(savedMult);
+                LOGGER.info("[Manager] restored double trouble multiplier = {}", savedMult);
+            }
 
             // Seed from client if first boot and we are in singleplayer/integrated server
             if (!data.isDifficultySet()) {
@@ -195,6 +219,7 @@ public class ChallengeManager {
                             data.setMaxHeartsTicks((int)(Chal_7_MaxHealthModify.getMaxHearts() * 2));
                             data.setLimitedInventorySlots(Chal_12_LimitedInventory.getLimitedSlots());
                             data.setMobHealthMultiplier(Chal_24_MobHealthMultiply.getMultiplier());
+                            data.setDoubleTroubleMultiplier(Chal_35_DoubleTrouble.getMultiplier());
                             data.setActivePerks(List.copyOf(PRE_LOADED_PERKS));
                             
                             LOGGER.info("ChallengeManager: seeded NEW dedicated server world from pre-loaded challenges: {}", currentActive);
@@ -203,7 +228,8 @@ public class ChallengeManager {
 
                     // Calculate difficulty if not already set
                     if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36) {
-                        double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getActivePerks());
+                        int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
+                        double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getDoubleTroubleMultiplier(), playerCount, data.getActivePerks());
                         data.setInitialDifficulty(initialDiff);
                         data.setDifficultySet(true);
                         LOGGER.info("ChallengeManager: seeded difficulty from existing data. Initial Difficulty: {}", initialDiff);
@@ -213,14 +239,17 @@ public class ChallengeManager {
                     int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                     int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
                     int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
+                    int clientDoubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
 
                     data.setMaxHeartsTicks(clientTicks);
                     data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
                     data.setActivePerks(List.copyOf(ChallengeCraftClient.SELECTED_PERKS));
                     data.setLimitedInventorySlots(clientSlots);
                     data.setMobHealthMultiplier(clientMult);
+                    data.setDoubleTroubleMultiplier(clientDoubleMult);
                     
-                    double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, ChallengeCraftClient.SELECTED_PERKS);
+                    int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
+                    double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, clientDoubleMult, playerCount, ChallengeCraftClient.SELECTED_PERKS);
                     data.setInitialDifficulty(initialDiff);
                     data.setDifficultySet(true);
 
@@ -232,13 +261,15 @@ public class ChallengeManager {
                     ChallengeCraftClient.SELECTED_MAX_HEARTS = 20;
                     ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36;
                     ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = 1;
+                    ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = 2;
                 }
 
-                // Apply current settings to challenge classes
+                data.setMaxHeartsTicks(data.getMaxHeartsTicks() != 0 ? data.getMaxHeartsTicks() : 20);
                 Chal_7_MaxHealthModify.setMaxHearts(data.getMaxHeartsTicks() * 0.5f);
                 Chal_12_LimitedInventory.setLimitedSlots(data.getLimitedInventorySlots());
                 Chal_24_MobHealthMultiply.setMultiplier(data.getMobHealthMultiplier());
                 Chal_25_DamageWorldBorder.setDiameter(data.getDamageWorldBorderSize());
+                Chal_35_DoubleTrouble.setMultiplier(data.getDoubleTroubleMultiplier());
 
                 // If Infinity Weapon perk is included at world creation, grant it once to eligible online players
                 if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
@@ -346,6 +377,7 @@ public class ChallengeManager {
                         data.getInt("maxHeartsTicks").ifPresent(ticks -> Chal_7_MaxHealthModify.setMaxHearts(ticks * 0.5f));
                         data.getInt("limitedInventorySlots").ifPresent(slots -> Chal_12_LimitedInventory.setLimitedSlots(slots));
                         data.getInt("mobHealthMultiplier").ifPresent(mult -> Chal_24_MobHealthMultiply.setMultiplier(mult));
+                        data.getInt("doubleTroubleMultiplier").ifPresent(mult -> Chal_35_DoubleTrouble.setMultiplier(mult));
                         
                         LOGGER.info("Pre-loaded active challenges and settings from disk: {} (Perks: {})", active, PRE_LOADED_PERKS);
                         return true;
@@ -398,6 +430,13 @@ public class ChallengeManager {
         if (Chal_26_AllAchievements.isActive()) ids.add(26);
         if (Chal_27_NoArmor.isActive()) ids.add(27);
         if (Chal_28_WalkDamage.isActive()) ids.add(28);
+        if (Chal_29_FloorIsLava.isActive()) ids.add(29);
+        if (Chal_30_HeavyPockets.isActive()) ids.add(30);
+        if (Chal_31_CorrosiveTools.isActive()) ids.add(31);
+        if (Chal_32_SymbioticBond.isActive()) ids.add(32);
+        if (Chal_33_SizeMatters.isActive()) ids.add(33);
+        if (Chal_34_UpsideDownDrops.isActive()) ids.add(34);
+        if (Chal_35_DoubleTrouble.isActive()) ids.add(35);
         return ids;
     }
 
@@ -430,9 +469,16 @@ public class ChallengeManager {
         Chal_26_AllAchievements.setActive(active);
         Chal_27_NoArmor.setActive(active);
         Chal_28_WalkDamage.setActive(active);
+        Chal_29_FloorIsLava.setActive(active);
+        Chal_30_HeavyPockets.setActive(active);
+        Chal_31_CorrosiveTools.setActive(active);
+        Chal_32_SymbioticBond.setActive(active);
+        Chal_33_SizeMatters.setActive(active);
+        Chal_34_UpsideDownDrops.setActive(active);
+        Chal_35_DoubleTrouble.setActive(active);
     }
 
-    private static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
+    public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
         switch (id) {
             case 1  -> { Chal_1_LevelItem        .setActive(true); LOGGER.info("Challenge 1 ON"); }
             case 2  -> { Chal_2_NoBlockDrops     .setActive(true); LOGGER.info("Challenge 2 ON"); }
@@ -487,6 +533,13 @@ public class ChallengeManager {
                 Chal_28_WalkDamage.setActive(true);
                 LOGGER.info("Challenge 28 ON");
             }
+            case 29 -> { Chal_29_FloorIsLava.setActive(true); LOGGER.info("Challenge 29 ON"); }
+            case 30 -> { Chal_30_HeavyPockets.setActive(true); LOGGER.info("Challenge 30 ON"); }
+            case 31 -> { Chal_31_CorrosiveTools.setActive(true); LOGGER.info("Challenge 31 ON"); }
+            case 32 -> { Chal_32_SymbioticBond.setActive(true); LOGGER.info("Challenge 32 ON"); }
+            case 33 -> { Chal_33_SizeMatters.setActive(true); LOGGER.info("Challenge 33 ON"); }
+            case 34 -> { Chal_34_UpsideDownDrops.setActive(true); LOGGER.info("Challenge 34 ON"); }
+            case 35 -> { Chal_35_DoubleTrouble.setActive(true); LOGGER.info("Challenge 35 ON"); }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }
     }

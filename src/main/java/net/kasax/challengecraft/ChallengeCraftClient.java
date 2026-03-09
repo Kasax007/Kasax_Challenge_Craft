@@ -19,6 +19,7 @@ import java.util.List;
 public class ChallengeCraftClient implements ClientModInitializer {
     public static int SELECTED_LIMITED_INVENTORY = 36;
     public static int SELECTED_MOB_HEALTH_MULTIPLIER = 1;
+    public static int SELECTED_DOUBLE_TROUBLE_MULTIPLIER = 2;
     /** Used for single‐player: last value chosen on the Create World screen */
     public static List<Integer> LAST_CHOSEN = Collections.emptyList();
     public static List<Integer> SELECTED_PERKS = Collections.emptyList();

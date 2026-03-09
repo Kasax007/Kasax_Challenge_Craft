@@ -19,7 +19,7 @@ import java.util.function.Consumer;
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.literal("Challenges");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 28, 24, 25, 9, 2, 3, 23, 14, 15, 19, 22
+            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 15, 35, 19, 22
     ));
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
@@ -27,6 +27,7 @@ public class ChallengeTab extends GridScreenTab {
     private final SliderWidget maxHealthSlider;
     private final SliderWidget inventorySlider;
     private final SliderWidget mobHealthSlider;
+    private final SliderWidget doubleTroubleSlider;
     private Text difficultyText = Text.empty();
 
     private WidgetScrollPanel scrollPanel;
@@ -42,6 +43,9 @@ public class ChallengeTab extends GridScreenTab {
     // sliderValue from 0.0 to 1.0, multiplier from 1..100
     private double mobHealthSliderValue = 0.0;
     private int mobHealthMultiplier = 1;
+
+    private double doubleTroubleSliderValue = 0.0;
+    private int doubleTroubleMultiplier = 2;
 
     public ChallengeTab() {
         super(TITLE);
@@ -117,6 +121,26 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
+        // Challenge 35
+        this.doubleTroubleSlider = new SliderWidget(
+                0, 0, 210, 20,
+                Text.literal("Double Trouble: 2x"),
+                doubleTroubleSliderValue
+        ) {
+            @Override
+            protected void updateMessage() {
+                double mult = 2 + (this.value * 8);
+                setMessage(Text.literal(String.format("Double Trouble: %.0fx", mult)));
+            }
+
+            @Override
+            protected void applyValue() {
+                doubleTroubleMultiplier = (int)(Math.round(this.value * 8) + 2);
+                this.value = (doubleTroubleMultiplier - 2) / 8.0;
+                updateDifficultyText();
+            }
+        };
+
         // Create ONCE. Do NOT replace this instance later, or CreateWorldScreen will keep the old reference.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
         updateDifficultyText();
@@ -134,7 +158,11 @@ public class ChallengeTab extends GridScreenTab {
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.difficultyText = Text.translatable("challengecraft.warning.conflict");
         } else {
-            double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, activePerks);
+            int playerCount = 0;
+            if (net.minecraft.client.MinecraftClient.getInstance().world != null) {
+                playerCount = net.minecraft.client.MinecraftClient.getInstance().world.getPlayers().size();
+            }
+            double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
             this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
@@ -184,7 +212,7 @@ public class ChallengeTab extends GridScreenTab {
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
 
-            if ((id == 7 || id == 12 || id == 24) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24 || id == 35) && col == 1) {
                 y += cardH + spacing;
                 col = 0;
             }
@@ -229,6 +257,16 @@ public class ChallengeTab extends GridScreenTab {
                 mobHealthSlider.setWidth(cardW);
                 mobHealthSlider.setHeight(cardH);
                 this.scrollPanel.addChild(mobHealthSlider);
+                y += cardH + spacing;
+                col = 0;
+            }
+
+            if (id == 35 && doubleTroubleSlider != null) {
+                doubleTroubleSlider.setX(x1);
+                doubleTroubleSlider.setY(y);
+                doubleTroubleSlider.setWidth(cardW);
+                doubleTroubleSlider.setHeight(cardH);
+                this.scrollPanel.addChild(doubleTroubleSlider);
                 y += cardH + spacing;
                 col = 0;
             }
@@ -313,6 +351,12 @@ public class ChallengeTab extends GridScreenTab {
             ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = mobHealthMultiplier;
         } else {
             ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = 1;
+        }
+
+        if (doubleTroubleSlider != null && active.contains(35)) {
+            ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = doubleTroubleMultiplier;
+        } else {
+            ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = 2;
         }
 
         return active;

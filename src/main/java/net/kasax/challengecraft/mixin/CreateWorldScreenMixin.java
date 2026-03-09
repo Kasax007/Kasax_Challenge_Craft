@@ -70,8 +70,9 @@ public class CreateWorldScreenMixin {
             int maxHearts = ChallengeCraftClient.SELECTED_MAX_HEARTS;
             int limitedInventorySlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             int mobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
+            int doubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
             ClientPlayNetworking.send(
-                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, perkList)
+                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, doubleTroubleMult, perkList)
             );
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }

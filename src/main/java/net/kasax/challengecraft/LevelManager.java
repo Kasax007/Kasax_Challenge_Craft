@@ -187,16 +187,19 @@ public class LevelManager {
             case 11, 12, 27 -> 5;
             case 20, 26 -> 6;
             case 21 -> 7;
-            case 24, 28 -> 8;
-            case 25 -> 9;
-            case 9 -> 10;
-            case 2 -> 12;
+            case 24, 28, 30 -> 8;
+            case 25, 31 -> 9;
+            case 9, 32 -> 10;
+            case 29 -> 11;
+            case 2, 33 -> 12;
             case 3 -> 13;
+            case 34 -> 14;
+            case 23 -> 15;
             case 14 -> 16;
             case 15 -> 17;
+            case 35 -> 18;
             case 19 -> 19;
             case 22 -> 20;
-            case 23 -> 15;
             
             // Perks
             case PERK_NIGHT_VISION -> 3;

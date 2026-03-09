@@ -18,6 +18,7 @@ public class ChallengeSyncPacket implements CustomPayload {
     public final int maxHearts;
     public final int limitedInventorySlots;
     public final int mobHealthMultiplier;
+    public final int doubleTroubleMultiplier;
 
     public static final PacketCodec<PacketByteBuf, ChallengeSyncPacket> CODEC = CustomPayload.codecOf(
             new ValueFirstEncoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -30,6 +31,7 @@ public class ChallengeSyncPacket implements CustomPayload {
                     buf.writeVarInt(pkt.maxHearts);
                     buf.writeVarInt(pkt.limitedInventorySlots);
                     buf.writeVarInt(pkt.mobHealthMultiplier);
+                    buf.writeVarInt(pkt.doubleTroubleMultiplier);
                 }
             },
             new PacketDecoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -44,17 +46,19 @@ public class ChallengeSyncPacket implements CustomPayload {
                     int maxHearts = buf.readVarInt();
                     int slots = buf.readVarInt();
                     int mobMult = buf.readVarInt();
-                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult);
+                    int doubleTroubleMult = buf.readVarInt();
+                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult);
                 }
             }
     );
 
-    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult) {
+    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult) {
         this.active = active;
         this.perks = perks;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
         this.mobHealthMultiplier = mobMult;
+        this.doubleTroubleMultiplier = doubleTroubleMult;
     }
 
     @Override

@@ -57,13 +57,14 @@ public class PacketHandler {
                             }
                         }
 
-                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}",
+                        ChallengeCraft.LOGGER.info("[Server] got ChallengePacket from {} → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, doubleTrouble = {}",
                                 context.player().getName().getString(),
                                 packet.active,
                                 packet.perks,
                                 packet.maxHearts,
                                 packet.limitedInventorySlots,
-                                packet.mobHealthMultiplier
+                                packet.mobHealthMultiplier,
+                                packet.doubleTroubleMultiplier
                         );
                         var world = server.getOverworld();
                         ChallengeSavedData data = ChallengeSavedData.get(world);
@@ -75,6 +76,7 @@ public class PacketHandler {
                         data.setMaxHeartsTicks(packet.maxHearts);
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
                         data.setMobHealthMultiplier(packet.mobHealthMultiplier);
+                        data.setDoubleTroubleMultiplier(packet.doubleTroubleMultiplier);
 
                         // If Infinity Weapon perk is newly activated via in-game selection, grant it once to eligible players
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
@@ -112,6 +114,11 @@ public class PacketHandler {
                             int mult = packet.mobHealthMultiplier;
                             net.kasax.challengecraft.challenges.Chal_24_MobHealthMultiply.setMultiplier(mult);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_24 multiplier = {}", mult);
+                        }
+                        if (packet.active.contains(35)) {
+                            int mult = packet.doubleTroubleMultiplier;
+                            net.kasax.challengecraft.challenges.Chal_35_DoubleTrouble.setMultiplier(mult);
+                            ChallengeCraft.LOGGER.info("[Server] set Chal_35 multiplier = {}", mult);
                         }
                         // re‑apply all active challenges
                         ChallengeManager.applyAll(server);

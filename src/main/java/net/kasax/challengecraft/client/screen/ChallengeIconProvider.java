@@ -38,6 +38,13 @@ public class ChallengeIconProvider {
         ICONS.put(26, new ItemStack(Items.WRITABLE_BOOK));
         ICONS.put(27, new ItemStack(Items.CHAINMAIL_CHESTPLATE));
         ICONS.put(28, new ItemStack(Items.IRON_BOOTS));
+        ICONS.put(29, new ItemStack(Items.LAVA_BUCKET));
+        ICONS.put(30, new ItemStack(Items.ANVIL));
+        ICONS.put(31, new ItemStack(Items.STONE_PICKAXE));
+        ICONS.put(32, new ItemStack(Items.END_CRYSTAL));
+        ICONS.put(33, new ItemStack(Items.SLIME_BALL));
+        ICONS.put(34, new ItemStack(Items.PHANTOM_MEMBRANE));
+        ICONS.put(35, new ItemStack(Items.SPAWNER));
         
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));
