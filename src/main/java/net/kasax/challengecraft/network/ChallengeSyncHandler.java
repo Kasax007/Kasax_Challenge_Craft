@@ -86,5 +86,11 @@ public class ChallengeSyncHandler {
                 context.client().setScreen(new AllAchievementsScreen(payload.advancements, payload.currentIndex));
             });
         });
+
+        ClientPlayNetworking.registerGlobalReceiver(TriviaQuestionPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreen(new net.kasax.challengecraft.client.screen.TriviaScreen(payload.question(), payload.answers(), payload.correctIndex()));
+            });
+        });
     }
 }

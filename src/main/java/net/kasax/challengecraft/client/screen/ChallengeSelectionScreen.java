@@ -22,7 +22,7 @@ import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     static {
@@ -60,6 +60,24 @@ public class ChallengeSelectionScreen extends Screen {
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Challenge Selection"));
+    }
+
+    private Text difficultyText = Text.empty();
+
+    private void updateDifficultyText() {
+        List<Integer> activeIds = getActiveIds();
+        List<Integer> activePerks = getActivePerks();
+
+        if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
+            this.difficultyText = Text.translatable("challengecraft.warning.conflict");
+        } else {
+            int playerCount = 0;
+            if (this.client != null && this.client.world != null) {
+                playerCount = this.client.world.getPlayers().size();
+            }
+            double total = net.kasax.challengecraft.ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, slotsSliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
+            this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
+        }
     }
 
     @Override
@@ -139,6 +157,7 @@ public class ChallengeSelectionScreen extends Screen {
             @Override protected void applyValue() {
                 sliderTicks = (int)(Math.round(this.value * 19) + 1);
                 this.value = (sliderTicks - 1) / 19.0;
+                updateDifficultyText();
             }
         };
         this.slotsSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Slots: %d", slotsSliderTicks)), slotsSliderValue) {
@@ -146,6 +165,7 @@ public class ChallengeSelectionScreen extends Screen {
             @Override protected void applyValue() {
                 slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
                 this.value = (slotsSliderTicks - 1) / 35.0;
+                updateDifficultyText();
             }
         };
         this.mobHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Mob Health: %dx", mobHealthMultiplier)), mobHealthSliderValue) {
@@ -153,6 +173,7 @@ public class ChallengeSelectionScreen extends Screen {
             @Override protected void applyValue() {
                 mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
                 this.value = (mobHealthMultiplier - 1) / 99.0;
+                updateDifficultyText();
             }
         };
         this.doubleTroubleSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Double Trouble: %dx", doubleTroubleMultiplier)), doubleTroubleSliderValue) {
@@ -160,6 +181,7 @@ public class ChallengeSelectionScreen extends Screen {
             @Override protected void applyValue() {
                 doubleTroubleMultiplier = (int)(Math.round(this.value * 8) + 2);
                 this.value = (doubleTroubleMultiplier - 2) / 8.0;
+                updateDifficultyText();
             }
         };
 
@@ -173,7 +195,10 @@ public class ChallengeSelectionScreen extends Screen {
             }
 
             int currentX = (col == 0) ? x0 : x1;
-            ChallengeCardWidget card = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, id, isOn, val -> updateSaveButton());
+            ChallengeCardWidget card = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, id, isOn, val -> {
+                updateSaveButton();
+                updateDifficultyText();
+            });
             cards.add(card);
             scrollPanel.addChild(card);
 
@@ -236,7 +261,10 @@ public class ChallengeSelectionScreen extends Screen {
             }
             boolean isOn = activePerks.contains(perkId);
             int currentX = (col == 0) ? x0 : x1;
-            ChallengeCardWidget perkCard = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, perkId, isOn, val -> updateSaveButton());
+            ChallengeCardWidget perkCard = new ChallengeCardWidget(currentX, y, cardWidth, cardHeight, perkId, isOn, val -> {
+                updateSaveButton();
+                updateDifficultyText();
+            });
             perkCards.add(perkCard);
             scrollPanel.addChild(perkCard);
 
@@ -271,6 +299,7 @@ public class ChallengeSelectionScreen extends Screen {
         addDrawableChild(this.saveButton);
         addDrawableChild(this.saveAndRestartButton);
         updateSaveButton();
+        updateDifficultyText();
     }
 
     private void sendChallengePacket(boolean restart) {
@@ -354,8 +383,7 @@ public class ChallengeSelectionScreen extends Screen {
             Text conflictWarning = Text.translatable("challengecraft.warning.conflict");
             ctx.drawCenteredTextWithShadow(this.textRenderer, conflictWarning, width / 2, 24, 0xFF5555);
         } else {
-            Text warning = Text.translatable("challengecraft.warning.tainted");
-            ctx.drawCenteredTextWithShadow(this.textRenderer, warning, width / 2, 24, 0xFF5555);
+            ctx.drawCenteredTextWithShadow(this.textRenderer, this.difficultyText, width / 2, 24, 0xFFFF55);
         }
     }
 

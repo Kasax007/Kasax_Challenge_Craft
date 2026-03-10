@@ -63,6 +63,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_26_AllAchievements.register();
 		Chal_27_NoArmor.register();
 		Chal_28_WalkDamage.register();
+		Chal_36_TriviaChallenge.register();
 		LevelXpListener.register();
 
 		// Register Hidden Skip Command
@@ -156,6 +157,8 @@ public class ChallengeCraft implements ModInitializer {
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
 		PayloadTypeRegistry.playC2S()
 				.register(ClientXpSyncPacket.ID, ClientXpSyncPacket.CODEC);
+		PayloadTypeRegistry.playC2S()
+				.register(TriviaAnswerPacket.ID, TriviaAnswerPacket.CODEC);
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
@@ -203,6 +206,10 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(
 				net.kasax.challengecraft.network.RestartPendingPacket.ID,
 				net.kasax.challengecraft.network.RestartPendingPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				TriviaQuestionPacket.ID,
+				TriviaQuestionPacket.CODEC
 		);
 
 		// 2) Now hook up the handler:

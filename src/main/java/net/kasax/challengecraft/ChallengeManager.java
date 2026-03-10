@@ -127,6 +127,7 @@ public class ChallengeManager {
             case 33 -> 1.5;  // Size Matters
             case 34 -> 0.5;  // Upside Down Drops
             case 35 -> 0.4 * doubleTroubleMult; // Double Trouble
+            case 36 -> 4.0;  // Trivia Challenge
             default -> 0.0;
         };
     }
@@ -437,6 +438,7 @@ public class ChallengeManager {
         if (Chal_33_SizeMatters.isActive()) ids.add(33);
         if (Chal_34_UpsideDownDrops.isActive()) ids.add(34);
         if (Chal_35_DoubleTrouble.isActive()) ids.add(35);
+        if (Chal_36_TriviaChallenge.isActive()) ids.add(36);
         return ids;
     }
 
@@ -476,6 +478,7 @@ public class ChallengeManager {
         Chal_33_SizeMatters.setActive(active);
         Chal_34_UpsideDownDrops.setActive(active);
         Chal_35_DoubleTrouble.setActive(active);
+        Chal_36_TriviaChallenge.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -540,6 +543,7 @@ public class ChallengeManager {
             case 33 -> { Chal_33_SizeMatters.setActive(true); LOGGER.info("Challenge 33 ON"); }
             case 34 -> { Chal_34_UpsideDownDrops.setActive(true); LOGGER.info("Challenge 34 ON"); }
             case 35 -> { Chal_35_DoubleTrouble.setActive(true); LOGGER.info("Challenge 35 ON"); }
+            case 36 -> { Chal_36_TriviaChallenge.setActive(true); LOGGER.info("Challenge 36 ON"); }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }
     }

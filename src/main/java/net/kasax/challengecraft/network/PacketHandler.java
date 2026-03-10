@@ -149,5 +149,16 @@ public class PacketHandler {
                     });
                 }
         );
+
+        ServerPlayNetworking.registerGlobalReceiver(
+                TriviaAnswerPacket.ID,
+                (packet, context) -> {
+                    var server = context.server();
+                    var player = context.player();
+                    server.execute(() -> {
+                        net.kasax.challengecraft.challenges.Chal_36_TriviaChallenge.handleAnswer(player, packet.answerIndex());
+                    });
+                }
+        );
     }
 }
