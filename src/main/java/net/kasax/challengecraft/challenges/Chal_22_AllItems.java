@@ -117,6 +117,7 @@ public class Chal_22_AllItems {
 
         for (Item item : itemRegistry) {
             Identifier id = itemRegistry.getId(item);
+            if (id.getNamespace().equals("challengecraft")) continue;
             if (!id.getNamespace().equals("minecraft")) continue;
             
             if (item == Items.AIR) continue;

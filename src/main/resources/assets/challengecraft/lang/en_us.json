@@ -105,5 +105,10 @@
   "challengecraft.perk.107": "Resistance",
   "challengecraft.perk.107.desc": "Grants +4 permanent Armor points.",
   "challengecraft.perk.108": "Infinity Weapon",
-  "challengecraft.perk.108.desc": "Grants a special sword, but sets difficulty to 0."
+  "challengecraft.perk.108.desc": "Grants a special sword, but sets difficulty to 0.",
+  "challengecraft.perk.109": "Infinite Chest",
+  "challengecraft.perk.109.desc": "Provides access to an infinite storage system at Level 20.",
+  "block.challengecraft.infinite_chest": "Infinite Chest",
+  "item.challengecraft.infinite_chest": "Infinite Chest",
+  "challengecraft.gui.search": "Search..."
 }

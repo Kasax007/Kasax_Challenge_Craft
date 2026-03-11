@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,waterlogged=false": { "model": "challengecraft:block/infinite_chest" },
+    "facing=north,waterlogged=true": { "model": "challengecraft:block/infinite_chest" },
+    "facing=south,waterlogged=false": { "model": "challengecraft:block/infinite_chest", "y": 180 },
+    "facing=south,waterlogged=true": { "model": "challengecraft:block/infinite_chest", "y": 180 },
+    "facing=east,waterlogged=false": { "model": "challengecraft:block/infinite_chest", "y": 90 },
+    "facing=east,waterlogged=true": { "model": "challengecraft:block/infinite_chest", "y": 90 },
+    "facing=west,waterlogged=false": { "model": "challengecraft:block/infinite_chest", "y": 270 },
+    "facing=west,waterlogged=true": { "model": "challengecraft:block/infinite_chest", "y": 270 }
+  }
+}

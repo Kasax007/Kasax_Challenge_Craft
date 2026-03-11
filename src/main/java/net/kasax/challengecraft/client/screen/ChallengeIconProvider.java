@@ -56,6 +56,7 @@ public class ChallengeIconProvider {
         ICONS.put(106, new ItemStack(Items.BOOK));
         ICONS.put(107, new ItemStack(Items.SHIELD));
         ICONS.put(108, new ItemStack(Items.GOLDEN_SWORD));
+        ICONS.put(109, new ItemStack(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_ITEM));
     }
 
     public static ItemStack getIcon(int id) {

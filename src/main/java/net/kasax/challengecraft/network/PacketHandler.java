@@ -160,5 +160,52 @@ public class PacketHandler {
                     });
                 }
         );
+
+        ServerPlayNetworking.registerGlobalReceiver(
+                InfiniteChestClickPayload.ID,
+                (packet, context) -> {
+                    var server = context.server();
+                    var player = context.player();
+                    server.execute(() -> {
+                        var world = player.getWorld();
+                        if (world.getBlockEntity(packet.pos()) instanceof net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
+                            var storage = be.getStorage();
+                            if (packet.button() == -1) {
+                                net.minecraft.screen.ScreenHandler handler = player.currentScreenHandler;
+                                if (handler instanceof net.kasax.challengecraft.block.InfiniteChestScreenHandler) {
+                                    net.minecraft.item.ItemStack cursorStack = handler.getCursorStack();
+                                    if (!cursorStack.isEmpty()) {
+                                        storage.addStack(cursorStack.copy());
+                                        cursorStack.setCount(0);
+                                        handler.setCursorStack(net.minecraft.item.ItemStack.EMPTY);
+                                        syncInfiniteChest(player, be);
+                                    }
+                                }
+                                return;
+                            }
+                            net.minecraft.item.ItemStack stack = packet.stack();
+                            if (!stack.isEmpty()) {
+                                net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey key = net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey.fromStack(stack);
+                                long amountToRemove = (packet.button() == 1) ? 1 : 64;
+                                long count = storage.removeItems(key, amountToRemove);
+                                if (count > 0) {
+                                    net.minecraft.item.ItemStack out = key.toStack((int) count);
+                                    player.getInventory().offerOrDrop(out);
+                                }
+                                syncInfiniteChest(player, be);
+                            }
+                        }
+                    });
+                }
+        );
+    }
+
+    public static void syncInfiniteChest(net.minecraft.server.network.ServerPlayerEntity player, net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
+        var storage = be.getStorage();
+        java.util.List<InfiniteChestSyncPayload.Entry> entries = new java.util.ArrayList<>();
+        storage.getStoredItems().forEach((key, count) -> {
+            entries.add(new InfiniteChestSyncPayload.Entry(key.toStack(1), count));
+        });
+        ServerPlayNetworking.send(player, new InfiniteChestSyncPayload(entries));
     }
 }

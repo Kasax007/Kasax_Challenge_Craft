@@ -41,6 +41,16 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.screen.AllAchievementsHUD.register();
         net.kasax.challengecraft.client.screen.MobHealthHUD.register();
 
+        net.minecraft.client.gui.screen.ingame.HandledScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
+
+        ClientPlayNetworking.registerGlobalReceiver(net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                if (context.client().currentScreen instanceof net.kasax.challengecraft.screen.InfiniteChestScreen screen) {
+                    screen.updateEntries(payload.entries());
+                }
+            });
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(RestartPendingPacket.ID, (payload, context) -> {
             boolean isSP = context.client().getServer() != null;
             RestartManager.setRestartPending(true, payload.worldName(), isSP);

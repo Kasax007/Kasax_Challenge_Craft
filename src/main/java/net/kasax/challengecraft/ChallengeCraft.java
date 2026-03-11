@@ -65,6 +65,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_28_WalkDamage.register();
 		Chal_36_TriviaChallenge.register();
 		LevelXpListener.register();
+		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 
 		// Register Hidden Skip Command
 		net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -159,6 +160,8 @@ public class ChallengeCraft implements ModInitializer {
 				.register(ClientXpSyncPacket.ID, ClientXpSyncPacket.CODEC);
 		PayloadTypeRegistry.playC2S()
 				.register(TriviaAnswerPacket.ID, TriviaAnswerPacket.CODEC);
+		PayloadTypeRegistry.playC2S()
+				.register(net.kasax.challengecraft.network.InfiniteChestClickPayload.ID, net.kasax.challengecraft.network.InfiniteChestClickPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
@@ -210,6 +213,10 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(
 				TriviaQuestionPacket.ID,
 				TriviaQuestionPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID,
+				net.kasax.challengecraft.network.InfiniteChestSyncPayload.CODEC
 		);
 
 		// 2) Now hook up the handler:

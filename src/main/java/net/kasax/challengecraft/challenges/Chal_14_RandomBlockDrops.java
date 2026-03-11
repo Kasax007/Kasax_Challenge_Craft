@@ -20,6 +20,11 @@ public class Chal_14_RandomBlockDrops {
     public static void register() {
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
             if (active && !player.isCreative() && world instanceof ServerWorld serverWorld) {
+                // EXCLUDE INFINITE CHEST FROM RANDOM DROPS
+                if (state.getBlock() == net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_BLOCK) {
+                    return true;
+                }
+                
                 // Get the random item for this block and world seed
                 ItemStack stack = getRandomDrop(state.getBlock(), serverWorld);
                 if (!stack.isEmpty()) {
@@ -47,7 +52,9 @@ public class Chal_14_RandomBlockDrops {
             ITEM_LIST = new ArrayList<>();
             Registries.ITEM.forEach(item -> {
                 // Skip air to avoid getting air drops
-                if (Registries.ITEM.getId(item).toString().equals("minecraft:air")) return;
+                Identifier id = Registries.ITEM.getId(item);
+                if (id.toString().equals("minecraft:air")) return;
+                if (id.getNamespace().equals("challengecraft")) return;
                 ITEM_LIST.add(item);
             });
         }

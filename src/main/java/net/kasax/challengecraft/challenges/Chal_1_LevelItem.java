@@ -14,7 +14,9 @@ import java.util.stream.Collectors;
 
 public class Chal_1_LevelItem {
     private static boolean active = false;
-    private static final List<Item> ALL_ITEMS = Registries.ITEM.stream().collect(Collectors.toList());
+    private static final List<Item> ALL_ITEMS = Registries.ITEM.stream()
+            .filter(item -> !Registries.ITEM.getId(item).getNamespace().equals("challengecraft"))
+            .collect(Collectors.toList());
 
     /** Called once on mod init to hook the events (they’ll no‑op until active==true). */
     public static void register() {

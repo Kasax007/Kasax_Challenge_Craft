@@ -9,6 +9,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.Identifier;
 import java.util.*;
 
 public class Chal_20_RandomizedCrafting {
@@ -38,6 +39,9 @@ public class Chal_20_RandomizedCrafting {
 
         Map<RecipeType<?>, List<RecipeEntry<?>>> grouped = new HashMap<>();
         for (RecipeEntry<?> entry : allRecipes) {
+            Identifier id = entry.id().getValue();
+            if (id.getNamespace().equals("challengecraft")) continue;
+
             RecipeType<?> type = entry.value().getType();
             List<RecipeEntry<?>> group = grouped.get(type);
             if (group == null) {

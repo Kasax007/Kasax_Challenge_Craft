@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.minecraft.block.*;
 import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.StructureWorldAccess;
@@ -28,6 +29,8 @@ public class Chal_16_RandomChunkBlocks {
         if (blockList == null) {
             blockList = new ArrayList<>();
             for (Block block : Registries.BLOCK) {
+                Identifier id = Registries.BLOCK.getId(block);
+                if (id.getNamespace().equals("challengecraft")) continue;
                 if (isException(block)) continue;
                 if (block == Blocks.TNT) continue;
 

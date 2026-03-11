@@ -28,6 +28,7 @@ public class LevelManager {
     public static final int PERK_SCHOLAR = 106;
     public static final int PERK_RESISTANCE = 107;
     public static final int PERK_INFINITY_WEAPON = 108;
+    public static final int PERK_INFINITE_CHEST = 109;
 
     public static final List<Integer> ALL_PERKS = List.of(
             PERK_NIGHT_VISION,
@@ -37,7 +38,8 @@ public class LevelManager {
             PERK_STRENGTH,
             PERK_SCHOLAR,
             PERK_RESISTANCE,
-            PERK_INFINITY_WEAPON
+            PERK_INFINITY_WEAPON,
+            PERK_INFINITE_CHEST
     );
 
     public static int getLevelForXp(long totalXp) {
@@ -210,6 +212,7 @@ public class LevelManager {
             case PERK_STRENGTH -> 14;
             case PERK_SCHOLAR -> 15;
             case PERK_RESISTANCE -> 18;
+            case PERK_INFINITE_CHEST -> 20;
             case PERK_INFINITY_WEAPON -> 999; // Special handling for Infinity Weapon (Star 20)
 
             default -> 1;

@@ -11,6 +11,7 @@ import net.minecraft.item.ItemConvertible;
 import net.minecraft.item.Items;
 import net.minecraft.recipe.book.RecipeCategory;
 import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -23,12 +24,20 @@ public class ModRecipeProvider extends FabricRecipeProvider {
 
     @Override
     protected RecipeGenerator getRecipeGenerator(RegistryWrapper.WrapperLookup wrapperLookup, RecipeExporter recipeExporter) {
-        //List<ItemConvertible> SMELTABLES = List.of(ModItems.CHALLENGE_STICK);
-        //ShapelessRecipeJsonBuilder.create(RecipeCategory.MISC, ModItems.CHALLENGE_STICK, 1)
-        //        .input(Items.STICK)
-        //        .criterion(hasItem(Items.STICK), conditionsFromItem(ModItems.CHALLENGE_STICK))
-        //        .offerTo(recipeExporter);
-        return null;
+        return new RecipeGenerator(wrapperLookup, recipeExporter) {
+            @Override
+            public void generate() {
+                ShapedRecipeJsonBuilder.create(wrapperLookup.getOrThrow(net.minecraft.registry.RegistryKeys.ITEM), net.minecraft.recipe.book.RecipeCategory.MISC, net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_ITEM.asItem())
+                        .pattern("DDD")
+                        .pattern("DCD")
+                        .pattern("DDD")
+                        .input('D', Items.DIAMOND_BLOCK.asItem())
+                        .input('C', Items.CHEST.asItem())
+                        .criterion(hasItem(Items.DIAMOND_BLOCK.asItem()), conditionsFromItem(Items.DIAMOND_BLOCK.asItem()))
+                        .criterion(hasItem(Items.CHEST.asItem()), conditionsFromItem(Items.CHEST.asItem()))
+                        .offerTo(exporter);
+            }
+        };
     }
 
     @Override

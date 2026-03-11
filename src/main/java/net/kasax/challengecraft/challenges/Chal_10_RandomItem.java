@@ -14,7 +14,11 @@ public class Chal_10_RandomItem {
     private static final List<Identifier> ITEMS = new ArrayList<>();
 
     static {
-        Registries.ITEM.forEach(item -> ITEMS.add(Registries.ITEM.getId(item)));
+        Registries.ITEM.forEach(item -> {
+            Identifier id = Registries.ITEM.getId(item);
+            if (id.getNamespace().equals("challengecraft")) return;
+            ITEMS.add(id);
+        });
     }
 
     public static void register() {
