@@ -33,7 +33,7 @@ public class TriviaQuestions {
         add("How can players safely store their valuable items?", "In chests", "In fire", "Throw them on the ground", "In water", 0);
         add("What potion is made by brewing a Fermented Spider Eye in a Water Bottle?", "Potion of Strength", "Potion of Weakness", "Potion of Harming", "Potion of Slowness", 1);
         add("What happens when you feed Raw Cod to a Dolphin?", "It heals the player", "It leads to treasure", "It attacks the player", "Nothing", 1);
-        add("What block is the taskbar icon of the Minecraft game?", "Dirt block", "Crafting table", "Grass block", "Diamond block", 1);
+        add("What block is the taskbar icon of the Minecraft game?", "Dirt block", "Crafting table", "Grass block", "Diamond block", 2);
         add("Does a lightning strike turn a Rabbit into a Killer Rabbit?", "Yes", "No", "Only if it is raining", "Only in Java Edition", 1);
         add("What is the maximum size for a Nether portal?", "10x10", "23x23", "21x21", "Unlimited", 1);
         add("What food item is made by cooking raw pork?", "Cooked Beef", "Cooked Porkchop", "Cooked Mutton", "Bacon", 1);
@@ -240,7 +240,7 @@ public class TriviaQuestions {
         add("Which item is used to trim armor?", "Smithing Template", "Diamond", "Gold Ingot", "Netherite", 0);
         add("What is the material used to craft a Netherite Ingot?", "Netherite Scrap and Gold Ingots", "Ancient Debris and Diamonds", "Obsidian and Gold", "Netherite Scrap and Diamonds", 0);
         add("Which mob is found in a Woodland Mansion?", "Evoker and Vindicator", "Witch and Skeleton", "Zombie and Creeper", "Piglin and Hoglin", 0);
-        add("How many hearts does the Ender Dragon have?", "50", "100", "200", "300", 2);
+        add("How many hearts does the Ender Dragon have?", "50", "100", "200", "300", 1);
         add("What is the name of the enchantment that allows you to mine faster?", "Efficiency", "Unbreaking", "Fortune", "Haste", 0);
         add("Which block is used to craft a Soul Campfire?", "Soul Sand or Soul Soil", "Netherrack", "Coal Block", "Magma Block", 0);
         add("What do you get when you use a bucket on a Cow?", "Water", "Milk", "Beef", "Leather", 1);
@@ -294,7 +294,7 @@ public class TriviaQuestions {
         add("Which mob can drop a Music Disc when killed by a Skeleton?", "Zombie", "Creeper", "Enderman", "Spider", 1);
         add("What is the name of the item used to repair an Anvil?", "Iron Ingot", "Iron Block", "None (Anvils cannot be repaired)", "Hammer", 2);
         add("Which item is used to craft an Item Frame?", "Leather and Sticks", "Paper and Sticks", "Wool and Sticks", "Leather and Iron", 0);
-        add("How many hearts does the Wither have on Bedrock Edition?", "150", "300", "600", "100", 2);
+        add("How many hearts does the Wither have on Bedrock Edition?", "150", "300", "600", "100", 1);
         add("Which mob can be found in the End Cities?", "Enderman", "Shulker", "Ghast", "Phantom", 1);
         add("What is the name of the effect given by eating a Chorus Fruit?", "Teleportation", "Levitation", "Invisibility", "Hunger", 0);
         add("Which block is used to craft a Lantern?", "Iron Ingots and Torch", "Iron Nuggets and Torch", "Gold Nuggets and Torch", "Glass and Torch", 1);
@@ -310,7 +310,7 @@ public class TriviaQuestions {
         add("Which mob can be sheared to get mushrooms?", "Mooshroom", "Pig", "Cow", "Sheep", 0);
         add("What is the name of the item used to craft a Spyglass?", "Amethyst Shard and Copper", "Amethyst Shard and Gold", "Diamond and Copper", "Quartz and Copper", 0);
         add("Which block can be used to craft a Grindstone?", "Stone Slabs, Sticks, and Planks", "Stone, Sticks, and Planks", "Iron, Sticks, and Planks", "Stone Slabs and Sticks only", 0);
-        add("How many hearts does a Ravager have?", "50", "100", "20", "30", 1);
+        add("How many hearts does a Ravager have?", "50", "100", "20", "30", 0);
         add("Which mob can be used to ride across lava in the Nether?", "Strider", "Piglin", "Hoglin", "Ghast", 0);
         add("What is the name of the enchantment that returns damage to the attacker?", "Sharpness", "Thorns", "Knockback", "Protection", 1);
         add("Which block is used to craft a Lectern?", "Wood Slabs and Bookshelf", "Wood Planks and Bookshelf", "Sticks and Bookshelf", "Wood Slabs and Books", 0);
@@ -330,7 +330,7 @@ public class TriviaQuestions {
         add("Which mob is found in a Bastion Remnant?", "Piglin Brute", "Piglin", "Hoglin", "All of the above", 3);
         add("What is the name of the mob that spawns in the Nether and looks like a floating cube of magma?", "Blaze", "Magma Cube", "Ghast", "Piglin", 1);
         add("Which block is used to craft a Barrel?", "Wood Planks and Slabs", "Wood Planks and Sticks", "Wood Logs and Slabs", "Wood Planks and Iron", 0);
-        add("How many hearts does an Iron Golem have?", "50", "100", "150", "200", 1);
+        add("How many hearts does an Iron Golem have?", "50", "100", "150", "200", 0);
         add("Which mob can drop a Nautilus Shell?", "Drowned", "Fishing", "Wandering Trader", "All of the above", 3);
         add("What is the name of the enchantment that allows you to hit multiple mobs at once?", "Sharpness", "Sweeping Edge", "Knockback", "Fire Aspect", 1);
         add("Which block can be used to craft a Smithing Table?", "Wood Planks and Iron Ingots", "Wood Planks and Flint", "Wood Logs and Iron Ingots", "Wood Slabs and Iron Ingots", 0);
@@ -346,7 +346,7 @@ public class TriviaQuestions {
         add("Which mob can drop an Iron Ingot?", "Zombie", "Iron Golem", "Both Zombie and Iron Golem", "None", 2);
         add("What is the name of the enchantment that makes items unbreakable?", "None (Unbreaking only increases durability)", "Mending", "Efficiency", "Fortune", 0);
         add("Which block can be used to craft a Blast Furnace?", "Furnace, Smooth Stone, and Iron Ingots", "Furnace, Stone, and Iron Ingots", "Furnace, Smooth Stone, and Gold Ingots", "Furnace, Cobblestone, and Iron Ingots", 0);
-        add("How many hearts does the Warden have?", "100", "250", "500", "50", 2);
+        add("How many hearts does the Warden have?", "100", "250", "500", "50", 1);
         add("Which mob can be bred with Crimson Fungus?", "Hoglin", "Piglin", "Strider", "Zoglin", 0);
         add("What is the name of the advancement for reaching the end of a world?", "The End?", "The End.", "End Game", "Victory!", 1);
         add("Which block can be used to craft a Smoker?", "Furnace and Logs", "Furnace and Planks", "Furnace and Sticks", "Furnace and Coal", 0);
@@ -378,7 +378,7 @@ public class TriviaQuestions {
         add("Which mob can drop a String?", "Spider", "Cave Spider", "Cat", "All of the above", 3);
         add("What is the name of the enchantment that sets mobs on fire?", "Fire Aspect", "Flame", "Fire Protection", "Both Fire Aspect and Flame (for swords and bows)", 3);
         add("Which block can be used to craft a Daylight Detector?", "3 Glass, 3 Quartz, 3 Wood Slabs", "3 Glass, 3 Redstone, 3 Wood Slabs", "3 Glass, 3 Quartz, 3 Stone Slabs", "3 Glass, 3 Iron, 3 Wood Slabs", 0);
-        add("How many hearts does a Ghast have?", "5", "10", "15", "20", 1);
+        add("How many hearts does a Ghast have?", "5", "10", "15", "20", 0);
         add("Which mob can be found in a Snowy Tundra?", "Stray", "Polar Bear", "Snow Golem (if built)", "All of the above", 3);
         add("What is the name of the enchantment that reduces fall damage?", "Protection", "Feather Falling", "Blast Protection", "Projectile Protection", 1);
         add("Which block can be used to craft a Repeater?", "2 Redstone Torches, 1 Redstone, 3 Stone", "2 Redstone Torches, 1 Redstone, 3 Cobblestone", "2 Redstone Torches, 1 Iron, 3 Stone", "2 Redstone Torches, 1 Quartz, 3 Stone", 0);
@@ -386,19 +386,19 @@ public class TriviaQuestions {
         add("Which mob can drop a Leather?", "Cow", "Horse", "Rabbit", "Both Cow and Horse", 3);
         add("What is the name of the enchantment that increases the damage of a crossbow?", "Power", "Piercing", "Quick Charge", "Multishot", 1);
         add("Which block can be used to craft a Comparator?", "3 Redstone Torches, 1 Quartz, 3 Stone", "3 Redstone Torches, 1 Redstone, 3 Stone", "3 Redstone Torches, 1 Iron, 3 Stone", "3 Redstone Torches, 1 Quartz, 3 Cobblestone", 0);
-        add("How many hearts does a Shulker have?", "10", "15", "20", "30", 2);
+        add("How many hearts does a Shulker have?", "10", "15", "20", "30", 1);
         add("Which mob can be found in a Savanna?", "Llama", "Horse", "Donkey", "All of the above", 3);
         add("What is the name of the enchantment that makes a crossbow load faster?", "Power", "Quick Charge", "Piercing", "Multishot", 1);
         add("Which block can be used to craft an Observer?", "2 Redstone, 1 Quartz, 6 Cobblestone", "2 Redstone, 1 Quartz, 6 Stone", "2 Redstone, 1 Diamond, 6 Cobblestone", "2 Redstone, 1 Quartz, 6 Iron", 0);
-        add("How many hearts does an Endermite have?", "4", "8", "10", "12", 1);
+        add("How many hearts does an Endermite have?", "4", "8", "10", "12", 0);
         add("Which mob can be found in a Mega Taiga?", "Wolf", "Fox", "Bear", "Both Wolf and Fox", 3);
         add("What is the name of the enchantment that allows a crossbow to shoot 3 arrows at once?", "Multishot", "Piercing", "Quick Charge", "Power", 0);
         add("Which block can be used to craft a Dispenser?", "7 Cobblestone, 1 Bow, 1 Redstone", "7 Cobblestone, 1 Dropper, 1 Redstone", "7 Stone, 1 Bow, 1 Redstone", "7 Cobblestone, 1 Bow, 1 String", 0);
-        add("How many hearts does a Silverfish have?", "4", "8", "10", "12", 1);
+        add("How many hearts does a Silverfish have?", "4", "8", "10", "1", 3);
         add("Which mob can be found in a Mushroom Forest?", "Mooshroom", "Cow", "Sheep", "Pig", 0);
         add("What is the name of the enchantment that allows a tool to mine blocks exactly as they are?", "Fortune", "Silk Touch", "Efficiency", "Unbreaking", 1);
         add("Which block can be used to craft a Dropper?", "7 Cobblestone and 1 Redstone", "7 Stone and 1 Redstone", "7 Cobblestone and 1 Bow", "7 Cobblestone and 1 Iron", 0);
-        add("How many hearts does a Blaze have?", "10", "20", "30", "40", 1);
+        add("How many hearts does a Blaze have?", "10", "20", "30", "40", 0);
         add("Which mob can be found in a Soul Sand Valley?", "Skeleton", "Ghast", "Enderman", "Both Skeleton and Ghast", 3);
         add("What is the name of the enchantment that increases the damage against aquatic mobs?", "Sharpness", "Impaling", "Bane of Arthropods", "Smite", 1);
         add("Which block can be used to craft a Lever?", "1 Stick and 1 Cobblestone", "1 Stick and 1 Stone", "1 Stick and 1 Iron", "1 Stick and 1 Redstone", 0);
@@ -411,7 +411,7 @@ public class TriviaQuestions {
         add("What is the blast resistance of a Dragon Egg?", "9", "12", "15", "20", 0);
         add("How many ticks are in a standard Minecraft game day (20 minutes)?", "12000", "24000", "36000", "48000", 1);
         add("What is the exact percentage chance of a Pink Sheep spawning naturally?", "0.164%", "0.5%", "1%", "0.05%", 0);
-        add("In Java Edition, how much health does a small Slime (size 1) have?", "1 heart", "2 hearts", "4 hearts", "0.5 hearts", 0);
+        add("In Java Edition, how much health does a small Slime (size 1) have?", "1 heart", "2 hearts", "4 hearts", "0.5 hearts", 3);
         add("What is the maximum number of entities that can cram into a single block by default?", "16", "24", "32", "64", 1);
         add("How many items can a single block of coal smelt in a furnace?", "64", "80", "100", "120", 1);
         add("What is the maximum horizontal distance a Sculk Sensor can detect vibrations?", "4 blocks", "8 blocks", "12 blocks", "16 blocks", 1);
@@ -427,11 +427,11 @@ public class TriviaQuestions {
         add("In what version was the 'Sprinting' mechanic officially introduced?", "Beta 1.7", "Beta 1.8", "1.0", "1.2", 1);
         add("What was the first block ever added to Minecraft during its development?", "Stone", "Dirt", "Grass", "Cobblestone", 2);
         add("What is the maximum level for the 'Luck of the Sea' enchantment?", "II", "III", "IV", "V", 1);
-        add("How many hearts of health does a Sniffer have?", "7", "10", "14", "20", 2);
+        add("How many hearts of health does a Sniffer have?", "7", "10", "14", "20", 0);
         add("What is the blast power of an End Crystal?", "4", "5", "6", "7", 2);
         add("How many durability points does a Golden Pickaxe have?", "32", "64", "128", "256", 0);
         add("What is the specific chance of a spider spawning with a status effect on Hard?", "5%", "10%", "15%", "20%", 1);
-        add("How many hearts of health does a Giant have?", "10", "50", "100", "200", 2);
+        add("How many hearts of health does a Giant have?", "10", "50", "100", "200", 1);
         add("What is the internal ID for the 'Illusioner' mob?", "illusioner", "illager_illusion", "hidden_illager", "phantom_illager", 0);
         add("How many ticks of invulnerability does a player get after taking damage?", "5", "10", "20", "40", 1);
         add("How many blocks away can a Bee travel from its hive before it gets lost?", "10", "22", "50", "100", 1);
@@ -452,7 +452,7 @@ public class TriviaQuestions {
         add("What is the blast resistance of a block of Crying Obsidian?", "600", "1200", "100", "50", 1);
         add("How many durability points does a standard Elytra have?", "232", "432", "532", "632", 1);
         add("What is the name of the hidden splash text that appears if 'splashes.txt' is missing?", "null", "missingno", "splash_error", "minecraft", 1);
-        add("How many hearts of damage does a Warden's melee attack deal on Hard?", "15", "30", "45", "60", 2);
+        add("How much damage does a Warden's melee attack deal on Hard?", "15", "30", "45", "60", 2);
         add("What is the range of a Warden's sonic boom attack in blocks?", "5", "10", "15", "20", 2);
         add("How many durability points does a Gold Sword have?", "32", "64", "131", "250", 0);
         add("What is the name of the advancement for trading with a villager at the world height limit?", "Star Trader", "High Roller", "Top Merchant", "Sky Trader", 0);
@@ -462,7 +462,7 @@ public class TriviaQuestions {
         add("What is the chance of a Skeleton Horse trap spawning during a thunderstorm on Normal?", "1.5-4%", "0.75-1.5%", "3.75-10%", "5-10%", 0);
         add("How many chunks are stored in a single Minecraft Region (.mca) file?", "256", "512", "1024", "2048", 2);
         add("What is the maximum level of a Sharpness enchantment book found in a Loot Chest?", "III", "IV", "V", "II", 2);
-        add("How many hearts of health does a Wither have in Minecraft: Bedrock Edition?", "150", "300", "600", "1000", 2);
+        add("How many hearts of health does a Wither have in Minecraft: Bedrock Edition?", "150", "300", "600", "1000", 1);
         add("What is the width of an Enderman's hitbox in blocks?", "0.5", "0.6", "0.7", "0.8", 1);
         add("How many blocks per second is the terminal velocity of a falling player?", "20", "50", "78.4", "100", 2);
         add("What is the name of the sound file used for a Creeper's fuse?", "fuse", "hiss", "prime", "random.fuse", 3);
@@ -491,7 +491,7 @@ public class TriviaQuestions {
         add("In which version was the 'Experience' system first introduced?", "Beta 1.8", "Beta 1.7", "1.0", "1.2", 0);
         add("In which version was the 'Hunger' mechanic introduced?", "Beta 1.7", "Beta 1.8", "1.0", "1.2", 1);
         add("What is the chance of a spider spawning with Strength on Hard?", "1.25%", "2.5%", "5%", "10%", 0);
-        add("How many hearts of health does a fully grown Slime of size 4 have?", "4", "16", "20", "32", 1);
+        add("How many hearts of health does a fully grown Slime of size 4 have?", "4", "8", "16", "32", 1);
         add("What happens when you use a Potion of Healing on a Zombie?", "It heals", "It takes damage", "It turns into a Villager", "Nothing", 1);
         add("How many blocks high can a player jump with Jump Boost II?", "1.5", "2.5", "3.5", "4.5", 1);
         add("What is the rarest biome in the game (pre-1.18)?", "Mushroom Fields", "Modified Jungle Edge", "Ice Spikes", "Eroded Badlands", 1);

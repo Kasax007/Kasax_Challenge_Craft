@@ -5,7 +5,13 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.network.TriviaQuestionPacket;
+import net.minecraft.entity.EntityStatuses;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
@@ -26,6 +32,18 @@ public class Chal_36_TriviaChallenge {
             if (!active) return;
 
             globalTimer++;
+
+            // Play countdown sounds 3, 2, 1 seconds before a question appears
+            if (globalTimer == TRIVIA_INTERVAL - 60 || globalTimer == TRIVIA_INTERVAL - 40 || globalTimer == TRIVIA_INTERVAL - 20) {
+                float pitch = 1.0f;
+                if (globalTimer == TRIVIA_INTERVAL - 40) pitch = 1.2f;
+                if (globalTimer == TRIVIA_INTERVAL - 20) pitch = 1.5f;
+
+                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                    player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_NOTE_BLOCK_PLING, SoundCategory.MASTER, 1.0f, pitch);
+                }
+            }
+
             if (globalTimer >= TRIVIA_INTERVAL) {
                 globalTimer = 0;
                 if (!server.getPlayerManager().getPlayerList().isEmpty()) {
@@ -70,9 +88,9 @@ public class Chal_36_TriviaChallenge {
 
         if (answerIndex == question.correctIndex()) {
             player.sendMessage(Text.literal("Correct!").formatted(Formatting.GREEN), true);
+            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.MASTER, 1.0f, 1.0f);
         } else {
-            player.sendMessage(Text.literal("Wrong! The correct answer was: " + question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
-            player.damage(player.getServerWorld(), player.getDamageSources().genericKill(), 1000.0f);
+            processWrongAnswer(player, question);
         }
     }
 
@@ -81,8 +99,35 @@ public class Chal_36_TriviaChallenge {
         PENDING_TIMEOUTS.remove(player.getUuid());
         if (question == null) return;
 
-        player.sendMessage(Text.literal("Time's up! The correct answer was: " + question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
-        player.damage(player.getServerWorld(), player.getDamageSources().genericKill(), 1000.0f);
+        player.sendMessage(Text.literal("Time's up!").formatted(Formatting.RED), false);
+        processWrongAnswer(player, question);
+    }
+
+    private static void processWrongAnswer(ServerPlayerEntity player, TriviaQuestion question) {
+        if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING) || player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
+            // Pop totem animation and sound
+            player.getServerWorld().sendEntityStatus(player, EntityStatuses.USE_TOTEM_OF_UNDYING);
+
+            // Consume totem
+            if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
+                player.getMainHandStack().decrement(1);
+            } else {
+                player.getOffHandStack().decrement(1);
+            }
+
+            // Apply totem effects (approximate vanilla)
+            player.setHealth(1.0f);
+            player.clearStatusEffects();
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 900, 1));
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.FIRE_RESISTANCE, 800, 0));
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.ABSORPTION, 100, 1));
+
+            player.sendMessage(Text.literal("Wrong! But your Totem of Undying saved you!").formatted(Formatting.GOLD), true);
+        } else {
+            player.sendMessage(Text.literal("Wrong! The correct answer was: " + question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
+            player.damage(player.getServerWorld(), player.getDamageSources().genericKill(), 1000.0f);
+            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_VILLAGER_NO, SoundCategory.MASTER, 1.0f, 1.0f);
+        }
     }
 
     public static void setActive(boolean isActive) {
