@@ -1,12 +1,12 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.component.DataComponentTypes;
+import net.kasax.challengecraft.util.BlockedBarrierItem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
 
 import java.util.stream.IntStream;
 
@@ -34,6 +34,17 @@ public class Chal_12_LimitedInventory {
                 limitInventory(player);
             }
         });
+
+        UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
+            if (!active) {
+                return ActionResult.PASS;
+            }
+
+            return BlockedBarrierItem.isBlockedBarrier(player.getStackInHand(hand))
+                    ? ActionResult.FAIL
+                    : ActionResult.PASS;
+        });
+
         ChallengeCraft.LOGGER.info("[Chal12] Registered tick callback");
     }
 
@@ -55,16 +66,14 @@ public class Chal_12_LimitedInventory {
 
         // 1) Place a barrier in the first `toDisable` slots (per our order)
         for (int i = 0; i < toDisable; i++) {
-            ItemStack blocked = new ItemStack(Items.BARRIER);
-            blocked.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Blocked"));
-            mainInv.set(DEACTIVATION_ORDER[i], blocked);
+            mainInv.set(DEACTIVATION_ORDER[i], BlockedBarrierItem.create());
         }
 
         // 2) Clear out any remaining barriers beyond that point
         for (int i = toDisable; i < DEACTIVATION_ORDER.length; i++) {
             int idx = DEACTIVATION_ORDER[i];
             ItemStack s = mainInv.get(idx);
-            if (s.getItem() == Items.BARRIER && s.getCount() == 1) {
+            if (BlockedBarrierItem.isBlockedBarrier(s)) {
                 mainInv.set(idx, ItemStack.EMPTY);
             }
         }

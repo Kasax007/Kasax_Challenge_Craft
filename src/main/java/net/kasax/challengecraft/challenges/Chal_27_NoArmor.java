@@ -2,12 +2,10 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.component.DataComponentTypes;
+import net.kasax.challengecraft.util.BlockedBarrierItem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.collection.DefaultedList;
 
 /**
  * Chal_27_NoArmor
@@ -43,9 +41,7 @@ public class Chal_27_NoArmor {
                 if (!current.isEmpty()) {
                     player.dropItem(current, false);
                 }
-                ItemStack blocked = new ItemStack(Items.BARRIER);
-                blocked.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Blocked"));
-                inv.setStack(slot, blocked);
+                inv.setStack(slot, BlockedBarrierItem.create());
             }
         }
     }

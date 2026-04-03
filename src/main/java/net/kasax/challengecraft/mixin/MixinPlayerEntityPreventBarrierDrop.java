@@ -1,16 +1,13 @@
 // src/main/java/net/kasax/challengecraft/mixin/MixinPlayerEntityPreventBarrierDrop.java
 package net.kasax.challengecraft.mixin;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
 import net.kasax.challengecraft.challenges.Chal_27_NoArmor;
-import net.minecraft.component.DataComponentTypes;
+import net.kasax.challengecraft.util.BlockedBarrierItem;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -40,11 +37,8 @@ public abstract class MixinPlayerEntityPreventBarrierDrop {
             for (int i = 0; i < toDisable; i++) {
                 int idx = order[i];
                 ItemStack s = main.get(idx);
-                if (s.getItem() == Items.BARRIER) {
-                    Text name = s.get(DataComponentTypes.CUSTOM_NAME);
-                    if (name != null && "Blocked".equals(name.getString())) {
-                        main.set(idx, ItemStack.EMPTY);
-                    }
+                if (BlockedBarrierItem.isBlockedBarrier(s)) {
+                    main.set(idx, ItemStack.EMPTY);
                 }
             }
         }
@@ -53,11 +47,8 @@ public abstract class MixinPlayerEntityPreventBarrierDrop {
         if (Chal_27_NoArmor.isActive()) {
             for (int i = 36; i <= 39; i++) {
                 ItemStack s = inv.getStack(i);
-                if (s.getItem() == Items.BARRIER) {
-                    Text name = s.get(DataComponentTypes.CUSTOM_NAME);
-                    if (name != null && "Blocked".equals(name.getString())) {
-                        inv.setStack(i, ItemStack.EMPTY);
-                    }
+                if (BlockedBarrierItem.isBlockedBarrier(s)) {
+                    inv.setStack(i, ItemStack.EMPTY);
                 }
             }
         }
