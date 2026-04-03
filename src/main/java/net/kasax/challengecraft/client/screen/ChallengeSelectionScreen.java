@@ -22,7 +22,7 @@ import java.util.List;
 
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     static {
@@ -42,6 +42,7 @@ public class ChallengeSelectionScreen extends Screen {
     private SliderWidget slotsSlider;
     private SliderWidget mobHealthSlider;
     private SliderWidget doubleTroubleSlider;
+    private SliderWidget gameSpeedSlider;
 
     private WidgetScrollPanel scrollPanel;
     private ButtonWidget saveButton;
@@ -57,6 +58,8 @@ public class ChallengeSelectionScreen extends Screen {
     private int mobHealthMultiplier;
     private double doubleTroubleSliderValue;
     private int doubleTroubleMultiplier;
+    private double gameSpeedSliderValue;
+    private int gameSpeedMultiplier;
 
     public ChallengeSelectionScreen() {
         super(Text.literal("Challenge Selection"));
@@ -75,7 +78,7 @@ public class ChallengeSelectionScreen extends Screen {
             if (this.client != null && this.client.world != null) {
                 playerCount = this.client.world.getPlayers().size();
             }
-            double total = net.kasax.challengecraft.ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, slotsSliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
+            double total = net.kasax.challengecraft.ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, slotsSliderTicks, mobHealthMultiplier, gameSpeedMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
             this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
@@ -95,6 +98,7 @@ public class ChallengeSelectionScreen extends Screen {
         int savedSlots;
         int savedMobHealthMult;
         int savedDoubleTroubleMult;
+        int savedGameSpeedMult;
 
         if (server != null) {
             ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
@@ -104,6 +108,7 @@ public class ChallengeSelectionScreen extends Screen {
             savedSlots = data.getLimitedInventorySlots();
             savedMobHealthMult = data.getMobHealthMultiplier();
             savedDoubleTroubleMult = data.getDoubleTroubleMultiplier();
+            savedGameSpeedMult = data.getGameSpeedMultiplier();
         } else {
             // Client side on dedicated server
             active = ChallengeCraftClient.LAST_CHOSEN;
@@ -112,12 +117,14 @@ public class ChallengeSelectionScreen extends Screen {
             savedSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             savedMobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
             savedDoubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
+            savedGameSpeedMult = ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER;
         }
 
         if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20;
         if (savedSlots <= 0) savedSlots = 36;
         if (savedMobHealthMult <= 0) savedMobHealthMult = 1;
         if (savedDoubleTroubleMult <= 0) savedDoubleTroubleMult = 2;
+        if (savedGameSpeedMult <= 0) savedGameSpeedMult = 1;
 
         // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)
         sliderTicks = savedMaxHeartsTicks;                  // 1..20
@@ -131,6 +138,9 @@ public class ChallengeSelectionScreen extends Screen {
 
         doubleTroubleMultiplier = savedDoubleTroubleMult;
         doubleTroubleSliderValue = (doubleTroubleMultiplier - 2) / 8.0;
+
+        gameSpeedMultiplier = savedGameSpeedMult;
+        gameSpeedSliderValue = (gameSpeedMultiplier - 1) / 9.0;
 
         int panelWidth = 260;
         int panelX = width / 2 - panelWidth / 2;
@@ -184,12 +194,20 @@ public class ChallengeSelectionScreen extends Screen {
                 updateDifficultyText();
             }
         };
+        this.gameSpeedSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Game Speed: %dx", gameSpeedMultiplier)), gameSpeedSliderValue) {
+            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Game Speed: %.0fx", 1 + (this.value * 9)))); }
+            @Override protected void applyValue() {
+                gameSpeedMultiplier = (int)(Math.round(this.value * 9) + 1);
+                this.value = (gameSpeedMultiplier - 1) / 9.0;
+                updateDifficultyText();
+            }
+        };
 
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
             boolean isOn = active.contains(id);
 
-            if ((id == 7 || id == 12 || id == 24 || id == 35) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24 || id == 35 || id == 37) && col == 1) {
                 y += cardHeight + spacing;
                 col = 0;
             }
@@ -234,6 +252,13 @@ public class ChallengeSelectionScreen extends Screen {
                 doubleTroubleSlider.setX(x1);
                 doubleTroubleSlider.setY(y);
                 scrollPanel.addChild(doubleTroubleSlider);
+                y += cardHeight + spacing;
+                col = 0;
+            }
+            if (id == 37 && gameSpeedSlider != null) {
+                gameSpeedSlider.setX(x1);
+                gameSpeedSlider.setY(y);
+                scrollPanel.addChild(gameSpeedSlider);
                 y += cardHeight + spacing;
                 col = 0;
             }
@@ -326,12 +351,17 @@ public class ChallengeSelectionScreen extends Screen {
             doubleMult = this.doubleTroubleMultiplier;
         }
 
+        int gameSpeedMult = 1;
+        if (newActive.contains(37) && gameSpeedSlider != null) {
+            gameSpeedMult = this.gameSpeedMultiplier;
+        }
+
         ChallengeCraft.LOGGER.info(
                 "[Client:Selection] sending ChallengePacket → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, doubleTrouble = {}, restart = {}",
-                newActive, newPerks, heartsTicks, slotticks, mobHealthMult, doubleMult, restart
+                newActive, newPerks, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, restart
         );
 
-        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, newPerks, restart));
+        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, newPerks, restart));
     }
 
     private List<Integer> getActiveIds() {

@@ -57,8 +57,8 @@ public class CreateWorldScreenMixin {
             return;
         }
 
-        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , perks = {}, maxHearts = {}, Inventory = {}, MobHealth = {}",
-                chosen, perks, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER);
+        ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , perks = {}, maxHearts = {}, Inventory = {}, MobHealth = {}, GameSpeed = {}",
+                chosen, perks, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER, ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER);
         // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
         ChallengeCraftClient.SELECTED_PERKS = List.copyOf(perks);
@@ -71,8 +71,9 @@ public class CreateWorldScreenMixin {
             int limitedInventorySlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
             int mobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
             int doubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
+            int gameSpeedMult = ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER;
             ClientPlayNetworking.send(
-                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, doubleTroubleMult, perkList)
+                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, doubleTroubleMult, gameSpeedMult, perkList)
             );
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }

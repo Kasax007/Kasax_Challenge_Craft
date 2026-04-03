@@ -9,6 +9,7 @@ import net.kasax.challengecraft.network.AdvancementInfo;
 import net.kasax.challengecraft.network.AllAchievementsListPacket;
 import net.kasax.challengecraft.network.AllAchievementsSyncPacket;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
+import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.advancement.AdvancementProgress;
 import net.minecraft.item.ItemStack;
@@ -19,7 +20,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -153,7 +153,7 @@ public class Chal_26_AllAchievements {
 
         for (int cid : data.getActive()) {
             eligiblePlayers.forEach(p -> {
-                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
                 StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
             });
         }

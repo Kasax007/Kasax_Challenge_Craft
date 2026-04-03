@@ -4,6 +4,7 @@ import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
+import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.advancement.PlayerAdvancementTracker;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
@@ -12,7 +13,6 @@ import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import java.util.List;
@@ -59,7 +59,7 @@ public class PlayerAdvancementTrackerMixin {
                         // Record completion for all active challenges for all eligible players
                         for (int cid : data.getActive()) {
                             eligiblePlayers.forEach(p -> {
-                                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
                                 StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
                             });
                         }

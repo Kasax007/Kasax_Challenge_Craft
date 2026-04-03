@@ -156,7 +156,7 @@ public class LevelingScreen extends Screen {
                     }
                 }
 
-                for (int id = 1; id <= 36; id++) {
+                for (int id = 1; id <= 37; id++) {
                     if (LevelManager.getRequiredLevel(id) == level) {
                         Text name = Text.translatable("challengecraft.worldcreate.challenge" + id);
                         Text desc = Text.translatable("challengecraft.worldcreate.challenge" + id + ".desc");

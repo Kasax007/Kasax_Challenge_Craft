@@ -19,6 +19,7 @@ public class ChallengeSyncPacket implements CustomPayload {
     public final int limitedInventorySlots;
     public final int mobHealthMultiplier;
     public final int doubleTroubleMultiplier;
+    public final int gameSpeedMultiplier;
 
     public static final PacketCodec<PacketByteBuf, ChallengeSyncPacket> CODEC = CustomPayload.codecOf(
             new ValueFirstEncoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -32,6 +33,7 @@ public class ChallengeSyncPacket implements CustomPayload {
                     buf.writeVarInt(pkt.limitedInventorySlots);
                     buf.writeVarInt(pkt.mobHealthMultiplier);
                     buf.writeVarInt(pkt.doubleTroubleMultiplier);
+                    buf.writeVarInt(pkt.gameSpeedMultiplier);
                 }
             },
             new PacketDecoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -47,18 +49,20 @@ public class ChallengeSyncPacket implements CustomPayload {
                     int slots = buf.readVarInt();
                     int mobMult = buf.readVarInt();
                     int doubleTroubleMult = buf.readVarInt();
-                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult);
+                    int gameSpeedMult = buf.readVarInt();
+                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult, gameSpeedMult);
                 }
             }
     );
 
-    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult) {
+    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult, int gameSpeedMult) {
         this.active = active;
         this.perks = perks;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
         this.mobHealthMultiplier = mobMult;
         this.doubleTroubleMultiplier = doubleTroubleMult;
+        this.gameSpeedMultiplier = gameSpeedMult;
     }
 
     @Override

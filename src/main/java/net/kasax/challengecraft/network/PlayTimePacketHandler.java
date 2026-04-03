@@ -4,24 +4,28 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.stat.Stats;
-import net.minecraft.util.Identifier;
 
 public class PlayTimePacketHandler {
+    private static long lastSyncMillis = 0L;
 
     public static void registerServer() {
         //
-        // 1) Periodic sync: every second (20 ticks)
+        // 1) Periodic sync: every real second, independent of current server TPS
         //
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (server.getTicks() % 20 == 0) {
-                Identifier chosenId = Stats.PLAY_TIME;
+            long now = System.currentTimeMillis();
+            if (lastSyncMillis == 0L) {
+                lastSyncMillis = now;
+            }
+
+            if (now - lastSyncMillis >= 1000L) {
+                lastSyncMillis = now;
                 for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                    int playTicks = player.getStatHandler()
-                            .getStat(Stats.CUSTOM.getOrCreateStat(chosenId));
+                    int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
                     ServerPlayNetworking.send(player, new PlayTimeSyncPacket(playTicks));
                 }
             }
@@ -35,10 +39,7 @@ public class PlayTimePacketHandler {
                     // run on the server main thread
                     server.execute(() -> {
                         ServerPlayerEntity player = handler.player;
-                        Identifier chosenId = Stats.PLAY_TIME;
-
-                        int playTicks = player.getStatHandler()
-                                .getStat(Stats.CUSTOM.getOrCreateStat(chosenId));
+                        int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
 
                         sender.sendPacket(new PlayTimeSyncPacket(playTicks));
                     });

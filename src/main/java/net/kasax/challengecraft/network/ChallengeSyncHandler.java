@@ -43,9 +43,11 @@ public class ChallengeSyncHandler {
                 ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = payload.limitedInventorySlots;
                 ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = payload.mobHealthMultiplier;
                 ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = payload.doubleTroubleMultiplier;
+                ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER = payload.gameSpeedMultiplier;
                 
                 Chal_24_MobHealthMultiply.setMultiplier(payload.mobHealthMultiplier);
                 Chal_35_DoubleTrouble.setMultiplier(payload.doubleTroubleMultiplier);
+                Chal_37_GameSpeed.setMultiplier(payload.gameSpeedMultiplier);
                 Chal_12_LimitedInventory.setLimitedSlots(payload.limitedInventorySlots);
                 Chal_7_MaxHealthModify.setMaxHearts(payload.maxHearts * 0.5f);
             });

@@ -9,6 +9,7 @@ import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.AllEntitiesSyncPacket;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
@@ -24,7 +25,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -120,7 +120,7 @@ public class Chal_23_AllEntities {
 
         for (int cid : data.getActive()) {
             eligiblePlayers.forEach(p -> {
-                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
                 StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
             });
         }

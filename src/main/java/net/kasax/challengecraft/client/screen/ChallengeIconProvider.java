@@ -46,6 +46,7 @@ public class ChallengeIconProvider {
         ICONS.put(34, new ItemStack(Items.PHANTOM_MEMBRANE));
         ICONS.put(35, new ItemStack(Items.SPAWNER));
         ICONS.put(36, new ItemStack(Items.WRITTEN_BOOK));
+        ICONS.put(37, new ItemStack(Items.REPEATER));
         
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));

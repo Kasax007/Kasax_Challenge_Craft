@@ -184,7 +184,7 @@ public class LevelManager {
         return switch (id) {
             case 1, 10, 16, 17, 18 -> 1;
             case 4, 5 -> 2;
-            case 6, 7 -> 3;
+            case 6, 7, 37 -> 3;
             case 8, 13 -> 4;
             case 11, 12, 27 -> 5;
             case 20, 26 -> 6;

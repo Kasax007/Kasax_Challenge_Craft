@@ -77,6 +77,7 @@ public class PacketHandler {
                         data.setLimitedInventorySlots(packet.limitedInventorySlots);
                         data.setMobHealthMultiplier(packet.mobHealthMultiplier);
                         data.setDoubleTroubleMultiplier(packet.doubleTroubleMultiplier);
+                        data.setGameSpeedMultiplier(packet.gameSpeedMultiplier);
 
                         // If Infinity Weapon perk is newly activated via in-game selection, grant it once to eligible players
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
@@ -119,6 +120,11 @@ public class PacketHandler {
                             int mult = packet.doubleTroubleMultiplier;
                             net.kasax.challengecraft.challenges.Chal_35_DoubleTrouble.setMultiplier(mult);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_35 multiplier = {}", mult);
+                        }
+                        if (packet.active.contains(37)) {
+                            int mult = packet.gameSpeedMultiplier;
+                            net.kasax.challengecraft.challenges.Chal_37_GameSpeed.setMultiplier(mult);
+                            ChallengeCraft.LOGGER.info("[Server] set Chal_37 multiplier = {}", mult);
                         }
                         // re‑apply all active challenges
                         ChallengeManager.applyAll(server);

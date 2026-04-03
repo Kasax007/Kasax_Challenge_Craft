@@ -8,6 +8,7 @@ import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.AllItemsSyncPacket;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
+import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.item.Item;
@@ -26,7 +27,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -205,7 +205,7 @@ public class Chal_22_AllItems {
 
         for (int cid : data.getActive()) {
             eligiblePlayers.forEach(p -> {
-                int pTicks = p.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
                 StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
             });
         }

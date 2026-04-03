@@ -51,9 +51,10 @@ public class ChallengeSavedData extends PersistentState {
             Codec.list(Codec.INT).optionalFieldOf("activePerks", List.of()).forGetter(ChallengeSavedData::getActivePerks),
             Codec.INT.optionalFieldOf("runIndex", 0).forGetter(ChallengeSavedData::getRunIndex),
             Codec.INT.optionalFieldOf("doubleTroubleMultiplier", 2).forGetter(ChallengeSavedData::getDoubleTroubleMultiplier),
+            Codec.INT.optionalFieldOf("gameSpeedMultiplier", 1).forGetter(ChallengeSavedData::getGameSpeedMultiplier),
             ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex))
-    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, progress) ->
-            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, progress.allAdvancementsOrder, progress.allAdvancementsIndex)
+    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, progress) ->
+            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, progress.allAdvancementsOrder, progress.allAdvancementsIndex)
     ));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -95,13 +96,14 @@ public class ChallengeSavedData extends PersistentState {
 
     private int runIndex = 0;
     private int doubleTroubleMultiplier = 2;
+    private int gameSpeedMultiplier = 1;
 
     private final List<Identifier> allAdvancementsOrder = new ArrayList<>();
     private int allAdvancementsIndex = 0;
 
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, int gameSpeedMultiplier, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -125,6 +127,7 @@ public class ChallengeSavedData extends PersistentState {
         this.activePerks.addAll(activePerks);
         this.runIndex = runIndex;
         this.doubleTroubleMultiplier = doubleTroubleMultiplier;
+        this.gameSpeedMultiplier = gameSpeedMultiplier;
         this.allAdvancementsOrder.clear();
         this.allAdvancementsOrder.addAll(allAdvancementsOrder);
         this.allAdvancementsIndex = allAdvancementsIndex;
@@ -317,6 +320,15 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDoubleTroubleMultiplier(int multiplier) {
         this.doubleTroubleMultiplier = multiplier;
+        markDirty();
+    }
+
+    public int getGameSpeedMultiplier() {
+        return gameSpeedMultiplier;
+    }
+
+    public void setGameSpeedMultiplier(int multiplier) {
+        this.gameSpeedMultiplier = Math.max(1, Math.min(multiplier, 10));
         markDirty();
     }
 
