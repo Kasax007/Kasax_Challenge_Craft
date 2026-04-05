@@ -91,6 +91,8 @@
   "challengecraft.worldcreate.challenge36.desc": "Every 2 minutes, you must answer a trivia question correctly or die.",
   "challengecraft.worldcreate.challenge37": "Game Speed",
   "challengecraft.worldcreate.challenge37.desc": "Speeds up the entire game. Adjust the slider from 1x to 10x game speed.",
+  "challengecraft.worldcreate.challenge38": "Chunk Hunt",
+  "challengecraft.worldcreate.challenge38.desc": "Entering a chunk locks the border to that chunk, turns its blocks into one random block type, and spawns a glowing random spawn-egg mob you must defeat to free the border.",
   
   "challengecraft.perk.101": "Night Vision",
   "challengecraft.perk.101.desc": "Grants permanent Night Vision.",

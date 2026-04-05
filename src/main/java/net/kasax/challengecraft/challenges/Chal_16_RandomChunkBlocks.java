@@ -2,10 +2,12 @@ package net.kasax.challengecraft.challenges;
 
 import net.minecraft.block.*;
 import net.minecraft.registry.Registries;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.StructureWorldAccess;
+import net.minecraft.world.chunk.Chunk;
 
 import java.util.*;
 
@@ -165,6 +167,49 @@ public class Chal_16_RandomChunkBlocks {
         long seed = worldSeed ^ pos.x ^ (long) pos.z << 32;
         Random random = new Random(seed);
         return blockList.get(random.nextInt(blockList.size()));
+    }
+
+    public static void replaceChunkBlocks(StructureWorldAccess world, Chunk chunk) {
+        Block randomBlock = getRandomBlockForChunk(world.getSeed(), chunk.getPos());
+        BlockState randomState = randomBlock.getDefaultState();
+
+        int minY = chunk.getBottomY();
+        int maxY = minY + chunk.getHeight();
+        ChunkPos chunkPos = chunk.getPos();
+        BlockPos.Mutable mutable = new BlockPos.Mutable();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y < maxY; y++) {
+                    mutable.set(chunkPos.getStartX() + x, y, chunkPos.getStartZ() + z);
+                    BlockState currentState = chunk.getBlockState(mutable);
+                    if (!isException(currentState.getBlock())) {
+                        chunk.setBlockState(mutable, randomState, 0);
+                    }
+                }
+            }
+        }
+    }
+
+    public static void replaceChunkBlocks(ServerWorld world, ChunkPos chunkPos) {
+        Block randomBlock = getRandomBlockForChunk(world.getSeed(), chunkPos);
+        BlockState randomState = randomBlock.getDefaultState();
+        Chunk chunk = world.getChunk(chunkPos.x, chunkPos.z);
+
+        int minY = chunk.getBottomY();
+        int maxY = minY + chunk.getHeight();
+        BlockPos.Mutable mutable = new BlockPos.Mutable();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y < maxY; y++) {
+                    mutable.set(chunkPos.getStartX() + x, y, chunkPos.getStartZ() + z);
+                    if (!isException(world.getBlockState(mutable).getBlock())) {
+                        world.setBlockState(mutable, randomState, 3);
+                    }
+                }
+            }
+        }
     }
 
     public static boolean isException(Block block) {

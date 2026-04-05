@@ -65,6 +65,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_28_WalkDamage.register();
 		Chal_36_TriviaChallenge.register();
 		Chal_37_GameSpeed.register();
+		Chal_38_ChunkHunt.register();
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 

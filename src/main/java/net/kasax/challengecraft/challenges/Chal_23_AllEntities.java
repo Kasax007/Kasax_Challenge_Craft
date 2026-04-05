@@ -93,10 +93,10 @@ public class Chal_23_AllEntities {
         syncProgressToAll(server, data);
     }
 
-    private static List<EntityType<?>> getEntitiesWithSpawnEggs() {
+    public static List<EntityType<?>> getEntitiesWithSpawnEggs() {
         List<EntityType<?>> list = new ArrayList<>();
         for (EntityType<?> type : Registries.ENTITY_TYPE) {
-            if (SpawnEggItem.forEntity(type) != null) {
+            if (type != EntityType.ENDER_DRAGON && SpawnEggItem.forEntity(type) != null) {
                 list.add(type);
             }
         }

@@ -134,6 +134,7 @@ public class ChallengeManager {
             case 35 -> 0.4 * doubleTroubleMult; // Double Trouble
             case 36 -> 4.0;  // Trivia Challenge
             case 37 -> (gameSpeedMult - 1) / 9.0 * 4.0; // Game Speed
+            case 38 -> 5.0;  // Chunk Hunt
             default -> 0.0;
         };
     }
@@ -159,6 +160,10 @@ public class ChallengeManager {
         if (ids.contains(3) && ids.contains(15)) return true; // No Mob Drops + Random Mob Drops
         if (ids.contains(8) && ids.contains(20)) return true; // No Crafting Table + Randomized Crafting
         if (ids.contains(9) && ids.contains(25)) return true; // ExpWorldBorder + DamageWorldBorder
+        if (ids.contains(38) && ids.contains(9)) return true; // Chunk Hunt + Level Border
+        if (ids.contains(38) && ids.contains(16)) return true; // Chunk Hunt + Random Chunk Blocks
+        if (ids.contains(38) && ids.contains(23)) return true; // Chunk Hunt + All Entities
+        if (ids.contains(38) && ids.contains(25)) return true; // Chunk Hunt + Damage Border
         
         // Added Max Hearts (Perk 103) + Max Health Modifier (Challenge 7) conflict
         if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
@@ -183,6 +188,7 @@ public class ChallengeManager {
 
         boolean wasExpBorderActive = Chal_9_ExpWorldBorder.isActive();
         boolean wasDamageBorderActive = Chal_25_DamageWorldBorder.isActive();
+        boolean wasChunkHuntActive = Chal_38_ChunkHunt.isActive();
 
         // 2) On Overworld load, restore specific settings and handle seeding
         if (world.getRegistryKey() == World.OVERWORLD) {
@@ -340,6 +346,9 @@ public class ChallengeManager {
         if (wasDamageBorderActive && !Chal_25_DamageWorldBorder.isActive()) {
             resetWorldBorder(world);
         }
+        if (wasChunkHuntActive && !Chal_38_ChunkHunt.isActive()) {
+            Chal_38_ChunkHunt.resetWorldBorder(world);
+        }
 
         // 4.6) Set center for border challenges
         if (Chal_9_ExpWorldBorder.isActive() || Chal_25_DamageWorldBorder.isActive()) {
@@ -461,6 +470,7 @@ public class ChallengeManager {
         if (Chal_35_DoubleTrouble.isActive()) ids.add(35);
         if (Chal_36_TriviaChallenge.isActive()) ids.add(36);
         if (Chal_37_GameSpeed.isActive()) ids.add(37);
+        if (Chal_38_ChunkHunt.isActive()) ids.add(38);
         return ids;
     }
 
@@ -502,6 +512,7 @@ public class ChallengeManager {
         Chal_35_DoubleTrouble.setActive(active);
         Chal_36_TriviaChallenge.setActive(active);
         Chal_37_GameSpeed.setActive(active);
+        Chal_38_ChunkHunt.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -568,6 +579,11 @@ public class ChallengeManager {
             case 35 -> { Chal_35_DoubleTrouble.setActive(true); LOGGER.info("Challenge 35 ON"); }
             case 36 -> { Chal_36_TriviaChallenge.setActive(true); LOGGER.info("Challenge 36 ON"); }
             case 37 -> { Chal_37_GameSpeed.setActive(true); LOGGER.info("Challenge 37 ON"); }
+            case 38 -> {
+                Chal_38_ChunkHunt.setActive(true);
+                if (world != null) Chal_38_ChunkHunt.updateWorldBorder(world);
+                LOGGER.info("Challenge 38 ON");
+            }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }
     }
