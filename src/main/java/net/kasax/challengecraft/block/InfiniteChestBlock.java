@@ -22,9 +22,11 @@ import net.minecraft.state.property.Properties;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
@@ -93,6 +95,56 @@ public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable
     @Override
     public BlockRenderType getRenderType(BlockState state) {
         return BlockRenderType.MODEL;
+    }
+
+    @Override
+    public void randomDisplayTick(BlockState state, World world, BlockPos pos, Random random) {
+        if (state.get(WATERLOGGED)) {
+            return;
+        }
+
+        Direction facing = state.get(FACING);
+        double centerX = pos.getX() + 0.5;
+        double centerY = pos.getY() + 0.75;
+        double centerZ = pos.getZ() + 0.5;
+        double frontX = centerX + facing.getOffsetX() * 0.44;
+        double frontZ = centerZ + facing.getOffsetZ() * 0.44;
+        double sideX = facing.rotateYClockwise().getOffsetX() * 0.18;
+        double sideZ = facing.rotateYClockwise().getOffsetZ() * 0.18;
+
+        world.addParticleClient(
+                ParticleTypes.ENCHANT,
+                frontX + sideX * (random.nextDouble() - 0.5),
+                centerY + (random.nextDouble() - 0.5) * 0.18,
+                frontZ + sideZ * (random.nextDouble() - 0.5),
+                (random.nextDouble() - 0.5) * 0.015,
+                0.01 + random.nextDouble() * 0.02,
+                (random.nextDouble() - 0.5) * 0.015
+        );
+
+        if (random.nextFloat() < 0.35f) {
+            world.addImportantParticleClient(
+                    ParticleTypes.END_ROD,
+                    centerX + (random.nextDouble() - 0.5) * 0.4,
+                    pos.getY() + 0.92 + random.nextDouble() * 0.18,
+                    centerZ + (random.nextDouble() - 0.5) * 0.4,
+                    (random.nextDouble() - 0.5) * 0.01,
+                    0.006 + random.nextDouble() * 0.012,
+                    (random.nextDouble() - 0.5) * 0.01
+            );
+        }
+
+        if (random.nextFloat() < 0.18f) {
+            world.addParticleClient(
+                    ParticleTypes.WITCH,
+                    frontX,
+                    pos.getY() + 0.56 + random.nextDouble() * 0.22,
+                    frontZ,
+                    0.0,
+                    0.0,
+                    0.0
+            );
+        }
     }
 
     @Override
