@@ -27,6 +27,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
     public static int SELECTED_MAX_HEARTS = 20;
     public static long LOCAL_PLAYER_XP = 0;
     public static java.util.Map<java.util.UUID, Long> PLAYER_XP_MAP = new java.util.HashMap<>();
+    public static boolean USE_LEGACY_LEVEL_SCREEN_LAYOUT = false;
 
 
     @Override
