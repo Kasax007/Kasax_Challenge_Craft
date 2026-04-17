@@ -296,6 +296,7 @@ public class LevelingScreen extends Screen {
                 .build());
         this.resetLayoutButton = addDrawableChild(ButtonWidget.builder(Text.literal("Reset Layout"), button -> {
                     this.layoutOffsets.clear();
+                    this.layoutOffsets.putAll(LevelJourneyLayoutStore.defaultOffsets());
                     LevelJourneyLayoutStore.clear();
                     buildMilestones();
                     if (this.journeyPanel != null) {

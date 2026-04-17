@@ -24,6 +24,7 @@ import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -234,6 +235,24 @@ public class ChallengeCraft implements ModInitializer {
 
 		net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			net.kasax.challengecraft.network.ChallengeWorldRestarter.handlePlayerTeleport(server);
+			server.execute(() -> sendProgressCommandReminders(handler.player));
 		});
+	}
+
+	private static void sendProgressCommandReminders(ServerPlayerEntity player) {
+		ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+
+		if (data.getActive().contains(22)) {
+			player.sendMessage(Text.literal("All Items is active. Use /challengecraft_all_items_list to view collected items and the next item needed.")
+					.formatted(Formatting.GOLD), false);
+		}
+		if (data.getActive().contains(23)) {
+			player.sendMessage(Text.literal("All Entities is active. Use /challengecraft_all_entities_list to view killed entities and the next entity needed.")
+					.formatted(Formatting.GOLD), false);
+		}
+		if (data.getActive().contains(26)) {
+			player.sendMessage(Text.literal("All Advancements is active. Use /challengecraft_all_advancements_list to view completed advancements and the next advancement needed.")
+					.formatted(Formatting.GOLD), false);
+		}
 	}
 }
