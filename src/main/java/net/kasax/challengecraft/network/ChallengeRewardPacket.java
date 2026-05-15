@@ -7,6 +7,7 @@ import net.minecraft.network.codec.ValueFirstEncoder;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Reward event used by the client overlay after XP changes. */
 public class ChallengeRewardPacket implements CustomPayload {
     public static final Id<ChallengeRewardPacket> ID = new Id<>(Identifier.of("challengecraft", "ender_dragon_defeat"));
     

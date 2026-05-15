@@ -6,6 +6,7 @@ import net.minecraft.item.Items;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Central icon lookup for challenge selection UI. */
 public class ChallengeIconProvider {
     private static final Map<Integer, ItemStack> ICONS = new HashMap<>();
 

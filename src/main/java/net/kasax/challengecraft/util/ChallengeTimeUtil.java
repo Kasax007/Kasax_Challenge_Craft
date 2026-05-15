@@ -4,6 +4,7 @@ import net.kasax.challengecraft.challenges.Chal_37_GameSpeed;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.stat.Stats;
 
+/** Converts vanilla playtime into the display timer used by challenge HUDs and rewards. */
 public final class ChallengeTimeUtil {
     private ChallengeTimeUtil() {
     }

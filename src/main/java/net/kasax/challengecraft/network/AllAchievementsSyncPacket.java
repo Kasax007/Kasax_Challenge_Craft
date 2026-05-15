@@ -5,6 +5,7 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Incremental HUD sync for the current advancement target. */
 public class AllAchievementsSyncPacket implements CustomPayload {
     public static final Id<AllAchievementsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_achievements_sync"));
 

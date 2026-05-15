@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/** Sizes the world border from the highest current vanilla XP level among online players. */
 public class Chal_9_ExpWorldBorder {
     private static boolean active = false;
     private static final Map<UUID, Integer> lastLevels = new HashMap<>();
@@ -17,7 +18,6 @@ public class Chal_9_ExpWorldBorder {
             if (!active) return;
             WorldBorder border = world.getWorldBorder();
 
-            // Determine target size based on highest level among all players
             int maxLvl = 0;
             boolean anyPlayer = false;
             for (ServerPlayerEntity player : world.getServer().getPlayerManager().getPlayerList()) {
@@ -31,7 +31,6 @@ public class Chal_9_ExpWorldBorder {
             double target = Math.max(1.0, (double) maxLvl);
             double current = border.getSize();
 
-            // Enforce size every tick if it's way off or not interpolating
             if (current > 1000000 || (Math.abs(current - target) > 0.1 && border.getSizeLerpTime() <= 0)) {
                 if (current > 1000000 || target < current) {
                     border.setSize(target);

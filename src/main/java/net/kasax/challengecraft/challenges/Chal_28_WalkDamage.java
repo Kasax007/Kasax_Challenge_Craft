@@ -11,7 +11,6 @@ public class Chal_28_WalkDamage {
     private static boolean active = false;
 
     public static void register() {
-        // No tick registration needed as MovementAndDamageMixin handles the logic
     }
 
     public static void setActive(boolean isActive) {

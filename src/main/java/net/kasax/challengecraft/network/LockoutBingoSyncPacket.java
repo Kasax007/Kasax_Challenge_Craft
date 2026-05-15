@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/** Full lockout match snapshot shared with every participating client. */
 public class LockoutBingoSyncPacket implements CustomPayload {
     public record PlayerState(UUID uuid, String name, int teamId, boolean ready, boolean online) {
     }

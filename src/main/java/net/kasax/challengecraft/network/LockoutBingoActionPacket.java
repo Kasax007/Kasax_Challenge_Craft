@@ -8,6 +8,7 @@ import net.minecraft.network.codec.ValueFirstEncoder;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Lobby action sent from the lockout client UI to the server. */
 public class LockoutBingoActionPacket implements CustomPayload {
     public enum Action {
         JOIN_TEAM,

@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LivingEntity.class)
+/** Scales living entities according to the size-matters challenge state. */
 public abstract class SizeMattersMixin {
 
     @Unique
@@ -30,12 +31,10 @@ public abstract class SizeMattersMixin {
     private void onBaseTick(CallbackInfo ci) {
         LivingEntity living = (LivingEntity) (Object) this;
 
-        // Only run on server and skip players
         if (living.getWorld().isClient || living instanceof PlayerEntity) {
             return;
         }
 
-        // Run check every 20 ticks (1 second) to be efficient
         if (living.age % 20 != 0) {
             return;
         }
@@ -50,21 +49,18 @@ public abstract class SizeMattersMixin {
                 float scale = 0.5f + living.getRandom().nextFloat() * 2.5f;
                 scaleAttr.addPersistentModifier(new EntityAttributeModifier(SCALE_MODIFIER_ID, scale - 1.0, EntityAttributeModifier.Operation.ADD_VALUE));
 
-                // Speed: smaller is faster
                 EntityAttributeInstance speedAttr = living.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);
                 if (speedAttr != null) {
                     double speedMult = 1.7 - 0.4 * scale; // 0.5x -> 1.5x, 3.0x -> 0.5x
                     speedAttr.addPersistentModifier(new EntityAttributeModifier(SPEED_MODIFIER_ID, speedMult - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
                 }
 
-                // Health: larger has more health
                 EntityAttributeInstance healthAttr = living.getAttributeInstance(EntityAttributes.MAX_HEALTH);
                 if (healthAttr != null) {
                     healthAttr.addPersistentModifier(new EntityAttributeModifier(HEALTH_MODIFIER_ID, (double) scale - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
                     living.setHealth(living.getMaxHealth());
                 }
 
-                // Attack Damage: larger deals more damage
                 EntityAttributeInstance damageAttr = living.getAttributeInstance(EntityAttributes.ATTACK_DAMAGE);
                 if (damageAttr != null) {
                     damageAttr.addPersistentModifier(new EntityAttributeModifier(DAMAGE_MODIFIER_ID, (double) scale - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
@@ -72,7 +68,6 @@ public abstract class SizeMattersMixin {
 
             }
         } else {
-            // Remove modifiers if challenge is no longer active
             if (scaleAttr.getModifier(SCALE_MODIFIER_ID) != null) {
                 scaleAttr.removeModifier(SCALE_MODIFIER_ID);
                 EntityAttributeInstance speedAttr = living.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);

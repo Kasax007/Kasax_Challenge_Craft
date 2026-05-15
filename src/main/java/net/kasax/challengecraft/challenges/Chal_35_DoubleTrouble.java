@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Stores the mob-duplication multiplier consumed by entity-spawn hooks. */
 public class Chal_35_DoubleTrouble {
     private static boolean active = false;
     private static int multiplier = 2;

@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ChunkGenerator.class)
+/** Runs deferred chunk replacement after generation has produced its final block states. */
 public class RandomChunkBlocksMixin {
 
     @Inject(
@@ -21,7 +22,6 @@ public class RandomChunkBlocksMixin {
         if (!Chal_16_RandomChunkBlocks.isActive()) return;
         Chal_16_RandomChunkBlocks.replaceChunkBlocks(world, chunk);
 
-        // Apply any pending replacements (e.g. leaves that were skipped during generation)
         Chal_16_RandomChunkBlocks.applyPendingReplacements(world);
     }
 }

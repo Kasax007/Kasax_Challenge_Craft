@@ -8,6 +8,7 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
+/** Client click intent for withdrawing from an infinite chest entry. */
 public record InfiniteChestClickPayload(BlockPos pos, ItemStack stack, int button, boolean shift) implements CustomPayload {
     public static final Id<InfiniteChestClickPayload> ID = new Id<>(Identifier.of("challengecraft", "infinite_chest_click"));
     

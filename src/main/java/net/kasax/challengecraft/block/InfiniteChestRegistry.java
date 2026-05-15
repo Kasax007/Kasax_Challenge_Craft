@@ -18,6 +18,7 @@ import net.minecraft.registry.Registry;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.util.Identifier;
 
+/** Registers the infinite chest block, block entity, and screen handler types. */
 public class InfiniteChestRegistry {
     public static final Identifier INFINITE_CHEST_ID = Identifier.of(ChallengeCraft.MOD_ID, "infinite_chest");
     public static final RegistryKey<Block> INFINITE_CHEST_BLOCK_KEY = RegistryKey.of(RegistryKeys.BLOCK, INFINITE_CHEST_ID);

@@ -1,4 +1,3 @@
-// src/main/java/net/kasax/challengecraft/mixin/MixinScreenHandler.java
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
@@ -23,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ScreenHandler.class)
+/** Prevents blocked inventory slots from being moved through vanilla screen handlers. */
 public abstract class MixinScreenHandler {
     @Inject(
             method = "onSlotClick(IILnet/minecraft/screen/slot/SlotActionType;Lnet/minecraft/entity/player/PlayerEntity;)V",
@@ -32,13 +32,11 @@ public abstract class MixinScreenHandler {
     private void onSlotClick_cancelDisabled(
             int slotIndex, int button, SlotActionType actionType, PlayerEntity player, CallbackInfo ci
     ) {
-        // grab the handler & player‐inventory
         ScreenHandler handler = (ScreenHandler)(Object)this;
         PlayerInventory inv = player.getInventory();
 
         Chal_40_LockoutBingo.handleScreenSlotClick(player, handler, slotIndex);
 
-        // 1) Challenge 12: Limited Inventory
         if (Chal_12_LimitedInventory.isActive()) {
             int limited   = Chal_12_LimitedInventory.getLimitedSlots();
             int toDisable = 36 - limited;
@@ -47,7 +45,7 @@ public abstract class MixinScreenHandler {
             if (slotIndex >= 0 && slotIndex < handler.slots.size()) {
                 Slot slot = handler.slots.get(slotIndex);
                 if (slot.inventory == inv) {
-                    int invSlot = slot.getIndex(); // 0–35 in the player‐inventory
+                    int invSlot = slot.getIndex();
                     for (int i = 0; i < toDisable; i++) {
                         if (order[i] == invSlot) {
                             ci.cancel();
@@ -67,7 +65,6 @@ public abstract class MixinScreenHandler {
             }
         }
 
-        // 2) Challenge 27: No Armor
         if (Chal_27_NoArmor.isActive()) {
             if (slotIndex >= 0 && slotIndex < handler.slots.size()) {
                 Slot slot = handler.slots.get(slotIndex);
@@ -81,7 +78,7 @@ public abstract class MixinScreenHandler {
             }
         }
 
-        // 3) Infinite Chest Level Requirement (Level 20 and Perk active to craft)
+        // The recipe stays visible, but the result is gated by progression and the selected perk.
         if (slotIndex >= 0 && slotIndex < handler.slots.size()) {
             Slot slot = handler.slots.get(slotIndex);
             if (slot instanceof CraftingResultSlot) {

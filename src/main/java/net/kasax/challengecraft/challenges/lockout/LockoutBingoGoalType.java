@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.challenges.lockout;
 
+/** Runtime matcher family used when checking lockout progress events. */
 public enum LockoutBingoGoalType {
     ITEM,
     ITEM_AMOUNT,

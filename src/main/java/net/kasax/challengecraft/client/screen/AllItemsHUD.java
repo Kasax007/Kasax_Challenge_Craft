@@ -13,6 +13,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
 @Environment(EnvType.CLIENT)
+/** Compact HUD for the current all-items target. */
 public class AllItemsHUD {
     private static ItemStack currentItem = ItemStack.EMPTY;
     private static int currentIndex = 0;
@@ -62,17 +63,13 @@ public class AllItemsHUD {
         }
         int y = 5;
 
-        // Draw icon
         if (!completed) {
             ctx.drawItem(currentItem, centerX - 8, y);
         } else {
             ctx.drawItem(new ItemStack(net.minecraft.item.Items.NETHER_STAR), centerX - 8, y);
         }
         
-        // Draw item name below
         ctx.drawCenteredTextWithShadow(tr, itemName, centerX, y + 18, 0xFFFFFF);
-        
-        // Draw progress below name
         ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

@@ -11,6 +11,7 @@ import net.minecraft.screen.slot.Slot;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
+/** Server/client screen handler bridge for the infinite chest UI. */
 public class InfiniteChestScreenHandler extends ScreenHandler {
     private final BlockPos pos;
     private final net.minecraft.entity.player.PlayerInventory playerInventory;
@@ -24,14 +25,12 @@ public class InfiniteChestScreenHandler extends ScreenHandler {
         this.pos = pos;
         this.playerInventory = playerInventory;
 
-        // Player Inventory
         for (int row = 0; row < 3; ++row) {
             for (int col = 0; col < 9; ++col) {
                 this.addSlot(new Slot(playerInventory, col + row * 9 + 9, 8 + col * 18, 140 + row * 18));
             }
         }
 
-        // Hotbar
         for (int col = 0; col < 9; ++col) {
             this.addSlot(new Slot(playerInventory, col, 8 + col * 18, 198));
         }

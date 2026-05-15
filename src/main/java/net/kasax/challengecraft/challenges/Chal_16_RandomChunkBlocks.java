@@ -11,6 +11,7 @@ import net.minecraft.world.chunk.Chunk;
 
 import java.util.*;
 
+/** Rewrites chunk blocks through a deterministic palette mapping. */
 public class Chal_16_RandomChunkBlocks {
     private static boolean active = false;
     private static List<Block> blockList = null;
@@ -36,25 +37,19 @@ public class Chal_16_RandomChunkBlocks {
                 if (isException(block)) continue;
                 if (block == Blocks.TNT) continue;
 
-                // Exclude fluids (Water, Lava)
                 if (block instanceof FluidBlock) continue;
-
-                // Exclude blocks affected by gravity
                 if (block instanceof FallingBlock) continue;
-
-                // Exclude fire
                 if (block instanceof AbstractFireBlock) continue;
 
-                // Exclude non-solid blocks (generally things you can walk through)
                 if (!block.getDefaultState().blocksMovement()) continue;
 
-                // Exclude non-full blocks that might be technically "solid" but not ideal for chunk replacement
+                // Replacement targets must remain self-supporting and usable as terrain.
                 if (block instanceof SlabBlock) continue;
                 if (block instanceof StairsBlock) continue;
                 if (block instanceof FenceBlock) continue;
                 if (block instanceof WallBlock) continue;
-                if (block instanceof PaneBlock) continue; // Glass Panes, Iron Bars
-                if (block instanceof LeavesBlock) continue; // They decay/are semi-transparent
+                if (block instanceof PaneBlock) continue;
+                if (block instanceof LeavesBlock) continue;
                 if (block instanceof ShulkerBoxBlock) continue;
                 if (block instanceof AbstractChestBlock) continue;
                 if (block instanceof AbstractFurnaceBlock) continue;
@@ -63,7 +58,6 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof FenceGateBlock) continue;
                 if (block instanceof TrapdoorBlock) continue;
 
-                // Exclude technical/invisible/special blocks
                 if (block instanceof BarrierBlock) continue;
                 if (block instanceof StructureVoidBlock) continue;
                 if (block instanceof LightBlock) continue;
@@ -97,20 +91,19 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof DecoratedPotBlock) continue;
                 if (block instanceof CreakingHeartBlock) continue;
 
-                // Exclude blocks that break when floating (as requested)
+                // Many decorative blocks pop off immediately when placed without support.
                 if (block instanceof TorchBlock) continue;
-                if (block instanceof PlantBlock) continue; // Saplings, Flowers, Mushrooms, Tall Grass, etc.
+                if (block instanceof PlantBlock) continue;
                 if (block instanceof CarpetBlock) continue;
                 if (block instanceof ButtonBlock) continue;
                 if (block instanceof LeverBlock) continue;
                 if (block instanceof RedstoneWireBlock) continue;
                 if (block instanceof RedstoneTorchBlock) continue;
-                if (block instanceof AbstractRedstoneGateBlock) continue; // Repeaters, Comparators
+                if (block instanceof AbstractRedstoneGateBlock) continue;
                 if (block instanceof AbstractSignBlock) continue;
                 if (block instanceof PressurePlateBlock) continue;
                 if (block instanceof WeightedPressurePlateBlock) continue;
 
-                // Exclude corals
                 if (block instanceof CoralBlock) continue;
                 if (block instanceof CoralFanBlock) continue;
                 if (block instanceof CoralWallFanBlock) continue;
@@ -118,7 +111,6 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof DeadCoralFanBlock) continue;
                 if (block instanceof DeadCoralWallFanBlock) continue;
 
-                // Other common "break-on-float" blocks for better experience
                 if (block instanceof RailBlock) continue;
                 if (block instanceof AbstractBannerBlock) continue;
                 if (block instanceof BedBlock) continue;
@@ -130,7 +122,7 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof TripwireHookBlock) continue;
                 if (block instanceof TripwireBlock) continue;
                 if (block instanceof AbstractCandleBlock) continue;
-                if (block instanceof AbstractPlantPartBlock) continue; // Kelp, Weeping Vines, etc.
+                if (block instanceof AbstractPlantPartBlock) continue;
                 if (block instanceof SeaPickleBlock) continue;
                 if (block instanceof TurtleEggBlock) continue;
                 if (block instanceof FrogspawnBlock) continue;
@@ -145,14 +137,14 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof AzaleaBlock) continue;
                 if (block instanceof BigDripleafBlock) continue;
                 if (block instanceof SmallDripleafBlock) continue;
-                if (block instanceof CakeBlock) continue; // Needs support
+                if (block instanceof CakeBlock) continue;
                 if (block instanceof ChorusFlowerBlock) continue;
                 if (block instanceof ChorusPlantBlock) continue;
                 if (block instanceof CocoaBlock) continue;
                 if (block instanceof HangingRootsBlock) continue;
                 if (block instanceof SporeBlossomBlock) continue;
                 if (block instanceof SweetBerryBushBlock) continue;
-                if (block instanceof MultifaceGrowthBlock) continue; // Glow Lichen, etc.
+                if (block instanceof MultifaceGrowthBlock) continue;
 
                 blockList.add(block);
             }
@@ -163,7 +155,7 @@ public class Chal_16_RandomChunkBlocks {
         ensureBlockList();
         if (blockList.isEmpty()) return Blocks.STONE;
 
-        // Use a combination of seed and chunk coordinates for a stable random
+        // Stable per-chunk mapping keeps reloads and newly created chunks consistent.
         long seed = worldSeed ^ pos.x ^ (long) pos.z << 32;
         Random random = new Random(seed);
         return blockList.get(random.nextInt(blockList.size()));

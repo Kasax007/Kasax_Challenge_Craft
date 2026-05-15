@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/** Replaces normal block drops with a deterministic random item mapping per world seed. */
 public class Chal_14_RandomBlockDrops {
     private static boolean active = false;
     private static List<Item> ITEM_LIST = null;
@@ -20,19 +21,16 @@ public class Chal_14_RandomBlockDrops {
     public static void register() {
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
             if (active && !player.isCreative() && world instanceof ServerWorld serverWorld) {
-                // EXCLUDE INFINITE CHEST FROM RANDOM DROPS
+                // The custom chest must survive as itself so its storage contract stays intact.
                 if (state.getBlock() == net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_BLOCK) {
                     return true;
                 }
                 
-                // Get the random item for this block and world seed
                 ItemStack stack = getRandomDrop(state.getBlock(), serverWorld);
                 if (!stack.isEmpty()) {
                     Block.dropStack(world, pos, stack);
                 }
-                // Break the block without dropping items
                 world.breakBlock(pos, false, player);
-                // Cancel the original break event to avoid double breaking/drops
                 return false;
             }
             return true;

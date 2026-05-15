@@ -8,11 +8,9 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.EntityType;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SpawnEggItem;
-import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
@@ -20,6 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Environment(EnvType.CLIENT)
+/** Compact HUD for the current all-entities target. */
 public class AllEntitiesHUD {
     private static EntityType<?> currentEntity = null;
     private static int currentIndex = 0;
@@ -72,7 +71,6 @@ public class AllEntitiesHUD {
         }
         int y = 5;
 
-        // Draw icon
         ItemStack icon;
         if (completed) {
             icon = new ItemStack(Items.NETHER_STAR);
@@ -89,10 +87,7 @@ public class AllEntitiesHUD {
         }
         ctx.drawItem(icon, centerX - 8, y);
         
-        // Draw entity name below
         ctx.drawCenteredTextWithShadow(tr, entityName, centerX, y + 18, 0xFFFFFF);
-        
-        // Draw progress below name
         ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

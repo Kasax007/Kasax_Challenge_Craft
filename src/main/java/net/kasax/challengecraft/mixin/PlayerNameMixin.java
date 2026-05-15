@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(PlayerEntity.class)
+/** Adds progression-based name colors on the client. */
 public abstract class PlayerNameMixin {
     @Inject(method = "getDisplayName", at = @At("RETURN"), cancellable = true)
     private void onGetDisplayName(CallbackInfoReturnable<Text> cir) {
@@ -49,7 +50,7 @@ public abstract class PlayerNameMixin {
 
             cir.setReturnValue(prefix.append(colored));
         } catch (Throwable t) {
-            // Silently fail to not break game logic if display name fails
+            // Display decoration must never interfere with normal player-name resolution.
         }
     }
 

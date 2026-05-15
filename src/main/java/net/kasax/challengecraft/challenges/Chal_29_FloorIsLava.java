@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Flag holder for floor-contact damage handled by movement hooks. */
 public class Chal_29_FloorIsLava {
     private static boolean active = false;
 

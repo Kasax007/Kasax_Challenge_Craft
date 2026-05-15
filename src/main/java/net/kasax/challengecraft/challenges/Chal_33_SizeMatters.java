@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Flag holder for size scaling applied by mixins. */
 public class Chal_33_SizeMatters {
     private static boolean active = false;
 

@@ -4,6 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
 import java.util.UUID;
 
+/** Platform-neutral XP lookup used by code shared between logical sides. */
 public class XpLookupProxy {
     private static final boolean IS_CLIENT = FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
 

@@ -3,6 +3,7 @@ package net.kasax.challengecraft.challenges.lockout;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Fixed team palette and lookup helpers for lockout matches. */
 public enum LockoutBingoTeam {
     RED("red", 0xFFFF5555, Formatting.RED),
     BLUE("blue", 0xFF5555FF, Formatting.BLUE),

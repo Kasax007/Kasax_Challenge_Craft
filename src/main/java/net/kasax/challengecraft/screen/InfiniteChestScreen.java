@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Locale;
 
+/** Client inventory screen for browsing and withdrawing infinite chest entries. */
 public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandler> {
     private static final Identifier TEXTURE = Identifier.of("challengecraft", "textures/gui/infinite_chest_gui.png");
     private TextFieldWidget searchField;
@@ -87,13 +88,11 @@ public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandle
     protected void drawBackground(DrawContext context, float delta, int mouseX, int mouseY) {
         context.drawTexture(net.minecraft.client.render.RenderLayer::getGuiTextured, TEXTURE, this.x, this.y, 0, 0, this.backgroundWidth, this.backgroundHeight, 256, 256);
         
-        // Scrollbar
         int i = (filteredEntries.size() + 8) / 9 - 6;
         int j = (int)(95.0F * this.scrollPosition);
         int u = 232 + (i > 0 ? 0 : 12);
         context.drawTexture(net.minecraft.client.render.RenderLayer::getGuiTextured, TEXTURE, this.x + 175, this.y + 17 + j, u, 0, 12, 15, 256, 256);
 
-        // Items
         int startEntry = (int) (scrollPosition * (Math.max(0, (filteredEntries.size() + 8) / 9 - 6)));
         for (int row = 0; row < 6; row++) {
             for (int col = 0; col < 9; col++) {
@@ -156,7 +155,6 @@ public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandle
             return true;
         }
         
-        // Scrollbar logic
         int scrollX = this.x + 174;
         int scrollY = this.y + 17;
         if (mouseX >= scrollX && mouseX < scrollX + 14 && mouseY >= scrollY && mouseY < scrollY + 110) {
@@ -164,7 +162,6 @@ public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandle
             return true;
         }
 
-        // Check if item was clicked
         int relativeX = (int) (mouseX - this.x);
         int relativeY = (int) (mouseY - this.y);
         

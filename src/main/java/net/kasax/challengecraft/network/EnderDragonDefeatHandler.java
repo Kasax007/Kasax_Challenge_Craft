@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.client.screen.ChallengeRewardOverlay;
 import net.kasax.challengecraft.data.XpManager;
 
+/** Client receiver for the completion reward overlay packet. */
 public class EnderDragonDefeatHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(ChallengeRewardPacket.ID, (payload, context) -> {

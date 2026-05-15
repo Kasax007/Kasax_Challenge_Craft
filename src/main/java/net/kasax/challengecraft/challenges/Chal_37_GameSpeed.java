@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.minecraft.util.math.MathHelper;
 
+/** Applies the configured server tick-rate multiplier and restores vanilla speed on disable. */
 public class Chal_37_GameSpeed {
     private static final float BASE_TICK_RATE = 20.0f;
 

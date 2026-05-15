@@ -12,12 +12,12 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import java.util.List;
 
 @Mixin(PlayerEntity.class)
+/** Applies the scholar perk bonus to earned experience. */
 public abstract class ScholarPerkMixin {
     @ModifyVariable(method = "addExperience", at = @At("HEAD"), argsOnly = true)
     private int modifyExperienceGain(int experience) {
         PlayerEntity player = (PlayerEntity) (Object) this;
         if (player.getWorld().isClient()) {
-            // On client, we could use the synced perks, but XP gain is usually server-side anyway.
             return experience;
         }
 

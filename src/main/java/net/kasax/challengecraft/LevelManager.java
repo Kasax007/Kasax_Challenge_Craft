@@ -1,7 +1,5 @@
 package net.kasax.challengecraft;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
@@ -12,11 +10,9 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.text.Text;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
+/** Owns the level curve, perk unlock thresholds, and XP sync fan-out. */
 public class LevelManager {
     public static final int MAX_LEVEL = 20;
 
@@ -43,8 +39,7 @@ public class LevelManager {
     );
 
     public static int getLevelForXp(long totalXp) {
-        // TotalXP = 50 * L * (L-1) => L^2 - L - TotalXP/50 = 0
-        // L = (1 + sqrt(1 + 4 * TotalXP / 50)) / 2
+        // Inverts the triangular XP curve without walking every level boundary.
         int level = (int) ((1 + Math.sqrt(1 + 0.08 * totalXp)) / 2);
         return Math.min(MAX_LEVEL, Math.max(1, level));
     }
@@ -81,9 +76,6 @@ public class LevelManager {
         long currentXp = XpManager.getXp(player.getUuid());
         int oldLevel = getLevelForXp(currentXp);
         
-        ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
-        List<Integer> activePerks = data.getActivePerks();
-
         XpManager.addXp(player.getUuid(), amount);
         long newXp = XpManager.getXp(player.getUuid());
         
@@ -102,7 +94,6 @@ public class LevelManager {
         player.sendMessage(Text.translatable("challengecraft.level.up", newLevel).formatted(Formatting.GOLD, Formatting.BOLD), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
         
-        // Check for perk unlocks
         for (int perkId : ALL_PERKS) {
             if (getRequiredLevel(perkId) == newLevel) {
                 Text name = Text.translatable("challengecraft.perk." + perkId).copy().formatted(Formatting.YELLOW);
@@ -119,7 +110,6 @@ public class LevelManager {
         player.sendMessage(Text.translatable("challengecraft.level.infinity_star", starCount).formatted(Formatting.YELLOW, Formatting.BOLD), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
         
-        // Handle new rewards
         if (starCount == 20) {
              player.sendMessage(Text.translatable(
                      "challengecraft.level.secret_unlock",
@@ -127,7 +117,6 @@ public class LevelManager {
              ).formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
         }
 
-        // Show overlay
         ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.ChallengeRewardPacket(oldXp, newXp, newXp - oldXp, false));
     }
 
@@ -158,13 +147,12 @@ public class LevelManager {
         long xp = XpManager.getXp(player.getUuid());
         ChallengeCraft.LOGGER.info("[Server] Syncing XP for {} (UUID: {}): {}", player.getName().getString(), player.getUuid(), xp);
         
-        // Broadcast to all players so they know this player's level/stars (for name tags)
+        // Other clients need this for name-tag styling, not just the local HUD.
         LevelSyncPacket pkt = new LevelSyncPacket(xp, player.getUuid());
         for (ServerPlayerEntity p : player.getServer().getPlayerManager().getPlayerList()) {
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, pkt);
         }
 
-        // Also sync personal bests and completions
         java.util.Map<Integer, Integer> times = StatsManager.getBestTimes(player.getUuidAsString());
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.StatsSyncPacket(times));
         ChallengeCraft.LOGGER.info("[Server] Synced Level ({}) and Stats ({}) to player {}", getLevelForXp(xp), times.size(), player.getName().getString());
@@ -198,7 +186,6 @@ public class LevelManager {
             case 19 -> 19;
             case 22 -> 20;
             
-            // Perks
             case PERK_NIGHT_VISION -> 3;
             case PERK_SWIFT_FOOTING -> 5;
             case PERK_TOUGH_SKIN -> 10;
@@ -207,7 +194,7 @@ public class LevelManager {
             case PERK_SCHOLAR -> 15;
             case PERK_RESISTANCE -> 18;
             case PERK_INFINITE_CHEST -> 20;
-            case PERK_INFINITY_WEAPON -> 999; // Special handling for Infinity Weapon (Star 20)
+            case PERK_INFINITY_WEAPON -> 999; // This perk is unlocked by star count, not player level.
 
             default -> 1;
         };

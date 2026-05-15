@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/** Persists long-lived player XP totals outside individual world saves. */
 public class XpManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-XP");
     private static final Path XP_FILE = FabricLoader.getInstance().getGameDir().resolve("challengecraft_xp.txt");
@@ -42,13 +43,11 @@ public class XpManager {
         save();
     }
     
-    // For legacy support or singleplayer client-side
+    /** Legacy singleplayer callers only ever had one XP entry. */
     public static synchronized long getTotalXp() {
         if (!loaded) {
             load();
         }
-        // If we have only one entry (likely singleplayer), return it.
-        // Otherwise return 0 or the first one.
         return playerXp.values().stream().findFirst().orElse(0L);
     }
 
@@ -63,10 +62,9 @@ public class XpManager {
                         try {
                             playerXp.put(UUID.fromString(parts[0]), Long.parseLong(parts[1]));
                         } catch (Exception e) {
-                             // Ignore malformed
+                            // Ignore malformed rows and keep the remaining file usable.
                         }
                     } else if (parts.length == 1 && !parts[0].isEmpty()) {
-                        // Compatibility with old format (just a number)
                         try {
                              playerXp.put(UUID.fromString("00000000-0000-0000-0000-000000000000"), Long.parseLong(parts[0]));
                         } catch (Exception e) {}

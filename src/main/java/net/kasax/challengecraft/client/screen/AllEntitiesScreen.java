@@ -11,6 +11,7 @@ import net.minecraft.util.Formatting;
 
 import java.util.List;
 
+/** Scrollable list view for the ordered all-entities run. */
 public class AllEntitiesScreen extends Screen {
     private final List<EntityType<?>> entities;
     private final int currentIndex;

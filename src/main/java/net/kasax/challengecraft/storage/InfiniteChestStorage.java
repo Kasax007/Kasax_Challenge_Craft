@@ -13,6 +13,7 @@ import net.minecraft.util.Identifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/** Stores arbitrarily large item counts while keeping item components part of the identity. */
 public class InfiniteChestStorage {
     private final Map<ItemStackKey, Long> storedItems = new HashMap<>();
     private List<StorageEntry> cachedSortedList = null;

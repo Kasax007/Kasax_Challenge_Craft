@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.UUID;
 
+/** Client-to-server XP snapshot used when joining from the title-screen cache. */
 public class ClientXpSyncPacket implements CustomPayload {
     public static final Id<ClientXpSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "client_xp_sync"));
     

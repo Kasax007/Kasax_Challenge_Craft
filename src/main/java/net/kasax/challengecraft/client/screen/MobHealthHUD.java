@@ -20,6 +20,7 @@ import net.minecraft.util.Formatting;
 import java.util.Locale;
 
 @Environment(EnvType.CLIENT)
+/** HUD element that exposes the current mob-health multiplier to players. */
 public class MobHealthHUD {
 
     public static void register() {
@@ -47,7 +48,7 @@ public class MobHealthHUD {
         Text nameText = living.getDisplayName().copy().formatted(Formatting.YELLOW, Formatting.BOLD);
         float health = living.getHealth();
         float maxHealth = living.getMaxHealth();
-        // Using Locale.US to ensure dot as decimal separator
+        // HUD formatting should not change with the client's locale.
         Text healthText = Text.translatable(
                 "challengecraft.mob_health.health",
                 String.format(Locale.US, "%.1f", health),
@@ -58,18 +59,15 @@ public class MobHealthHUD {
         int boxHeight = 40;
         int x = centerX - boxWidth / 2;
 
-        // Draw semi-transparent background
         ctx.fill(x, y, x + boxWidth, y + boxHeight, 0x80000000);
         ctx.drawBorder(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
 
-        // Draw Entity Icon
         ItemStack icon = SpawnEggItem.forEntity(living.getType()) != null 
                 ? new ItemStack(SpawnEggItem.forEntity(living.getType()))
                 : new ItemStack(Items.ZOMBIE_SPAWN_EGG);
         
         ctx.drawItem(icon, x + 10, y + 12);
 
-        // Draw Name and Health
         ctx.drawTextWithShadow(tr, nameText, x + 40, y + 10, 0xFFFFFF);
         ctx.drawTextWithShadow(tr, healthText, x + 40, y + 22, 0xFFFFFF);
     }

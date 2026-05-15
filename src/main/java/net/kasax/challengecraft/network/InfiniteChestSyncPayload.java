@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.List;
 
+/** Server snapshot of visible infinite chest entries for the open screen. */
 public record InfiniteChestSyncPayload(List<InfiniteChestSyncPayload.Entry> entries) implements CustomPayload {
     public static final Id<InfiniteChestSyncPayload> ID = new Id<>(Identifier.of("challengecraft", "infinite_chest_sync"));
     

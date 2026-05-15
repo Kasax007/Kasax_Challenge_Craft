@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+/** Catalog of questions used by the timed trivia challenge. */
 public class TriviaQuestions {
     private static final List<TriviaQuestion> POOL = new ArrayList<>();
     private static final Random RANDOM = new Random();

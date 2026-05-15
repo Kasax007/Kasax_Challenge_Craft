@@ -11,6 +11,7 @@ import net.minecraft.util.Identifier;
 import java.util.List;
 import java.util.Objects;
 
+/** Immutable board-goal definition shared by server validation and client rendering. */
 public record LockoutBingoGoal(
         String id,
         LockoutBingoGoalCategory category,

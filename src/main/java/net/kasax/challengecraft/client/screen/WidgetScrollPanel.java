@@ -29,18 +29,12 @@ public class WidgetScrollPanel extends ScrollableWidget {
         this.setScrollY(0);
     }
 
-    /**
-     * IMPORTANT: The widget's X/Y must be the "unscrolled" coordinates (normal screen coords).
-     * This panel will render it at (y - scrollY) and also forward mouse events accordingly.
-     */
+    /** Children keep their layout coordinates; scroll offset is applied only while rendering or dispatching input. */
     public void addChild(ClickableWidget widget) {
         children.add(widget);
 
-        // Track the maximum bottom edge relative to our panel top
         int bottom = (widget.getY() + widget.getHeight()) - this.getY();
         contentHeight = Math.max(contentHeight, bottom);
-
-        // Keep scroll clamped if content size changed
         this.refreshScroll();
     }
 
@@ -50,7 +44,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
 
     @Override
     protected int getContentsHeightWithPadding() {
-        // small padding so the last widget isn't glued to the bottom
         return Math.max(this.contentHeight + 20, this.height);
     }
 
@@ -61,7 +54,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
 
     @Override
     protected void renderWidget(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
-        // Clip children rendering to the panel rect
         context.enableScissor(this.getX(), this.getY(), this.getRight(), this.getBottom());
 
         int scrollY = (int) Math.floor(this.getScrollY());
@@ -75,7 +67,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
 
         context.disableScissor();
 
-        // Draw vanilla scrollbar on top
         this.drawScrollbar(context);
     }
 
@@ -83,7 +74,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!this.visible) return false;
 
-        // First: allow grabbing the scrollbar thumb
         if (this.checkScrollbarDragged(mouseX, mouseY, button)) {
             return true;
         }
@@ -108,7 +98,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (!this.visible) return false;
 
-        // Stop scrollbar dragging
         this.onRelease(mouseX, mouseY);
 
         int scrollY = (int) Math.floor(this.getScrollY());
@@ -128,7 +117,6 @@ public class WidgetScrollPanel extends ScrollableWidget {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (!this.visible) return false;
 
-        // Let ScrollableWidget handle dragging the scrollbar thumb
         if (super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
             return true;
         }
@@ -157,6 +145,5 @@ public class WidgetScrollPanel extends ScrollableWidget {
 
     @Override
     protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
-        // optional
     }
 }

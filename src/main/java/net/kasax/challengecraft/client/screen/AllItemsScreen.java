@@ -10,6 +10,7 @@ import net.minecraft.util.Formatting;
 
 import java.util.List;
 
+/** Scrollable list view for the ordered all-items run. */
 public class AllItemsScreen extends Screen {
     private final List<ItemStack> items;
     private final int currentIndex;
@@ -42,8 +43,6 @@ public class AllItemsScreen extends Screen {
             }
             if (currentIndex >= 0 && currentIndex < this.getEntryCount()) {
                 this.setSelected(this.getEntry(currentIndex));
-                // Try to scroll to it
-                // this.setScrollAmount(currentIndex * 20);
             }
         }
 

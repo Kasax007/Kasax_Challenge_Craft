@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LivingEntity.class)
+/** Applies the challenge mob-health multiplier when entities initialize attributes. */
 public abstract class MobHealthMixin {
 
     @Unique
@@ -23,12 +24,10 @@ public abstract class MobHealthMixin {
     private void onBaseTick(CallbackInfo ci) {
         LivingEntity living = (LivingEntity) (Object) this;
 
-        // Only run on server and skip players
         if (living.getWorld().isClient || living instanceof PlayerEntity) {
             return;
         }
 
-        // Run check every 10 ticks (0.5 second) to be efficient
         if (living.age % 10 != 0) {
             return;
         }
@@ -45,18 +44,16 @@ public abstract class MobHealthMixin {
             EntityAttributeModifier existing = healthAttr.getModifier(HEALTH_MULTIPLIER_ID);
             
             if (existing == null) {
-                // Apply modifier if it doesn't exist and multiplier is > 1
                 if (currentMultiplier > 1) {
                     healthAttr.addPersistentModifier(new EntityAttributeModifier(
                             HEALTH_MULTIPLIER_ID,
                             targetModifierValue,
                             EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE
                     ));
-                    // Heal the entity to its new max health when the modifier is first applied
+                    // Newly scaled mobs should not start below their new health cap.
                     living.setHealth(living.getMaxHealth());
                 }
             } else if (Math.abs(existing.value() - targetModifierValue) > 0.001) {
-                // Update existing modifier if the multiplier changed
                 healthAttr.removeModifier(HEALTH_MULTIPLIER_ID);
                 if (currentMultiplier > 1) {
                     healthAttr.addPersistentModifier(new EntityAttributeModifier(
@@ -64,17 +61,14 @@ public abstract class MobHealthMixin {
                             targetModifierValue,
                             EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE
                     ));
-                    // Optional: heal when scaling up
                     if (targetModifierValue > existing.value()) {
                         living.setHealth(living.getMaxHealth());
                     }
                 }
             }
         } else {
-            // Remove modifier if challenge is no longer active
             if (healthAttr.getModifier(HEALTH_MULTIPLIER_ID) != null) {
                 healthAttr.removeModifier(HEALTH_MULTIPLIER_ID);
-                // Clamp current health if it exceeds new max
                 if (living.getHealth() > living.getMaxHealth()) {
                     living.setHealth(living.getMaxHealth());
                 }

@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import net.minecraft.text.TextCodecs;
 import net.minecraft.util.Identifier;
 
+/** Client-safe snapshot of the advancement data needed by list screens. */
 public record AdvancementInfo(Identifier id, Text title, ItemStack icon, Text description) {
     public static final PacketCodec<RegistryByteBuf, AdvancementInfo> CODEC = PacketCodec.of(
             (info, buf) -> {

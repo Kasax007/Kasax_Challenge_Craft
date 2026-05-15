@@ -1,4 +1,3 @@
-// src/main/java/net/kasax/challengecraft/mixin/CreateWorldScreenMixin.java
 package net.kasax.challengecraft.mixin;
 
 import net.fabricmc.api.EnvType;
@@ -11,7 +10,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.gui.tab.Tab;
 import net.minecraft.client.gui.widget.TabNavigationWidget;
-import net.minecraft.network.PacketByteBuf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,13 +17,11 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-
-import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
 
 @Mixin(CreateWorldScreen.class)
 @Environment(EnvType.CLIENT)
+/** Adds the challenge setup tab to vanilla world creation. */
 public class CreateWorldScreenMixin {
     private net.kasax.challengecraft.client.screen.ChallengeTab challengeTab;
 
@@ -47,7 +43,6 @@ public class CreateWorldScreenMixin {
 
     @Inject(method = "createLevel", at = @At("HEAD"), cancellable = true)
     private void onCreateLevel(CallbackInfo ci) {
-        // grab your full list of “on” toggles:
         List<Integer> chosen = this.challengeTab.getActive();
         List<Integer> perks = this.challengeTab.getSelectedPerks();
 
@@ -59,11 +54,9 @@ public class CreateWorldScreenMixin {
 
         ChallengeCraft.LOGGER.info("[Client:CreateWorld] chosen challenges = {} , perks = {}, maxHearts = {}, Inventory = {}, MobHealth = {}, GameSpeed = {}",
                 chosen, perks, ChallengeCraftClient.SELECTED_MAX_HEARTS, ChallengeCraftClient.SELECTED_LIMITED_INVENTORY, ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER, ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER);
-        // stash for SP:
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
         ChallengeCraftClient.SELECTED_PERKS = List.copyOf(perks);
 
-        // if we’re on a real (integrated or remote) server, send them all:
         if (MinecraftClient.getInstance().getNetworkHandler() != null) {
             List<Integer> chosenList = ChallengeCraftClient.LAST_CHOSEN;
             List<Integer> perkList = ChallengeCraftClient.SELECTED_PERKS;

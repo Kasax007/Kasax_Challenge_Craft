@@ -26,6 +26,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.*;
 
+/** Tracks the ordered advancement run and mirrors the current target to clients. */
 public class Chal_26_AllAchievements {
     private static boolean active = false;
 
@@ -47,7 +48,7 @@ public class Chal_26_AllAchievements {
             AdvancementEntry currentAdv = server.getAdvancementLoader().get(currentAdvId);
 
             if (currentAdv == null) {
-                // If advancement is missing for some reason, skip it
+                // Datapacks can remove advancements between sessions; do not stall the run on stale IDs.
                 index++;
                 data.setAllAdvancementsIndex(index);
                 syncProgressToAll(server, data);
@@ -68,9 +69,8 @@ public class Chal_26_AllAchievements {
                 data.setAllAdvancementsIndex(index);
                 syncProgressToAll(server, data);
 
-                // Give some XP for completing the advancement (scaled by difficulty)
                 double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-                long xpPerAdv = 10; // Slightly more than items
+                long xpPerAdv = 10;
                 if (xpPerAdv > 0 && difficulty > 0) {
                     server.getPlayerManager().getPlayerList().forEach(p -> {
                         LevelManager.addXp(p, xpPerAdv);
@@ -101,18 +101,15 @@ public class Chal_26_AllAchievements {
             Identifier id = advancement.id();
             if (!id.getNamespace().equals("minecraft")) return;
             
-            // Exclude technical advancements (no display info)
             if (advancement.value().display().isEmpty()) return;
             
-            // Exclude root advancements (no parent)
             if (advancement.value().parent().isEmpty()) return;
             
-            // Exclude recipes
             if (id.getPath().startsWith("recipes/")) return;
 
             advancements.add(id);
         });
-        // Sort by ID to keep it deterministic before shuffle
+        // Keep the pre-shuffle order stable across reloads and registry iteration changes.
         advancements.sort(Comparator.comparing(Identifier::toString));
         return advancements;
     }
@@ -147,7 +144,7 @@ public class Chal_26_AllAchievements {
 
         if (eligiblePlayers.isEmpty()) return;
 
-        // Check if other all-inclusive challenges are done if they are active
+        // Completion rewards are shared across the chained collection challenges.
         if (data.getActive().contains(22) && data.getAllItemsIndex() < data.getAllItemsOrder().size()) return;
         if (data.getActive().contains(23) && data.getAllEntitiesIndex() < data.getAllEntitiesOrder().size()) return;
 

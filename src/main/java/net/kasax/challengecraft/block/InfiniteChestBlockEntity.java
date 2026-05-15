@@ -17,6 +17,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.registry.RegistryWrapper;
 import org.jetbrains.annotations.Nullable;
 
+/** Block entity backing the infinite chest GUI and Fabric transfer API view. */
 public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory<InfiniteChestScreenHandler.PacketData> {
     private final InfiniteChestStorage storage = new InfiniteChestStorage();
 

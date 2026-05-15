@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MobEntity.class)
+/** Applies configured entity duplication after vanilla spawn setup. */
 public abstract class MobEntityMixin implements EntityDoublingAccess {
 
     @Unique
@@ -44,8 +45,7 @@ public abstract class MobEntityMixin implements EntityDoublingAccess {
     private void onBaseTick(CallbackInfo ci) {
         MobEntity mob = (MobEntity) (Object) this;
         if (Chal_35_DoubleTrouble.isActive() && !challengecraft$doubled && !mob.getWorld().isClient && !(mob instanceof EnderDragonEntity)) {
-            // Check age to only double newly spawned mobs, not loaded ones that might be missing the NBT flag (though unlikely now)
-            // Using < 20 (1 second) to be more lenient than == 0
+            // Only fresh spawns should duplicate; old entities may predate the saved marker.
             if (mob.age < 20) {
                 challengecraft$doubled = true;
                 ServerWorld world = (ServerWorld) mob.getWorld();
@@ -62,7 +62,6 @@ public abstract class MobEntityMixin implements EntityDoublingAccess {
                     }
                 }
             } else {
-                // Mark as doubled if it's already an old mob (e.g. loaded from old world)
                 challengecraft$doubled = true;
             }
         }

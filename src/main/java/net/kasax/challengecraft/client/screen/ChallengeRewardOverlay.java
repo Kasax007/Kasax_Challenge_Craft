@@ -13,6 +13,7 @@ import net.minecraft.util.math.MathHelper;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Brief XP reward animation shown after completed challenge milestones. */
 public class ChallengeRewardOverlay {
     private static long startTime = -1;
     private static long xpGained = 0;

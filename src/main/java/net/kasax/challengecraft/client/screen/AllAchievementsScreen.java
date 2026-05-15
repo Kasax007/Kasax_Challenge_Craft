@@ -13,6 +13,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.List;
 
+/** Scrollable list view for the ordered all-achievements run. */
 public class AllAchievementsScreen extends Screen {
     private final List<AdvancementInfo> advancements;
     private final int currentIndex;

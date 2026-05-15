@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(GameMenuScreen.class)
+/** Adds the challenge editor entry point to the pause menu. */
 public abstract class GameMenuScreenMixin extends Screen {
     protected GameMenuScreenMixin(Text title) {
         super(title);

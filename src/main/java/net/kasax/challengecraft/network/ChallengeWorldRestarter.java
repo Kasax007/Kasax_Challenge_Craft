@@ -1,8 +1,6 @@
 package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.data.ChallengeSavedData;
-import net.kasax.challengecraft.LevelManager;
-import net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld;
 import net.kasax.challengecraft.mixin.MinecraftServerAccessor;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
@@ -11,10 +9,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.WorldSavePath;
-import net.minecraft.world.GameMode;
-import net.minecraft.world.World;
-import net.minecraft.world.level.LevelProperties;
-import net.minecraft.world.gen.GeneratorOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,10 +16,15 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Rotates a finished world out of the active save directory and prepares the next run in place.
+ *
+ * Most of the restart work happens before the replacement world boots, so a few helpers use
+ * reflection to reset state that Minecraft does not expose through public APIs.
+ */
 public class ChallengeWorldRestarter {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Restarter");
     private static boolean needsTeleport = false;
@@ -60,7 +59,6 @@ public class ChallengeWorldRestarter {
             server.getPlayerManager().getPlayerList().forEach(player -> {
                 ServerWorld overworld = server.getOverworld();
                 net.minecraft.util.math.BlockPos spawn = overworld.getSpawnPos();
-                // Use requestTeleport which is safer across versions
                 player.requestTeleport(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
                 LOGGER.info("[Teleport] Teleported {} to safe spawn at {}", player.getName().getString(), spawn);
             });
@@ -70,32 +68,26 @@ public class ChallengeWorldRestarter {
     public static void initiateRestart(MinecraftServer server) {
         LOGGER.info("Initiating world restart via offline rotation...");
 
-        // 1. Reset challenge progress for the upcoming new world
         ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
         data.resetForNewWorld();
         
-        // Save the persistent state manager to ensure ChallengeSavedData is written to disk
-        // before we stop the server and move the data folder.
+        // Persist before stopping so the next run can keep challenge settings while resetting progress.
         server.getOverworld().getPersistentStateManager().save();
         
         LOGGER.info("Reset challenge progress and saved persistent state for the upcoming new world.");
 
-        // 2. Broadcast message
         server.getPlayerManager().broadcast(Text.translatable("challengecraft.restart.broadcast").formatted(Formatting.GOLD, Formatting.BOLD), false);
 
-        // 3. Send message to players
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             player.sendMessage(Text.translatable("challengecraft.restart.preparing").formatted(Formatting.YELLOW), false);
         }
 
         String worldName = ((MinecraftServerAccessor) server).getSession().getDirectoryName();
 
-        // 4. Send packet to client so it knows to auto-restart
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, new RestartPendingPacket(worldName));
         }
 
-        // 5. Create the flag file
         try {
             Path worldDir = server.getSavePath(WorldSavePath.ROOT);
             Files.writeString(worldDir.resolve("challengecraft_restart_pending"), "true");
@@ -104,12 +96,10 @@ public class ChallengeWorldRestarter {
             LOGGER.error("Failed to create restart flag file!", e);
         }
 
-        // 6. Stop the server
         server.stop(false);
     }
 
     public static void initializeGenerators(MinecraftServer server) {
-        // Pre-initialize Skyblock generators if active
         net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(null);
         net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(null);
 
@@ -154,16 +144,12 @@ public class ChallengeWorldRestarter {
             long newSeed = new java.util.Random().nextLong();
             LOGGER.info("Randomizing seed in memory for fresh world. New seed: {}", newSeed);
 
-            // 1. Try to randomize all long fields in the main properties object
             randomizeAllLongFields(properties, newSeed);
             
-            // 2. Reset spawn coordinates so the game finds a new safe spot
             resetSpawnFields(properties);
 
-            // 3. Clear player data and boss events so they don't persist in the new world
             clearNbtFields(properties);
             
-            // 4. Specifically target MainWorldProperties if separate
             try {
                 Object mainWorldProps = properties.getMainWorldProperties();
                 if (mainWorldProps != null && mainWorldProps != properties) {
@@ -174,13 +160,11 @@ public class ChallengeWorldRestarter {
                 }
             } catch (Throwable ignored) {}
 
-            // 5. Try to randomize all long fields in GeneratorOptions
             net.minecraft.world.gen.GeneratorOptions options = properties.getGeneratorOptions();
             if (options != null) {
                 randomizeAllLongFields(options, newSeed);
             }
 
-            // 6. Force lifecycle to Stable to avoid "Experimental settings" warning
             try {
                 for (java.lang.reflect.Field f : properties.getClass().getDeclaredFields()) {
                     if (f.getType() == com.mojang.serialization.Lifecycle.class) {
@@ -227,15 +211,13 @@ public class ChallengeWorldRestarter {
             for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
                 String name = f.getName().toLowerCase();
                 
-                // Debug log all fields in LevelProperties to identify coordinate fields
                 if (clazz.getSimpleName().equals("LevelProperties") || clazz.getSimpleName().equals("class_31")) {
                      try {
                          f.setAccessible(true);
                          Object val = f.get(obj);
                          LOGGER.info("[SpawnDebug] Field: {} (type: {}, value: {})", f.getName(), f.getType().getSimpleName(), val);
                          
-                         // In 1.21.5+, spawnPos might be a BlockPos field (e.g. field_48380)
-                         // We definitely want to AVOID resetting it to 0,0,0 here.
+                         // Current versions keep spawn as BlockPos; resetting that to zero can create unsafe starts.
                          if (f.getType().getSimpleName().contains("BlockPos") || f.getType().getSimpleName().contains("class_2338")) {
                              LOGGER.info("[SpawnDebug] Identified BlockPos field '{}', skipping reset to keep safe spawn.", f.getName());
                              continue;
@@ -243,9 +225,6 @@ public class ChallengeWorldRestarter {
                      } catch (Exception ignored) {}
                 }
 
-                // Target wandering trader state, but avoid resetting spawn coordinates directly to 0,0,0
-                // as this can spawn players in the void or inside blocks.
-                // We want to keep wandering trader reset but let Minecraft handle the spawn location.
                 if (name.contains("wandering") || name.contains("spawnangle") || name.contains("spawnforced")) {
                     try {
                         f.setAccessible(true);
@@ -263,9 +242,7 @@ public class ChallengeWorldRestarter {
                         LOGGER.warn("Could not reset field '{}.{}'", clazz.getSimpleName(), f.getName());
                     }
                 } else if (name.equals("x") || name.equals("y") || name.equals("z") || name.contains("center")) {
-                    // Only reset x, y, z if they belong to a WorldBorder-like object (handled via clearNbtFields call)
-                    // or if explicitly handled here for non-spawn objects.
-                    // When called on LevelProperties, we want to AVOID resetting spawnX, spawnY, spawnZ.
+                    // Leave spawn fields alone; zeroing them can move players into unsafe terrain.
                     if (!clazz.getSimpleName().contains("Properties") && !clazz.getSimpleName().contains("Level")) {
                         try {
                             f.setAccessible(true);
@@ -292,17 +269,14 @@ public class ChallengeWorldRestarter {
                 Class<?> type = f.getType();
                 String typeName = type.getName();
                 
-                // Use class references directly for better reliability
                 boolean isNbt = net.minecraft.nbt.NbtCompound.class.isAssignableFrom(type);
 
                 if (isNbt) {
                     String name = f.getName().toLowerCase();
-                    // Avoid clearing playerdata in a way that breaks login ("Not a string" error)
-                    // Instead of new NbtCompound(), we'll just let Minecraft re-initialize it or clear it carefully
+                    // Empty player data compounds break login decoding; null makes vanilla rebuild the record.
                     if (name.contains("playerdata") || name.equals("field_169")) {
                         try {
                             f.setAccessible(true);
-                            // Set to null to force Minecraft to use world spawn instead of an empty record
                             f.set(obj, null);
                             LOGGER.info("[SeedReset] Set playerData field '{}.{}' to null", clazz.getSimpleName(), f.getName());
                         } catch (Exception e) {
@@ -338,7 +312,6 @@ public class ChallengeWorldRestarter {
                     resetDragonFightField(f, obj, type, false);
                 } else if (type == boolean.class || type == Boolean.class) {
                     String name = f.getName().toLowerCase();
-                    // Reset 'initialized' and other flags to force fresh world/boss setup
                     if (name.equals("initialized") || name.contains("spawned") || name.contains("killed") || name.contains("dragon") || 
                         name.equals("field_192") || name.equals("field_176") || name.equals("field_185")) { // Common obfuscated names for initialized/dragonKilled
                         try {
@@ -350,7 +323,6 @@ public class ChallengeWorldRestarter {
                         }
                     }
                 } else if (typeName.contains("WorldBorder") || typeName.contains("class_2784")) {
-                     // Try to reset world border state in properties if possible
                      try {
                          f.setAccessible(true);
                          Object border = f.get(obj);
@@ -369,15 +341,12 @@ public class ChallengeWorldRestarter {
         String name = type.getName();
         if (name.contains("EnderDragonFight$Data") || name.contains("class_4472$class_4473")) return true;
 
-        // Generic check: is it a record-like class with dragon-related fields?
         try {
             boolean hasKilled = false;
             boolean hasSeen = false;
             for (java.lang.reflect.Field f : type.getDeclaredFields()) {
                 String fn = f.getName().toLowerCase();
-                // Check for dragonKilled or field_21052 (record component)
                 if (fn.contains("dragonkilled") || fn.equals("field_21052") || fn.equals("dragonKilled") || fn.equals("comp_582")) hasKilled = true;
-                // Check for needsStateScanning or field_21051
                 if (fn.contains("needsstatescanning") || fn.equals("field_21051") || fn.equals("needsStateScanning")) hasSeen = true;
             }
             return (hasKilled && hasSeen) || type.isRecord();
@@ -399,7 +368,6 @@ public class ChallengeWorldRestarter {
                 } catch (NoSuchFieldException ignored) {}
             }
 
-            // Robust fallback: Find any static field of the same type
             if (defaultField == null) {
                 for (java.lang.reflect.Field staticField : type.getDeclaredFields()) {
                     if (java.lang.reflect.Modifier.isStatic(staticField.getModifiers()) && staticField.getType() == type) {
@@ -433,7 +401,6 @@ public class ChallengeWorldRestarter {
 
         LOGGER.info("Performing offline world rotation to {}", archiveDir);
 
-        // Files/Folders to move to archive
         String[] toMove = {
             "region", "poi", "entities", "DIM1", "DIM-1", 
             "playerdata", "advancements", "stats", "data",
@@ -446,7 +413,7 @@ public class ChallengeWorldRestarter {
                 boolean isDir = Files.isDirectory(src);
                 try {
                     moveOrRecursive(src, archiveDir.resolve(name));
-                    // RECREATE important directories immediately to prevent potential save issues
+                    // Minecraft expects these directories to exist again before the next save pass.
                     if (isDir && (name.equals("playerdata") || name.equals("advancements") || name.equals("stats") || 
                                   name.equals("region") || name.equals("poi") || name.equals("entities"))) {
                         Files.createDirectories(src);
@@ -458,7 +425,7 @@ public class ChallengeWorldRestarter {
             }
         }
         
-        // Also move 'data' folder BUT preserve 'challengecraft_challenges.dat'
+        // Keep the challenge configuration file in place so the next run preserves the chosen rules.
         Path dataDir = worldDir.resolve("data");
         if (Files.exists(dataDir)) {
             Path archiveDataDir = archiveDir.resolve("data");
@@ -477,11 +444,8 @@ public class ChallengeWorldRestarter {
             }
         }
         
-        // Clean up any remaining files in DIM folders just in case
         deleteRecursive(worldDir.resolve("DIM1"));
         deleteRecursive(worldDir.resolve("DIM-1"));
-        
-        // The server will now start and see no level.dat, so it will generate a brand new world with a new seed.
     }
 
     private static void deleteRecursive(Path path) {
@@ -496,29 +460,11 @@ public class ChallengeWorldRestarter {
         } catch (IOException ignored) {}
     }
 
-    private static void tryRotateFile(Path src, Path dst) {
-        if (Files.exists(src)) {
-            try {
-                Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                LOGGER.warn("Could not move file {}: {}", src, e.getMessage());
-            }
-        }
-    }
-
-    private static void createDirs(Path base) throws IOException {
-        Files.createDirectories(base.resolve("data"));
-        Files.createDirectories(base.resolve("region"));
-        Files.createDirectories(base.resolve("poi"));
-        Files.createDirectories(base.resolve("entities"));
-    }
-
     private static void moveOrRecursive(Path src, Path dst) throws IOException {
         if (!Files.exists(src)) return;
         try {
             Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            // Folder might be partially locked. Try to move individual files.
             if (Files.isDirectory(src)) {
                 Files.createDirectories(dst);
                 try (Stream<Path> stream = Files.list(src)) {
@@ -526,7 +472,6 @@ public class ChallengeWorldRestarter {
                         moveOrRecursive(p, dst.resolve(p.getFileName()));
                     }
                 }
-                // Try to delete the directory if it's now empty
                 try {
                     Files.deleteIfExists(src);
                 } catch (IOException ignored) {}

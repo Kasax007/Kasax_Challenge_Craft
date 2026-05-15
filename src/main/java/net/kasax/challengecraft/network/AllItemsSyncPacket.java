@@ -6,6 +6,7 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Incremental HUD sync for the current item target. */
 public class AllItemsSyncPacket implements CustomPayload {
     public static final Id<AllItemsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_items_sync"));
 

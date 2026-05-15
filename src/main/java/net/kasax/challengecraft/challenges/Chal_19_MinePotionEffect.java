@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+/** Maps mined block types to stable potion effects for the current world seed. */
 public class Chal_19_MinePotionEffect {
     private static boolean active = false;
     private static final Map<Block, StatusEffect> MAPPING = new HashMap<>();

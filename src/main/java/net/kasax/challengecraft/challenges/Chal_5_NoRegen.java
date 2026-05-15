@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.world.GameRules;
 
+/** Mirrors the challenge state into the natural regeneration gamerule. */
 public class Chal_5_NoRegen {
     private static boolean active = false;
     public static void setActive(boolean on) { active = on; }

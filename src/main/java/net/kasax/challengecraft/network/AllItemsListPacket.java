@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Full ordered item list sent when the player opens the detail screen. */
 public class AllItemsListPacket implements CustomPayload {
     public static final Id<AllItemsListPacket> ID = new Id<>(Identifier.of("challengecraft", "all_items_list"));
 

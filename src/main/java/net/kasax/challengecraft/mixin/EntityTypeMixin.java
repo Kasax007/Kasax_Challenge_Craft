@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.Optional;
 
 @Mixin(EntityType.class)
+/** Marks duplicated entities so recursive double-spawn loops are avoided. */
 public abstract class EntityTypeMixin {
     @Inject(method = "getLootTableKey", at = @At("HEAD"), cancellable = true)
     private void onGetLootTableKey(CallbackInfoReturnable<Optional<RegistryKey<LootTable>>> cir) {

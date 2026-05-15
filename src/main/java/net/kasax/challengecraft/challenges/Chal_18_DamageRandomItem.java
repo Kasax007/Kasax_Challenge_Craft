@@ -6,6 +6,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Supplies the item pool used when damage events grant random items. */
 public class Chal_18_DamageRandomItem {
     private static boolean active = false;
     private static final List<Identifier> ITEMS = new ArrayList<>();

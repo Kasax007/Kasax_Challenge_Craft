@@ -29,6 +29,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
+/**
+ * Starts a one-mob encounter whenever players enter a fresh chunk and locks the border around it.
+ * Target entities carry command tags so encounters can be recovered after reloads before new mobs spawn.
+ */
 public class Chal_38_ChunkHunt {
     private static final double LOCKED_BORDER_SIZE = 16.0;
     private static final double NORMAL_BORDER_SIZE = 6.0E7;
@@ -227,6 +231,7 @@ public class Chal_38_ChunkHunt {
                 continue;
             }
 
+            // Old saves can contain duplicates if a reload happens mid-encounter; keep only one target.
             clearTargetTags(entity);
             entity.setGlowing(false);
         }

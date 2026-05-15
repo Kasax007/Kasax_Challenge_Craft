@@ -6,6 +6,7 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Tells the client whether to open the lockout lobby or active board screen. */
 public record LockoutBingoOpenScreenPacket(boolean boardScreen) implements CustomPayload {
     public static final Id<LockoutBingoOpenScreenPacket> ID =
             new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "lockout_bingo_open_screen"));

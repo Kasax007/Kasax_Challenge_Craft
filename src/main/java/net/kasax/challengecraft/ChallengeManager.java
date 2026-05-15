@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Applies saved challenge settings and keeps server/client challenge flags in sync. */
 public class ChallengeManager {
     public static final Logger LOGGER = LoggerFactory.getLogger(ChallengeCraft.MOD_ID);
     private static List<Integer> PRE_LOADED_PERKS = new ArrayList<>();
@@ -41,9 +42,7 @@ public class ChallengeManager {
         });
     }
 
-    /**
-     * Force-reapply all active challenges (e.g. after /reload).
-     */
+    /** Rebuilds challenge state after reloads and in-game configuration changes. */
     public static void applyAll(net.minecraft.server.MinecraftServer server) {
         LOGGER.info("ChallengeManager.applyAll: re-applying to all worlds");
         for (ServerWorld world : server.getWorlds()) {
@@ -127,11 +126,7 @@ public class ChallengeManager {
             case 29 -> 2.5;  // Floor is Lava
             case 30 -> 1.2;  // Heavy Pockets
             case 31 -> 2.0;  // Corrosive Tools
-            case 32 -> (playerCount <= 1) ? 0.0 : (1.0 + playerCount); // Symbiotic Bond: 2p -> 3.0, 3p -> 4.0? 
-                             // Wait, user said "2.0x for two players (scales with player count +1 per player, 0 if solo)"
-                             // So 2p -> 2.0, 3p -> 3.0, etc.
-                             // Wait, (playerCount == 2) ? 2.0 : (playerCount > 2 ? 2.0 + (playerCount - 2) : 0.0)
-                             // Simplified: (playerCount >= 2) ? (double)playerCount : 0.0;
+            case 32 -> (playerCount <= 1) ? 0.0 : (1.0 + playerCount); // Symbiotic Bond
             case 33 -> 1.5;  // Size Matters
             case 34 -> 0.5;  // Upside Down Drops
             case 35 -> 0.4 * doubleTroubleMult; // Double Trouble
@@ -157,7 +152,7 @@ public class ChallengeManager {
         for (int perkId : perks) {
             total += getDifficulty(perkId, heartsTicks, inventorySlots, mobHealthMult, gameSpeedMult, doubleTroubleMult, playerCount);
         }
-        return Math.max(0, total); // Ensure it's not negative
+        return Math.max(0, total);
     }
 
     public static boolean hasConflict(List<Integer> ids, List<Integer> perks) {
@@ -174,23 +169,19 @@ public class ChallengeManager {
         if (ids.contains(40) && ids.contains(26)) return true; // Lockout Bingo + All Achievements
         if (ids.contains(40) && ids.contains(38)) return true; // Lockout Bingo + Chunk Hunt
         
-        // Added Max Hearts (Perk 103) + Max Health Modifier (Challenge 7) conflict
         if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
 
-        // No Armor (Challenge 27) + Resistance Perk (Perk 107) conflict
         if (ids.contains(27) && perks.contains(LevelManager.PERK_RESISTANCE)) return true;
 
-        // Walk = Damage (Challenge 28) + Damage = Border (Challenge 25) conflict
         if (ids.contains(28) && ids.contains(25)) return true;
 
-        // Floor is Lava (Challenge 29) + Fire Resistance Perk (Perk 104) conflict
         if (ids.contains(29) && perks.contains(LevelManager.PERK_FIRE_RESISTANCE)) return true;
 
         return false;
     }
 
     private static void applyTo(ServerWorld world) {
-        // 1) Always load or create our saved data from the OVERWORLD
+        // The overworld owns the canonical saved state even when another dimension loads first.
         ServerWorld overworld = world.getServer().getOverworld();
         ChallengeSavedData data = ChallengeSavedData.get(overworld);
         List<Integer> saved = data.getActive();
@@ -199,9 +190,7 @@ public class ChallengeManager {
         boolean wasDamageBorderActive = Chal_25_DamageWorldBorder.isActive();
         boolean wasChunkHuntActive = Chal_38_ChunkHunt.isActive();
 
-        // 2) On Overworld load, restore specific settings and handle seeding
         if (world.getRegistryKey() == World.OVERWORLD) {
-            // Restore slider values for specific challenges
             if (saved.contains(7)) {
                 int savedTicks = data.getMaxHeartsTicks();
                 float hearts   = savedTicks * 0.5f;
@@ -234,19 +223,16 @@ public class ChallengeManager {
                 LOGGER.info("[Manager] restored game speed multiplier = {}", savedMult);
             }
 
-            // Seed from client if first boot and we are in singleplayer/integrated server
             if (!data.isDifficultySet()) {
                 boolean serverSide = world.getServer().isDedicated();
                 
                 if (serverSide) {
-                    // On dedicated server, if we are initializing a fresh world (empty active list),
-                    // seeded from pre-loaded static flags if they were set during loadWorld (e.g. after restart).
+                    // Dedicated restarts restore static challenge flags before world state is available.
                     if (data.getActive().isEmpty()) {
                         List<Integer> currentActive = getCurrentlyActiveIds();
                         if (!currentActive.isEmpty()) {
                             data.setActive(currentActive);
                             
-                            // Also sync slider values from static fields to the new data object
                             data.setMaxHeartsTicks((int)(Chal_7_MaxHealthModify.getMaxHearts() * 2));
                             data.setLimitedInventorySlots(Chal_12_LimitedInventory.getLimitedSlots());
                             data.setMobHealthMultiplier(Chal_24_MobHealthMultiply.getMultiplier());
@@ -258,7 +244,6 @@ public class ChallengeManager {
                         }
                     }
 
-                    // Calculate difficulty if not already set
                     if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36 || data.getGameSpeedMultiplier() != 1) {
                         int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
                         double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getGameSpeedMultiplier(), data.getDoubleTroubleMultiplier(), playerCount, data.getActivePerks());
@@ -267,7 +252,6 @@ public class ChallengeManager {
                         LOGGER.info("ChallengeManager: seeded difficulty from existing data. Initial Difficulty: {}", initialDiff);
                     }
                 } else {
-                    // Singleplayer: use client's last choices
                     int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                     int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
                     int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
@@ -289,7 +273,7 @@ public class ChallengeManager {
 
                     LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
                     
-                    // Clear client cache so it doesn't get applied to other worlds loaded in this session
+                    // These selections belong to one world-creation flow and must not leak into the next world.
                     ChallengeCraftClient.LAST_CHOSEN = new ArrayList<>();
                     ChallengeCraftClient.SELECTED_PERKS = new ArrayList<>();
                     ChallengeCraftClient.SELECTED_MAX_HEARTS = 20;
@@ -307,14 +291,12 @@ public class ChallengeManager {
                 Chal_35_DoubleTrouble.setMultiplier(data.getDoubleTroubleMultiplier());
                 Chal_37_GameSpeed.setMultiplier(data.getGameSpeedMultiplier());
 
-                // If Infinity Weapon perk is included at world creation, grant it once to eligible online players
                 if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
                     for (var p : world.getServer().getPlayerManager().getPlayerList()) {
                         net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
                     }
                 }
 
-                // Force spawn to 0,0 for border challenges or Skyblock
                 boolean isBorderOrSky = data.getActive().contains(9) || data.getActive().contains(11) || data.getActive().contains(25);
                 
                 if (isBorderOrSky) {
@@ -322,15 +304,13 @@ public class ChallengeManager {
                     int z = 0;
                     int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, x, z);
                     
-                    // For Skyblock, we know the island is at 64. 
-                    // For border, we try to find the top block but fallback to 64 if it's a void start.
+                    // Skyblock starts on a fixed island. Border worlds keep the first spawn inside the opening border.
                     if (y <= 0 || data.getActive().contains(11)) y = 64;
                     
                     world.setSpawnPos(new net.minecraft.util.math.BlockPos(x, y, z), 0.0f);
                     world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
                     LOGGER.info("Forced world spawn to {}, {}, {} and spawnRadius to 0 due to active challenge (Border/Skyblock)", x, y, z);
                 } else {
-                    // Normal world: ensure Y is at least safe if it happens to be 0
                     net.minecraft.util.math.BlockPos currentSpawn = world.getSpawnPos();
                     if (currentSpawn.getY() <= 0) {
                         int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, currentSpawn.getX(), currentSpawn.getZ());
@@ -340,15 +320,12 @@ public class ChallengeManager {
                     }
                 }
                 
-                // re-read the saved list
                 saved = data.getActive();
             }
         }
 
-        // 3) Turn everything off and back on based on the saved list
         applyActiveChallenges(saved, world, data);
 
-        // 4.5) Reset border if deactivated
         if (wasExpBorderActive && !Chal_9_ExpWorldBorder.isActive()) {
             resetWorldBorder(world);
         }
@@ -359,14 +336,12 @@ public class ChallengeManager {
             Chal_38_ChunkHunt.resetWorldBorder(world);
         }
 
-        // 4.6) Set center for border challenges
         if (Chal_9_ExpWorldBorder.isActive() || Chal_25_DamageWorldBorder.isActive()) {
             world.getWorldBorder().setCenter(0.5, 0.5);
-            // Force 0 spawn radius so players don't spawn outside the tiny initial border
+            // A nonzero radius can place players outside the tiny opening border.
             world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
         }
 
-        // 5) Finally, update game rules for block/mob drops
         var rules         = world.getGameRules();
         var tileDropsRule = rules.get(GameRules.DO_TILE_DROPS);
         var mobLootRule   = rules.get(GameRules.DO_MOB_LOOT);
@@ -377,7 +352,6 @@ public class ChallengeManager {
 
     private static void resetWorldBorder(ServerWorld world) {
         world.getWorldBorder().setSize(6.0E7);
-        // Restore default spawn radius when border challenge is off
         world.getGameRules().get(GameRules.SPAWN_RADIUS).set(10, world.getServer());
     }
 
@@ -405,7 +379,6 @@ public class ChallengeManager {
                         }
                         applyActiveChallenges(active, null, null);
                         
-                        // Also load perks and other settings for restart sync
                         PRE_LOADED_PERKS.clear();
                         data.getList("activePerks").ifPresent(perksList -> {
                             for (int i = 0; i < perksList.size(); i++) {

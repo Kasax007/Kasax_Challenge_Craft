@@ -12,6 +12,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.Identifier;
 import java.util.*;
 
+/** Shuffles crafting outputs within each recipe type while preserving recipe inputs. */
 public class Chal_20_RandomizedCrafting {
     private static boolean active = false;
     private static final Map<RecipeType<?>, Map<RegistryKey<Recipe<?>>, RecipeEntry<?>>> SHUFFLED_BY_TYPE = new HashMap<>();

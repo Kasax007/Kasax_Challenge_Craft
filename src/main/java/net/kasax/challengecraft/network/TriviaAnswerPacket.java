@@ -6,6 +6,7 @@ import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Client answer submission for the currently pending trivia question. */
 public record TriviaAnswerPacket(int answerIndex) implements CustomPayload {
     public static final Id<TriviaAnswerPacket> ID = new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "trivia_answer"));
     public static final PacketCodec<RegistryByteBuf, TriviaAnswerPacket> CODEC = PacketCodec.tuple(

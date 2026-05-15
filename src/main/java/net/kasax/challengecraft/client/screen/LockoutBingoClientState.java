@@ -6,6 +6,7 @@ import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
 import java.util.List;
 import java.util.UUID;
 
+/** Client cache for the latest lockout sync packet. */
 public final class LockoutBingoClientState {
     private static LockoutBingoSyncPacket latest = new LockoutBingoSyncPacket(List.of(), List.of(), List.of(), List.of(), false, false, -1, 0L, 0);
     private static long lastSyncMillis = 0L;

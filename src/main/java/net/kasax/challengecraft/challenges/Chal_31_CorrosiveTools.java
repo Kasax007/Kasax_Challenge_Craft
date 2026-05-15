@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Flag holder for accelerated tool wear. */
 public class Chal_31_CorrosiveTools {
     private static boolean active = false;
 

@@ -4,8 +4,6 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.kasax.challengecraft.network.AdvancementInfo;
-import net.minecraft.advancement.AdvancementDisplay;
-import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -14,9 +12,9 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 
 @Environment(EnvType.CLIENT)
+/** Compact HUD for the current all-achievements target. */
 public class AllAchievementsHUD {
     private static AdvancementInfo currentAdvancement = null;
     private static int currentIndex = 0;
@@ -75,13 +73,8 @@ public class AllAchievementsHUD {
         
         int y = 5;
 
-        // Draw icon
         ctx.drawItem(icon, centerX - 8, y);
-        
-        // Draw advancement name below
         ctx.drawCenteredTextWithShadow(tr, advName, centerX, y + 18, 0xFFFFFF);
-        
-        // Draw progress below name
         ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

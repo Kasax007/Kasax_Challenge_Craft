@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.List;
 
+/** Server question payload that opens the trivia answer screen. */
 public record TriviaQuestionPacket(String question, List<String> answers, int correctIndex) implements CustomPayload {
     public static final Id<TriviaQuestionPacket> ID = new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "trivia_question"));
     public static final PacketCodec<RegistryByteBuf, TriviaQuestionPacket> CODEC = PacketCodec.tuple(

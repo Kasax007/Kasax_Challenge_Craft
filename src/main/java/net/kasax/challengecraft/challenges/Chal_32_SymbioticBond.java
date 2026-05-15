@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Flag holder for linked-player damage behavior. */
 public class Chal_32_SymbioticBond {
     private static boolean active = false;
 

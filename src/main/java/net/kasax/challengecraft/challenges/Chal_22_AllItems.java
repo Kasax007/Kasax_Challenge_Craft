@@ -35,6 +35,7 @@ import net.minecraft.util.Identifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/** Tracks the ordered all-items run, syncs HUD state, and awards completion XP once. */
 public class Chal_22_AllItems {
     private static boolean active = false;
 
@@ -67,7 +68,6 @@ public class Chal_22_AllItems {
                 data.setAllItemsIndex(index);
                 syncProgressToAll(server, data);
 
-                // Give some XP for finding the item (scaled by difficulty)
                 double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
                 long xpPerItem = Math.round(5.0);
                 if (xpPerItem > 0 && difficulty > 0) {
@@ -131,14 +131,12 @@ public class Chal_22_AllItems {
             items.add(new ItemStack(item));
         }
 
-        // Add Potions
         for (Potion potion : potionRegistry) {
             Identifier pid = potionRegistry.getId(potion);
             if (pid.getPath().equals("empty") || pid.getPath().equals("luck")) continue;
             if (pid.getPath().equals("mundane") || pid.getPath().equals("thick") || pid.getPath().equals("awkward")) {
                 continue;
             }
-            // Inclusion of Water Bottle
             if (pid.getPath().equals("water")) {
                 items.add(PotionContentsComponent.createStack(Items.POTION, potionRegistry.getEntry(potion)));
                 continue;
@@ -189,14 +187,13 @@ public class Chal_22_AllItems {
     }
 
     private static void completeChallenge(MinecraftServer server, ChallengeSavedData data) {
-        // Find players who haven't received the XP yet
         List<ServerPlayerEntity> eligiblePlayers = server.getPlayerManager().getPlayerList().stream()
                 .filter(p -> !data.isXpAwarded(p.getUuid()))
                 .toList();
 
         if (eligiblePlayers.isEmpty()) return;
 
-        // If All Entities challenge is active, ensure it is also completed
+        // Completion rewards are shared across the chained collection challenges.
         if (data.getActive().contains(23)) {
             if (data.getAllEntitiesIndex() < data.getAllEntitiesOrder().size()) {
                 return;
@@ -211,7 +208,7 @@ public class Chal_22_AllItems {
         }
 
         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-        long xpAmount = Math.round(100.0 * difficulty); // Increased completion reward
+        long xpAmount = Math.round(100.0 * difficulty);
 
         if (xpAmount > 0) {
             boolean isGameComp = true;

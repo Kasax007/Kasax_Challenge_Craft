@@ -9,14 +9,14 @@ import net.minecraft.util.math.MathHelper;
 
 import java.util.UUID;
 
+/** Applies a configurable max-health cap through a persistent attribute modifier. */
 public class Chal_7_MaxHealthModify {
     private static boolean active = false;
-    private static float maxHearts = 10f; // default
+    private static float maxHearts = 10f;
     private static final Identifier MAX_HEALTH_MOD_ID = Identifier.of("challengecraft", "max_health");
 
 
     public static void register() {
-        // Apply health attribute each world tick
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (!active) return;
             server.getPlayerManager().getPlayerList().forEach(player -> {
@@ -27,9 +27,7 @@ public class Chal_7_MaxHealthModify {
                 double expectedAmount = newMax - attr.getBaseValue();
                 
                 var existing = attr.getModifier(MAX_HEALTH_MOD_ID);
-                if (existing != null && Math.abs(existing.value() - expectedAmount) < 0.001) {
-                    // already correct
-                } else {
+                if (existing == null || Math.abs(existing.value() - expectedAmount) >= 0.001) {
                     if (existing != null) attr.removeModifier(MAX_HEALTH_MOD_ID);
                     attr.addPersistentModifier(new EntityAttributeModifier(
                             MAX_HEALTH_MOD_ID, expectedAmount, EntityAttributeModifier.Operation.ADD_VALUE));

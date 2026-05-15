@@ -5,6 +5,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 
+/** Creates and identifies the synthetic barrier items used for blocked equipment slots. */
 public final class BlockedBarrierItem {
     private static final String BLOCKED_NAME_KEY = "challengecraft.blocked_barrier";
 

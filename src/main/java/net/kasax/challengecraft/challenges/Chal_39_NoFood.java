@@ -9,6 +9,7 @@ import net.minecraft.registry.tag.ItemTags;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 
+/** Blocks edible items and cake interaction while leaving other use actions alone. */
 public class Chal_39_NoFood {
     private static final Text BLOCKED_MESSAGE = Text.translatable("challengecraft.worldcreate.challenge39.blocked");
     private static boolean active = false;

@@ -7,6 +7,7 @@ import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.MerchantScreenHandler;
 import net.minecraft.util.ActionResult;
 
+/** Prevents players from opening villager trades while the challenge is active. */
 public class Chal_6_NoVillagerTrading {
     private static boolean active = false;
 

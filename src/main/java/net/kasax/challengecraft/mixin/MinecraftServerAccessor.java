@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.Map;
 
 @Mixin(MinecraftServer.class)
+/** Accessor for server internals needed by the controlled world restart flow. */
 public interface MinecraftServerAccessor {
     @Accessor("worlds")
     Map<RegistryKey<World>, ServerWorld> getWorlds();

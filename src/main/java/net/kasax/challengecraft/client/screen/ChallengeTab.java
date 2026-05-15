@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
+/** Create-world challenge configuration tab shown before the first server boot. */
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.translatable("challengecraft.challenge_tab.title");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
@@ -35,15 +36,13 @@ public class ChallengeTab extends GridScreenTab {
 
     private WidgetScrollPanel scrollPanel;
 
-    // sliderValue from 0.0 to 1.0, sliderTicks from 1..20 (½♥ to 10♥)
+    // Slider values are normalized for the widget; ticks keep the exact gameplay units.
     private double sliderValue = 1.0;
     private int sliderTicks = (int)(Math.round(sliderValue * 19) + 1);
 
-    // sliderValue from 0.0 to 1.0, sliderTicks from 1..36 (1..36 slots)
     private double inventorySliderValue = 1.0;
     private int inventorysliderTicks = (int)(Math.round(inventorySliderValue * 35) + 1);
 
-    // sliderValue from 0.0 to 1.0, multiplier from 1..100
     private double mobHealthSliderValue = 0.0;
     private int mobHealthMultiplier = 1;
 
@@ -66,7 +65,6 @@ public class ChallengeTab extends GridScreenTab {
             perkCards.add(perkCard);
         }
 
-        // Challenge 7 is at index 6
         this.maxHealthSlider = new SliderWidget(
                 0, 0, 210, 20,
                 getHealthSliderText(0.5 + (sliderValue * 9.5)),
@@ -80,14 +78,13 @@ public class ChallengeTab extends GridScreenTab {
 
             @Override
             protected void applyValue() {
-                // quantize to half-heart increments
+                // Health is saved in half-heart ticks to match vanilla health math.
                 sliderTicks = (int)(Math.round(this.value * 19) + 1);
                 this.value  = (sliderTicks - 1) / 19.0;
                 updateDifficultyText();
             }
         };
 
-        // Challenge 12 is at index 7
         this.inventorySlider = new SliderWidget(
                 0, 0, 210, 20,
                 getSlotsSliderText(36),
@@ -107,7 +104,6 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        // Challenge 24
         this.mobHealthSlider = new SliderWidget(
                 0, 0, 210, 20,
                 getMobHealthSliderText(1),
@@ -127,7 +123,6 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        // Challenge 35
         this.doubleTroubleSlider = new SliderWidget(
                 0, 0, 210, 20,
                 getDoubleTroubleSliderText(2),
@@ -147,7 +142,6 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        // Challenge 37
         this.gameSpeedSlider = new SliderWidget(
                 0, 0, 210, 20,
                 getGameSpeedSliderText(1),
@@ -167,7 +161,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        // Create ONCE. Do NOT replace this instance later, or CreateWorldScreen will keep the old reference.
+        // CreateWorldScreen keeps this widget reference, so later refreshes must reuse it.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
         updateDifficultyText();
     }
@@ -204,13 +198,12 @@ public class ChallengeTab extends GridScreenTab {
         int panelW = Math.max(60, tabArea.width() - padding * 2);
         int panelH = Math.max(60, tabArea.height() - padding * 2);
 
-        // Resize/reposition the EXISTING panel instance
         this.scrollPanel.setX(panelX);
         this.scrollPanel.setY(panelY);
         this.scrollPanel.setWidth(panelW);
         this.scrollPanel.setHeight(panelH);
 
-        // Rebuild panel contents for this size
+        // Child bounds depend on the current tab size, but the panel instance stays stable.
         this.scrollPanel.clearChildren();
 
         int cardW = (panelW - 24) / 2;
@@ -221,7 +214,6 @@ public class ChallengeTab extends GridScreenTab {
         int col = 0;
         int y = panelY + 4;
 
-        // Add Difficulty Text at the top
         this.scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, Text.empty()) {
             @Override
             public Text getMessage() {
@@ -310,7 +302,6 @@ public class ChallengeTab extends GridScreenTab {
             }
         }
         
-        // Perks section
         if (col == 1) y += cardH + spacing;
         y += 15;
         Text perkTitle = Text.translatable("challengecraft.challenge_selection.perks_header");
@@ -326,7 +317,7 @@ public class ChallengeTab extends GridScreenTab {
 
         col = 0;
         for (ChallengeCardWidget perkCard : perkCards) {
-            // Hide Infinity Weapon perk if not unlocked (20 stars)
+            // Infinity Weapon is a star reward, so it should not appear before that milestone.
             if (perkCard.getChallengeId() == net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON) {
                 if (net.kasax.challengecraft.LevelManager.getStars(ChallengeCraftClient.LOCAL_PLAYER_XP) < 20) {
                     continue;
@@ -376,13 +367,13 @@ public class ChallengeTab extends GridScreenTab {
         if (maxHealthSlider != null && active.contains(7)) {
             ChallengeCraftClient.SELECTED_MAX_HEARTS = sliderTicks;
         } else {
-            ChallengeCraftClient.SELECTED_MAX_HEARTS = 20; // Default if OFF
+            ChallengeCraftClient.SELECTED_MAX_HEARTS = 20;
         }
         
         if (inventorySlider != null && active.contains(12)) {
             ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = inventorysliderTicks;
         } else {
-            ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36; // Default if OFF
+            ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36;
         }
 
         if (mobHealthSlider != null && active.contains(24)) {

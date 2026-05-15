@@ -8,6 +8,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Full ordered advancement list sent when the player opens the detail screen. */
 public class AllAchievementsListPacket implements CustomPayload {
     public static final Id<AllAchievementsListPacket> ID = new Id<>(Identifier.of("challengecraft", "all_achievements_list"));
 

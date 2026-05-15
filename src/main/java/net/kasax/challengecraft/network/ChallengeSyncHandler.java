@@ -16,18 +16,17 @@ import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeManager;
 import net.kasax.challengecraft.ChallengeCraftClient;
 
+/** Applies server challenge sync packets to client-side state and HUDs. */
 public class ChallengeSyncHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(PlayTimeSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 TimerOverlay.setBasePlayTicks(payload.playTicks);
-                //ChallengeCraft.LOGGER.info("→ synced playTicks = " + payload.playTicks);
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(ChallengeSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                // Clear all active first (on client)
                 ChallengeManager.setAllActive(false);
                 AllItemsHUD.setActive(false);
                 AllEntitiesHUD.setActive(false);

@@ -17,16 +17,15 @@ import java.nio.file.Path;
 import java.io.IOException;
 
 @Mixin(MinecraftServer.class)
+/** Hooks dedicated restart cleanup into the server lifecycle. */
 public abstract class MinecraftServerMixin {
     @Inject(method = "loadWorld", at = @At("HEAD"))
     private void onLoadWorld(CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
         Path worldDir = server.getSavePath(net.minecraft.util.WorldSavePath.ROOT);
         
-        // 1. Always try to pre-load challenge states from the data file if it exists.
         boolean loadedFromDisk = net.kasax.challengecraft.ChallengeManager.loadInitialActiveChallenges(worldDir);
         
-        // 2. If no data on disk (fresh world) and we are an integrated server, seed from client choice.
         if (!loadedFromDisk && !server.isDedicated() && !net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN.isEmpty()) {
             net.kasax.challengecraft.ChallengeCraft.LOGGER.info("Seeding challenges from client for new integrated world: {}", net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN);
             net.kasax.challengecraft.ChallengeManager.applyActiveChallenges(net.kasax.challengecraft.ChallengeCraftClient.LAST_CHOSEN, null, null);
@@ -51,10 +50,8 @@ public abstract class MinecraftServerMixin {
     @Inject(method = "loadWorld", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;createWorlds(Lnet/minecraft/server/WorldGenerationProgressListener;)V"))
     private void beforeCreateWorlds(CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
-        // Always try to initialize generators (e.g. for Skyblock) before worlds are created
+        // Skyblock swaps generators before createWorlds consumes the dimension options.
         ChallengeWorldRestarter.initializeGenerators(server);
-        // Only randomize seed and fix state if we just rotated (needsTeleport is a good proxy)
-        // or if it's the very first load of a fresh world.
         ChallengeWorldRestarter.randomizeSeed(server);
     }
 }

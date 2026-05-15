@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Server-to-client snapshot of active challenge settings. */
 public class ChallengeSyncPacket implements CustomPayload {
     public static final Id<ChallengeSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "sync_challenges"));
     

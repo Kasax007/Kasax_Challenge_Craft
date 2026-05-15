@@ -16,6 +16,7 @@ import net.minecraft.util.Formatting;
 
 import java.util.function.Consumer;
 
+/** Toggle card shared by the create-world tab and the in-world challenge editor. */
 public class ChallengeCardWidget extends ClickableWidget {
     private final int challengeId;
     private final ItemStack icon;
@@ -69,8 +70,7 @@ public class ChallengeCardWidget extends ClickableWidget {
 
     @Override
     public void playDownSound(net.minecraft.client.sound.SoundManager soundManager) {
-        // We do not play sound here to avoid double sound feedback reported by users.
-        // The sound is handled by the screen/panel or we intentionally skip it for the card itself.
+        // Parent screens own click feedback so one interaction does not play twice.
     }
 
     @Override
@@ -98,7 +98,6 @@ public class ChallengeCardWidget extends ClickableWidget {
 
         TextRenderer tr = MinecraftClient.getInstance().textRenderer;
         
-        // Truncate text if it's too long
         Text renderedTitle = title;
         int xOffset = locked ? 48 : 24;
         if (tr.getWidth(title) > getWidth() - xOffset - 4) {

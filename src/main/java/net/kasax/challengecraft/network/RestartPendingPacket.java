@@ -6,6 +6,7 @@ import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.util.Identifier;
 
+/** Notifies a client that the current world is about to restart. */
 public record RestartPendingPacket(String worldName) implements CustomPayload {
     public static final Id<RestartPendingPacket> ID = new Id<>(Identifier.of("challengecraft", "restart_pending"));
     public static final PacketCodec<RegistryByteBuf, RestartPendingPacket> CODEC = CustomPayload.codecOf(RestartPendingPacket::write, RestartPendingPacket::new);

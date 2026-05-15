@@ -6,6 +6,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Idle screen shown to dedicated-server clients while a world restart is in progress. */
 public class DedicatedRestartScreen extends Screen {
     public DedicatedRestartScreen() {
         super(Text.translatable("challengecraft.restart.server.title"));
@@ -15,9 +16,8 @@ public class DedicatedRestartScreen extends Screen {
     protected void init() {
         this.addDrawableChild(ButtonWidget.builder(Text.translatable("gui.toMenu"), button -> {
             if (this.client != null) {
-                this.client.setScreen(null); // Close current screen
-                // Returning to main menu is usually handled by disconnecting, 
-                // but since we're already disconnected, we just go to TitleScreen
+                // The connection is already gone, so there is no vanilla disconnect flow left to finish.
+                this.client.setScreen(null);
                 this.client.setScreen(new net.minecraft.client.gui.screen.TitleScreen());
             }
         }).dimensions(this.width / 2 - 100, this.height / 4 + 120, 200, 20).build());

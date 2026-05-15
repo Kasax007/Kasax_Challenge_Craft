@@ -31,6 +31,7 @@ import net.minecraft.util.Identifier;
 
 import java.util.*;
 
+/** Tracks the ordered all-entities run, syncs HUD state, and awards completion XP once. */
 public class Chal_23_AllEntities {
     private static boolean active = false;
 
@@ -57,9 +58,8 @@ public class Chal_23_AllEntities {
                     data.setAllEntitiesIndex(index);
                     syncProgressToAll(server, data);
 
-                    // Give some XP for discovering the entity (scaled by difficulty)
                     double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-                    long xpPerEntity = Math.round(10.0); // Entities are rarer than items
+                    long xpPerEntity = Math.round(10.0);
                     if (xpPerEntity > 0 && difficulty > 0) {
                         server.getPlayerManager().getPlayerList().forEach(p -> {
                             LevelManager.addXp(p, xpPerEntity);
@@ -104,14 +104,13 @@ public class Chal_23_AllEntities {
     }
 
     private static void completeChallenge(MinecraftServer server, ChallengeSavedData data) {
-        // Find players who haven't received the XP yet
         List<ServerPlayerEntity> eligiblePlayers = server.getPlayerManager().getPlayerList().stream()
                 .filter(p -> !data.isXpAwarded(p.getUuid()))
                 .toList();
 
         if (eligiblePlayers.isEmpty()) return;
 
-        // If All Items challenge is active, ensure it is also completed
+        // Completion rewards are shared across the chained collection challenges.
         if (data.getActive().contains(22)) {
             if (data.getAllItemsIndex() < data.getAllItemsOrder().size()) {
                 return;
@@ -126,7 +125,7 @@ public class Chal_23_AllEntities {
         }
 
         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-        long xpAmount = Math.round(100.0 * difficulty); // Increased completion reward
+        long xpAmount = Math.round(100.0 * difficulty);
 
         if (xpAmount > 0) {
             boolean isGameComp = true;

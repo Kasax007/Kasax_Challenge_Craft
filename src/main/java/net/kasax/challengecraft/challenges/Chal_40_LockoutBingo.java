@@ -89,6 +89,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
+/**
+ * Server-side controller for lockout bingo.
+ *
+ * The board itself lives in persistent state; this class wires player actions and passive goal scans
+ * into claims, score changes, rewards, and client synchronization.
+ */
 public final class Chal_40_LockoutBingo {
     public static final int CHALLENGE_ID = 40;
     private static final int BOARD_SIZE = 25;

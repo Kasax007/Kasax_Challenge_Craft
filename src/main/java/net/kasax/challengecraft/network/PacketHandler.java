@@ -3,9 +3,7 @@ package net.kasax.challengecraft.network;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeManager;
-import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
 import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
-import net.kasax.challengecraft.challenges.Chal_7_MaxHealthModify;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
 import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
@@ -16,16 +14,15 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Server receivers for mutable client requests such as challenge edits and lockout actions. */
 public class PacketHandler {
     public static void register() {
         ServerPlayNetworking.registerGlobalReceiver(
                 ChallengePacket.ID,
                 (packet, context) -> {
-                    // packet is already a fully–deserialized ChallengePacket
                     var server = context.server();
                     var player = context.player();
 
-                    // schedule on the main thread
                     server.execute(() -> {
                         if (!player.hasPermissionLevel(2)) {
                             ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (no permission)", player.getName().getString());
@@ -33,7 +30,6 @@ public class PacketHandler {
                             return;
                         }
 
-                        // Level Check
                         int playerLevel = net.kasax.challengecraft.LevelManager.getLevelForXp(net.kasax.challengecraft.data.XpManager.getXp(player.getUuid()));
                         long playerXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
                         
@@ -69,9 +65,7 @@ public class PacketHandler {
                         );
                         var world = server.getOverworld();
                         ChallengeSavedData data = ChallengeSavedData.get(world);
-                        // capture previous perks to detect first-time activation
                         java.util.List<Integer> prevPerks = new java.util.ArrayList<>(data.getActivePerks());
-                        // overwrite your active list
                         data.setActive(packet.active);
                         data.setActivePerks(packet.perks);
                         data.setMaxHeartsTicks(packet.maxHearts);
@@ -80,7 +74,6 @@ public class PacketHandler {
                         data.setDoubleTroubleMultiplier(packet.doubleTroubleMultiplier);
                         data.setGameSpeedMultiplier(packet.gameSpeedMultiplier);
 
-                        // If Infinity Weapon perk is newly activated via in-game selection, grant it once to eligible players
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         boolean hasAfter  = packet.perks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         if (!hadBefore && hasAfter) {
@@ -127,7 +120,6 @@ public class PacketHandler {
                             net.kasax.challengecraft.challenges.Chal_37_GameSpeed.setMultiplier(mult);
                             ChallengeCraft.LOGGER.info("[Server] set Chal_37 multiplier = {}", mult);
                         }
-                        // re‑apply all active challenges
                         ChallengeManager.applyAll(server);
                         ChallengeCraft.LOGGER.info("Packet Handler applyAll " + packet );
 
@@ -150,7 +142,7 @@ public class PacketHandler {
                                 ChallengeCraft.LOGGER.info("[Server] Received XP sync from client {}: {} (current server XP: {})", player.getName().getString(), packet.xp, serverXp);
                                 net.kasax.challengecraft.data.XpManager.setXp(player.getUuid(), packet.xp);
                             }
-                            // Always sync back to confirm or correct the client
+                            // The server remains authoritative if the client has stale local XP.
                             net.kasax.challengecraft.LevelManager.sync(player);
                         }
                     });

@@ -5,13 +5,6 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.world.World;
-import net.minecraft.world.dimension.DimensionType;
-import net.minecraft.world.dimension.DimensionTypes;
-import net.minecraft.world.gen.chunk.FlatChunkGenerator;
-import net.minecraft.world.gen.chunk.FlatChunkGeneratorConfig;
-import net.minecraft.world.gen.FlatLevelGeneratorPresets;
-import java.util.Optional;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.*;
@@ -29,6 +22,7 @@ import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Registers the shared gameplay systems, commands, packets, and world hooks for the mod. */
 public class ChallengeCraft implements ModInitializer {
 	public static final String MOD_ID = "challengecraft";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
@@ -39,21 +33,15 @@ public class ChallengeCraft implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("Challenge Craft loaded");
 
-		// register items, commands, world‐load hooks, etc.
 		ModItems.initialize();
 		ChallengeManager.register();
-		//ClientCommands.register();
 		Chal_1_LevelItem.register();
-		//Chal_2_NoBlockDrops.register();
-		//Chal_3_NoMobDrops.register();
-		//Chal_4_NoChestLoot.register();
 		Chal_5_NoRegen.register();
 		Chal_6_NoVillagerTrading.register();
 		Chal_7_MaxHealthModify.register();
 		Chal_8_NoCraftingTable.register();
 		Chal_9_ExpWorldBorder.register();
 		Chal_10_RandomItem.register();
-		//Chal_11_SkyblockWorld.register();
 		Chal_12_LimitedInventory.register();
 		Chal_13_RandomEnchantment.register();
 		Chal_14_RandomBlockDrops.register();
@@ -72,7 +60,6 @@ public class ChallengeCraft implements ModInitializer {
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 
-		// Register Hidden Skip Command
 		net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(CommandManager.literal("challengecraft_skip_item")
 					.requires(source -> source.hasPermissionLevel(2))
@@ -193,7 +180,6 @@ public class ChallengeCraft implements ModInitializer {
 			);
 		});
 
-		// 1) Tell Fabric about our SERVER‑BOUND channel:
 		PayloadTypeRegistry.playC2S()
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
 		PayloadTypeRegistry.playC2S()
@@ -269,11 +255,9 @@ public class ChallengeCraft implements ModInitializer {
 				LockoutBingoOpenScreenPacket.CODEC
 		);
 
-		// 2) Now hook up the handler:
 		PacketHandler.register();
 		PlayTimePacketHandler.registerServer();
 
-		// Chunk Generator Register
 		Registry.register(
 				Registries.CHUNK_GENERATOR,
 				Identifier.of("challengecraft", "skyblock_chunk_generator"),

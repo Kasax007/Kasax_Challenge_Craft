@@ -7,6 +7,7 @@ import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
+/** Incremental HUD sync for the current entity target. */
 public class AllEntitiesSyncPacket implements CustomPayload {
     public static final Id<AllEntitiesSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_entities_sync"));
 

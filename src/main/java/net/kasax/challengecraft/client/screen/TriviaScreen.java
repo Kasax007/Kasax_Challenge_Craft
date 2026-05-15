@@ -13,6 +13,7 @@ import net.minecraft.util.Formatting;
 import java.util.List;
 
 @Environment(EnvType.CLIENT)
+/** Modal answer screen shown when the trivia challenge asks a question. */
 public class TriviaScreen extends Screen {
     private final String question;
     private final List<String> answers;
@@ -48,7 +49,6 @@ public class TriviaScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
         
-        // Draw Overlay Background
         int bgWidth = 300;
         int bgHeight = 200;
         int x = (this.width - bgWidth) / 2;
@@ -57,10 +57,8 @@ public class TriviaScreen extends Screen {
         context.fill(x, y, x + bgWidth, y + bgHeight, 0xAA000000);
         context.drawBorder(x, y, bgWidth, bgHeight, 0xFFFFFFFF);
 
-        // Draw Title
         context.drawCenteredTextWithShadow(this.textRenderer, this.title.copy().formatted(Formatting.GOLD, Formatting.BOLD), this.width / 2, y + 10, 0xFFFFFF);
         
-        // Draw Question (wrapped)
         List<net.minecraft.text.OrderedText> wrappedQuestion = this.textRenderer.wrapLines(Text.of(question), bgWidth - 20);
         int qY = y + 30;
         for (net.minecraft.text.OrderedText line : wrappedQuestion) {
@@ -68,7 +66,6 @@ public class TriviaScreen extends Screen {
             qY += 10;
         }
 
-        // Draw Timer
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         int remaining = Math.max(0, TIMEOUT_SECONDS - (int)elapsed);
         int timerColor = remaining <= 10 ? 0xFFFF5555 : 0xFFFFFFFF;

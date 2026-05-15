@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.data.XpManager;
 
+/** Applies XP sync packets to local player state and remote nameplate caches. */
 public class LevelSyncHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(LevelSyncPacket.ID, (payload, context) -> {

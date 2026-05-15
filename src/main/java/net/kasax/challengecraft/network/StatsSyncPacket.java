@@ -8,6 +8,7 @@ import net.minecraft.util.Identifier;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Server-to-client snapshot of challenge personal-best times. */
 public record StatsSyncPacket(Map<Integer, Integer> bestTimes) implements CustomPayload {
     public static final Id<StatsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "stats_sync"));
 

@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Full ordered entity list sent when the player opens the detail screen. */
 public class AllEntitiesListPacket implements CustomPayload {
     public static final Id<AllEntitiesListPacket> ID = new Id<>(Identifier.of("challengecraft", "all_entities_list"));
 

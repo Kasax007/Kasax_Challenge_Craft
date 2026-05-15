@@ -1,6 +1,5 @@
 package net.kasax.challengecraft.network;
 
-import net.kasax.challengecraft.ChallengeCraftClient;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.network.codec.PacketCodec;
@@ -11,6 +10,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Client-to-server challenge settings update plus restart intent. */
 public class ChallengePacket implements CustomPayload {
     public final List<Integer> active;
     public final int           maxHearts;
@@ -21,15 +21,11 @@ public class ChallengePacket implements CustomPayload {
     public final List<Integer> perks;
     public final boolean       restart;
 
-
-    // your channel ID
     public static final Id<ChallengePacket> ID =
             new Id<>(Identifier.of("challengecraft", "update_challenges"));
 
-    // the codec that Fabric will use if you register it via PayloadTypeRegistry
     public static final PacketCodec<PacketByteBuf, ChallengePacket> CODEC =
             CustomPayload.codecOf(
-                    // 1) encoder writes list size, each id, then maxHearts
                     new ValueFirstEncoder<PacketByteBuf, ChallengePacket>() {
                         @Override
                         public void encode(ChallengePacket pkt, PacketByteBuf buf) {
@@ -45,7 +41,6 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeBoolean(pkt.restart);
                         }
                     },
-                    // 2) decoder reads them back in the same order
                     new PacketDecoder<PacketByteBuf, ChallengePacket>() {
                         @Override
                         public ChallengePacket decode(PacketByteBuf buf) {
@@ -70,7 +65,6 @@ public class ChallengePacket implements CustomPayload {
                     }
             );
 
-    /** Construct on the client when sending */
     public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, List<Integer> perks, boolean restart) {
         this.active    = active;
         this.maxHearts = maxHearts;
@@ -82,12 +76,10 @@ public class ChallengePacket implements CustomPayload {
         this.restart = restart;
     }
 
-    // Default constructor for standard update (no restart)
     public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, List<Integer> perks) {
         this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, perks, false);
     }
 
-    /** Called by Fabric when it needs to serialize */
     public void write(PacketByteBuf buf) {
         buf.writeVarInt(active.size());
         for (int id : active) buf.writeVarInt(id);
@@ -101,7 +93,6 @@ public class ChallengePacket implements CustomPayload {
         buf.writeBoolean(restart);
     }
 
-    /** Identify your channel */
     @Override
     public Id<? extends CustomPayload> getId() {
         return ID;

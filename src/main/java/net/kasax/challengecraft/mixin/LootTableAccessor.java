@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.Optional;
 
 @Mixin(LootTable.class)
+/** Exposes the loot-table registry key used by randomized mob drops. */
 public interface LootTableAccessor {
     @Accessor("type")
     ContextType getType();

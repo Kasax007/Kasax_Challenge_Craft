@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.block.Blocks;
 import net.minecraft.util.ActionResult;
 
+/** Blocks direct crafting-table interaction without touching player inventories. */
 public class Chal_8_NoCraftingTable {
     private static boolean active = false;
 

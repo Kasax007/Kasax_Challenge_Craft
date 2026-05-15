@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 import java.util.UUID;
 import java.util.Optional;
 
+/** Server-to-client XP update for one player UUID. */
 public class LevelSyncPacket implements CustomPayload {
     public static final Id<LevelSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "level_sync"));
     

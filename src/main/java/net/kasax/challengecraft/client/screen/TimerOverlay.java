@@ -14,6 +14,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import java.awt.*;
 
 @Environment(EnvType.CLIENT)
+/** Shared run timer overlay backed by server-synced display time. */
 public class TimerOverlay {
     private static int basePlayTicks = -1;
     private static double extraTicks = 0.0;

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Environment(EnvType.CLIENT)
+/** Client board view for claimed tiles, team colors, and match state. */
 public class LockoutBingoBoardScreen extends Screen {
     private static final int GRID_SIZE = 5;
     private static final int TILE_SIZE = 54;

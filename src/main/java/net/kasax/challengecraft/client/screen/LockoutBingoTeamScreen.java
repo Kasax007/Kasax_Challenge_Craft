@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Environment(EnvType.CLIENT)
+/** Lobby screen for team selection and ready state before a lockout run begins. */
 public class LockoutBingoTeamScreen extends Screen {
     private ButtonWidget leaveButton;
     private ButtonWidget readyButton;

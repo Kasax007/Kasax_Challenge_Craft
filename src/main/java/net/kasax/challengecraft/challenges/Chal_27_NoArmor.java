@@ -7,15 +7,10 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 
-/**
- * Chal_27_NoArmor
- *
- * Blocks all 4 armor slots of the player by placing barrier items in them.
- */
+/** Blocks armor slots with synthetic barrier items so the disabled state is visible in inventory screens. */
 public class Chal_27_NoArmor {
     private static boolean active = false;
 
-    /** Call this once at mod startup to hook the per-tick handler. */
     public static void register() {
         ServerTickEvents.START_SERVER_TICK.register(server -> {
             if (!active) return;
@@ -26,7 +21,6 @@ public class Chal_27_NoArmor {
         ChallengeCraft.LOGGER.info("[Chal27] Registered tick callback");
     }
 
-    /** Enable or disable the armor-blocking behavior. */
     public static void setActive(boolean isActive) {
         active = isActive;
         ChallengeCraft.LOGGER.info("[Chal27] {}", active ? "activated" : "deactivated");
@@ -35,7 +29,7 @@ public class Chal_27_NoArmor {
     private static void blockArmor(PlayerEntity player) {
         var inv = player.getInventory();
         for (int i = 0; i < 4; i++) {
-            int slot = 36 + i; // armor slots
+            int slot = 36 + i;
             ItemStack current = inv.getStack(slot);
             if (current.getItem() != Items.BARRIER) {
                 if (!current.isEmpty()) {
@@ -46,7 +40,6 @@ public class Chal_27_NoArmor {
         }
     }
 
-    /** Used by Mixins or Managers to decide if we're currently enforcing limits. */
     public static boolean isActive() {
         return active;
     }

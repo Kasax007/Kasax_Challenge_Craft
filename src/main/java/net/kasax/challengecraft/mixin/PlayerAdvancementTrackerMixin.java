@@ -26,6 +26,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(PlayerAdvancementTracker.class)
+/** Observes completed advancements for ordered advancement progression. */
 public class PlayerAdvancementTrackerMixin {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Advancement");
 
@@ -34,13 +35,11 @@ public class PlayerAdvancementTrackerMixin {
 
     @Inject(method = "grantCriterion", at = @At("RETURN"))
     private void onGrantCriterion(AdvancementEntry entry, String criterionName, CallbackInfoReturnable<Boolean> cir) {
-        // If the criterion was actually granted (returned true)
         if (cir.getReturnValue()) {
             String id = entry.id().toString();
             LOGGER.info("[Advancement] criterion {} granted for {}", criterionName, id);
 
             if (id.equals("minecraft:end/kill_dragon")) {
-                // Check if the whole advancement is now done
                 if (this.owner.getAdvancementTracker().getProgress(entry).isDone()) {
                     ChallengeSavedData data = ChallengeSavedData.get(owner.getServer().getOverworld());
                     LOGGER.info("[Advancement] Free the End completed. Tainted: {}, Initial Difficulty: {}", data.isTainted(), data.getInitialDifficulty());
@@ -50,13 +49,11 @@ public class PlayerAdvancementTrackerMixin {
                         return;
                     }
 
-                    // Find players who haven't received the XP yet
                     List<ServerPlayerEntity> eligiblePlayers = owner.getServer().getPlayerManager().getPlayerList().stream()
                             .filter(p -> !data.isXpAwarded(p.getUuid()))
                             .toList();
 
                     if (!eligiblePlayers.isEmpty()) {
-                        // Record completion for all active challenges for all eligible players
                         for (int cid : data.getActive()) {
                             eligiblePlayers.forEach(p -> {
                                 int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
@@ -64,21 +61,19 @@ public class PlayerAdvancementTrackerMixin {
                             });
                         }
                         
-                        // Sync stats to all eligible players after recording
                         eligiblePlayers.forEach(LevelManager::sync);
 
                         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
-                        long xpAmount = Math.round(100.0 * difficulty); // Adjusted award as requested
+                        long xpAmount = Math.round(100.0 * difficulty);
                         
                         if (xpAmount > 0) {
                             final long baseAmount = xpAmount;
                             eligiblePlayers.forEach(p -> {
                                 LevelManager.XpResult res = LevelManager.addXp(p, baseAmount);
                                 data.setXpAwarded(p.getUuid(), true);
-                                // Advancement rewards are NOT game completions
+                                // Dragon completion is a reward trigger, not a full run-completion screen.
                                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, false));
                                 
-                                // Visual and Audio reward for everyone who got it
                                 p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
                             });
                             

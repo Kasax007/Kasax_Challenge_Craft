@@ -25,10 +25,7 @@ import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
 public class ChallengeSavedData extends PersistentState {
     private static final String KEY = "challengecraft_challenges";
 
-    /**
-     * Codec that serializes both the list of active IDs and the max-health
-     * “ticks” (1–20 = half-hearts).
-     */
+    /** Persistent state for world-scoped challenge settings and ordered progress lists. */
     private static final Codec<ChallengeSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.list(Codec.INT).fieldOf("active").forGetter(ChallengeSavedData::getActive),
             Codec.INT.fieldOf("maxHeartsTicks").forGetter(ChallengeSavedData::getMaxHeartsTicks),
@@ -60,12 +57,10 @@ public class ChallengeSavedData extends PersistentState {
     public static final PersistentStateType<ChallengeSavedData> TYPE =
             new PersistentStateType<>(KEY, ChallengeSavedData::new, CODEC, DataFixTypes.LEVEL);
 
-    // ---- your actual state ----
-
-    /** Active challenge IDs (default = []) */
+    /** Active challenge IDs. */
     private final List<Integer> active = new ArrayList<>();
 
-    /** Max-health slider in half-heart “ticks” (1…20). Default = 20 (10 hearts). */
+    /** Max-health slider in half-heart ticks. */
     private int maxHeartsTicks;
 
     private int limitedInventorySlots;
@@ -133,19 +128,15 @@ public class ChallengeSavedData extends PersistentState {
         this.allAdvancementsIndex = allAdvancementsIndex;
     }
 
-    /** Retrieve (or create) for this world. */
     public static ChallengeSavedData get(ServerWorld world) {
         PersistentStateManager mgr = world.getPersistentStateManager();
         return mgr.getOrCreate(TYPE);
     }
 
     public NbtCompound writeNbt(NbtCompound tag) {
-        // Codec-based PersistentState usually doesn't need manual writeNbt if using the constructor that takes CODEC.
-        // But for compatibility or if manual NBT is needed:
+        // Serialization is handled by CODEC through PersistentStateType.
         return tag;
     }
-
-    // -------- getters & setters --------
 
     public List<Integer> getActive() {
         return List.copyOf(active);

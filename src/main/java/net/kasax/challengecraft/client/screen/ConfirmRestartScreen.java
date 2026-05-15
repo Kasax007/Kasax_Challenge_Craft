@@ -6,6 +6,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Confirmation screen shown before applying challenge changes that require a restart. */
 public class ConfirmRestartScreen extends Screen {
     private final Screen parent;
     private final Runnable onConfirm;

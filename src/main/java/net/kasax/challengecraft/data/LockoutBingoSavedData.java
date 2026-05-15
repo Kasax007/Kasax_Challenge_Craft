@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/** Stores one lockout board, its team state, and per-run bookkeeping for the current world. */
 public class LockoutBingoSavedData extends PersistentState {
     private static final String KEY = "challengecraft_lockout_bingo";
 

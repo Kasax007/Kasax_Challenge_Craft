@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 @Mixin(ItemStack.class)
+/** Hooks item damage so corrosive tools can add extra durability loss. */
 public abstract class ToolUsageMixin {
 
     private static final Map<Item, Item> DOWNGRADES = Map.ofEntries(
@@ -52,30 +53,25 @@ public abstract class ToolUsageMixin {
     @Inject(method = "Lnet/minecraft/item/ItemStack;onDurabilityChange(ILnet/minecraft/server/network/ServerPlayerEntity;Ljava/util/function/Consumer;)V", at = @At("HEAD"), cancellable = true)
     private void onDurabilityChange(int damage, @Nullable ServerPlayerEntity player, Consumer<Item> breakCallback, CallbackInfo ci) {
         if (Chal_31_CorrosiveTools.isActive() && player != null) {
-            // New logic: Only roll if durability is actually decreasing (damage is increasing)
             ItemStack stack = (ItemStack) (Object) this;
             if (damage > stack.getDamage()) {
-                if (player.getRandom().nextFloat() < 0.05f) { // 5% chance
+                if (player.getRandom().nextFloat() < 0.05f) {
                     Item currentItem = stack.getItem();
                     Item downgraded = DOWNGRADES.get(currentItem);
                     
                     if (downgraded != null) {
-                        // Use copyComponentsToNewStack to only copy CHANGES (enchantments, custom names)
-                        // instead of ALL components (which might include tier-specific attributes)
+                        // Copy custom data without carrying tier-specific base attributes across materials.
                         ItemStack newStack = stack.copyComponentsToNewStack(downgraded, stack.getCount());
                         
-                        // Calculate new damage proportionally to avoid "resetting" or "breaking immediately"
                         int oldMax = stack.getMaxDamage();
                         int newMax = newStack.getMaxDamage();
                         
                         if (oldMax > 0 && newMax > 0) {
                             double damageRatio = (double) damage / oldMax;
                             int newDamage = (int) Math.round(damageRatio * newMax);
-                            // Ensure it's not breaking it immediately unless it was already at max damage
                             newStack.setDamage(Math.min(newDamage, newMax - 1));
                         }
                         
-                        // Replace the stack in the inventory and all equipment slots
                         boolean replaced = false;
                         for (int i = 0; i < player.getInventory().size(); i++) {
                             if (player.getInventory().getStack(i) == stack) {
@@ -91,7 +87,7 @@ public abstract class ToolUsageMixin {
                             }
                         }
                         
-                        // Fallback: if not found by identity, check by equality (for safety)
+                        // Some call sites hand us an equivalent stack instance rather than the inventory reference.
                         if (!replaced) {
                             for (int i = 0; i < player.getInventory().size(); i++) {
                                 if (ItemStack.areItemsAndComponentsEqual(player.getInventory().getStack(i), stack)) {

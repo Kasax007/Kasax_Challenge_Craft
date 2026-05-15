@@ -12,13 +12,14 @@ import net.minecraft.item.Item;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/** Keeps the challenge stick available and rerolls it into random vanilla items on use. */
 public class Chal_1_LevelItem {
     private static boolean active = false;
     private static final List<Item> ALL_ITEMS = Registries.ITEM.stream()
             .filter(item -> !Registries.ITEM.getId(item).getNamespace().equals("challengecraft"))
             .collect(Collectors.toList());
 
-    /** Called once on mod init to hook the events (they’ll no‑op until active==true). */
+    /** Event hooks are registered once at startup and remain dormant while the challenge is inactive. */
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (!active) return;

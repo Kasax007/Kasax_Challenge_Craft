@@ -26,6 +26,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * Renders the progression journey view and its older list-layout fallback.
+ * Manual milestone offsets are saved client-side so the artwork can be tuned without touching gameplay data.
+ */
 public class LevelingScreen extends Screen {
     private static final Identifier JOURNEY_TEXTURE = Identifier.of("challengecraft", "textures/gui/level_journey_map.png");
     private static final int JOURNEY_TEXTURE_WIDTH = 576;

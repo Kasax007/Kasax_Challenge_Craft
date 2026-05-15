@@ -10,6 +10,7 @@ import net.minecraft.util.Identifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/** Swaps mob loot tables through a stable per-seed entity mapping. */
 public class Chal_15_RandomMobDrops {
     private static boolean active = false;
     private static List<EntityType<?>> ENTITY_LIST = null;

@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.network;
 
+/** Small client-side state holder for the restart handoff between disconnect and reopen. */
 public class RestartManager {
     private static boolean restartPending = false;
     private static String lastWorldName = null;

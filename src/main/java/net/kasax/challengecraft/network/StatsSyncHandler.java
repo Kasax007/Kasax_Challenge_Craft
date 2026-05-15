@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.data.StatsManager;
 import net.minecraft.client.MinecraftClient;
 
+/** Applies personal-best sync packets to the client stats cache. */
 public class StatsSyncHandler {
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(StatsSyncPacket.ID, (payload, context) -> {

@@ -13,11 +13,12 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Stores per-player personal best times for repeatable challenge completions. */
 public class StatsManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Stats");
     private static final Path STATS_FILE = FabricLoader.getInstance().getGameDir().resolve("challengecraft_stats.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static Map<String, Map<Integer, Integer>> bestTimes = new HashMap<>(); // uuid -> (challengeId -> bestTime in ticks)
+    private static Map<String, Map<Integer, Integer>> bestTimes = new HashMap<>();
     private static boolean loaded = false;
 
     public static synchronized Map<Integer, Integer> getBestTimes(String uuid) {
@@ -70,13 +71,11 @@ public class StatsManager {
                     if (bestTimes == null) bestTimes = new HashMap<>();
                 } catch (Exception e) {
                     LOGGER.warn("Old stats format or corrupt JSON, attempting conversion or reset: {}", e.getMessage());
-                    // Try to see if it's the old Map<Integer, Integer> format
                     try {
                         Map<Integer, Integer> oldMap = GSON.fromJson(content, new TypeToken<Map<Integer, Integer>>() {}.getType());
                         bestTimes = new HashMap<>();
                         if (oldMap != null && !oldMap.isEmpty()) {
-                            // We don't know the UUID, so we can't really migrate it properly.
-                            // But we'll at least not crash.
+                            // The old format had no player identity, so it cannot be migrated faithfully.
                             LOGGER.info("Discarded old format stats (UUID mapping unknown)");
                         }
                     } catch (Exception ex) {

@@ -11,6 +11,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Predicate;
 
+/**
+ * Declarative goal catalog plus the weighted board picker used by lockout runs.
+ * Board generation limits repeated goal types first, then relaxes that rule only when a bucket is undersupplied.
+ */
 public final class LockoutBingoGoalPool {
     private static final int BOARD_SIZE = 25;
 
@@ -431,6 +435,7 @@ public final class LockoutBingoGoalPool {
         Set<String> usedIds = new java.util.LinkedHashSet<>();
         Map<LockoutBingoGoalType, Integer> typeCounts = new EnumMap<>(LockoutBingoGoalType.class);
 
+        // Reserve broad categories up front so a board feels varied before difficulty fillers are added.
         pickInto(board, usedIds, typeCounts, random, 5, goal -> goal.category() == LockoutBingoGoalCategory.ITEM && goal.difficulty().isAtMost(LockoutBingoGoalDifficulty.MEDIUM));
         pickInto(board, usedIds, typeCounts, random, 5, goal -> goal.category() == LockoutBingoGoalCategory.CRAFT && goal.difficulty().isAtMost(LockoutBingoGoalDifficulty.MEDIUM));
         pickInto(board, usedIds, typeCounts, random, 3, goal -> goal.category() == LockoutBingoGoalCategory.KILL && goal.difficulty().isAtMost(LockoutBingoGoalDifficulty.MEDIUM));

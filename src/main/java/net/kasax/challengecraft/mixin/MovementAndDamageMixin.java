@@ -27,6 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ServerPlayerEntity.class)
+/** Central player hook for movement and shared damage challenges. */
 public abstract class MovementAndDamageMixin {
 
     @Unique
@@ -76,7 +77,6 @@ public abstract class MovementAndDamageMixin {
             walkDamageDistanceAccumulator = 0;
         }
 
-        // ID 29: The Floor is Lava
         if (Chal_29_FloorIsLava.isActive() && !player.isCreative() && !player.isSpectator()) {
             BlockPos currentBlockPos = player.getBlockPos();
             net.minecraft.block.Block floorBlock = player.getWorld().getBlockState(currentBlockPos.down()).getBlock();
@@ -90,7 +90,7 @@ public abstract class MovementAndDamageMixin {
                 lastBlockPos = currentBlockPos;
             }
 
-            if (onNatural || standingTicks > 60) { // 60 ticks = 3 seconds
+            if (onNatural || standingTicks > 60) {
                 player.setOnFireFor(3);
                 player.damage(player.getServerWorld(), player.getWorld().getDamageSources().onFire(), 1.0f);
             }
@@ -99,7 +99,6 @@ public abstract class MovementAndDamageMixin {
             lastBlockPos = null;
         }
 
-        // ID 30: Heavy Pockets
         if (Chal_30_HeavyPockets.isActive() && !player.isCreative() && !player.isSpectator()) {
             int filledSlots = 0;
             for (int i = 0; i < 36; i++) {
@@ -112,7 +111,7 @@ public abstract class MovementAndDamageMixin {
                 if (filledSlots == 36) {
                     player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, 5, false, false, true));
                 } else {
-                    int amplifier = (filledSlots / 6) - 1; // 6-11: 0, 12-17: 1, 18-23: 2, 24-29: 3, 30-35: 4
+                    int amplifier = (filledSlots / 6) - 1;
                     if (amplifier >= 0) {
                         player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, amplifier, false, false, true));
                     }
@@ -126,7 +125,6 @@ public abstract class MovementAndDamageMixin {
         if (cir.getReturnValue()) {
             ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
 
-            // ID 32: Symbiotic Bond
             if (Chal_32_SymbioticBond.isActive() && !sharingDamage) {
                 sharingDamage = true;
                 for (ServerPlayerEntity other : player.getServer().getPlayerManager().getPlayerList()) {
@@ -154,18 +152,16 @@ public abstract class MovementAndDamageMixin {
                 double next = current + amount;
                 Chal_25_DamageWorldBorder.setDiameter(next);
 
-                // Sync to all world borders
                 player.getServer().getWorlds().forEach(w -> {
                     double currentSize = w.getWorldBorder().getSize();
                     if (next > currentSize) {
-                        // Gradual growth: 1 block per second
+                        // Use interpolation so border growth remains readable while taking damage.
                         w.getWorldBorder().interpolateSize(currentSize, next, (long)((next - currentSize) * 1000));
                     } else {
                         w.getWorldBorder().setSize(next);
                     }
                 });
 
-                // Persist to saved data
                 ChallengeSavedData data = ChallengeSavedData.get(world.getServer().getOverworld());
                 data.setDamageWorldBorderSize(next);
             }
@@ -178,7 +174,6 @@ public abstract class MovementAndDamageMixin {
             ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
             ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
 
-            // Only fail if not already failed (difficulty > 0)
             if (data.getInitialDifficulty() > 0) {
                 data.setInitialDifficulty(0);
                 data.setTainted(true);

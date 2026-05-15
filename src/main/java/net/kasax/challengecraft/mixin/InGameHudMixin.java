@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 @Mixin(InGameHud.class)
+/** Renders the custom overlay stack after vanilla HUD drawing. */
 public abstract class InGameHudMixin {
     @ModifyVariable(method = "drawHeart", at = @At("HEAD"), ordinal = 0, argsOnly = true)
     private boolean forceHardcoreHeart(boolean hardcore) {

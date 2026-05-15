@@ -8,6 +8,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.network.ServerPlayerEntity;
 
+/** Adds a random enchantment level to each player's held item on a timer. */
 public class Chal_13_RandomEnchantment {
     private static boolean active = false;
     private static int tickCounter = 0;

@@ -1,10 +1,7 @@
 package net.kasax.challengecraft;
 
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.XpManager;
 import net.minecraft.component.DataComponentTypes;
@@ -12,10 +9,7 @@ import net.minecraft.component.type.AttributeModifierSlot;
 import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.component.type.ItemEnchantmentsComponent.Builder;
-import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -24,61 +18,34 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.World;
 
 import java.util.List;
 
+/** Awards meta progression after completed runs and keeps perk side effects current. */
 public class LevelXpListener {
     private static final Identifier HEALTH_BONUS_ID = Identifier.of(ChallengeCraft.MOD_ID, "level_health_bonus");
     private static final Identifier STRENGTH_BONUS_ID = Identifier.of(ChallengeCraft.MOD_ID, "level_strength_bonus");
     private static final Identifier RESISTANCE_BONUS_ID = Identifier.of(ChallengeCraft.MOD_ID, "level_resistance_bonus");
 
     public static void register() {
-//        // XP for killing mobs
-//        ServerLivingEntityEvents.AFTER_DEATH.register((entity, damageSource) -> {
-//            if (damageSource.getAttacker() instanceof ServerPlayerEntity player) {
-//                long xp = 10;
-//                if (entity.getMaxHealth() >= 100) xp = 100;
-//                LevelManager.addXp(player, xp);
-//            }
-//        });
-//
-//        // XP for mining blocks
-//        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-//            if (player instanceof ServerPlayerEntity serverPlayer) {
-//                LevelManager.addXp(serverPlayer, 1);
-//            }
-//        });
-
-        // XP for survivability & Perks application
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-//                if (server.getTicks() % 1200 == 0) { // Every minute (20 * 60)
-//                    LevelManager.addXp(player, 5); // Passive XP for surviving
-//                }
-                
                 applyPerks(player);
             }
         });
 
-        // Sync on join
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-            // Send new player their own level and everyone else's level
             for (ServerPlayerEntity p : server.getPlayerManager().getPlayerList()) {
                 LevelManager.sync(p);
             }
             
-            // Grant Infinity Weapon on join if perk is active and player eligible, only if they don't already have it
             var overworld = server.getOverworld();
             ChallengeSavedData data = ChallengeSavedData.get(overworld);
             if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
@@ -175,8 +142,7 @@ public class LevelXpListener {
     public static void grantInfinityWeapon(ServerPlayerEntity player) {
         if (LevelManager.getStars(XpManager.getXp(player.getUuid())) < 20) return;
         
-        // Grant once logic: only if they don't have it yet?
-        // The user said "once", but let's check inventory to be safe against accidental double-grant.
+        // The perk is reapplied on join, so inventory inspection prevents duplicate rewards.
         boolean hasWeapon = false;
         for (int i = 0; i < player.getInventory().size(); i++) {
             ItemStack stack = player.getInventory().getStack(i);
@@ -200,7 +166,6 @@ public class LevelXpListener {
 
         if (!stack.isOf(Items.GOLDEN_SWORD)) return false;
         
-        // Check for attribute modifier
         AttributeModifiersComponent attrs = stack.get(DataComponentTypes.ATTRIBUTE_MODIFIERS);
         if (attrs != null) {
             for (AttributeModifiersComponent.Entry entry : attrs.modifiers()) {
@@ -210,7 +175,6 @@ public class LevelXpListener {
             }
         }
 
-        // Check for enchantment
         ItemEnchantmentsComponent enchants = stack.get(DataComponentTypes.ENCHANTMENTS);
         if (enchants != null) {
             var registry = server.getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
@@ -224,11 +188,9 @@ public class LevelXpListener {
     public static ItemStack createInfinityWeapon(MinecraftServer server) {
         ItemStack stack = new ItemStack(Items.GOLDEN_SWORD);
         
-        // Rainbow Name: Infinity Weapon
         Text rainbowName = createRainbowName(Text.translatable("challengecraft.item.infinity_weapon").getString());
         stack.set(DataComponentTypes.CUSTOM_NAME, rainbowName);
         
-        // Add Attribute Modifier for "Infinite" damage
         AttributeModifiersComponent.Builder attrBuilder = AttributeModifiersComponent.builder();
         attrBuilder.add(EntityAttributes.ATTACK_DAMAGE, 
             new EntityAttributeModifier(Identifier.of("challengecraft", "infinity_weapon_damage"), 1000000.0, EntityAttributeModifier.Operation.ADD_VALUE),

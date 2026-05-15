@@ -4,6 +4,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Transitional screen used while the integrated server is reopening the same save. */
 public class RestartingScreen extends Screen {
     public RestartingScreen() {
         super(Text.translatable("challengecraft.restart.world.title"));

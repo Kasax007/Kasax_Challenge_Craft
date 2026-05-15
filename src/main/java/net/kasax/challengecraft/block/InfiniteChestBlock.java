@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+/** World block for the infinite chest, including screen opening and waterlogging behavior. */
 public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable {
     public static final MapCodec<InfiniteChestBlock> CODEC = createCodec(InfiniteChestBlock::new);
     public static final EnumProperty<Direction> FACING = HorizontalFacingBlock.FACING;

@@ -8,6 +8,7 @@ import net.minecraft.util.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Gives each player a random vanilla item every thirty seconds. */
 public class Chal_10_RandomItem {
     private static boolean active = false;
     private static int tickCounter = 0;

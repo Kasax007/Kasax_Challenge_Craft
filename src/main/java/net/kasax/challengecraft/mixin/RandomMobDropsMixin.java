@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LivingEntity.class)
+/** Redirects loot-table lookup for the randomized mob-drops challenge. */
 public abstract class RandomMobDropsMixin {
     @Inject(method = "dropLoot(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/damage/DamageSource;Z)V", at = @At("HEAD"))
     private void beforeDropLoot(ServerWorld world, DamageSource source, boolean causedByPlayer, CallbackInfo ci) {

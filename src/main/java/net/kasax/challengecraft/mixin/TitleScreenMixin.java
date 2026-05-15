@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(TitleScreen.class)
+/** Adds the progression screen button to the title screen. */
 public abstract class TitleScreenMixin extends Screen {
     protected TitleScreenMixin(Text title) {
         super(title);
@@ -42,7 +43,7 @@ public abstract class TitleScreenMixin extends Screen {
         boolean isCommaHeld = InputUtil.isKeyPressed(windowHandle, GLFW.GLFW_KEY_COMMA);
         boolean isPeriodHeld = InputUtil.isKeyPressed(windowHandle, GLFW.GLFW_KEY_PERIOD);
 
-        // Top-left 10x10 corner while holding , and .
+        // Hidden dev shortcut kept away from normal title-screen clicks.
         if (mouseX <= 10 && mouseY <= 10 && isCommaHeld && isPeriodHeld) {
             UUID uuid = this.client.getSession().getUuidOrNull();
             if (uuid != null) {

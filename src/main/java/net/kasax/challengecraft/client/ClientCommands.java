@@ -14,17 +14,15 @@ import net.minecraft.command.CommandRegistryAccess;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
+/** Client-side command entry points for opening local mod screens. */
 public class ClientCommands implements ClientModInitializer {
-    // a simple flag that we flip when /challenges is run
     private static boolean openOnNextTick = false;
 
     @Override
     public void onInitializeClient() {
-        // Register the chat command
         ClientCommandRegistrationCallback.EVENT.register(this::register);
         ChallengeCraft.LOGGER.info("Challenge Craft Command loaded");
 
-        // Register a tick listener to actually open the screen
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (openOnNextTick) {
                 openOnNextTick = false;
@@ -40,7 +38,7 @@ public class ClientCommands implements ClientModInitializer {
                 ClientCommandManager.literal("challenges")
                         .executes(ctx -> {
                             if (ctx.getSource().getClient().player != null && ctx.getSource().getClient().player.hasPermissionLevel(2)) {
-                                // just set our flag—don't call setScreen() here
+                                // Open on the next tick so the command handler does not mutate screens mid-dispatch.
                                 ChallengeCraft.LOGGER.info("'/challenges' received, scheduling UI open");
                                 openOnNextTick = true;
                                 return 1;

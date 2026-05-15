@@ -2,6 +2,7 @@ package net.kasax.challengecraft.challenges;
 
 import net.kasax.challengecraft.ChallengeCraft;
 
+/** Flag holder for inverted drop behavior. */
 public class Chal_34_UpsideDownDrops {
     private static boolean active = false;
 

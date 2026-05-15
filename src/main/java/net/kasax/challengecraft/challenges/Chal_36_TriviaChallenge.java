@@ -19,10 +19,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/** Schedules trivia questions and applies timed rewards or penalties per player answer. */
 public class Chal_36_TriviaChallenge {
     private static boolean active = false;
     private static int globalTimer = 0;
-    private static final int TRIVIA_INTERVAL = 2400; // 2 minutes in ticks
+    private static final int TRIVIA_INTERVAL = 2400;
     private static final int TIMEOUT_SECONDS = 60;
     private static final Map<UUID, TriviaQuestion> PENDING_QUESTIONS = new HashMap<>();
     private static final Map<UUID, Long> PENDING_TIMEOUTS = new HashMap<>();
@@ -54,7 +55,6 @@ public class Chal_36_TriviaChallenge {
                 }
             }
 
-            // Check for timeouts
             long now = System.currentTimeMillis();
             for (UUID uuid : new java.util.HashSet<>(PENDING_TIMEOUTS.keySet())) {
                 if (now > PENDING_TIMEOUTS.get(uuid)) {
@@ -105,17 +105,15 @@ public class Chal_36_TriviaChallenge {
 
     private static void processWrongAnswer(ServerPlayerEntity player, TriviaQuestion question) {
         if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING) || player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
-            // Pop totem animation and sound
             player.getServerWorld().sendEntityStatus(player, EntityStatuses.USE_TOTEM_OF_UNDYING);
 
-            // Consume totem
             if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
                 player.getMainHandStack().decrement(1);
             } else {
                 player.getOffHandStack().decrement(1);
             }
 
-            // Apply totem effects (approximate vanilla)
+            // Mirror the survival effects players expect after a normal totem save.
             player.setHealth(1.0f);
             player.clearStatusEffects();
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 900, 1));

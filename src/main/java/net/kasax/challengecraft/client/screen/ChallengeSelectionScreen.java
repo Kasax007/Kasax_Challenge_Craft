@@ -18,14 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/** In-world challenge editor used after a save already exists. */
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
             1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
-    static {
-        // IDS.sort(java.util.Comparator.comparingInt(net.kasax.challengecraft.LevelManager::getRequiredLevel).thenComparingInt(id -> id));
-    }
     private static final List<Text> TITLES = IDS.stream()
             .map(id -> (Text) Text.translatable("challengecraft.worldcreate.challenge" + id))
             .toList();
@@ -124,11 +122,11 @@ public class ChallengeSelectionScreen extends Screen {
         if (savedDoubleTroubleMult <= 0) savedDoubleTroubleMult = 2;
         if (savedGameSpeedMult <= 0) savedGameSpeedMult = 1;
 
-        // Convert saved ticks/slots -> slider knob value (0.0 .. 1.0)
-        sliderTicks = savedMaxHeartsTicks;                  // 1..20
+        // Persisted values use gameplay units; sliders render them as normalized positions.
+        sliderTicks = savedMaxHeartsTicks;
         sliderValue = (sliderTicks - 1) / 19.0;
 
-        slotsSliderTicks = savedSlots;                      // 1..36
+        slotsSliderTicks = savedSlots;
         slotsSliderValue = (slotsSliderTicks - 1) / 35.0;
 
         mobHealthMultiplier = savedMobHealthMult;
@@ -143,7 +141,7 @@ public class ChallengeSelectionScreen extends Screen {
         int panelWidth = 260;
         int panelX = width / 2 - panelWidth / 2;
         int panelTop = 40;
-        int panelBottomReserved = 48; // space for Save button
+        int panelBottomReserved = 48;
         int panelHeight = Math.max(60, height - panelTop - panelBottomReserved);
 
         this.scrollPanel = new WidgetScrollPanel(panelX, panelTop, panelWidth, panelHeight, Text.empty());
@@ -159,7 +157,6 @@ public class ChallengeSelectionScreen extends Screen {
         int col = 0;
         int y = panelTop + 6;
 
-        // Initialize sliders
         this.maxHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getHealthSliderText(0.5 + (sliderValue * 9.5)), sliderValue) {
             @Override protected void updateMessage() { setMessage(getHealthSliderText(0.5 + (this.value * 9.5))); }
             @Override protected void applyValue() {
@@ -276,7 +273,7 @@ public class ChallengeSelectionScreen extends Screen {
 
         col = 0;
         for (int perkId : LevelManager.ALL_PERKS) {
-            // Hide Infinity Weapon perk if not unlocked (20 stars)
+            // Infinity Weapon is a star reward, so it should not appear before that milestone.
             if (perkId == LevelManager.PERK_INFINITY_WEAPON) {
                 if (LevelManager.getStars(ChallengeCraftClient.LOCAL_PLAYER_XP) < 20) {
                     continue;
@@ -301,7 +298,6 @@ public class ChallengeSelectionScreen extends Screen {
         if (col == 1) y += cardHeight + spacing;
         
         int saveY = panelTop + panelHeight + 10;
-        // Save and Restart button
         this.saveButton = new SaveButton(
                 width / 2 - 125, saveY, 120, 20,
                 Text.translatable("challengecraft.challenge_selection.save"),
@@ -403,10 +399,8 @@ public class ChallengeSelectionScreen extends Screen {
         this.renderBackground(ctx, mouseX, mouseY, delta);
         super.render(ctx, mouseX, mouseY, delta);
 
-        // Title
         ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, width / 2, 10, 0xFFFF55);
 
-        // Render the warning message
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks())) {
             Text conflictWarning = Text.translatable("challengecraft.warning.conflict");
             ctx.drawCenteredTextWithShadow(this.textRenderer, conflictWarning, width / 2, 24, 0xFF5555);

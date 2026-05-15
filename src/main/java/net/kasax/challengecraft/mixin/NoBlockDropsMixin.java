@@ -14,21 +14,18 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Block.class)
+/** Suppresses block loot while leaving vanilla XP behavior intact. */
 public class NoBlockDropsMixin {
     @Shadow @Final private static Logger LOGGER;
 
-    /**
-     * Always drop block‐mining XP orbs, regardless of GameRules.DO_TILE_DROPS.
-     */
+    /** Block drops can be disabled without suppressing the XP vanilla would have awarded. */
     @Inject(
             method = "dropExperience(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;I)V",
             at = @At("HEAD"),
             cancellable = true
     )
     private void alwaysDropBlockXp(ServerWorld world, BlockPos pos, int size, CallbackInfo ci) {
-        // spawn XP exactly as vanilla would:
         ExperienceOrbEntity.spawn(world, Vec3d.ofCenter(pos), size);
-        // skip the vanilla rule‐check:
         ci.cancel();
     }
 }
