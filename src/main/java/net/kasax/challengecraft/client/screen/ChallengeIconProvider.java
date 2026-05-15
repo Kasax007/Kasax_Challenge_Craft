@@ -48,6 +48,8 @@ public class ChallengeIconProvider {
         ICONS.put(36, new ItemStack(Items.WRITTEN_BOOK));
         ICONS.put(37, new ItemStack(Items.REPEATER));
         ICONS.put(38, new ItemStack(Items.GLOW_INK_SAC));
+        ICONS.put(39, new ItemStack(Items.COOKED_BEEF));
+        ICONS.put(40, new ItemStack(Items.FILLED_MAP));
         
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));
@@ -68,7 +70,7 @@ public class ChallengeIconProvider {
     public static void drawIcon(DrawContext context, int x, int y, int id) {
         ItemStack stack = getIcon(id);
         context.drawItem(stack, x, y);
-        if (id == 28) {
+        if (id == 28 || id == 39) {
             ItemStack barrier = new ItemStack(Items.BARRIER);
             context.drawItem(barrier, x, y);
         }

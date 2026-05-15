@@ -48,7 +48,11 @@ public class MobHealthHUD {
         float health = living.getHealth();
         float maxHealth = living.getMaxHealth();
         // Using Locale.US to ensure dot as decimal separator
-        Text healthText = Text.literal(String.format(Locale.US, "%.1f / %.1f HP", health, maxHealth)).formatted(Formatting.RED);
+        Text healthText = Text.translatable(
+                "challengecraft.mob_health.health",
+                String.format(Locale.US, "%.1f", health),
+                String.format(Locale.US, "%.1f", maxHealth)
+        ).formatted(Formatting.RED);
 
         int boxWidth = 150;
         int boxHeight = 40;

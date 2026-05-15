@@ -124,7 +124,7 @@ public class Chal_26_AllAchievements {
             var display = entry.value().display().get();
             return new AdvancementInfo(id, display.getTitle(), display.getIcon(), display.getDescription());
         }
-        return new AdvancementInfo(id, Text.literal(id.toString()), new ItemStack(net.minecraft.item.Items.BARRIER), Text.literal(""));
+        return new AdvancementInfo(id, Text.of(id.toString()), new ItemStack(net.minecraft.item.Items.BARRIER), Text.empty());
     }
 
     public static void sendListToPlayer(ServerPlayerEntity player) {

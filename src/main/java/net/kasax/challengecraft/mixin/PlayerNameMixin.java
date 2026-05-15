@@ -17,18 +17,23 @@ public abstract class PlayerNameMixin {
     private void onGetDisplayName(CallbackInfoReturnable<Text> cir) {
         try {
             PlayerEntity player = (PlayerEntity) (Object) this;
-            if (player == null || player.getUuid() == null || player.getWorld() == null) return;
-            
+            if (player == null || player.getUuid() == null || player.getWorld() == null) {
+                return;
+            }
+
             long xp = LevelManager.getPlayerXp(player);
 
             int stars = LevelManager.getStars(xp);
             int level = LevelManager.getLevelForXp(xp);
-            
+
             Text original = cir.getReturnValue();
-            if (original == null) return;
-            
-            // Avoid double adding if somehow called recursively or by other mods
-            if (original.getString().contains("[Lvl ")) return;
+            if (original == null) {
+                return;
+            }
+
+            if (original.getString().contains(Text.translatable("challengecraft.player_name.prefix_guard").getString())) {
+                return;
+            }
 
             Text colored = original;
             String colorName = LevelManager.getNameColor(stars);
@@ -36,12 +41,12 @@ public abstract class PlayerNameMixin {
                 colored = applyColor(original, colorName);
             }
 
-            MutableText prefix = Text.literal("[Lvl " + level).formatted(Formatting.GRAY);
+            MutableText prefix = Text.translatable("challengecraft.player_name.prefix_level", level).formatted(Formatting.GRAY);
             if (stars > 0) {
-                prefix.append(Text.literal(" ★" + stars).formatted(Formatting.YELLOW));
+                prefix.append(Text.translatable("challengecraft.player_name.prefix_stars", stars).formatted(Formatting.YELLOW));
             }
-            prefix.append(Text.literal("] ").formatted(Formatting.GRAY));
-            
+            prefix.append(Text.translatable("challengecraft.player_name.prefix_suffix").formatted(Formatting.GRAY));
+
             cir.setReturnValue(prefix.append(colored));
         } catch (Throwable t) {
             // Silently fail to not break game logic if display name fails
@@ -53,13 +58,17 @@ public abstract class PlayerNameMixin {
         if ("rainbow".equals(color)) {
             String name = text.getString();
             Formatting[] rainbow = {
-                Formatting.AQUA, Formatting.GREEN, Formatting.YELLOW, 
-                Formatting.RED, Formatting.LIGHT_PURPLE, Formatting.BLUE
+                    Formatting.AQUA,
+                    Formatting.GREEN,
+                    Formatting.YELLOW,
+                    Formatting.RED,
+                    Formatting.LIGHT_PURPLE,
+                    Formatting.BLUE
             };
             MutableText result = Text.empty();
             for (int i = 0; i < name.length(); i++) {
                 Formatting f = rainbow[i % rainbow.length];
-                result.append(Text.literal(String.valueOf(name.charAt(i))).formatted(f, Formatting.BOLD));
+                result.append(Text.empty().append(String.valueOf(name.charAt(i))).formatted(f, Formatting.BOLD));
             }
             return result;
         }

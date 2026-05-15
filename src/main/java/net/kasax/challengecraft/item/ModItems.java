@@ -34,6 +34,13 @@ public class ModItems {
                     .maxCount(1)
     );
 
+    public static final Item LOCKOUT_BINGO_MAP = register(
+            "lockout_bingo_map",
+            LockoutBingoMapItem::new,
+            new Item.Settings()
+                    .maxCount(1)
+    );
+
     /** Call this from your ModInitializer to ensure the class loads */
     public static void initialize() {
         // (nothing needed here, calling it forces the static inits above)

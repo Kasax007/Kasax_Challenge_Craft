@@ -8,7 +8,7 @@ import net.minecraft.util.Formatting;
 
 public class DedicatedRestartScreen extends Screen {
     public DedicatedRestartScreen() {
-        super(Text.literal("Server Restarting"));
+        super(Text.translatable("challengecraft.restart.server.title"));
     }
 
     @Override
@@ -26,10 +26,10 @@ public class DedicatedRestartScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("World restart initiated!").formatted(Formatting.GOLD, Formatting.BOLD), this.width / 2, this.height / 4, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("The server is creating a fresh world."), this.width / 2, this.height / 4 + 20, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Please wait a moment and then reconnect."), this.width / 2, this.height / 4 + 40, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("You have been disconnected.").formatted(Formatting.GRAY), this.width / 2, this.height / 4 + 80, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.restart.server.started").formatted(Formatting.GOLD, Formatting.BOLD), this.width / 2, this.height / 4, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.restart.server.creating"), this.width / 2, this.height / 4 + 20, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.restart.server.reconnect"), this.width / 2, this.height / 4 + 40, 0xFFFFFF);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.restart.server.disconnected").formatted(Formatting.GRAY), this.width / 2, this.height / 4 + 80, 0xFFFFFF);
     }
 
     @Override

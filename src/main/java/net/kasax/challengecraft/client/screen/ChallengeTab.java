@@ -13,13 +13,14 @@ import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 public class ChallengeTab extends GridScreenTab {
-    private static final Text TITLE = Text.literal("Challenges");
+    private static final Text TITLE = Text.translatable("challengecraft.challenge_tab.title");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
@@ -30,6 +31,7 @@ public class ChallengeTab extends GridScreenTab {
     private final SliderWidget doubleTroubleSlider;
     private final SliderWidget gameSpeedSlider;
     private Text difficultyText = Text.empty();
+    private boolean hasConflict;
 
     private WidgetScrollPanel scrollPanel;
 
@@ -67,13 +69,13 @@ public class ChallengeTab extends GridScreenTab {
         // Challenge 7 is at index 6
         this.maxHealthSlider = new SliderWidget(
                 0, 0, 210, 20,
-                Text.literal(String.format("Health: %.1f❤", 0.5 + (sliderValue * 9.5))),
+                getHealthSliderText(0.5 + (sliderValue * 9.5)),
                 sliderValue
         ) {
             @Override
             protected void updateMessage() {
                 double hearts = 0.5 + (this.value * 9.5);
-                setMessage(Text.literal(String.format("Health: %.1f❤", hearts)));
+                setMessage(getHealthSliderText(hearts));
             }
 
             @Override
@@ -88,13 +90,13 @@ public class ChallengeTab extends GridScreenTab {
         // Challenge 12 is at index 7
         this.inventorySlider = new SliderWidget(
                 0, 0, 210, 20,
-                Text.literal("Slots: 36"),
+                getSlotsSliderText(36),
                 inventorySliderValue
         ) {
             @Override
             protected void updateMessage() {
                 double slots = 1 + (this.value * 35);
-                setMessage(Text.literal(String.format("Slots: %.0f", slots)));
+                setMessage(getSlotsSliderText(slots));
             }
 
             @Override
@@ -108,13 +110,13 @@ public class ChallengeTab extends GridScreenTab {
         // Challenge 24
         this.mobHealthSlider = new SliderWidget(
                 0, 0, 210, 20,
-                Text.literal("Mob Health: 1x"),
+                getMobHealthSliderText(1),
                 mobHealthSliderValue
         ) {
             @Override
             protected void updateMessage() {
                 double mult = 1 + (this.value * 99);
-                setMessage(Text.literal(String.format("Mob Health: %.0fx", mult)));
+                setMessage(getMobHealthSliderText(mult));
             }
 
             @Override
@@ -128,13 +130,13 @@ public class ChallengeTab extends GridScreenTab {
         // Challenge 35
         this.doubleTroubleSlider = new SliderWidget(
                 0, 0, 210, 20,
-                Text.literal("Double Trouble: 2x"),
+                getDoubleTroubleSliderText(2),
                 doubleTroubleSliderValue
         ) {
             @Override
             protected void updateMessage() {
                 double mult = 2 + (this.value * 8);
-                setMessage(Text.literal(String.format("Double Trouble: %.0fx", mult)));
+                setMessage(getDoubleTroubleSliderText(mult));
             }
 
             @Override
@@ -148,13 +150,13 @@ public class ChallengeTab extends GridScreenTab {
         // Challenge 37
         this.gameSpeedSlider = new SliderWidget(
                 0, 0, 210, 20,
-                Text.literal("Game Speed: 1x"),
+                getGameSpeedSliderText(1),
                 gameSpeedSliderValue
         ) {
             @Override
             protected void updateMessage() {
                 double mult = 1 + (this.value * 9);
-                setMessage(Text.literal(String.format("Game Speed: %.0fx", mult)));
+                setMessage(getGameSpeedSliderText(mult));
             }
 
             @Override
@@ -180,8 +182,10 @@ public class ChallengeTab extends GridScreenTab {
         List<Integer> activePerks = getSelectedPerks();
 
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
+            this.hasConflict = true;
             this.difficultyText = Text.translatable("challengecraft.warning.conflict");
         } else {
+            this.hasConflict = false;
             int playerCount = 0;
             if (net.minecraft.client.MinecraftClient.getInstance().world != null) {
                 playerCount = net.minecraft.client.MinecraftClient.getInstance().world.getPlayers().size();
@@ -225,7 +229,7 @@ public class ChallengeTab extends GridScreenTab {
             }
             @Override
             protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                int color = getMessage().getString().contains("Warning") ? 0xFF5555 : 0xFFFF55;
+                int color = hasConflict ? 0xFF5555 : 0xFFFF55;
                 context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
             }
             @Override
@@ -309,7 +313,7 @@ public class ChallengeTab extends GridScreenTab {
         // Perks section
         if (col == 1) y += cardH + spacing;
         y += 15;
-        Text perkTitle = Text.literal("--- Perks (-0.5 Difficulty each) ---");
+        Text perkTitle = Text.translatable("challengecraft.challenge_selection.perks_header");
         scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, perkTitle) {
             @Override
             protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
@@ -400,5 +404,25 @@ public class ChallengeTab extends GridScreenTab {
         }
 
         return active;
+    }
+
+    private static Text getHealthSliderText(double hearts) {
+        return Text.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
+    }
+
+    private static Text getSlotsSliderText(double slots) {
+        return Text.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
+    }
+
+    private static Text getMobHealthSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getDoubleTroubleSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getGameSpeedSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 }

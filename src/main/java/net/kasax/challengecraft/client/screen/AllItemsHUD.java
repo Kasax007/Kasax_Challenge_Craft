@@ -48,8 +48,7 @@ public class AllItemsHUD {
 
         boolean completed = currentIndex >= totalItems;
         Text itemName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : Chal_22_AllItems.getFormattedItemName(currentItem).copy().formatted(Formatting.GOLD);
-        String progressStr = (currentIndex) + " / " + totalItems;
-        Text progressText = Text.literal(progressStr).formatted(Formatting.GRAY);
+        Text progressText = Text.translatable("challengecraft.progress.simple", currentIndex, totalItems).formatted(Formatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (active ? 1 : 0) + (AllEntitiesHUD.isActive() ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);

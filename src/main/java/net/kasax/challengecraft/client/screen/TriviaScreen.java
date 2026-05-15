@@ -21,7 +21,7 @@ public class TriviaScreen extends Screen {
     private static final int TIMEOUT_SECONDS = 60;
 
     public TriviaScreen(String question, List<String> answers, int correctIndex) {
-        super(Text.literal("Minecraft Trivia"));
+        super(Text.translatable("challengecraft.worldcreate.challenge36"));
         this.question = question;
         this.answers = answers;
         this.correctIndex = correctIndex;
@@ -37,7 +37,7 @@ public class TriviaScreen extends Screen {
 
         for (int i = 0; i < answers.size(); i++) {
             int index = i;
-            this.addDrawableChild(ButtonWidget.builder(Text.literal(answers.get(i)), button -> {
+            this.addDrawableChild(ButtonWidget.builder(Text.of(answers.get(i)), button -> {
                 ClientPlayNetworking.send(new TriviaAnswerPacket(index));
                 this.close();
             }).dimensions(centerX - buttonWidth / 2, centerY - 20 + i * 25, buttonWidth, buttonHeight).build());
@@ -61,7 +61,7 @@ public class TriviaScreen extends Screen {
         context.drawCenteredTextWithShadow(this.textRenderer, this.title.copy().formatted(Formatting.GOLD, Formatting.BOLD), this.width / 2, y + 10, 0xFFFFFF);
         
         // Draw Question (wrapped)
-        List<net.minecraft.text.OrderedText> wrappedQuestion = this.textRenderer.wrapLines(Text.literal(question), bgWidth - 20);
+        List<net.minecraft.text.OrderedText> wrappedQuestion = this.textRenderer.wrapLines(Text.of(question), bgWidth - 20);
         int qY = y + 30;
         for (net.minecraft.text.OrderedText line : wrappedQuestion) {
             context.drawCenteredTextWithShadow(this.textRenderer, line, this.width / 2, qY, 0xFFFFFF);
@@ -71,9 +71,8 @@ public class TriviaScreen extends Screen {
         // Draw Timer
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         int remaining = Math.max(0, TIMEOUT_SECONDS - (int)elapsed);
-        String timerText = "Time remaining: " + remaining + "s";
         int timerColor = remaining <= 10 ? 0xFFFF5555 : 0xFFFFFFFF;
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(timerText), this.width / 2, y + bgHeight - 15, timerColor);
+        context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.trivia.time_remaining", remaining), this.width / 2, y + bgHeight - 15, timerColor);
 
         if (remaining <= 0) {
             this.close();

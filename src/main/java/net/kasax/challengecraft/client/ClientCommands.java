@@ -45,7 +45,7 @@ public class ClientCommands implements ClientModInitializer {
                                 openOnNextTick = true;
                                 return 1;
                             } else {
-                                ctx.getSource().sendFeedback(Text.literal("You do not have permission to use this command.").formatted(Formatting.RED));
+                                ctx.getSource().sendFeedback(Text.translatable("challengecraft.command.no_permission").formatted(Formatting.RED));
                                 return 0;
                             }
                         })

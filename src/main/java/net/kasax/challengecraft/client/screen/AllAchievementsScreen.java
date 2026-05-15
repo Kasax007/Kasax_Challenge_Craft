@@ -91,13 +91,13 @@ public class AllAchievementsScreen extends Screen {
                 
                 boolean current = this.index == currentIndex;
                 Text displayName = nameCache;
-                if (current) displayName = Text.literal("> ").append(displayName);
+                if (current) displayName = Text.empty().append("> ").append(displayName);
                 
                 context.drawItem(info.icon(), x + 5, y + 2);
                 context.drawTextWithShadow(client.textRenderer, displayName, x + 25, y + 6, 0xFFFFFF);
                 
                 if (this.index < currentIndex) {
-                    context.drawTextWithShadow(client.textRenderer, Text.literal("✓").formatted(Formatting.GREEN), x + entryWidth - 20, y + 6, 0xFFFFFF);
+                    context.drawTextWithShadow(client.textRenderer, Text.empty().append("✓").formatted(Formatting.GREEN), x + entryWidth - 20, y + 6, 0xFFFFFF);
                 }
             }
 

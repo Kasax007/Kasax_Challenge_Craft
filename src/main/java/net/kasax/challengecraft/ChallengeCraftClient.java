@@ -3,6 +3,7 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.kasax.challengecraft.client.screen.ChallengeRewardOverlay;
+import net.kasax.challengecraft.client.screen.LockoutBingoClientState;
 import net.kasax.challengecraft.client.screen.TimerOverlay;
 import net.kasax.challengecraft.network.ChallengeSyncHandler;
 import net.kasax.challengecraft.network.LevelSyncHandler;
@@ -81,6 +82,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             PLAYER_XP_MAP.clear();
             LOCAL_PLAYER_XP = 0;
+            LockoutBingoClientState.clear();
         });
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {

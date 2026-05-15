@@ -3,6 +3,7 @@ package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
 import net.kasax.challengecraft.challenges.Chal_27_NoArmor;
+import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
 import net.kasax.challengecraft.block.InfiniteChestRegistry;
 import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.ChallengeSavedData;
@@ -34,6 +35,8 @@ public abstract class MixinScreenHandler {
         // grab the handler & player‐inventory
         ScreenHandler handler = (ScreenHandler)(Object)this;
         PlayerInventory inv = player.getInventory();
+
+        Chal_40_LockoutBingo.handleScreenSlotClick(player, handler, slotIndex);
 
         // 1) Challenge 12: Limited Inventory
         if (Chal_12_LimitedInventory.isActive()) {
@@ -97,8 +100,10 @@ public abstract class MixinScreenHandler {
 
                     if (level < 20 || !perkActive) {
                         if (!player.getWorld().isClient) {
-                            String message = level < 20 ? "You must be level 20 to craft the Infinite Chest!" : "The Infinite Chest perk is not active!";
-                            player.sendMessage(Text.literal(message).formatted(Formatting.RED), true);
+                            var message = level < 20
+                                    ? Text.translatable("challengecraft.infinite_chest.require_level")
+                                    : Text.translatable("challengecraft.infinite_chest.require_perk");
+                            player.sendMessage(message.formatted(Formatting.RED), true);
                         }
                         ci.cancel();
                         return;

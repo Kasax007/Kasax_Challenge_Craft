@@ -55,9 +55,8 @@ public class AllEntitiesHUD {
         int sw = client.getWindow().getScaledWidth();
 
         boolean completed = currentIndex >= totalEntities;
-        Text entityName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : (currentEntity != null ? currentEntity.getName().copy().formatted(Formatting.RED) : Text.literal("???"));
-        String progressStr = "Obtained: " + currentIndex + " / " + totalEntities;
-        Text progressText = Text.literal(progressStr).formatted(Formatting.GRAY);
+        Text entityName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : (currentEntity != null ? currentEntity.getName().copy().formatted(Formatting.RED) : Text.translatable("challengecraft.placeholder.unknown"));
+        Text progressText = Text.translatable("challengecraft.progress.obtained", currentIndex, totalEntities).formatted(Formatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (active ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);

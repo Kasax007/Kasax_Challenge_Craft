@@ -77,6 +77,9 @@ public class ChallengeManager {
         if (active.contains(26)) {
             net.kasax.challengecraft.challenges.Chal_26_AllAchievements.syncProgressToAll(server, data);
         }
+        if (active.contains(40)) {
+            net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.syncToAll(server);
+        }
     }
 
     public static double getDifficulty(int id, int ticks, int slots, int mobHealthMult) {
@@ -135,6 +138,8 @@ public class ChallengeManager {
             case 36 -> 4.0;  // Trivia Challenge
             case 37 -> (gameSpeedMult - 1) / 9.0 * 4.0; // Game Speed
             case 38 -> 5.0;  // Chunk Hunt
+            case 39 -> 1.3;  // No Food
+            case 40 -> 0.0;  // Lockout Bingo
             default -> 0.0;
         };
     }
@@ -164,6 +169,10 @@ public class ChallengeManager {
         if (ids.contains(38) && ids.contains(16)) return true; // Chunk Hunt + Random Chunk Blocks
         if (ids.contains(38) && ids.contains(23)) return true; // Chunk Hunt + All Entities
         if (ids.contains(38) && ids.contains(25)) return true; // Chunk Hunt + Damage Border
+        if (ids.contains(40) && ids.contains(22)) return true; // Lockout Bingo + All Items
+        if (ids.contains(40) && ids.contains(23)) return true; // Lockout Bingo + All Entities
+        if (ids.contains(40) && ids.contains(26)) return true; // Lockout Bingo + All Achievements
+        if (ids.contains(40) && ids.contains(38)) return true; // Lockout Bingo + Chunk Hunt
         
         // Added Max Hearts (Perk 103) + Max Health Modifier (Challenge 7) conflict
         if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
@@ -471,6 +480,8 @@ public class ChallengeManager {
         if (Chal_36_TriviaChallenge.isActive()) ids.add(36);
         if (Chal_37_GameSpeed.isActive()) ids.add(37);
         if (Chal_38_ChunkHunt.isActive()) ids.add(38);
+        if (Chal_39_NoFood.isActive()) ids.add(39);
+        if (Chal_40_LockoutBingo.isActive()) ids.add(40);
         return ids;
     }
 
@@ -513,6 +524,8 @@ public class ChallengeManager {
         Chal_36_TriviaChallenge.setActive(active);
         Chal_37_GameSpeed.setActive(active);
         Chal_38_ChunkHunt.setActive(active);
+        Chal_39_NoFood.setActive(active);
+        Chal_40_LockoutBingo.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -583,6 +596,14 @@ public class ChallengeManager {
                 Chal_38_ChunkHunt.setActive(true);
                 if (world != null) Chal_38_ChunkHunt.updateWorldBorder(world);
                 LOGGER.info("Challenge 38 ON");
+            }
+            case 39 -> { Chal_39_NoFood.setActive(true); LOGGER.info("Challenge 39 ON"); }
+            case 40 -> {
+                Chal_40_LockoutBingo.setActive(true);
+                if (world != null) {
+                    Chal_40_LockoutBingo.onActivated(world);
+                }
+                LOGGER.info("Challenge 40 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

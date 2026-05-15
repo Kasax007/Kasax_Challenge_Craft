@@ -1,6 +1,5 @@
 package net.kasax.challengecraft.client.screen;
 
-import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeCraftClient;
@@ -10,19 +9,18 @@ import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     static {
@@ -62,7 +60,7 @@ public class ChallengeSelectionScreen extends Screen {
     private int gameSpeedMultiplier;
 
     public ChallengeSelectionScreen() {
-        super(Text.literal("Challenge Selection"));
+        super(Text.translatable("challengecraft.challenge_selection.title"));
     }
 
     private Text difficultyText = Text.empty();
@@ -162,40 +160,40 @@ public class ChallengeSelectionScreen extends Screen {
         int y = panelTop + 6;
 
         // Initialize sliders
-        this.maxHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Health: %.1f❤", 0.5 + (sliderValue * 9.5))), sliderValue) {
-            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Health: %.1f❤", 0.5 + (this.value * 9.5)))); }
+        this.maxHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getHealthSliderText(0.5 + (sliderValue * 9.5)), sliderValue) {
+            @Override protected void updateMessage() { setMessage(getHealthSliderText(0.5 + (this.value * 9.5))); }
             @Override protected void applyValue() {
                 sliderTicks = (int)(Math.round(this.value * 19) + 1);
                 this.value = (sliderTicks - 1) / 19.0;
                 updateDifficultyText();
             }
         };
-        this.slotsSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Slots: %d", slotsSliderTicks)), slotsSliderValue) {
-            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Slots: %d", (int)(1 + (this.value * 35))))); }
+        this.slotsSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getSlotsSliderText(slotsSliderTicks), slotsSliderValue) {
+            @Override protected void updateMessage() { setMessage(getSlotsSliderText((int)(1 + (this.value * 35)))); }
             @Override protected void applyValue() {
                 slotsSliderTicks = (int)(Math.round(this.value * 35) + 1);
                 this.value = (slotsSliderTicks - 1) / 35.0;
                 updateDifficultyText();
             }
         };
-        this.mobHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Mob Health: %dx", mobHealthMultiplier)), mobHealthSliderValue) {
-            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Mob Health: %.0fx", 1 + (this.value * 99)))); }
+        this.mobHealthSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getMobHealthSliderText(mobHealthMultiplier), mobHealthSliderValue) {
+            @Override protected void updateMessage() { setMessage(getMobHealthSliderText(1 + (this.value * 99))); }
             @Override protected void applyValue() {
                 mobHealthMultiplier = (int)(Math.round(this.value * 99) + 1);
                 this.value = (mobHealthMultiplier - 1) / 99.0;
                 updateDifficultyText();
             }
         };
-        this.doubleTroubleSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Double Trouble: %dx", doubleTroubleMultiplier)), doubleTroubleSliderValue) {
-            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Double Trouble: %.0fx", 2 + (this.value * 8)))); }
+        this.doubleTroubleSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getDoubleTroubleSliderText(doubleTroubleMultiplier), doubleTroubleSliderValue) {
+            @Override protected void updateMessage() { setMessage(getDoubleTroubleSliderText(2 + (this.value * 8))); }
             @Override protected void applyValue() {
                 doubleTroubleMultiplier = (int)(Math.round(this.value * 8) + 2);
                 this.value = (doubleTroubleMultiplier - 2) / 8.0;
                 updateDifficultyText();
             }
         };
-        this.gameSpeedSlider = new SliderWidget(0, 0, cardWidth, cardHeight, Text.literal(String.format("Game Speed: %dx", gameSpeedMultiplier)), gameSpeedSliderValue) {
-            @Override protected void updateMessage() { setMessage(Text.literal(String.format("Game Speed: %.0fx", 1 + (this.value * 9)))); }
+        this.gameSpeedSlider = new SliderWidget(0, 0, cardWidth, cardHeight, getGameSpeedSliderText(gameSpeedMultiplier), gameSpeedSliderValue) {
+            @Override protected void updateMessage() { setMessage(getGameSpeedSliderText(1 + (this.value * 9))); }
             @Override protected void applyValue() {
                 gameSpeedMultiplier = (int)(Math.round(this.value * 9) + 1);
                 this.value = (gameSpeedMultiplier - 1) / 9.0;
@@ -265,7 +263,7 @@ public class ChallengeSelectionScreen extends Screen {
         }
         if (col == 1) y += cardHeight + spacing;
         y += 15;
-        Text perkTitle = Text.literal("--- Perks (-0.5 Difficulty each) ---");
+        Text perkTitle = Text.translatable("challengecraft.challenge_selection.perks_header");
         scrollPanel.addChild(new net.minecraft.client.gui.widget.ClickableWidget(panelX, y, panelWidth, 20, perkTitle) {
             @Override
             protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
@@ -306,7 +304,7 @@ public class ChallengeSelectionScreen extends Screen {
         // Save and Restart button
         this.saveButton = new SaveButton(
                 width / 2 - 125, saveY, 120, 20,
-                Text.literal("Save"),
+                Text.translatable("challengecraft.challenge_selection.save"),
                 btn -> {
                     sendChallengePacket(false);
                     client.setScreen(null);
@@ -314,7 +312,7 @@ public class ChallengeSelectionScreen extends Screen {
         );
         this.saveAndRestartButton = new SaveButton(
                 width / 2 + 5, saveY, 120, 20,
-                Text.literal("Save and Restart"),
+                Text.translatable("challengecraft.challenge_selection.save_restart"),
                 btn -> {
                     client.setScreen(new ConfirmRestartScreen(this, () -> {
                         sendChallengePacket(true);
@@ -423,5 +421,25 @@ public class ChallengeSelectionScreen extends Screen {
             super(x, y, w, h, msg, onPress,
                     ButtonWidget.DEFAULT_NARRATION_SUPPLIER);
         }
+    }
+
+    private static Text getHealthSliderText(double hearts) {
+        return Text.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
+    }
+
+    private static Text getSlotsSliderText(double slots) {
+        return Text.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
+    }
+
+    private static Text getMobHealthSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getDoubleTroubleSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getGameSpeedSliderText(double multiplier) {
+        return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 }

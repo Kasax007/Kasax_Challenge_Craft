@@ -87,7 +87,7 @@ public class Chal_36_TriviaChallenge {
         if (question == null) return;
 
         if (answerIndex == question.correctIndex()) {
-            player.sendMessage(Text.literal("Correct!").formatted(Formatting.GREEN), true);
+            player.sendMessage(Text.translatable("challengecraft.trivia.correct").formatted(Formatting.GREEN), true);
             player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.MASTER, 1.0f, 1.0f);
         } else {
             processWrongAnswer(player, question);
@@ -99,7 +99,7 @@ public class Chal_36_TriviaChallenge {
         PENDING_TIMEOUTS.remove(player.getUuid());
         if (question == null) return;
 
-        player.sendMessage(Text.literal("Time's up!").formatted(Formatting.RED), false);
+        player.sendMessage(Text.translatable("challengecraft.trivia.timeout").formatted(Formatting.RED), false);
         processWrongAnswer(player, question);
     }
 
@@ -122,9 +122,9 @@ public class Chal_36_TriviaChallenge {
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.FIRE_RESISTANCE, 800, 0));
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.ABSORPTION, 100, 1));
 
-            player.sendMessage(Text.literal("Wrong! But your Totem of Undying saved you!").formatted(Formatting.GOLD), true);
+            player.sendMessage(Text.translatable("challengecraft.trivia.wrong_totem").formatted(Formatting.GOLD), true);
         } else {
-            player.sendMessage(Text.literal("Wrong! The correct answer was: " + question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("challengecraft.trivia.wrong_answer", question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
             player.damage(player.getServerWorld(), player.getDamageSources().genericKill(), 1000.0f);
             player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_VILLAGER_NO, SoundCategory.MASTER, 1.0f, 1.0f);
         }

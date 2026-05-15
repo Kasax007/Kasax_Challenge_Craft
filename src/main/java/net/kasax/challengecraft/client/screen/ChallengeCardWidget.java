@@ -58,8 +58,10 @@ public class ChallengeCardWidget extends ClickableWidget {
         }
         
         if (locked) {
-            String req = challengeId == LevelManager.PERK_INFINITY_WEAPON ? "20 Infinity Stars" : "Level " + requiredLevel;
-            setTooltip(Tooltip.of(Text.literal("§cLocked! §7Requires §b" + req).append("\n").append(description)));
+            Text requirement = challengeId == LevelManager.PERK_INFINITY_WEAPON
+                    ? Text.translatable("challengecraft.requirement.infinity_stars", 20)
+                    : Text.translatable("challengecraft.requirement.level", requiredLevel);
+            setTooltip(Tooltip.of(Text.translatable("challengecraft.challenge_card.locked", requirement).formatted(Formatting.RED).append(Text.of("\n")).append(description)));
         } else {
             setTooltip(Tooltip.of(description));
         }
@@ -86,7 +88,9 @@ public class ChallengeCardWidget extends ClickableWidget {
         context.drawBorder(getX(), getY(), getWidth(), getHeight(), isFocused() ? 0xFFFFFFFF : 0xFFAAAAAA);
 
         if (locked) {
-            String label = challengeId == LevelManager.PERK_INFINITY_WEAPON ? "§c🔒 ★ 20" : "§c🔒 Lvl " + requiredLevel;
+            Text label = challengeId == LevelManager.PERK_INFINITY_WEAPON
+                    ? Text.translatable("challengecraft.challenge_card.locked_stars_short", 20).formatted(Formatting.RED)
+                    : Text.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel).formatted(Formatting.RED);
             context.drawText(MinecraftClient.getInstance().textRenderer, label, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
         } else {
             ChallengeIconProvider.drawIcon(context, getX() + 4, getY() + (getHeight() - 16) / 2, challengeId);
@@ -99,7 +103,7 @@ public class ChallengeCardWidget extends ClickableWidget {
         int xOffset = locked ? 48 : 24;
         if (tr.getWidth(title) > getWidth() - xOffset - 4) {
              String s = tr.trimToWidth(title.getString(), getWidth() - xOffset - 12) + "...";
-             renderedTitle = Text.literal(s);
+             renderedTitle = Text.of(s);
         }
 
         if (pbTicks != null && !locked) {
@@ -107,8 +111,7 @@ public class ChallengeCardWidget extends ClickableWidget {
             context.drawText(tr, renderedTitle, getX() + xOffset, titleY, textColor, true);
             
             String timeStr = formatTicks(pbTicks);
-            MutableText pbText = Text.literal("COMPLETED: ").formatted(Formatting.GREEN)
-                    .append(Text.literal(timeStr).formatted(Formatting.WHITE));
+            MutableText pbText = Text.translatable("challengecraft.challenge_card.completed_time", timeStr).formatted(Formatting.GREEN);
             
             int pbY = getY() + (getHeight() / 2) + 1;
             context.drawText(tr, pbText, getX() + xOffset, pbY, 0xFFFFFF, true);

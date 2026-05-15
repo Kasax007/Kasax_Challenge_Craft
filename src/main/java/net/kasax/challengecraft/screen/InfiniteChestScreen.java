@@ -34,7 +34,7 @@ public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandle
     @Override
     protected void init() {
         super.init();
-        this.searchField = new TextFieldWidget(this.textRenderer, this.x + 100, this.y + 6, 68, 10, Text.literal(""));
+        this.searchField = new TextFieldWidget(this.textRenderer, this.x + 100, this.y + 6, 68, 10, Text.empty());
         this.searchField.setDrawsBackground(true);
         this.searchField.setEditableColor(-1);
         this.searchField.setUneditableColor(-1);
@@ -233,7 +233,7 @@ public class InfiniteChestScreen extends HandledScreen<InfiniteChestScreenHandle
                 InfiniteChestSyncPayload.Entry entry = filteredEntries.get(entryIndex);
                 ItemStack stack = entry.stack();
                 List<Text> tooltip = new ArrayList<>(getTooltipFromItem(stack));
-                tooltip.add(Text.literal("Count: " + entry.count()).formatted(net.minecraft.util.Formatting.GRAY));
+                tooltip.add(Text.translatable("challengecraft.infinite_chest.count", entry.count()).formatted(net.minecraft.util.Formatting.GRAY));
                 context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
             }
         }

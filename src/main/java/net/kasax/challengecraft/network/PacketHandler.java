@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeManager;
 import net.kasax.challengecraft.challenges.Chal_12_LimitedInventory;
+import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
 import net.kasax.challengecraft.challenges.Chal_7_MaxHealthModify;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
@@ -28,7 +29,7 @@ public class PacketHandler {
                     server.execute(() -> {
                         if (!player.hasPermissionLevel(2)) {
                             ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (no permission)", player.getName().getString());
-                            player.sendMessage(Text.literal("You don't have permission to change challenges.").formatted(Formatting.RED), false);
+                            player.sendMessage(Text.translatable("challengecraft.permission.change_challenges").formatted(Formatting.RED), false);
                             return;
                         }
 
@@ -39,7 +40,7 @@ public class PacketHandler {
                         for (int cid : packet.active) {
                             if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(cid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (challenge {} locked for level {})", player.getName().getString(), cid, playerLevel);
-                                player.sendMessage(Text.literal("You don't have the required level for challenge " + cid).formatted(Formatting.RED), false);
+                                player.sendMessage(Text.translatable("challengecraft.requirement.challenge_level", cid).formatted(Formatting.RED), false);
                                 return;
                             }
                         }
@@ -47,12 +48,12 @@ public class PacketHandler {
                             if (pid == net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON) {
                                 if (net.kasax.challengecraft.LevelManager.getStars(playerXp) < 20) {
                                     ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (Infinity Weapon perk locked)", player.getName().getString());
-                                    player.sendMessage(Text.literal("You don't have enough Infinity Stars for Infinity Weapon perk").formatted(Formatting.RED), false);
+                                    player.sendMessage(Text.translatable("challengecraft.requirement.infinity_weapon_stars").formatted(Formatting.RED), false);
                                     return;
                                 }
                             } else if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(pid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (perk {} locked for level {})", player.getName().getString(), pid, playerLevel);
-                                player.sendMessage(Text.literal("You don't have the required level for perk " + pid).formatted(Formatting.RED), false);
+                                player.sendMessage(Text.translatable("challengecraft.requirement.perk_level", pid).formatted(Formatting.RED), false);
                                 return;
                             }
                         }
@@ -202,6 +203,15 @@ public class PacketHandler {
                             }
                         }
                     });
+                }
+        );
+
+        ServerPlayNetworking.registerGlobalReceiver(
+                LockoutBingoActionPacket.ID,
+                (packet, context) -> {
+                    var server = context.server();
+                    var player = context.player();
+                    server.execute(() -> Chal_40_LockoutBingo.handleAction(player, packet));
                 }
         );
     }

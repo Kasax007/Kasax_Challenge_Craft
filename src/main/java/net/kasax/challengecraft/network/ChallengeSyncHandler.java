@@ -8,6 +8,9 @@ import net.kasax.challengecraft.client.screen.AllEntitiesHUD;
 import net.kasax.challengecraft.client.screen.AllEntitiesScreen;
 import net.kasax.challengecraft.client.screen.AllItemsHUD;
 import net.kasax.challengecraft.client.screen.AllItemsScreen;
+import net.kasax.challengecraft.client.screen.LockoutBingoBoardScreen;
+import net.kasax.challengecraft.client.screen.LockoutBingoClientState;
+import net.kasax.challengecraft.client.screen.LockoutBingoTeamScreen;
 import net.kasax.challengecraft.client.screen.TimerOverlay;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeManager;
@@ -92,6 +95,20 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(TriviaQuestionPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 context.client().setScreen(new net.kasax.challengecraft.client.screen.TriviaScreen(payload.question(), payload.answers(), payload.correctIndex()));
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(LockoutBingoSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> LockoutBingoClientState.update(payload));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(LockoutBingoOpenScreenPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                if (payload.boardScreen()) {
+                    context.client().setScreen(new LockoutBingoBoardScreen());
+                } else {
+                    context.client().setScreen(new LockoutBingoTeamScreen());
+                }
             });
         });
     }

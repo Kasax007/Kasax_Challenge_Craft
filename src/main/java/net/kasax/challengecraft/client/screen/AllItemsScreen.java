@@ -64,19 +64,19 @@ public class AllItemsScreen extends Screen {
                 Formatting color = collected ? Formatting.GREEN : (current ? Formatting.GOLD : Formatting.GRAY);
                 Text name = Chal_22_AllItems.getFormattedItemName(stack).copy().formatted(color);
                 
-                if (current) name = Text.literal("> ").append(name);
+                if (current) name = Text.empty().append("> ").append(name);
                 
                 context.drawItem(stack, x + 5, y);
                 context.drawTextWithShadow(client.textRenderer, name, x + 25, y + 5, 0xFFFFFF);
                 
                 if (collected) {
-                    context.drawTextWithShadow(client.textRenderer, Text.literal("✓").formatted(Formatting.GREEN), x + entryWidth - 20, y + 5, 0xFFFFFF);
+                    context.drawTextWithShadow(client.textRenderer, Text.empty().append("✓").formatted(Formatting.GREEN), x + entryWidth - 20, y + 5, 0xFFFFFF);
                 }
             }
 
             @Override
             public Text getNarration() {
-                return Text.literal(stack.getName().getString());
+                return stack.getName().copy();
             }
         }
     }

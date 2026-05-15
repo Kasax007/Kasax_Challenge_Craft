@@ -99,38 +99,32 @@ public class LevelManager {
     }
 
     private static void onLevelUp(ServerPlayerEntity player, int newLevel) {
-        player.sendMessage(Text.literal("Level Up! ").formatted(Formatting.GOLD, Formatting.BOLD)
-                .append(Text.literal("You are now level ").formatted(Formatting.RESET))
-                .append(Text.literal(String.valueOf(newLevel)).formatted(Formatting.AQUA)), false);
+        player.sendMessage(Text.translatable("challengecraft.level.up", newLevel).formatted(Formatting.GOLD, Formatting.BOLD), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
         
         // Check for perk unlocks
         for (int perkId : ALL_PERKS) {
             if (getRequiredLevel(perkId) == newLevel) {
-                String name = Text.translatable("challengecraft.perk." + perkId).getString();
-                player.sendMessage(Text.literal("Unlocked Perk: ").formatted(Formatting.GREEN)
-                        .append(Text.literal(name).formatted(Formatting.YELLOW)), false);
+                Text name = Text.translatable("challengecraft.perk." + perkId).copy().formatted(Formatting.YELLOW);
+                player.sendMessage(Text.translatable("challengecraft.level.unlock_perk", name).formatted(Formatting.GREEN), false);
             }
         }
 
         if (newLevel == 20) {
-            player.sendMessage(Text.literal("MASTER ACHIEVED! ").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD)
-                    .append(Text.literal("You have reached the maximum level!").formatted(Formatting.RESET)), false);
+            player.sendMessage(Text.translatable("challengecraft.level.master").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
         }
     }
 
     private static void onStarGain(ServerPlayerEntity player, int starCount, long oldXp, long newXp) {
-        player.sendMessage(Text.literal("+1 Infinity Star! ").formatted(Formatting.YELLOW, Formatting.BOLD)
-                .append(Text.literal("Total Stars: ").formatted(Formatting.RESET))
-                .append(Text.literal(String.valueOf(starCount)).formatted(Formatting.GOLD)), false);
+        player.sendMessage(Text.translatable("challengecraft.level.infinity_star", starCount).formatted(Formatting.YELLOW, Formatting.BOLD), false);
         player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
         
         // Handle new rewards
         if (starCount == 20) {
-             player.sendMessage(Text.literal("SECRET UNLOCKED! ").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD)
-                     .append(Text.literal("You have unlocked the ").formatted(Formatting.RESET))
-                     .append(Text.literal("Infinity Weapon").formatted(Formatting.GOLD))
-                     .append(Text.literal(" perk!").formatted(Formatting.RESET)), false);
+             player.sendMessage(Text.translatable(
+                     "challengecraft.level.secret_unlock",
+                     Text.translatable("challengecraft.perk." + PERK_INFINITY_WEAPON).copy().formatted(Formatting.GOLD)
+             ).formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
         }
 
         // Show overlay
@@ -182,7 +176,7 @@ public class LevelManager {
 
     public static int getRequiredLevel(int id) {
         return switch (id) {
-            case 1, 10, 16, 17, 18 -> 1;
+            case 1, 10, 16, 17, 18, 40 -> 1;
             case 4, 5 -> 2;
             case 6, 7, 37 -> 3;
             case 8, 13 -> 4;
@@ -194,7 +188,7 @@ public class LevelManager {
             case 9, 32 -> 10;
             case 29 -> 11;
             case 2, 33 -> 12;
-            case 3 -> 13;
+            case 3, 39 -> 13;
             case 34 -> 14;
             case 23 -> 15;
             case 14 -> 16;

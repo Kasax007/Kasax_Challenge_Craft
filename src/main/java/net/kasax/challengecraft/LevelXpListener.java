@@ -29,7 +29,9 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
@@ -189,16 +191,12 @@ public class LevelXpListener {
             if (!player.getInventory().insertStack(weapon)) {
                 player.dropItem(weapon, false);
             }
-            player.sendMessage(Text.literal("§d§lInfinity Weapon granted!"), false);
+            player.sendMessage(Text.translatable("challengecraft.infinity_weapon.granted").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
         }
     }
 
     private static boolean isInfinityWeapon(ItemStack stack, MinecraftServer server) {
         if (stack.isEmpty()) return false;
-        
-        // Check for custom name first
-        Text name = stack.get(DataComponentTypes.CUSTOM_NAME);
-        if (name != null && name.getString().contains("Infinity Weapon")) return true;
 
         if (!stack.isOf(Items.GOLDEN_SWORD)) return false;
         
@@ -227,7 +225,7 @@ public class LevelXpListener {
         ItemStack stack = new ItemStack(Items.GOLDEN_SWORD);
         
         // Rainbow Name: Infinity Weapon
-        Text rainbowName = Text.literal("§b§lI§a§ln§e§lf§c§li§d§ln§9§li§b§lt§a§ly §e§lW§c§le§d§la§9§lp§b§lo§a§ln");
+        Text rainbowName = createRainbowName(Text.translatable("challengecraft.item.infinity_weapon").getString());
         stack.set(DataComponentTypes.CUSTOM_NAME, rainbowName);
         
         // Add Attribute Modifier for "Infinite" damage
@@ -245,5 +243,21 @@ public class LevelXpListener {
         stack.set(DataComponentTypes.ENCHANTMENTS, builder.build());
         
         return stack;
+    }
+
+    private static Text createRainbowName(String value) {
+        Formatting[] rainbow = {
+                Formatting.AQUA,
+                Formatting.GREEN,
+                Formatting.YELLOW,
+                Formatting.RED,
+                Formatting.LIGHT_PURPLE,
+                Formatting.BLUE
+        };
+        MutableText result = Text.empty();
+        for (int i = 0; i < value.length(); i++) {
+            result.append(Text.empty().append(String.valueOf(value.charAt(i))).formatted(rainbow[i % rainbow.length], Formatting.BOLD));
+        }
+        return result;
     }
 }

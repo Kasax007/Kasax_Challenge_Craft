@@ -96,7 +96,7 @@ public class LevelingScreen extends Screen {
     private int radarViewportTravel;
 
     public LevelingScreen(Screen parent) {
-        super(Text.literal("Progress Journey"));
+        super(Text.translatable("challengecraft.leveling.title"));
         this.parent = parent;
         this.legacyLayoutMode = ChallengeCraftClient.USE_LEGACY_LEVEL_SCREEN_LAYOUT;
 
@@ -219,11 +219,15 @@ public class LevelingScreen extends Screen {
     }
 
     private Text getLayoutButtonText() {
-        return Text.literal(this.layoutEditMode ? "Layout Edit On" : "Layout Edit Off");
+        return Text.translatable(this.layoutEditMode
+                ? "challengecraft.leveling.layout_edit.on"
+                : "challengecraft.leveling.layout_edit.off");
     }
 
     private Text getLayoutModeButtonText() {
-        return Text.literal(this.legacyLayoutMode ? "Layout: Legacy" : "Layout: Journey");
+        return Text.translatable(this.legacyLayoutMode
+                ? "challengecraft.leveling.layout_mode.legacy"
+                : "challengecraft.leveling.layout_mode.journey");
     }
 
     private void updateLayoutButtons() {
@@ -277,10 +281,10 @@ public class LevelingScreen extends Screen {
 
         int buttonY = this.height - 26;
         int startX = this.width / 2 - 222;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Back"), button -> close())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.ui.back"), button -> close())
                 .dimensions(startX, buttonY, 102, 20)
                 .build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Center On Current"), button -> {
+        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.leveling.center_current"), button -> {
                     if (this.journeyPanel != null) {
                         this.journeyPanel.centerOn(this.currentMilestone != null ? this.currentMilestone : this.pinnedMilestone);
                     }
@@ -294,7 +298,7 @@ public class LevelingScreen extends Screen {
                 })
                 .dimensions(startX + 216, buttonY, 102, 20)
                 .build());
-        this.resetLayoutButton = addDrawableChild(ButtonWidget.builder(Text.literal("Reset Layout"), button -> {
+        this.resetLayoutButton = addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.leveling.reset_layout"), button -> {
                     this.layoutOffsets.clear();
                     this.layoutOffsets.putAll(LevelJourneyLayoutStore.defaultOffsets());
                     LevelJourneyLayoutStore.clear();
@@ -326,7 +330,7 @@ public class LevelingScreen extends Screen {
             currentY += entry.getHeight() + 6;
         }
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Back"), button -> close())
+        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.ui.back"), button -> close())
                 .dimensions(this.width / 2 - 50, this.height - 26, 100, 20)
                 .build());
     }
@@ -394,7 +398,7 @@ public class LevelingScreen extends Screen {
         for (int level = 1; level <= LevelManager.MAX_LEVEL; level++) {
             List<Reward> rewards = buildLevelRewards(level);
             Milestone milestone = new Milestone(index++, level, false, LevelManager.getXpForLevel(level), rewards);
-            milestone.title = "Level " + level;
+            milestone.title = tr("challengecraft.leveling.level_value", level);
             milestone.summary = buildLevelSummary(rewards);
             milestone.unlocked = this.currentLevel >= level;
             this.milestones.add(milestone);
@@ -413,7 +417,7 @@ public class LevelingScreen extends Screen {
                 }
 
                 Milestone milestone = new Milestone(index++, star, true, LevelManager.getXpForLevel(LevelManager.MAX_LEVEL) + (long) star * 1000L, rewards);
-                milestone.title = "Star " + star;
+                milestone.title = tr("challengecraft.leveling.star_value", star);
                 milestone.summary = buildStarSummary(rewards);
                 milestone.unlocked = this.currentStars >= star;
                 this.milestones.add(milestone);
@@ -549,7 +553,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 38; challengeId++) {
+        for (int challengeId = 1; challengeId <= 40; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Text.translatable("challengecraft.worldcreate.challenge" + challengeId),
@@ -562,8 +566,8 @@ public class LevelingScreen extends Screen {
 
         if (level == LevelManager.MAX_LEVEL) {
             rewards.add(Reward.special(
-                    Text.literal("Infinity Road"),
-                    Text.literal("The infinity-star track opens after reaching level 20."),
+                    Text.translatable("challengecraft.leveling.infinity_road"),
+                    Text.translatable("challengecraft.leveling.infinity_road.desc"),
                     0xFFE3B35A
             ));
         }
@@ -597,16 +601,16 @@ public class LevelingScreen extends Screen {
             case "rainbow" -> 0xFF6DE7E1;
             default -> 0xFFFFFFFF;
         };
-        String label = switch (rewardId) {
-            case "green" -> "Green Name Aura";
-            case "blue" -> "Blue Name Aura";
-            case "red" -> "Red Name Aura";
-            case "purple" -> "Purple Name Aura";
-            case "gold" -> "Gold Name Aura";
-            case "rainbow" -> "Rainbow Name Aura";
-            default -> rewardId;
+        Text label = switch (rewardId) {
+            case "green" -> Text.translatable("challengecraft.leveling.aura.green");
+            case "blue" -> Text.translatable("challengecraft.leveling.aura.blue");
+            case "red" -> Text.translatable("challengecraft.leveling.aura.red");
+            case "purple" -> Text.translatable("challengecraft.leveling.aura.purple");
+            case "gold" -> Text.translatable("challengecraft.leveling.aura.gold");
+            case "rainbow" -> Text.translatable("challengecraft.leveling.aura.rainbow");
+            default -> Text.of(rewardId);
         };
-        rewards.add(Reward.color(Text.literal(label), Text.literal("Your name color changes when this milestone is unlocked."), color));
+        rewards.add(Reward.color(label, Text.translatable("challengecraft.leveling.aura.desc"), color));
         return rewards;
     }
 
@@ -623,23 +627,23 @@ public class LevelingScreen extends Screen {
 
         if (perkCount == 0) {
             return challengeCount == 1
-                    ? "Unlocks 1 new challenge."
-                    : "Unlocks " + challengeCount + " new challenges.";
+                    ? tr("challengecraft.leveling.summary.challenge_single")
+                    : tr("challengecraft.leveling.summary.challenge_multiple", challengeCount);
         }
         if (challengeCount == 0) {
             return perkCount == 1
-                    ? "Unlocks 1 new perk."
-                    : "Unlocks " + perkCount + " new perks.";
+                    ? tr("challengecraft.leveling.summary.perk_single")
+                    : tr("challengecraft.leveling.summary.perk_multiple", perkCount);
         }
-        return "Unlocks " + challengeCount + " challenges and " + perkCount + " perk" + (perkCount == 1 ? "" : "s") + ".";
+        return tr("challengecraft.leveling.summary.mixed", challengeCount, perkCount, perkCount == 1 ? tr("challengecraft.leveling.summary.perk_word_single") : tr("challengecraft.leveling.summary.perk_word_multiple"));
     }
 
     private String buildStarSummary(List<Reward> rewards) {
         Reward reward = rewards.get(0);
         if (reward.kind == RewardKind.COLOR) {
-            return "Unlocks a new name aura for your profile.";
+            return tr("challengecraft.leveling.summary.aura");
         }
-        return "Unlocks a hidden infinity reward.";
+        return tr("challengecraft.leveling.summary.infinity");
     }
 
     private void drawHeader(DrawContext context) {
@@ -660,9 +664,9 @@ public class LevelingScreen extends Screen {
     }
 
     private void drawJourneyHeader(DrawContext context, int x, int y, int topWidth, int rowWidth) {
-        context.drawText(this.textRenderer, Text.literal("Challenge Journey"), x, y, 0xFFF4F8FF, false);
-        String subtitle = trimToWidth("A crafted reward trail from early challenges to infinity.", topWidth);
-        context.drawText(this.textRenderer, Text.literal(subtitle), x, y + 11, 0xFF9FB0CA, false);
+        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.header.journey"), x, y, 0xFFF4F8FF, false);
+        String subtitle = trimToWidth(tr("challengecraft.leveling.header.journey.desc"), topWidth);
+        context.drawText(this.textRenderer, Text.of(subtitle), x, y + 11, 0xFF9FB0CA, false);
 
         float progress;
         String progressText;
@@ -670,23 +674,23 @@ public class LevelingScreen extends Screen {
             long maxXp = LevelManager.getXpForLevel(LevelManager.MAX_LEVEL);
             long starProgress = Math.max(0L, this.totalXp - maxXp) % 1000L;
             progress = starProgress / 1000.0f;
-            progressText = "Infinity Star: " + formatXp(starProgress) + " / 1,000 XP";
+            progressText = tr("challengecraft.leveling.header.infinity_progress", formatXp(starProgress));
         } else {
             long currentLevelXp = LevelManager.getXpForLevel(this.currentLevel);
             long nextLevelXp = LevelManager.getXpForLevel(this.currentLevel + 1);
             long neededXp = Math.max(1L, nextLevelXp - currentLevelXp);
             long progressXp = Math.max(0L, this.totalXp - currentLevelXp);
             progress = MathHelper.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
-            progressText = formatXp(progressXp) + " / " + formatXp(neededXp) + " XP";
+            progressText = tr("challengecraft.leveling.header.progress", formatXp(progressXp), formatXp(neededXp));
         }
 
-        String left = "Level " + this.currentLevel;
+        String left = tr("challengecraft.leveling.level_value", this.currentLevel);
         String right = this.currentLevel < LevelManager.MAX_LEVEL
-                ? "Next level: " + (this.currentLevel + 1)
-                : (this.currentStars > 0 ? this.currentStars + " stars" : "Infinity unlocked");
+                ? tr("challengecraft.leveling.header.next_level", this.currentLevel + 1)
+                : (this.currentStars > 0 ? tr("challengecraft.leveling.header.stars", this.currentStars) : tr("challengecraft.leveling.header.infinity_unlocked"));
         int labelY = y + 24;
-        context.drawText(this.textRenderer, Text.literal(left), x, labelY, 0xFFDAE7FF, false);
-        context.drawText(this.textRenderer, Text.literal(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
+        context.drawText(this.textRenderer, Text.of(left), x, labelY, 0xFFDAE7FF, false);
+        context.drawText(this.textRenderer, Text.of(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
 
         int progressPanelY = y + 35;
         int progressPanelWidth = Math.max(200, rowWidth);
@@ -698,18 +702,18 @@ public class LevelingScreen extends Screen {
         drawBar(context, barX, barY, barWidth, barHeight, progress);
 
         String footer = this.layoutEditMode
-                ? "Edit mode: drag boxes, arrow keys nudge, R resets selected"
+                ? tr("challengecraft.leveling.header.edit_mode")
                 : progressText;
         int footerTop = progressPanelY + 16;
         int footerBottom = y + this.headerHeight - 13;
         int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.textRenderer.fontHeight) / 2);
-        context.drawText(this.textRenderer, Text.literal(trimToWidth(footer, rowWidth)), x, footerY, this.layoutEditMode ? 0xFFF7DF8A : 0xFFB9C5DA, false);
+        context.drawText(this.textRenderer, Text.of(trimToWidth(footer, rowWidth)), x, footerY, this.layoutEditMode ? 0xFFF7DF8A : 0xFFB9C5DA, false);
     }
 
     private void drawLegacyHeader(DrawContext context, int x, int y, int topWidth, int rowWidth) {
-        context.drawText(this.textRenderer, Text.literal("Leveling & Rewards"), x, y, 0xFFF4F8FF, false);
-        String subtitle = trimToWidth("Legacy layout with the original full unlock list.", topWidth);
-        context.drawText(this.textRenderer, Text.literal(subtitle), x, y + 11, 0xFF9FB0CA, false);
+        context.drawText(this.textRenderer, Text.translatable("challengecraft.mainmenu.leveling_button"), x, y, 0xFFF4F8FF, false);
+        String subtitle = trimToWidth(tr("challengecraft.leveling.header.legacy.desc"), topWidth);
+        context.drawText(this.textRenderer, Text.of(subtitle), x, y + 11, 0xFF9FB0CA, false);
 
         float progress;
         String progressText;
@@ -717,23 +721,23 @@ public class LevelingScreen extends Screen {
             long maxXp = LevelManager.getXpForLevel(LevelManager.MAX_LEVEL);
             long starProgress = Math.max(0L, this.totalXp - maxXp) % 1000L;
             progress = starProgress / 1000.0f;
-            progressText = "Infinity Star: " + formatXp(starProgress) + " / 1,000 XP";
+            progressText = tr("challengecraft.leveling.header.infinity_progress", formatXp(starProgress));
         } else {
             long currentLevelXp = LevelManager.getXpForLevel(this.currentLevel);
             long nextLevelXp = LevelManager.getXpForLevel(this.currentLevel + 1);
             long neededXp = Math.max(1L, nextLevelXp - currentLevelXp);
             long progressXp = Math.max(0L, this.totalXp - currentLevelXp);
             progress = MathHelper.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
-            progressText = formatXp(progressXp) + " / " + formatXp(neededXp) + " XP";
+            progressText = tr("challengecraft.leveling.header.progress", formatXp(progressXp), formatXp(neededXp));
         }
 
-        String left = "Level " + this.currentLevel;
+        String left = tr("challengecraft.leveling.level_value", this.currentLevel);
         String right = this.currentLevel < LevelManager.MAX_LEVEL
-                ? "Next level: " + (this.currentLevel + 1)
-                : (this.currentStars > 0 ? this.currentStars + " stars" : "Infinity unlocked");
+                ? tr("challengecraft.leveling.header.next_level", this.currentLevel + 1)
+                : (this.currentStars > 0 ? tr("challengecraft.leveling.header.stars", this.currentStars) : tr("challengecraft.leveling.header.infinity_unlocked"));
         int labelY = y + 24;
-        context.drawText(this.textRenderer, Text.literal(left), x, labelY, 0xFFDAE7FF, false);
-        context.drawText(this.textRenderer, Text.literal(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
+        context.drawText(this.textRenderer, Text.of(left), x, labelY, 0xFFDAE7FF, false);
+        context.drawText(this.textRenderer, Text.of(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
 
         int progressPanelY = y + 35;
         int progressPanelWidth = Math.max(200, rowWidth);
@@ -746,7 +750,7 @@ public class LevelingScreen extends Screen {
         int footerTop = progressPanelY + 16;
         int footerBottom = y + this.headerHeight - 13;
         int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.textRenderer.fontHeight) / 2);
-        context.drawText(this.textRenderer, Text.literal(trimToWidth(progressText, rowWidth)), x, footerY, 0xFFB9C5DA, false);
+        context.drawText(this.textRenderer, Text.of(trimToWidth(progressText, rowWidth)), x, footerY, 0xFFB9C5DA, false);
     }
 
     private void drawProgressRadar(DrawContext context) {
@@ -760,9 +764,9 @@ public class LevelingScreen extends Screen {
         int panelHeight = Math.min(this.mapHeight - 32, 220);
         drawPanel(context, panelX, panelY, panelWidth, panelHeight, 0xAA111923, 0xFF364255, 0xFF8BA6D8);
 
-        context.drawText(this.textRenderer, Text.literal("Route Radar"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
-        String count = getCompletedMilestoneCount() + " / " + this.milestones.size() + " cleared";
-        context.drawText(this.textRenderer, Text.literal(count), panelX + 10, panelY + 19, 0xFFB9C5DA, false);
+        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.radar.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
+        String count = tr("challengecraft.leveling.radar.count", getCompletedMilestoneCount(), this.milestones.size());
+        context.drawText(this.textRenderer, Text.of(count), panelX + 10, panelY + 19, 0xFFB9C5DA, false);
 
         int railX = panelX + 16;
         int railY = panelY + 34;
@@ -794,10 +798,10 @@ public class LevelingScreen extends Screen {
             context.fill(railX + 7, dotY - 1, railX + 11, dotY + 3, color);
         }
 
-        String currentText = this.currentMilestone != null ? this.currentMilestone.title : "None";
-        String nextText = this.nextMilestone != null ? this.nextMilestone.title : "Done";
-        context.drawText(this.textRenderer, Text.literal(trimToWidth("Now: " + currentText, panelWidth - 34)), panelX + 24, panelY + panelHeight - 32, 0xFFE8EEF9, false);
-        context.drawText(this.textRenderer, Text.literal(trimToWidth("Next: " + nextText, panelWidth - 34)), panelX + 24, panelY + panelHeight - 19, 0xFFB3D5FF, false);
+        String currentText = this.currentMilestone != null ? this.currentMilestone.title : tr("challengecraft.leveling.none");
+        String nextText = this.nextMilestone != null ? this.nextMilestone.title : tr("challengecraft.leveling.done");
+        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.radar.now", currentText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 32, 0xFFE8EEF9, false);
+        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.radar.next", nextText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 19, 0xFFB3D5FF, false);
     }
 
     private void drawUpcomingPanel(DrawContext context) {
@@ -811,25 +815,27 @@ public class LevelingScreen extends Screen {
         int panelHeight = Math.min(this.mapHeight - 20, 168);
         drawPanel(context, panelX, panelY, panelWidth, panelHeight, 0xAA111923, 0xFF364255, 0xFFE3B35A);
 
-        context.drawText(this.textRenderer, Text.literal("Route Ledger"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
-        context.drawText(this.textRenderer, Text.literal(trimToWidth("Pinned: " + (this.pinnedMilestone != null ? this.pinnedMilestone.title : "-"), panelWidth - 18)), panelX + 10, panelY + 20, 0xFFF7DF8A, false);
+        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
+        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.ledger.pinned", this.pinnedMilestone != null ? this.pinnedMilestone.title : "-"), panelWidth - 18)), panelX + 10, panelY + 20, 0xFFF7DF8A, false);
 
         List<Milestone> preview = getPreviewMilestones(4);
         int textY = panelY + 38;
         for (Milestone milestone : preview) {
             int color = milestone == this.nextMilestone ? 0xFFB3D5FF : (milestone.unlocked ? 0xFF8FE2B1 : 0xFFD8DFEC);
-            String prefix = milestone == this.currentMilestone ? "Now" : (milestone == this.nextMilestone ? "Up" : "Soon");
-            String line = prefix + ": " + milestone.title + "  " + formatXp(Math.max(0L, milestone.requiredXp - this.totalXp)) + " XP";
-            context.drawText(this.textRenderer, Text.literal(trimToWidth(line, panelWidth - 18)), panelX + 10, textY, color, false);
+            String prefix = milestone == this.currentMilestone
+                    ? tr("challengecraft.leveling.ledger.now")
+                    : (milestone == this.nextMilestone ? tr("challengecraft.leveling.ledger.up") : tr("challengecraft.leveling.ledger.soon"));
+            String line = tr("challengecraft.leveling.ledger.line", prefix, milestone.title, formatXp(Math.max(0L, milestone.requiredXp - this.totalXp)));
+            context.drawText(this.textRenderer, Text.of(trimToWidth(line, panelWidth - 18)), panelX + 10, textY, color, false);
             textY += 12;
         }
 
         if (this.layoutEditMode && this.pinnedMilestone != null) {
-            String coords = String.format(Locale.ROOT, "Offset X %.1f  Y %.1f", this.pinnedMilestone.offsetArtX, this.pinnedMilestone.offsetArtY);
-            context.drawText(this.textRenderer, Text.literal(trimToWidth(coords, panelWidth - 18)), panelX + 10, panelY + panelHeight - 24, 0xFFF7DF8A, false);
-            context.drawText(this.textRenderer, Text.literal("Drag or use arrows"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
+            String coords = tr("challengecraft.leveling.ledger.offsets", String.format(Locale.ROOT, "%.1f", this.pinnedMilestone.offsetArtX), String.format(Locale.ROOT, "%.1f", this.pinnedMilestone.offsetArtY));
+            context.drawText(this.textRenderer, Text.of(trimToWidth(coords, panelWidth - 18)), panelX + 10, panelY + panelHeight - 24, 0xFFF7DF8A, false);
+            context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.drag_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
         } else {
-            context.drawText(this.textRenderer, Text.literal("Select a node for full details"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
+            context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.select_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
         }
     }
 
@@ -875,21 +881,21 @@ public class LevelingScreen extends Screen {
 
         drawPanel(context, this.detailX, this.detailY, this.detailWidth, this.detailHeight, DETAIL_BG, 0xFF384356, DETAIL_ACCENT);
 
-        String status = focus.unlocked ? "Unlocked" : (focus == this.nextMilestone ? "Up next" : "Locked");
+        String status = focus.unlocked ? tr("challengecraft.leveling.status.unlocked") : (focus == this.nextMilestone ? tr("challengecraft.leveling.status.up_next") : tr("challengecraft.leveling.status.locked"));
         int statusColor = focus.unlocked ? 0xFF7BE0A4 : (focus == this.nextMilestone ? DETAIL_ACCENT : 0xFF9FAAC1);
 
-        context.drawText(this.textRenderer, Text.literal(focus.title), this.detailX + 12, this.detailY + 10, 0xFFF4F8FF, false);
+        context.drawText(this.textRenderer, Text.of(focus.title), this.detailX + 12, this.detailY + 10, 0xFFF4F8FF, false);
         int statusWidth = this.textRenderer.getWidth(status);
         drawChip(context, this.detailX + this.detailWidth - statusWidth - 20, this.detailY + 8, statusWidth + 10, 12, 0x44222A34, statusColor);
-        context.drawText(this.textRenderer, Text.literal(status), this.detailX + this.detailWidth - statusWidth - 15, this.detailY + 10, statusColor, false);
+        context.drawText(this.textRenderer, Text.of(status), this.detailX + this.detailWidth - statusWidth - 15, this.detailY + 10, statusColor, false);
 
         String requirement = focus.isStar
-                ? "Requirement: level 20 + " + formatXp(Math.max(0L, focus.requiredXp - LevelManager.getXpForLevel(LevelManager.MAX_LEVEL))) + " XP"
-                : "Requirement: " + formatXp(focus.requiredXp) + " XP";
-        context.drawText(this.textRenderer, Text.literal(requirement), this.detailX + 12, this.detailY + 24, 0xFFB9C5DA, false);
+                ? tr("challengecraft.leveling.requirement.star", formatXp(Math.max(0L, focus.requiredXp - LevelManager.getXpForLevel(LevelManager.MAX_LEVEL))))
+                : tr("challengecraft.leveling.requirement.level", formatXp(focus.requiredXp));
+        context.drawText(this.textRenderer, Text.of(requirement), this.detailX + 12, this.detailY + 24, 0xFFB9C5DA, false);
 
         String summary = trimToWidth(focus.summary, this.detailWidth - 24);
-        context.drawText(this.textRenderer, Text.literal(summary), this.detailX + 12, this.detailY + 37, 0xFFD8DFEC, false);
+        context.drawText(this.textRenderer, Text.of(summary), this.detailX + 12, this.detailY + 37, 0xFFD8DFEC, false);
 
         int chipX = this.detailX + 12;
         int chipY = this.detailY + 48;
@@ -898,8 +904,8 @@ public class LevelingScreen extends Screen {
         Reward hoveredReward = null;
 
         if (focus.rewards.isEmpty()) {
-            drawRewardChip(context, chipX, chipY, 118, Text.literal("Momentum"), null, 0xFF95A3BC, RewardKind.SPECIAL, false);
-            drawRewardDescription(context, Text.literal("Checkpoint"), Text.literal("A pacing node with no reward attached. Keep climbing toward the next unlock."), null);
+            drawRewardChip(context, chipX, chipY, 118, Text.translatable("challengecraft.leveling.reward.momentum"), null, 0xFF95A3BC, RewardKind.SPECIAL, false);
+            drawRewardDescription(context, Text.translatable("challengecraft.leveling.reward.checkpoint"), Text.translatable("challengecraft.leveling.reward.checkpoint.desc"), null);
             return;
         }
 
@@ -919,7 +925,7 @@ public class LevelingScreen extends Screen {
             int remaining = focus.rewards.size() - visibleRewards;
             int moreX = chipX + visibleRewards * 96;
             boolean hoveredMore = isInside(mouseX, mouseY, moreX, chipY, 74, 26);
-            drawRewardChip(context, moreX, chipY, 74, Text.literal("+" + remaining + " more"), null, 0xFFAAB4C8, RewardKind.SPECIAL, hoveredMore);
+            drawRewardChip(context, moreX, chipY, 74, Text.translatable("challengecraft.leveling.reward.more", remaining), null, 0xFFAAB4C8, RewardKind.SPECIAL, hoveredMore);
         }
 
         if (hoveredReward != null) {
@@ -928,7 +934,7 @@ public class LevelingScreen extends Screen {
             Reward reward = focus.rewards.get(0);
             drawRewardDescription(context, reward.name, reward.description, reward);
         } else {
-            drawRewardDescription(context, Text.literal("Reward Inspector"), Text.literal("Hover a reward chip to inspect the unlock description."), null);
+            drawRewardDescription(context, Text.translatable("challengecraft.leveling.reward.inspector"), Text.translatable("challengecraft.leveling.reward.inspector.desc"), null);
         }
     }
 
@@ -945,7 +951,7 @@ public class LevelingScreen extends Screen {
 
         int textX = x + 24;
         String trimmed = trimToWidth(label.getString(), width - 30);
-        context.drawText(this.textRenderer, Text.literal(trimmed), textX, y + 9, kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFDCE7F8, false);
+        context.drawText(this.textRenderer, Text.of(trimmed), textX, y + 9, kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFDCE7F8, false);
     }
 
     private void drawRewardDescription(DrawContext context, Text title, Text description, Reward reward) {
@@ -956,7 +962,7 @@ public class LevelingScreen extends Screen {
         int accent = reward != null ? reward.accentColor : 0xFF95A3BC;
 
         drawPanel(context, boxX, boxY, boxWidth, boxHeight, 0xAA101722, 0xFF334155, accent);
-        context.drawText(this.textRenderer, Text.literal(trimToWidth(title.getString(), boxWidth - 16)), boxX + 8, boxY + 4, 0xFFF2F6FF, false);
+        context.drawText(this.textRenderer, Text.of(trimToWidth(title.getString(), boxWidth - 16)), boxX + 8, boxY + 4, 0xFFF2F6FF, false);
         drawWrappedLines(context, description, boxX + 8, boxY + 13, boxWidth - 16, 0xFFB9C5DA, 2);
     }
 
@@ -1010,6 +1016,10 @@ public class LevelingScreen extends Screen {
         int g = (int) (((color >>> 8) & 0xFF) * factor);
         int b = (int) ((color & 0xFF) * factor);
         return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private static String tr(String key, Object... args) {
+        return Text.translatable(key, args).getString();
     }
 
     private String trimToWidth(String text, int width) {
@@ -1147,17 +1157,17 @@ public class LevelingScreen extends Screen {
             int rightX = leftX + segmentWidth;
             boolean journeySelected = !legacyLayoutMode;
 
-            drawModeSegment(context, leftX, getY() + 3, segmentWidth, getHeight() - 6, "Journey", journeySelected, hovering && mouseX < rightX);
-            drawModeSegment(context, rightX, getY() + 3, segmentWidth, getHeight() - 6, "Legacy", !journeySelected, hovering && mouseX >= rightX);
+            drawModeSegment(context, leftX, getY() + 3, segmentWidth, getHeight() - 6, Text.translatable("challengecraft.leveling.mode.journey"), journeySelected, hovering && mouseX < rightX);
+            drawModeSegment(context, rightX, getY() + 3, segmentWidth, getHeight() - 6, Text.translatable("challengecraft.leveling.mode.legacy"), !journeySelected, hovering && mouseX >= rightX);
         }
 
-        private void drawModeSegment(DrawContext context, int x, int y, int width, int height, String label, boolean selected, boolean hovered) {
+        private void drawModeSegment(DrawContext context, int x, int y, int width, int height, Text label, boolean selected, boolean hovered) {
             int fill = selected ? 0xFF314A38 : (hovered ? 0xCC243345 : 0x99182230);
             int border = selected ? 0xFF74D7A0 : 0xFF506179;
             int accent = selected ? 0xFFBFF3D0 : 0xFF9CB7E8;
             drawPanel(context, x, y, width, height, fill, border, accent);
             int color = selected ? 0xFFF6FFF9 : 0xFFD6E1F4;
-            context.drawCenteredTextWithShadow(textRenderer, Text.literal(label), x + width / 2, y + 4, color);
+            context.drawCenteredTextWithShadow(textRenderer, label, x + width / 2, y + 4, color);
         }
 
         @Override
@@ -1200,21 +1210,21 @@ public class LevelingScreen extends Screen {
 
             drawPanel(context, getX(), getY(), getWidth(), getHeight(), fill, 0xFF3C495C, accent);
 
-            String label = this.milestone.isStar ? "Infinity Star " + this.milestone.value : this.milestone.title;
-            context.drawText(textRenderer, Text.literal(label), getX() + 10, getY() + 8, 0xFFF4F8FF, false);
+            String label = this.milestone.isStar ? tr("challengecraft.leveling.infinity_star_value", this.milestone.value) : this.milestone.title;
+            context.drawText(textRenderer, Text.of(label), getX() + 10, getY() + 8, 0xFFF4F8FF, false);
 
-            String state = this.milestone.unlocked ? "UNLOCKED" : (this.milestone == nextMilestone ? "UP NEXT" : "LOCKED");
+            String state = this.milestone.unlocked ? tr("challengecraft.leveling.state.unlocked") : (this.milestone == nextMilestone ? tr("challengecraft.leveling.state.up_next") : tr("challengecraft.leveling.state.locked"));
             int stateColor = this.milestone.unlocked ? 0xFF7BE0A4 : (this.milestone == nextMilestone ? 0xFFE3B35A : 0xFFB3C0D3);
             int chipWidth = textRenderer.getWidth(state) + 10;
             drawChip(context, getX() + getWidth() - chipWidth - 8, getY() + 6, chipWidth, 12, 0x55222A34, stateColor);
-            context.drawText(textRenderer, Text.literal(state), getX() + getWidth() - chipWidth - 3, getY() + 8, stateColor, false);
+            context.drawText(textRenderer, Text.of(state), getX() + getWidth() - chipWidth - 3, getY() + 8, stateColor, false);
 
             String summary = trimToWidth(this.milestone.summary, getWidth() - 20);
-            context.drawText(textRenderer, Text.literal(summary), getX() + 10, getY() + 20, 0xFFB9C5DA, false);
+            context.drawText(textRenderer, Text.of(summary), getX() + 10, getY() + 20, 0xFFB9C5DA, false);
 
             int rewardY = getY() + 33;
             if (this.milestone.rewards.isEmpty()) {
-                context.drawText(textRenderer, Text.literal("Momentum checkpoint"), getX() + 26, rewardY, 0xFFD8DFEC, false);
+                context.drawText(textRenderer, Text.translatable("challengecraft.leveling.reward.momentum_checkpoint"), getX() + 26, rewardY, 0xFFD8DFEC, false);
                 drawGem(context, getX() + 13, rewardY + 5, 0xFF95A3BC);
             } else {
                 for (Reward reward : this.milestone.rewards) {
@@ -1229,10 +1239,10 @@ public class LevelingScreen extends Screen {
                     int textX = getX() + 30;
                     int maxWidth = getWidth() - 38;
                     String rewardName = trimToWidth(reward.name.getString(), maxWidth);
-                    context.drawText(textRenderer, Text.literal(rewardName), textX, rewardY, reward.kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFE8EEF9, false);
+                    context.drawText(textRenderer, Text.of(rewardName), textX, rewardY, reward.kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFE8EEF9, false);
 
                     String rewardDesc = trimToWidth(reward.description.getString(), maxWidth);
-                    context.drawText(textRenderer, Text.literal(rewardDesc), textX, rewardY + 10, 0xFF9FB0CA, false);
+                    context.drawText(textRenderer, Text.of(rewardDesc), textX, rewardY + 10, 0xFF9FB0CA, false);
                     rewardY += 22;
                 }
             }
@@ -1342,12 +1352,12 @@ public class LevelingScreen extends Screen {
                     JOURNEY_TEXTURE_HEIGHT
             );
 
-            drawSectionRibbon(context, "Spawn Trail", scaleArtY(SPAWN_RIBBON_Y) - scrollY, 0xFF88D38E, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, "Cavern Rise", scaleArtY(CAVERN_RIBBON_Y) - scrollY, 0xFF81A5D9, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, "Nether Crucible", scaleArtY(NETHER_RIBBON_Y) - scrollY, 0xFFE07A62, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, "End Citadel", scaleArtY(END_RIBBON_Y) - scrollY, 0xFFC9A6FF, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.spawn"), scaleArtY(SPAWN_RIBBON_Y) - scrollY, 0xFF88D38E, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.cavern"), scaleArtY(CAVERN_RIBBON_Y) - scrollY, 0xFF81A5D9, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.nether"), scaleArtY(NETHER_RIBBON_Y) - scrollY, 0xFFE07A62, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.end"), scaleArtY(END_RIBBON_Y) - scrollY, 0xFFC9A6FF, true, artX, artX + renderedArtWidth);
             if (showInfinityTrack) {
-                drawSectionRibbon(context, "Infinity Expanse", scaleArtY(INFINITY_RIBBON_Y) - scrollY, 0xFF6DE7E1, true, artX, artX + renderedArtWidth);
+                drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.infinity"), scaleArtY(INFINITY_RIBBON_Y) - scrollY, 0xFF6DE7E1, true, artX, artX + renderedArtWidth);
             }
 
             for (int i = 0; i < this.milestones.size() - 1; i++) {
@@ -1402,7 +1412,7 @@ public class LevelingScreen extends Screen {
             return null;
         }
 
-        private void drawSectionRibbon(DrawContext context, String label, int y, int color, boolean rightAligned, int artLeft, int artRight) {
+        private void drawSectionRibbon(DrawContext context, Text label, int y, int color, boolean rightAligned, int artLeft, int artRight) {
             if (y < -24 || y > this.height + 24) {
                 return;
             }
@@ -1410,7 +1420,7 @@ public class LevelingScreen extends Screen {
             int x = rightAligned ? artRight - width - 14 : artLeft + 14;
             int border = darken(color, 0.55f);
             drawPanel(context, x, this.getY() + y - 9, width, 18, 0x88202835, border, color);
-            context.drawText(LevelingScreen.this.textRenderer, Text.literal(label), x + 12, this.getY() + y - 4, 0xFFF7FAFF, false);
+            context.drawText(LevelingScreen.this.textRenderer, label, x + 12, this.getY() + y - 4, 0xFFF7FAFF, false);
         }
 
         private void drawSegment(DrawContext context, Milestone a, Milestone b, int scrollY) {
@@ -1493,23 +1503,23 @@ public class LevelingScreen extends Screen {
                 context.fill(x - 5, y - 5, x - 3, y + milestone.cardHeight + 5, 0xFFF7DF8A);
                 context.fill(x + milestone.cardWidth + 3, y - 5, x + milestone.cardWidth + 5, y + milestone.cardHeight + 5, 0xFFF7DF8A);
                 drawChip(context, x + 8, y - 12, 56, 12, 0xCC271B0E, 0xFFF7DF8A);
-                context.drawText(LevelingScreen.this.textRenderer, Text.literal("SELECTED"), x + 13, y - 10, 0xFFF9F4D1, false);
+                context.drawText(LevelingScreen.this.textRenderer, Text.translatable("challengecraft.leveling.selected"), x + 13, y - 10, 0xFFF9F4D1, false);
             }
 
             drawPanel(context, x, y, milestone.cardWidth, milestone.cardHeight, fill, border, accent);
 
-            String header = milestone.isStar ? "STAR " + milestone.value : "LEVEL " + milestone.value;
-            context.drawText(LevelingScreen.this.textRenderer, Text.literal(header), x + 8, y + 7, milestone.isStar ? 0xFFFFE39B : 0xFFE4EEFF, false);
+            String header = milestone.isStar ? tr("challengecraft.leveling.header.star", milestone.value) : tr("challengecraft.leveling.header.level", milestone.value);
+            context.drawText(LevelingScreen.this.textRenderer, Text.of(header), x + 8, y + 7, milestone.isStar ? 0xFFFFE39B : 0xFFE4EEFF, false);
 
-            String state = milestone.unlocked ? "CLEARED" : (isNext ? "NEXT" : "LOCKED");
+            String state = milestone.unlocked ? tr("challengecraft.leveling.state.cleared") : (isNext ? tr("challengecraft.leveling.state.next") : tr("challengecraft.leveling.state.locked"));
             int stateColor = milestone.unlocked ? 0xFF8FE2B1 : (isNext ? 0xFFB3D5FF : 0xFFA1ADC2);
             int stateWidth = LevelingScreen.this.textRenderer.getWidth(state);
-            context.drawText(LevelingScreen.this.textRenderer, Text.literal(state), x + milestone.cardWidth - stateWidth - 8, y + 7, stateColor, false);
+            context.drawText(LevelingScreen.this.textRenderer, Text.of(state), x + milestone.cardWidth - stateWidth - 8, y + 7, stateColor, false);
 
             int rewardY = y + (milestone.isStar && milestone.rewards.isEmpty() ? 18 : 24);
             if (milestone.rewards.isEmpty()) {
                 drawGem(context, x + 12, rewardY, accent);
-                context.drawText(LevelingScreen.this.textRenderer, Text.literal("Checkpoint"), x + 22, rewardY - 4, 0xFFB8C6DD, false);
+                context.drawText(LevelingScreen.this.textRenderer, Text.translatable("challengecraft.leveling.reward.checkpoint"), x + 22, rewardY - 4, 0xFFB8C6DD, false);
                 return;
             }
 
@@ -1526,9 +1536,9 @@ public class LevelingScreen extends Screen {
 
             String rewardLabel = milestone.rewards.size() == 1
                     ? milestone.rewards.get(0).name.getString()
-                    : milestone.rewards.size() + " unlocks";
+                    : tr("challengecraft.leveling.reward.unlocks", milestone.rewards.size());
             rewardLabel = trimToWidth(rewardLabel, milestone.cardWidth - 70);
-            context.drawText(LevelingScreen.this.textRenderer, Text.literal(rewardLabel), x + 64, rewardY + 5, 0xFFDCE7F8, false);
+            context.drawText(LevelingScreen.this.textRenderer, Text.of(rewardLabel), x + 64, rewardY + 5, 0xFFDCE7F8, false);
         }
 
         private void drawPixelLine(DrawContext context, int startX, int startY, int endX, int endY, int size, int color) {

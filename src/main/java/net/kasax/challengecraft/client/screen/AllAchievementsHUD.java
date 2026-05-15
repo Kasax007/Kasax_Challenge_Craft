@@ -52,7 +52,7 @@ public class AllAchievementsHUD {
 
         boolean completed = currentIndex >= total;
         
-        Text advName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : Text.literal("...");
+        Text advName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : Text.translatable("challengecraft.placeholder.pending");
         ItemStack icon = completed ? new ItemStack(Items.NETHER_STAR) : ItemStack.EMPTY;
 
         if (!completed && currentAdvancement != null) {
@@ -60,8 +60,7 @@ public class AllAchievementsHUD {
             icon = currentAdvancement.icon();
         }
 
-        String progressStr = currentIndex + " / " + total;
-        Text progressText = Text.literal(progressStr).formatted(Formatting.GRAY);
+        Text progressText = Text.translatable("challengecraft.progress.simple", currentIndex, total).formatted(Formatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (AllEntitiesHUD.isActive() ? 1 : 0) + (active ? 1 : 0);

@@ -67,6 +67,8 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_36_TriviaChallenge.register();
 		Chal_37_GameSpeed.register();
 		Chal_38_ChunkHunt.register();
+		Chal_39_NoFood.register();
+		Chal_40_LockoutBingo.register();
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 
@@ -76,14 +78,14 @@ public class ChallengeCraft implements ModInitializer {
 					.requires(source -> source.hasPermissionLevel(2))
 					.executes(context -> {
 						Chal_22_AllItems.skipItem(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.literal("Skipped current item."), true);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_item.single"), true);
 						return 1;
 					})
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_22_AllItems.skipItem(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.literal("Skipped " + amount + " items."), true);
+								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_item.multiple", amount), true);
 								return 1;
 							}))
 			);
@@ -95,7 +97,7 @@ public class ChallengeCraft implements ModInitializer {
 						if (Chal_22_AllItems.isActive()) {
 							ServerPlayNetworking.send(player, new AllItemsListPacket(data.getAllItemsOrder(), data.getAllItemsIndex()));
 						} else {
-							context.getSource().sendFeedback(() -> Text.literal("All Items challenge is not active."), false);
+							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_items.inactive"), false);
 						}
 						return 1;
 					}));
@@ -104,14 +106,14 @@ public class ChallengeCraft implements ModInitializer {
 					.requires(source -> source.hasPermissionLevel(2))
 					.executes(context -> {
 						Chal_23_AllEntities.skipEntity(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.literal("Skipped current entity."), true);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_entity.single"), true);
 						return 1;
 					})
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_23_AllEntities.skipEntity(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.literal("Skipped " + amount + " entities."), true);
+								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_entity.multiple", amount), true);
 								return 1;
 							}))
 			);
@@ -123,7 +125,7 @@ public class ChallengeCraft implements ModInitializer {
 						if (Chal_23_AllEntities.isActive()) {
 							ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.AllEntitiesListPacket(data.getAllEntitiesOrder(), data.getAllEntitiesIndex()));
 						} else {
-							context.getSource().sendFeedback(() -> Text.literal("All Entities challenge is not active."), false);
+							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_entities.inactive"), false);
 						}
 						return 1;
 					}));
@@ -132,14 +134,14 @@ public class ChallengeCraft implements ModInitializer {
 					.requires(source -> source.hasPermissionLevel(2))
 					.executes(context -> {
 						Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.literal("Skipped current advancement."), true);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_advancement.single"), true);
 						return 1;
 					})
 					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.literal("Skipped " + amount + " advancements."), true);
+								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_advancement.multiple", amount), true);
 								return 1;
 							}))
 			);
@@ -150,10 +152,45 @@ public class ChallengeCraft implements ModInitializer {
 						if (Chal_26_AllAchievements.isActive()) {
 							Chal_26_AllAchievements.sendListToPlayer(player);
 						} else {
-							context.getSource().sendFeedback(() -> Text.literal("All Achievements challenge is not active."), false);
+							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_advancements.inactive"), false);
 						}
 						return 1;
 					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_lockout_debug_solo")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						Chal_40_LockoutBingo.startSoloDebugRun(player);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_solo.started"), true);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_lockout_debug_claim")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						int claimed = Chal_40_LockoutBingo.debugClaimTiles(player, 1);
+						if (claimed > 0) {
+							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
+						} else {
+							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.none"), false);
+						}
+						return claimed;
+					})
+					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1, 25))
+							.executes(context -> {
+								ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+								int amount = IntegerArgumentType.getInteger(context, "amount");
+								int claimed = Chal_40_LockoutBingo.debugClaimTiles(player, amount);
+								if (claimed > 0) {
+									context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
+								} else {
+									context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.none"), false);
+								}
+								return claimed;
+							}))
+			);
 		});
 
 		// 1) Tell Fabric about our SERVER‑BOUND channel:
@@ -165,6 +202,8 @@ public class ChallengeCraft implements ModInitializer {
 				.register(TriviaAnswerPacket.ID, TriviaAnswerPacket.CODEC);
 		PayloadTypeRegistry.playC2S()
 				.register(net.kasax.challengecraft.network.InfiniteChestClickPayload.ID, net.kasax.challengecraft.network.InfiniteChestClickPayload.CODEC);
+		PayloadTypeRegistry.playC2S()
+				.register(LockoutBingoActionPacket.ID, LockoutBingoActionPacket.CODEC);
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
@@ -221,6 +260,14 @@ public class ChallengeCraft implements ModInitializer {
 				net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID,
 				net.kasax.challengecraft.network.InfiniteChestSyncPayload.CODEC
 		);
+		PayloadTypeRegistry.playS2C().register(
+				LockoutBingoSyncPacket.ID,
+				LockoutBingoSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				LockoutBingoOpenScreenPacket.ID,
+				LockoutBingoOpenScreenPacket.CODEC
+		);
 
 		// 2) Now hook up the handler:
 		PacketHandler.register();
@@ -243,15 +290,15 @@ public class ChallengeCraft implements ModInitializer {
 		ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
 
 		if (data.getActive().contains(22)) {
-			player.sendMessage(Text.literal("All Items is active. Use /challengecraft_all_items_list to view collected items and the next item needed.")
+			player.sendMessage(Text.translatable("challengecraft.command.all_items.reminder")
 					.formatted(Formatting.GOLD), false);
 		}
 		if (data.getActive().contains(23)) {
-			player.sendMessage(Text.literal("All Entities is active. Use /challengecraft_all_entities_list to view killed entities and the next entity needed.")
+			player.sendMessage(Text.translatable("challengecraft.command.all_entities.reminder")
 					.formatted(Formatting.GOLD), false);
 		}
 		if (data.getActive().contains(26)) {
-			player.sendMessage(Text.literal("All Advancements is active. Use /challengecraft_all_advancements_list to view completed advancements and the next advancement needed.")
+			player.sendMessage(Text.translatable("challengecraft.command.all_advancements.reminder")
 					.formatted(Formatting.GOLD), false);
 		}
 	}

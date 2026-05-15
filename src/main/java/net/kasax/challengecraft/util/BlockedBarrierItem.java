@@ -6,14 +6,14 @@ import net.minecraft.item.Items;
 import net.minecraft.text.Text;
 
 public final class BlockedBarrierItem {
-    private static final String BLOCKED_NAME = "Blocked";
+    private static final String BLOCKED_NAME_KEY = "challengecraft.blocked_barrier";
 
     private BlockedBarrierItem() {
     }
 
     public static ItemStack create() {
         ItemStack blocked = new ItemStack(Items.BARRIER);
-        blocked.set(DataComponentTypes.CUSTOM_NAME, Text.literal(BLOCKED_NAME));
+        blocked.set(DataComponentTypes.CUSTOM_NAME, Text.translatable(BLOCKED_NAME_KEY));
         return blocked;
     }
 
@@ -23,6 +23,6 @@ public final class BlockedBarrierItem {
         }
 
         Text name = stack.get(DataComponentTypes.CUSTOM_NAME);
-        return name != null && BLOCKED_NAME.equals(name.getString());
+        return name != null && Text.translatable(BLOCKED_NAME_KEY).getString().equals(name.getString());
     }
 }

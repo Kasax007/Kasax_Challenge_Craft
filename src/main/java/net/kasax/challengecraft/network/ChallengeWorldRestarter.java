@@ -81,11 +81,11 @@ public class ChallengeWorldRestarter {
         LOGGER.info("Reset challenge progress and saved persistent state for the upcoming new world.");
 
         // 2. Broadcast message
-        server.getPlayerManager().broadcast(Text.literal("World restart initiated! The server will restart to create a fresh world...").formatted(Formatting.GOLD, Formatting.BOLD), false);
+        server.getPlayerManager().broadcast(Text.translatable("challengecraft.restart.broadcast").formatted(Formatting.GOLD, Formatting.BOLD), false);
 
         // 3. Send message to players
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.sendMessage(Text.literal("Preparing for restart...").formatted(Formatting.YELLOW), false);
+            player.sendMessage(Text.translatable("challengecraft.restart.preparing").formatted(Formatting.YELLOW), false);
         }
 
         String worldName = ((MinecraftServerAccessor) server).getSession().getDirectoryName();

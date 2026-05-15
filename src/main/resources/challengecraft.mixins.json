@@ -9,6 +9,7 @@
     "MixinPlayerEntityDrop",
     "MixinPlayerEntityPreventBarrierDrop",
     "MixinScreenHandler",
+    "MerchantScreenHandlerAccessor",
     "DimensionOptionsMixin",
     "NoBlockDropsMixin",
     "NoChestLootMixin",
