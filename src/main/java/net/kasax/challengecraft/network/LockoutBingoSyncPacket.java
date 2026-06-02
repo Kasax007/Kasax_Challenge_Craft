@@ -1,37 +1,36 @@
 package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /** Full lockout match snapshot shared with every participating client. */
-public class LockoutBingoSyncPacket implements CustomPayload {
+public class LockoutBingoSyncPacket implements CustomPacketPayload {
     public record PlayerState(UUID uuid, String name, int teamId, boolean ready, boolean online) {
     }
 
-    public static final Id<LockoutBingoSyncPacket> ID =
-            new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "lockout_bingo_sync"));
+    public static final Type<LockoutBingoSyncPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "lockout_bingo_sync"));
 
-    public static final PacketCodec<PacketByteBuf, LockoutBingoSyncPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<>() {
+    public static final StreamCodec<FriendlyByteBuf, LockoutBingoSyncPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<>() {
                 @Override
-                public void encode(LockoutBingoSyncPacket packet, PacketByteBuf buf) {
+                public void encode(LockoutBingoSyncPacket packet, FriendlyByteBuf buf) {
                     writeStrings(buf, packet.boardGoalIds);
                     writeInts(buf, packet.claimedTeams);
                     writeStrings(buf, packet.claimedByNames);
 
                     buf.writeVarInt(packet.players.size());
                     for (PlayerState player : packet.players) {
-                        buf.writeUuid(player.uuid());
-                        buf.writeString(player.name());
+                        buf.writeUUID(player.uuid());
+                        buf.writeUtf(player.name());
                         buf.writeVarInt(player.teamId());
                         buf.writeBoolean(player.ready());
                         buf.writeBoolean(player.online());
@@ -44,9 +43,9 @@ public class LockoutBingoSyncPacket implements CustomPayload {
                     buf.writeVarInt(packet.runId);
                 }
             },
-            new PacketDecoder<>() {
+            new StreamDecoder<>() {
                 @Override
-                public LockoutBingoSyncPacket decode(PacketByteBuf buf) {
+                public LockoutBingoSyncPacket decode(FriendlyByteBuf buf) {
                     List<String> boardGoalIds = readStrings(buf);
                     List<Integer> claimedTeams = readInts(buf);
                     List<String> claimedByNames = readStrings(buf);
@@ -55,8 +54,8 @@ public class LockoutBingoSyncPacket implements CustomPayload {
                     List<PlayerState> players = new ArrayList<>(playerCount);
                     for (int i = 0; i < playerCount; i++) {
                         players.add(new PlayerState(
-                                buf.readUuid(),
-                                buf.readString(),
+                                buf.readUUID(),
+                                buf.readUtf(),
                                 buf.readVarInt(),
                                 buf.readBoolean(),
                                 buf.readBoolean()
@@ -147,34 +146,34 @@ public class LockoutBingoSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 
-    private static void writeStrings(PacketByteBuf buf, List<String> values) {
+    private static void writeStrings(FriendlyByteBuf buf, List<String> values) {
         buf.writeVarInt(values.size());
         for (String value : values) {
-            buf.writeString(value);
+            buf.writeUtf(value);
         }
     }
 
-    private static List<String> readStrings(PacketByteBuf buf) {
+    private static List<String> readStrings(FriendlyByteBuf buf) {
         int size = buf.readVarInt();
         List<String> values = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            values.add(buf.readString());
+            values.add(buf.readUtf());
         }
         return values;
     }
 
-    private static void writeInts(PacketByteBuf buf, List<Integer> values) {
+    private static void writeInts(FriendlyByteBuf buf, List<Integer> values) {
         buf.writeVarInt(values.size());
         for (Integer value : values) {
             buf.writeVarInt(value);
         }
     }
 
-    private static List<Integer> readInts(PacketByteBuf buf) {
+    private static List<Integer> readInts(FriendlyByteBuf buf) {
         int size = buf.readVarInt();
         List<Integer> values = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {

@@ -1,13 +1,12 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_33_SizeMatters;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,27 +18,27 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class SizeMattersMixin {
 
     @Unique
-    private static final Identifier SCALE_MODIFIER_ID = Identifier.of("challengecraft", "size_matters_scale");
+    private static final Identifier SCALE_MODIFIER_ID = Identifier.fromNamespaceAndPath("challengecraft", "size_matters_scale");
     @Unique
-    private static final Identifier SPEED_MODIFIER_ID = Identifier.of("challengecraft", "size_matters_speed");
+    private static final Identifier SPEED_MODIFIER_ID = Identifier.fromNamespaceAndPath("challengecraft", "size_matters_speed");
     @Unique
-    private static final Identifier HEALTH_MODIFIER_ID = Identifier.of("challengecraft", "size_matters_health");
+    private static final Identifier HEALTH_MODIFIER_ID = Identifier.fromNamespaceAndPath("challengecraft", "size_matters_health");
     @Unique
-    private static final Identifier DAMAGE_MODIFIER_ID = Identifier.of("challengecraft", "size_matters_damage");
+    private static final Identifier DAMAGE_MODIFIER_ID = Identifier.fromNamespaceAndPath("challengecraft", "size_matters_damage");
 
     @Inject(method = "baseTick", at = @At("HEAD"))
     private void onBaseTick(CallbackInfo ci) {
         LivingEntity living = (LivingEntity) (Object) this;
 
-        if (living.getWorld().isClient || living instanceof PlayerEntity) {
+        if (living.level().isClientSide() || living instanceof Player) {
             return;
         }
 
-        if (living.age % 20 != 0) {
+        if (living.tickCount % 20 != 0) {
             return;
         }
 
-        EntityAttributeInstance scaleAttr = living.getAttributeInstance(EntityAttributes.SCALE);
+        AttributeInstance scaleAttr = living.getAttribute(Attributes.SCALE);
         if (scaleAttr == null) {
             return;
         }
@@ -47,39 +46,39 @@ public abstract class SizeMattersMixin {
         if (Chal_33_SizeMatters.isActive()) {
             if (scaleAttr.getModifier(SCALE_MODIFIER_ID) == null) {
                 float scale = 0.5f + living.getRandom().nextFloat() * 2.5f;
-                scaleAttr.addPersistentModifier(new EntityAttributeModifier(SCALE_MODIFIER_ID, scale - 1.0, EntityAttributeModifier.Operation.ADD_VALUE));
+                scaleAttr.addPermanentModifier(new AttributeModifier(SCALE_MODIFIER_ID, scale - 1.0, AttributeModifier.Operation.ADD_VALUE));
 
-                EntityAttributeInstance speedAttr = living.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);
+                AttributeInstance speedAttr = living.getAttribute(Attributes.MOVEMENT_SPEED);
                 if (speedAttr != null) {
                     double speedMult = 1.7 - 0.4 * scale; // 0.5x -> 1.5x, 3.0x -> 0.5x
-                    speedAttr.addPersistentModifier(new EntityAttributeModifier(SPEED_MODIFIER_ID, speedMult - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+                    speedAttr.addPermanentModifier(new AttributeModifier(SPEED_MODIFIER_ID, speedMult - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
                 }
 
-                EntityAttributeInstance healthAttr = living.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+                AttributeInstance healthAttr = living.getAttribute(Attributes.MAX_HEALTH);
                 if (healthAttr != null) {
-                    healthAttr.addPersistentModifier(new EntityAttributeModifier(HEALTH_MODIFIER_ID, (double) scale - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+                    healthAttr.addPermanentModifier(new AttributeModifier(HEALTH_MODIFIER_ID, (double) scale - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
                     living.setHealth(living.getMaxHealth());
                 }
 
-                EntityAttributeInstance damageAttr = living.getAttributeInstance(EntityAttributes.ATTACK_DAMAGE);
+                AttributeInstance damageAttr = living.getAttribute(Attributes.ATTACK_DAMAGE);
                 if (damageAttr != null) {
-                    damageAttr.addPersistentModifier(new EntityAttributeModifier(DAMAGE_MODIFIER_ID, (double) scale - 1.0, EntityAttributeModifier.Operation.ADD_MULTIPLIED_BASE));
+                    damageAttr.addPermanentModifier(new AttributeModifier(DAMAGE_MODIFIER_ID, (double) scale - 1.0, AttributeModifier.Operation.ADD_MULTIPLIED_BASE));
                 }
 
             }
         } else {
             if (scaleAttr.getModifier(SCALE_MODIFIER_ID) != null) {
                 scaleAttr.removeModifier(SCALE_MODIFIER_ID);
-                EntityAttributeInstance speedAttr = living.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);
+                AttributeInstance speedAttr = living.getAttribute(Attributes.MOVEMENT_SPEED);
                 if (speedAttr != null) speedAttr.removeModifier(SPEED_MODIFIER_ID);
-                EntityAttributeInstance healthAttr = living.getAttributeInstance(EntityAttributes.MAX_HEALTH);
+                AttributeInstance healthAttr = living.getAttribute(Attributes.MAX_HEALTH);
                 if (healthAttr != null) {
                     healthAttr.removeModifier(HEALTH_MODIFIER_ID);
                     if (living.getHealth() > living.getMaxHealth()) {
                         living.setHealth(living.getMaxHealth());
                     }
                 }
-                EntityAttributeInstance damageAttr = living.getAttributeInstance(EntityAttributes.ATTACK_DAMAGE);
+                AttributeInstance damageAttr = living.getAttribute(Attributes.ATTACK_DAMAGE);
                 if (damageAttr != null) damageAttr.removeModifier(DAMAGE_MODIFIER_ID);
             }
         }

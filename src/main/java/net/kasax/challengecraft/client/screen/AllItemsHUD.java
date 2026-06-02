@@ -2,15 +2,15 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.kasax.challengecraft.challenges.Chal_22_AllItems;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 
 @Environment(EnvType.CLIENT)
 /** Compact HUD for the current all-items target. */
@@ -35,21 +35,21 @@ public class AllItemsHUD {
     }
 
     public static void register() {
-        HudRenderCallback.EVENT.register(AllItemsHUD::onHudRender);
+        HudElementRegistry.addLast(net.minecraft.resources.Identifier.fromNamespaceAndPath("challengecraft", "all_items_hud"), AllItemsHUD::onHudRender);
     }
 
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
+    private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
         if (!active || totalItems == 0) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client.options.hideGui) return;
 
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
+        Font tr = client.font;
+        int sw = client.getWindow().getGuiScaledWidth();
 
         boolean completed = currentIndex >= totalItems;
-        Text itemName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : Chal_22_AllItems.getFormattedItemName(currentItem).copy().formatted(Formatting.GOLD);
-        Text progressText = Text.translatable("challengecraft.progress.simple", currentIndex, totalItems).formatted(Formatting.GRAY);
+        Component itemName = completed ? Component.translatable("challengecraft.completed").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD) : Chal_22_AllItems.getFormattedItemName(currentItem).copy().withStyle(ChatFormatting.GOLD);
+        Component progressText = Component.translatable("challengecraft.progress.simple", currentIndex, totalItems).withStyle(ChatFormatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (active ? 1 : 0) + (AllEntitiesHUD.isActive() ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);
@@ -64,12 +64,12 @@ public class AllItemsHUD {
         int y = 5;
 
         if (!completed) {
-            ctx.drawItem(currentItem, centerX - 8, y);
+            ctx.item(currentItem, centerX - 8, y);
         } else {
-            ctx.drawItem(new ItemStack(net.minecraft.item.Items.NETHER_STAR), centerX - 8, y);
+            ctx.item(new ItemStack(net.minecraft.world.item.Items.NETHER_STAR), centerX - 8, y);
         }
         
-        ctx.drawCenteredTextWithShadow(tr, itemName, centerX, y + 18, 0xFFFFFF);
-        ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
+        ctx.centeredText(tr, itemName, centerX, y + 18, 0xFFFFFF);
+        ctx.centeredText(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

@@ -1,10 +1,10 @@
 package net.kasax.challengecraft.challenges;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 
 /** Tracks the alternate chunk generators and spawn placement used by skyblock worlds. */
 public class Chal_11_SkyblockWorld {
@@ -26,10 +26,10 @@ public class Chal_11_SkyblockWorld {
     /** Pins spawn to the skyblock island after the server finishes creating the world. */
     public static void onWorldCreated(MinecraftServer server) {
         if (!active) return;
-        ServerWorld overworld = server.getWorld(World.OVERWORLD);
+        ServerLevel overworld = server.getLevel(Level.OVERWORLD);
         if (overworld != null) {
             BlockPos spawn = new BlockPos(0, 65, 0);
-            overworld.setSpawnPos(spawn, 0.0f);
+            overworld.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(overworld.dimension(), spawn, 0.0f, 0.0f));
         }
     }
 }

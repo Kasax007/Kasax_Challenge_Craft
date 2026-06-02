@@ -9,29 +9,26 @@ import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.AllItemsSyncPacket;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.kasax.challengecraft.util.ChallengeTimeUtil;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.PotionContentsComponent;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.Potions;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.Potion;
+import net.minecraft.world.item.alchemy.PotionContents;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,7 +40,7 @@ public class Chal_22_AllItems {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (!active) return;
 
-            ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+            ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
             List<ItemStack> order = data.getAllItemsOrder();
             if (order.isEmpty()) {
                 generateOrder(server, data);
@@ -56,7 +53,7 @@ public class Chal_22_AllItems {
             ItemStack currentItem = order.get(index);
 
             boolean found = false;
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 if (hasItem(player, currentItem)) {
                     found = true;
                     break;
@@ -71,7 +68,7 @@ public class Chal_22_AllItems {
                 double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
                 long xpPerItem = Math.round(5.0);
                 if (xpPerItem > 0 && difficulty > 0) {
-                    server.getPlayerManager().getPlayerList().forEach(p -> {
+                    server.getPlayerList().getPlayers().forEach(p -> {
                         LevelManager.addXp(p, xpPerItem);
                     });
                 }
@@ -83,12 +80,12 @@ public class Chal_22_AllItems {
         });
     }
 
-    private static boolean hasItem(ServerPlayerEntity player, ItemStack target) {
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
-            if (stack.isOf(target.getItem())) {
+    private static boolean hasItem(ServerPlayer player, ItemStack target) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.is(target.getItem())) {
                 if (target.getItem() == Items.POTION || target.getItem() == Items.SPLASH_POTION || target.getItem() == Items.LINGERING_POTION) {
-                    if (Objects.equals(stack.get(DataComponentTypes.POTION_CONTENTS), target.get(DataComponentTypes.POTION_CONTENTS))) {
+                    if (Objects.equals(stack.get(DataComponents.POTION_CONTENTS), target.get(DataComponents.POTION_CONTENTS))) {
                         return true;
                     }
                 } else {
@@ -100,9 +97,9 @@ public class Chal_22_AllItems {
     }
 
     private static void generateOrder(MinecraftServer server, ChallengeSavedData data) {
-        List<ItemStack> survivalItems = getSurvivalItems(server.getRegistryManager());
+        List<ItemStack> survivalItems = getSurvivalItems(server.registryAccess());
         
-        long seed = server.getOverworld().getSeed();
+        long seed = server.overworld().getSeed();
         Collections.shuffle(survivalItems, new Random(seed));
 
         data.setAllItemsOrder(survivalItems);
@@ -110,13 +107,13 @@ public class Chal_22_AllItems {
         syncProgressToAll(server, data);
     }
 
-    private static List<ItemStack> getSurvivalItems(DynamicRegistryManager registryManager) {
+    private static List<ItemStack> getSurvivalItems(RegistryAccess registryManager) {
         List<ItemStack> items = new ArrayList<>();
-        Registry<Item> itemRegistry = registryManager.getOrThrow(RegistryKeys.ITEM);
-        Registry<Potion> potionRegistry = registryManager.getOrThrow(RegistryKeys.POTION);
+        Registry<Item> itemRegistry = registryManager.lookupOrThrow(Registries.ITEM);
+        Registry<Potion> potionRegistry = registryManager.lookupOrThrow(Registries.POTION);
 
         for (Item item : itemRegistry) {
-            Identifier id = itemRegistry.getId(item);
+            Identifier id = itemRegistry.getKey(item);
             if (id.getNamespace().equals("challengecraft")) continue;
             if (!id.getNamespace().equals("minecraft")) continue;
             
@@ -132,19 +129,19 @@ public class Chal_22_AllItems {
         }
 
         for (Potion potion : potionRegistry) {
-            Identifier pid = potionRegistry.getId(potion);
+            Identifier pid = potionRegistry.getKey(potion);
             if (pid.getPath().equals("empty") || pid.getPath().equals("luck")) continue;
             if (pid.getPath().equals("mundane") || pid.getPath().equals("thick") || pid.getPath().equals("awkward")) {
                 continue;
             }
             if (pid.getPath().equals("water")) {
-                items.add(PotionContentsComponent.createStack(Items.POTION, potionRegistry.getEntry(potion)));
+                items.add(PotionContents.createItemStack(Items.POTION, potionRegistry.wrapAsHolder(potion)));
                 continue;
             }
 
-            items.add(PotionContentsComponent.createStack(Items.POTION, potionRegistry.getEntry(potion)));
-            items.add(PotionContentsComponent.createStack(Items.SPLASH_POTION, potionRegistry.getEntry(potion)));
-            items.add(PotionContentsComponent.createStack(Items.LINGERING_POTION, potionRegistry.getEntry(potion)));
+            items.add(PotionContents.createItemStack(Items.POTION, potionRegistry.wrapAsHolder(potion)));
+            items.add(PotionContents.createItemStack(Items.SPLASH_POTION, potionRegistry.wrapAsHolder(potion)));
+            items.add(PotionContents.createItemStack(Items.LINGERING_POTION, potionRegistry.wrapAsHolder(potion)));
         }
 
         return items;
@@ -178,17 +175,17 @@ public class Chal_22_AllItems {
         return false;
     }
 
-    public static Text getFormattedItemName(ItemStack stack) {
-        MutableText name = stack.getName().copy();
-        if (stack.contains(DataComponentTypes.JUKEBOX_PLAYABLE)) {
-             name.append(" (").append(Text.translatable(stack.getItem().getTranslationKey() + ".desc")).append(")");
+    public static Component getFormattedItemName(ItemStack stack) {
+        MutableComponent name = stack.getHoverName().copy();
+        if (stack.has(DataComponents.JUKEBOX_PLAYABLE)) {
+             name.append(" (").append(Component.translatable(stack.getItem().getDescriptionId() + ".desc")).append(")");
         }
         return name;
     }
 
     private static void completeChallenge(MinecraftServer server, ChallengeSavedData data) {
-        List<ServerPlayerEntity> eligiblePlayers = server.getPlayerManager().getPlayerList().stream()
-                .filter(p -> !data.isXpAwarded(p.getUuid()))
+        List<ServerPlayer> eligiblePlayers = server.getPlayerList().getPlayers().stream()
+                .filter(p -> !data.isXpAwarded(p.getUUID()))
                 .toList();
 
         if (eligiblePlayers.isEmpty()) return;
@@ -203,7 +200,7 @@ public class Chal_22_AllItems {
         for (int cid : data.getActive()) {
             eligiblePlayers.forEach(p -> {
                 int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
-                StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
+                StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
             });
         }
 
@@ -219,28 +216,28 @@ public class Chal_22_AllItems {
             final boolean finalIsGameComp = isGameComp;
             eligiblePlayers.forEach(p -> {
                 LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
-                data.setXpAwarded(p.getUuid(), true);
+                data.setXpAwarded(p.getUUID(), true);
                 ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, finalIsGameComp));
                 
-                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
+                p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
             });
             
-            Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
-                    .formatted(Formatting.GOLD, Formatting.BOLD);
-            server.getPlayerManager().broadcast(chatMsg, false);
+            Component chatMsg = Component.translatable("challengecraft.reward.xp_earned", xpAmount)
+                    .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+            server.getPlayerList().broadcastSystemMessage(chatMsg, false);
 
-            Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
-            Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
+            Component title = Component.translatable("challengecraft.reward.title").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD);
+            Component subtitle = Component.translatable("challengecraft.reward.xp_earned", xpAmount).withStyle(ChatFormatting.GOLD);
 
-            server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-            server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
-            server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+            server.getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+            server.getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+            server.getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
         }
     }
 
     public static void skipItem(MinecraftServer server, int amount) {
         if (!active) return;
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         List<ItemStack> order = data.getAllItemsOrder();
         int index = data.getAllItemsIndex();
         int newIndex = Math.min(index + amount, order.size());
@@ -266,7 +263,7 @@ public class Chal_22_AllItems {
         int index = data.getAllItemsIndex();
         ItemStack currentItem = (index < order.size()) ? order.get(index) : ItemStack.EMPTY;
         AllItemsSyncPacket packet = new AllItemsSyncPacket(currentItem, index, order.size());
-        server.getPlayerManager().getPlayerList().forEach(player -> {
+        server.getPlayerList().getPlayers().forEach(player -> {
             ServerPlayNetworking.send(player, packet);
         });
     }

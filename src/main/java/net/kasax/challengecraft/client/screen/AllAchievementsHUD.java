@@ -2,16 +2,16 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.kasax.challengecraft.network.AdvancementInfo;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 @Environment(EnvType.CLIENT)
 /** Compact HUD for the current all-achievements target. */
@@ -36,29 +36,29 @@ public class AllAchievementsHUD {
     }
 
     public static void register() {
-        HudRenderCallback.EVENT.register(AllAchievementsHUD::onHudRender);
+        HudElementRegistry.addLast(net.minecraft.resources.Identifier.fromNamespaceAndPath("challengecraft", "all_achievements_hud"), AllAchievementsHUD::onHudRender);
     }
 
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
+    private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
         if (!active || total == 0) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client.options.hideGui) return;
 
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
+        Font tr = client.font;
+        int sw = client.getWindow().getGuiScaledWidth();
 
         boolean completed = currentIndex >= total;
         
-        Text advName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : Text.translatable("challengecraft.placeholder.pending");
+        Component advName = completed ? Component.translatable("challengecraft.completed").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD) : Component.translatable("challengecraft.placeholder.pending");
         ItemStack icon = completed ? new ItemStack(Items.NETHER_STAR) : ItemStack.EMPTY;
 
         if (!completed && currentAdvancement != null) {
-            advName = currentAdvancement.title().copy().formatted(Formatting.GOLD);
+            advName = currentAdvancement.title().copy().withStyle(ChatFormatting.GOLD);
             icon = currentAdvancement.icon();
         }
 
-        Text progressText = Text.translatable("challengecraft.progress.simple", currentIndex, total).formatted(Formatting.GRAY);
+        Component progressText = Component.translatable("challengecraft.progress.simple", currentIndex, total).withStyle(ChatFormatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (AllEntitiesHUD.isActive() ? 1 : 0) + (active ? 1 : 0);
@@ -73,8 +73,8 @@ public class AllAchievementsHUD {
         
         int y = 5;
 
-        ctx.drawItem(icon, centerX - 8, y);
-        ctx.drawCenteredTextWithShadow(tr, advName, centerX, y + 18, 0xFFFFFF);
-        ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
+        ctx.item(icon, centerX - 8, y);
+        ctx.centeredText(tr, advName, centerX, y + 18, 0xFFFFFF);
+        ctx.centeredText(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

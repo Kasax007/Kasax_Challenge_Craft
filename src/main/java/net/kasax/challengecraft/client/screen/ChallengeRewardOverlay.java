@@ -1,15 +1,13 @@
 package net.kasax.challengecraft.client.screen;
 
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.kasax.challengecraft.LevelManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.MathHelper;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +21,7 @@ public class ChallengeRewardOverlay {
     private static final long DURATION_MS = 8000;
 
     public static void register() {
-        HudRenderCallback.EVENT.register((context, tickCounter) -> render(context, 0.0f));
+        HudElementRegistry.addLast(net.minecraft.resources.Identifier.fromNamespaceAndPath("challengecraft", "challenge_reward_overlay"), (context, tickCounter) -> render(context, 0.0f));
     }
 
     public static void start(long oldXpVal, long newXpVal, long gain, boolean gameComp) {
@@ -33,7 +31,7 @@ public class ChallengeRewardOverlay {
         isGameComp = gameComp;
     }
 
-    private static void render(DrawContext context, float delta) {
+    private static void render(GuiGraphicsExtractor context, float delta) {
         if (startTime == -1) {
             return;
         }
@@ -48,10 +46,10 @@ public class ChallengeRewardOverlay {
             return;
         }
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        TextRenderer tr = client.textRenderer;
-        int width = context.getScaledWindowWidth();
-        int height = context.getScaledWindowHeight();
+        Minecraft client = Minecraft.getInstance();
+        Font tr = client.font;
+        int width = context.guiWidth();
+        int height = context.guiHeight();
 
         int centerY = height / 4;
         float alpha = 1.0f;
@@ -63,17 +61,17 @@ public class ChallengeRewardOverlay {
 
         int baseAlpha = (int) (alpha * 255) << 24;
 
-        Text titleText = isGameComp
-                ? Text.translatable("challengecraft.overlay.game_completed").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD)
-                : Text.translatable("challengecraft.overlay.challenge_complete").formatted(Formatting.GOLD, Formatting.BOLD);
-        context.drawCenteredTextWithShadow(tr, titleText, width / 2, centerY - 40, baseAlpha | (isGameComp ? 0xFF55FF : 0xFFAA00));
+        Component titleText = isGameComp
+                ? Component.translatable("challengecraft.overlay.game_completed").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD)
+                : Component.translatable("challengecraft.overlay.challenge_complete").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        context.centeredText(tr, titleText, width / 2, centerY - 40, baseAlpha | (isGameComp ? 0xFF55FF : 0xFFAA00));
 
-        float countProgress = MathHelper.clamp(progress * 2.0f, 0, 1);
+        float countProgress = Mth.clamp(progress * 2.0f, 0, 1);
         long currentXpDisplay = oldXp + (long) (xpGained * countProgress);
-        context.drawCenteredTextWithShadow(tr, Text.translatable("challengecraft.overlay.xp_total", currentXpDisplay), width / 2, centerY - 15, baseAlpha | 0xFFFFFF);
+        context.centeredText(tr, Component.translatable("challengecraft.overlay.xp_total", currentXpDisplay), width / 2, centerY - 15, baseAlpha | 0xFFFFFF);
 
-        Text gainedText = Text.translatable("challengecraft.overlay.xp_gain", xpGained).formatted(Formatting.GREEN);
-        context.drawCenteredTextWithShadow(tr, gainedText, width / 2, centerY - 5, baseAlpha | 0x55FF55);
+        Component gainedText = Component.translatable("challengecraft.overlay.xp_gain", xpGained).withStyle(ChatFormatting.GREEN);
+        context.centeredText(tr, gainedText, width / 2, centerY - 5, baseAlpha | 0x55FF55);
 
         int oldLevel = LevelManager.getLevelForXp(oldXp);
         int currentLevel = LevelManager.getLevelForXp(currentXpDisplay);
@@ -84,18 +82,18 @@ public class ChallengeRewardOverlay {
         int barY = centerY + 15;
 
         float barProgress;
-        Text levelText;
+        Component levelText;
         if (currentLevel >= LevelManager.MAX_LEVEL) {
             long maxXp = LevelManager.getXpForLevel(LevelManager.MAX_LEVEL);
             long starProgress = (currentXpDisplay - maxXp) % 1000;
             barProgress = (float) starProgress / 1000.0f;
             int stars = LevelManager.getStars(currentXpDisplay);
-            levelText = Text.translatable("challengecraft.overlay.level_with_stars", stars);
+            levelText = Component.translatable("challengecraft.overlay.level_with_stars", stars);
         } else {
             long levelStartXp = LevelManager.getXpForLevel(currentLevel);
             long xpNeeded = LevelManager.getXpNeededForNextLevel(currentLevel);
             barProgress = (float) (currentXpDisplay - levelStartXp) / xpNeeded;
-            levelText = Text.translatable("challengecraft.overlay.level", currentLevel);
+            levelText = Component.translatable("challengecraft.overlay.level", currentLevel);
         }
 
         int bgAlpha = (int) (alpha * 0x80) << 24;
@@ -105,38 +103,38 @@ public class ChallengeRewardOverlay {
         if (fillWidth > 0) {
             context.fill(barX, barY, barX + fillWidth, barY + barHeight, baseAlpha | 0x00AA00);
         }
-        context.drawBorder(barX - 1, barY - 1, barWidth + 2, barHeight + 2, baseAlpha | 0xAAAAAA);
+        context.outline(barX - 1, barY - 1, barWidth + 2, barHeight + 2, baseAlpha | 0xAAAAAA);
 
-        context.drawCenteredTextWithShadow(tr, levelText, width / 2, barY - 12, baseAlpha | 0x00AAFF);
+        context.centeredText(tr, levelText, width / 2, barY - 12, baseAlpha | 0x00AAFF);
 
-        Text xpText;
+        Component xpText;
         if (currentLevel >= LevelManager.MAX_LEVEL) {
             long maxXp = LevelManager.getXpForLevel(LevelManager.MAX_LEVEL);
             long starProgress = (currentXpDisplay - maxXp) % 1000;
-            xpText = Text.translatable("challengecraft.overlay.star_progress", starProgress);
+            xpText = Component.translatable("challengecraft.overlay.star_progress", starProgress);
         } else {
             long levelStartXp = LevelManager.getXpForLevel(currentLevel);
             long xpNeeded = LevelManager.getXpNeededForNextLevel(currentLevel);
-            xpText = Text.translatable("challengecraft.overlay.level_progress", currentXpDisplay - levelStartXp, xpNeeded);
+            xpText = Component.translatable("challengecraft.overlay.level_progress", currentXpDisplay - levelStartXp, xpNeeded);
         }
-        context.drawCenteredTextWithShadow(tr, xpText, width / 2, barY + 2, baseAlpha | 0xFFFFFF);
+        context.centeredText(tr, xpText, width / 2, barY + 2, baseAlpha | 0xFFFFFF);
 
         int oldStarsDisplay = LevelManager.getStars(oldXp);
         int currentStarsDisplay = LevelManager.getStars(currentXpDisplay);
 
         if (currentLevel > oldLevel || currentStarsDisplay > oldStarsDisplay) {
             float lvPulse = (float) Math.sin(progress * 20) * 0.1f + 1.0f;
-            context.getMatrices().push();
-            context.getMatrices().translate(width / 2f, centerY + 55, 0);
-            context.getMatrices().scale(lvPulse, lvPulse, 1);
-            context.getMatrices().translate(-(width / 2f), -(centerY + 55), 0);
+            context.pose().pushMatrix();
+            context.pose().translate(width / 2f, centerY + 55);
+            context.pose().scale(lvPulse, lvPulse);
+            context.pose().translate(-(width / 2f), -(centerY + 55));
 
             if (currentLevel > oldLevel && currentLevel <= LevelManager.MAX_LEVEL) {
-                context.drawCenteredTextWithShadow(tr, Text.translatable("challengecraft.overlay.level_up").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), width / 2, centerY + 50, baseAlpha | 0xFF55FF);
+                context.centeredText(tr, Component.translatable("challengecraft.overlay.level_up").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD), width / 2, centerY + 50, baseAlpha | 0xFF55FF);
             } else if (currentStarsDisplay > oldStarsDisplay) {
-                context.drawCenteredTextWithShadow(tr, Text.translatable("challengecraft.overlay.infinity_star").formatted(Formatting.YELLOW, Formatting.BOLD), width / 2, centerY + 50, baseAlpha | 0xFFFF55);
+                context.centeredText(tr, Component.translatable("challengecraft.overlay.infinity_star").withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD), width / 2, centerY + 50, baseAlpha | 0xFFFF55);
             }
-            context.getMatrices().pop();
+            context.pose().popMatrix();
 
             List<Object> rewards = new ArrayList<>();
             for (int l = oldLevel + 1; l <= Math.min(currentLevel, LevelManager.MAX_LEVEL); l++) {
@@ -170,7 +168,7 @@ public class ChallengeRewardOverlay {
             }
 
             if (!rewards.isEmpty()) {
-                context.drawCenteredTextWithShadow(tr, Text.translatable("challengecraft.overlay.rewards_unlocked").formatted(Formatting.YELLOW), width / 2, centerY + 75, baseAlpha | 0xFFFF55);
+                context.centeredText(tr, Component.translatable("challengecraft.overlay.rewards_unlocked").withStyle(ChatFormatting.YELLOW), width / 2, centerY + 75, baseAlpha | 0xFFFF55);
                 int itemsPerRow = 8;
                 int totalRewards = rewards.size();
 
@@ -182,9 +180,9 @@ public class ChallengeRewardOverlay {
                     int x = width / 2 - (rowSize * 24) / 2 + col * 24;
                     int y = centerY + 90 + row * 24;
 
-                    context.getMatrices().push();
+                    context.pose().pushMatrix();
                     float iconFloat = (float) Math.sin(progress * 10 + i) * 2;
-                    context.getMatrices().translate(0, iconFloat, 0);
+                    context.pose().translate(0, iconFloat);
 
                     Object reward = rewards.get(i);
                     if (reward instanceof Integer cid) {
@@ -193,7 +191,7 @@ public class ChallengeRewardOverlay {
                         if (s.startsWith("PERK_")) {
                             int perkId = Integer.parseInt(s.substring(5));
                             ChallengeIconProvider.drawIcon(context, x, y, perkId);
-                            context.drawText(tr, "*", x + 12, y + 8, baseAlpha | 0xFFFF55, true);
+                            context.text(tr, "*", x + 12, y + 8, baseAlpha | 0xFFFF55, true);
                         } else if (s.startsWith("STAR_COLOR_")) {
                             String color = s.substring(11);
                             int c = switch (color) {
@@ -205,14 +203,14 @@ public class ChallengeRewardOverlay {
                                 case "rainbow" -> 0x55FFFF;
                                 default -> 0xFFFFFF;
                             };
-                            context.drawText(tr, "*", x + 4, y + 4, baseAlpha | c, true);
+                            context.text(tr, "*", x + 4, y + 4, baseAlpha | c, true);
                         } else if (s.equals("STAR")) {
-                            context.drawText(tr, "*", x + 4, y + 4, baseAlpha | 0x888888, true);
+                            context.text(tr, "*", x + 4, y + 4, baseAlpha | 0x888888, true);
                         } else {
-                            context.drawText(tr, "*", x + 4, y + 4, baseAlpha | 0xFFFF55, true);
+                            context.text(tr, "*", x + 4, y + 4, baseAlpha | 0xFFFF55, true);
                         }
                     }
-                    context.getMatrices().pop();
+                    context.pose().popMatrix();
                 }
             }
         }

@@ -2,17 +2,14 @@ package net.kasax.challengecraft.client;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.client.screen.ChallengeSelectionScreen;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.command.CommandRegistryAccess;
-
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.network.chat.Component;
 
 /** Client-side command entry points for opening local mod screens. */
 public class ClientCommands implements ClientModInitializer {
@@ -33,17 +30,17 @@ public class ClientCommands implements ClientModInitializer {
     }
 
     private void register(CommandDispatcher<FabricClientCommandSource> dispatcher,
-                          CommandRegistryAccess registryAccess) {
+                          CommandBuildContext registryAccess) {
         dispatcher.register(
-                ClientCommandManager.literal("challenges")
+                net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("challenges")
                         .executes(ctx -> {
-                            if (ctx.getSource().getClient().player != null && ctx.getSource().getClient().player.hasPermissionLevel(2)) {
+                            if (ctx.getSource().getClient().player != null) {
                                 // Open on the next tick so the command handler does not mutate screens mid-dispatch.
                                 ChallengeCraft.LOGGER.info("'/challenges' received, scheduling UI open");
                                 openOnNextTick = true;
                                 return 1;
                             } else {
-                                ctx.getSource().sendFeedback(Text.translatable("challengecraft.command.no_permission").formatted(Formatting.RED));
+                                ctx.getSource().sendFeedback(Component.translatable("challengecraft.command.no_permission").withStyle(ChatFormatting.RED));
                                 return 0;
                             }
                         })

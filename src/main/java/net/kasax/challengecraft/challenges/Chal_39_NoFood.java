@@ -2,48 +2,48 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.minecraft.block.Blocks;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
 
 /** Blocks edible items and cake interaction while leaving other use actions alone. */
 public class Chal_39_NoFood {
-    private static final Text BLOCKED_MESSAGE = Text.translatable("challengecraft.worldcreate.challenge39.blocked");
+    private static final Component BLOCKED_MESSAGE = Component.translatable("challengecraft.worldcreate.challenge39.blocked");
     private static boolean active = false;
 
     public static void register() {
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (!active) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            ItemStack stack = player.getStackInHand(hand);
-            if (!stack.contains(DataComponentTypes.FOOD)) {
-                return ActionResult.PASS;
+            ItemStack stack = player.getItemInHand(hand);
+            if (!stack.has(DataComponents.FOOD)) {
+                return InteractionResult.PASS;
             }
 
-            if (!world.isClient) {
-                player.sendMessage(BLOCKED_MESSAGE, true);
+            if (!world.isClientSide()) {
+                player.sendOverlayMessage(BLOCKED_MESSAGE);
             }
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
 
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
-            if (!active || !world.getBlockState(hit.getBlockPos()).isOf(Blocks.CAKE)) {
-                return ActionResult.PASS;
+            if (!active || !world.getBlockState(hit.getBlockPos()).is(Blocks.CAKE)) {
+                return InteractionResult.PASS;
             }
 
-            if (player.getStackInHand(hand).isIn(ItemTags.CANDLES)) {
-                return ActionResult.PASS;
+            if (player.getItemInHand(hand).is(ItemTags.CANDLES)) {
+                return InteractionResult.PASS;
             }
 
-            if (!world.isClient) {
-                player.sendMessage(BLOCKED_MESSAGE, true);
+            if (!world.isClientSide()) {
+                player.sendOverlayMessage(BLOCKED_MESSAGE);
             }
-            return ActionResult.FAIL;
+            return InteractionResult.FAIL;
         });
     }
 

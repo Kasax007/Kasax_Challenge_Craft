@@ -4,10 +4,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.util.BlockedBarrierItem;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import java.util.stream.IntStream;
 
 /** Limits the usable inventory while keeping the blocked slots visible to the player. */
@@ -24,19 +23,19 @@ public class Chal_12_LimitedInventory {
     public static void register() {
         ServerTickEvents.START_SERVER_TICK.register(server -> {
             if (!active) return;
-            for (PlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (Player player : server.getPlayerList().getPlayers()) {
                 limitInventory(player);
             }
         });
 
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
             if (!active) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            return BlockedBarrierItem.isBlockedBarrier(player.getStackInHand(hand))
-                    ? ActionResult.FAIL
-                    : ActionResult.PASS;
+            return BlockedBarrierItem.isBlockedBarrier(player.getItemInHand(hand))
+                    ? InteractionResult.FAIL
+                    : InteractionResult.PASS;
         });
 
         ChallengeCraft.LOGGER.info("[Chal12] Registered tick callback");
@@ -52,8 +51,8 @@ public class Chal_12_LimitedInventory {
         ChallengeCraft.LOGGER.info("[Chal12] {}", active ? "activated" : "deactivated");
     }
 
-    private static void limitInventory(PlayerEntity player) {
-        var mainInv = player.getInventory().getMainStacks();
+    private static void limitInventory(Player player) {
+        var mainInv = player.getInventory().getNonEquipmentItems();
         int toDisable = 36 - limitedSlots;
 
         for (int i = 0; i < toDisable; i++) {

@@ -1,9 +1,9 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.border.WorldBorder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.border.WorldBorder;
 
 /** Configures the world border as a damaging hazard rather than a hard wall. */
 public class Chal_25_DamageWorldBorder {
@@ -11,12 +11,12 @@ public class Chal_25_DamageWorldBorder {
     private static double currentDiameter = 2.0;
 
     public static void register() {
-        ServerTickEvents.END_WORLD_TICK.register((world) -> {
+        ServerTickEvents.END_LEVEL_TICK.register((world) -> {
             if (!active) return;
             WorldBorder border = world.getWorldBorder();
             double target = currentDiameter;
 
-            if (border.getSize() > 1000000 || (Math.abs(border.getSize() - target) > 0.1 && border.getSizeLerpTime() <= 0)) {
+            if (border.getSize() > 1000000 || (Math.abs(border.getSize() - target) > 0.1 && border.getLerpTime() <= 0)) {
                 border.setSize(target);
             }
 
@@ -25,10 +25,10 @@ public class Chal_25_DamageWorldBorder {
             }
 
             // First joins can happen outside the tiny opening border before the server corrects spawn.
-            for (ServerPlayerEntity player : world.getPlayers()) {
-                if (!border.contains(player.getX(), player.getZ())) {
-                    int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, 0, 0);
-                    player.requestTeleport(0.5, (double) y, 0.5);
+            for (ServerPlayer player : world.getPlayers(player -> true)) {
+                if (!border.isWithinBounds(player.getX(), player.getZ())) {
+                    int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, 0, 0);
+                    player.teleportTo(0.5, (double) y, 0.5);
                 }
             }
         });
@@ -50,7 +50,7 @@ public class Chal_25_DamageWorldBorder {
         currentDiameter = Math.max(2.0, diameter);
     }
 
-    public static void updateWorldBorder(ServerWorld world) {
+    public static void updateWorldBorder(ServerLevel world) {
         if (!active) return;
         world.getWorldBorder().setSize(currentDiameter);
     }

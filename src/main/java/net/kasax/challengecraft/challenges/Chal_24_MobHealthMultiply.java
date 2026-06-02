@@ -1,6 +1,6 @@
 package net.kasax.challengecraft.challenges;
 
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 /** Holds the configured health multiplier consumed by mob-spawn hooks. */
 public class Chal_24_MobHealthMultiply {
@@ -16,7 +16,7 @@ public class Chal_24_MobHealthMultiply {
     }
 
     public static void setMultiplier(int mult) {
-        multiplier = MathHelper.clamp(mult, 1, 100);
+        multiplier = Mth.clamp(mult, 1, 100);
     }
 
     public static int getMultiplier() {

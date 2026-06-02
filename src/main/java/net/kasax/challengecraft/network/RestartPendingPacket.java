@@ -1,26 +1,25 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Notifies a client that the current world is about to restart. */
-public record RestartPendingPacket(String worldName) implements CustomPayload {
-    public static final Id<RestartPendingPacket> ID = new Id<>(Identifier.of("challengecraft", "restart_pending"));
-    public static final PacketCodec<RegistryByteBuf, RestartPendingPacket> CODEC = CustomPayload.codecOf(RestartPendingPacket::write, RestartPendingPacket::new);
+public record RestartPendingPacket(String worldName) implements CustomPacketPayload {
+    public static final Type<RestartPendingPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "restart_pending"));
+    public static final StreamCodec<RegistryFriendlyByteBuf, RestartPendingPacket> CODEC = CustomPacketPayload.codec(RestartPendingPacket::write, RestartPendingPacket::new);
 
-    public RestartPendingPacket(RegistryByteBuf buf) {
-        this(buf.readString());
+    public RestartPendingPacket(RegistryFriendlyByteBuf buf) {
+        this(buf.readUtf());
     }
 
-    private void write(RegistryByteBuf buf) {
-        buf.writeString(worldName);
+    private void write(RegistryFriendlyByteBuf buf) {
+        buf.writeUtf(worldName);
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

@@ -44,30 +44,30 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.screen.AllAchievementsHUD.register();
         net.kasax.challengecraft.client.screen.MobHealthHUD.register();
 
-        net.minecraft.client.gui.screen.ingame.HandledScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
+        net.minecraft.client.gui.screens.MenuScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
 
         ClientPlayNetworking.registerGlobalReceiver(net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
-                if (context.client().currentScreen instanceof net.kasax.challengecraft.screen.InfiniteChestScreen screen) {
+                if (context.client().screen instanceof net.kasax.challengecraft.screen.InfiniteChestScreen screen) {
                     screen.updateEntries(payload.entries());
                 }
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(RestartPendingPacket.ID, (payload, context) -> {
-            boolean isSP = context.client().getServer() != null;
+            boolean isSP = context.client().hasSingleplayerServer();
             RestartManager.setRestartPending(true, payload.worldName(), isSP);
         });
 
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (RestartManager.isRestartPending() && client.getNetworkHandler() == null && client.world == null) {
+            if (RestartManager.isRestartPending() && client.getConnection() == null && client.level == null) {
                 boolean isSP = RestartManager.isSinglePlayer();
                 String worldName = RestartManager.getLastWorldName();
                 RestartManager.setRestartPending(false, null, false);
                 
                 if (isSP && worldName != null) {
                     client.execute(() -> {
-                        client.createIntegratedServerLoader().start(worldName, () -> {});
+                        client.createWorldOpenFlows().openWorld(worldName, () -> {});
                     });
                 } else if (!isSP) {
                     client.execute(() -> {
@@ -87,12 +87,12 @@ public class ChallengeCraftClient implements ClientModInitializer {
             if (client.player != null) {
                 // Joining directly into a world bypasses the title-screen XP preload.
                 if (LOCAL_PLAYER_XP == 0) {
-                    LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUuid());
+                    LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUUID());
                     ChallengeCraft.LOGGER.info("Loaded initial local XP from file on join: {}", LOCAL_PLAYER_XP);
                 }
                 
                 if (ClientPlayNetworking.canSend(net.kasax.challengecraft.network.ClientXpSyncPacket.ID)) {
-                    ClientPlayNetworking.send(new net.kasax.challengecraft.network.ClientXpSyncPacket(LOCAL_PLAYER_XP, client.player.getUuid()));
+                    ClientPlayNetworking.send(new net.kasax.challengecraft.network.ClientXpSyncPacket(LOCAL_PLAYER_XP, client.player.getUUID()));
                     ChallengeCraft.LOGGER.info("Sent local XP sync to server: {}", LOCAL_PLAYER_XP);
                 }
             }

@@ -10,7 +10,7 @@ public class LevelSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(LevelSyncPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 net.kasax.challengecraft.ChallengeCraft.LOGGER.info("[Client] Received LevelSyncPacket for {}: {}", payload.uuid, payload.xp);
-                if (context.player().getUuid().equals(payload.uuid)) {
+                if (context.player().getUUID().equals(payload.uuid)) {
                     net.kasax.challengecraft.ChallengeCraftClient.LOCAL_PLAYER_XP = payload.xp;
                     XpManager.setXp(payload.uuid, payload.xp);
                 }

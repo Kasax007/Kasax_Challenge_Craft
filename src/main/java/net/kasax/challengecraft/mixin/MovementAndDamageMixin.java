@@ -2,23 +2,22 @@ package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ServerPlayerEntity.class)
+@Mixin(ServerPlayer.class)
 /** Central player hook for movement and shared damage challenges. */
 public abstract class MovementAndDamageMixin {
 
@@ -35,7 +34,7 @@ public abstract class MovementAndDamageMixin {
     @Unique
     private double walkDamageDistanceAccumulator = 0;
     @Unique
-    private Vec3d lastPos = null;
+    private Vec3 lastPos = null;
     @Unique
     private float damageAccumulator = 0;
     @Unique
@@ -47,10 +46,10 @@ public abstract class MovementAndDamageMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
-        ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+        ServerPlayer player = (ServerPlayer) (Object) this;
 
         if (Chal_17_WalkRandomItem.isActive() || Chal_28_WalkDamage.isActive()) {
-            Vec3d currentPos = player.getPos();
+            Vec3 currentPos = player.position();
             if (lastPos != null) {
                 double dist = currentPos.distanceTo(lastPos);
                 
@@ -58,7 +57,7 @@ public abstract class MovementAndDamageMixin {
                     walkDistanceAccumulator += dist;
                     while (walkDistanceAccumulator >= 500.0) {
                         walkDistanceAccumulator -= 500.0;
-                        player.getInventory().insertStack(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
+                        player.getInventory().add(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
                     }
                 }
 
@@ -66,7 +65,7 @@ public abstract class MovementAndDamageMixin {
                     walkDamageDistanceAccumulator += dist;
                     while (walkDamageDistanceAccumulator >= 1.0) {
                         walkDamageDistanceAccumulator -= 1.0;
-                        player.damage(player.getServerWorld(), player.getWorld().getDamageSources().generic(), 2.0f);
+                        player.hurtServer(player.level(), player.level().damageSources().generic(), 2.0f);
                     }
                 }
             }
@@ -78,8 +77,8 @@ public abstract class MovementAndDamageMixin {
         }
 
         if (Chal_29_FloorIsLava.isActive() && !player.isCreative() && !player.isSpectator()) {
-            BlockPos currentBlockPos = player.getBlockPos();
-            net.minecraft.block.Block floorBlock = player.getWorld().getBlockState(currentBlockPos.down()).getBlock();
+            BlockPos currentBlockPos = player.blockPosition();
+            net.minecraft.world.level.block.Block floorBlock = player.level().getBlockState(currentBlockPos.below()).getBlock();
 
             boolean onNatural = floorBlock == Blocks.GRASS_BLOCK || floorBlock == Blocks.STONE || floorBlock == Blocks.DEEPSLATE;
 
@@ -91,8 +90,8 @@ public abstract class MovementAndDamageMixin {
             }
 
             if (onNatural || standingTicks > 60) {
-                player.setOnFireFor(3);
-                player.damage(player.getServerWorld(), player.getWorld().getDamageSources().onFire(), 1.0f);
+                player.igniteForSeconds(3);
+                player.hurtServer(player.level(), player.level().damageSources().onFire(), 1.0f);
             }
         } else {
             standingTicks = 0;
@@ -102,34 +101,34 @@ public abstract class MovementAndDamageMixin {
         if (Chal_30_HeavyPockets.isActive() && !player.isCreative() && !player.isSpectator()) {
             int filledSlots = 0;
             for (int i = 0; i < 36; i++) {
-                if (!player.getInventory().getStack(i).isEmpty()) {
+                if (!player.getInventory().getItem(i).isEmpty()) {
                     filledSlots++;
                 }
             }
 
             if (filledSlots > 0) {
                 if (filledSlots == 36) {
-                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, 5, false, false, true));
+                    player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 10, 5, false, false, true));
                 } else {
                     int amplifier = (filledSlots / 6) - 1;
                     if (amplifier >= 0) {
-                        player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 10, amplifier, false, false, true));
+                        player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 10, amplifier, false, false, true));
                     }
                 }
             }
         }
     }
 
-    @Inject(method = "damage", at = @At("RETURN"), cancellable = true)
-    private void onDamage(ServerWorld world, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "hurtServer", at = @At("RETURN"), cancellable = true)
+    private void onDamage(ServerLevel world, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue()) {
-            ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+            ServerPlayer player = (ServerPlayer) (Object) this;
 
             if (Chal_32_SymbioticBond.isActive() && !sharingDamage) {
                 sharingDamage = true;
-                for (ServerPlayerEntity other : player.getServer().getPlayerManager().getPlayerList()) {
+                for (ServerPlayer other : player.level().getServer().getPlayerList().getPlayers()) {
                     if (other != player && !other.isCreative() && !other.isSpectator()) {
-                        other.damage(world, source, amount);
+                        other.hurtServer(world, source, amount);
                     }
                 }
                 sharingDamage = false;
@@ -144,7 +143,7 @@ public abstract class MovementAndDamageMixin {
 
                     ItemStack reward = Chal_18_DamageRandomItem.getRandomItem(player.getRandom());
                     reward.setCount(hearts);
-                    player.getInventory().insertStack(reward);
+                    player.getInventory().add(reward);
                 }
             }
             if (Chal_25_DamageWorldBorder.isActive()) {
@@ -152,41 +151,41 @@ public abstract class MovementAndDamageMixin {
                 double next = current + amount;
                 Chal_25_DamageWorldBorder.setDiameter(next);
 
-                player.getServer().getWorlds().forEach(w -> {
+                player.level().getServer().getAllLevels().forEach(w -> {
                     double currentSize = w.getWorldBorder().getSize();
                     if (next > currentSize) {
                         // Use interpolation so border growth remains readable while taking damage.
-                        w.getWorldBorder().interpolateSize(currentSize, next, (long)((next - currentSize) * 1000));
+                        w.getWorldBorder().lerpSizeBetween(currentSize, next, (long)((next - currentSize) * 1000), 0L);
                     } else {
                         w.getWorldBorder().setSize(next);
                     }
                 });
 
-                ChallengeSavedData data = ChallengeSavedData.get(world.getServer().getOverworld());
+                ChallengeSavedData data = ChallengeSavedData.get(world.getServer().overworld());
                 data.setDamageWorldBorderSize(next);
             }
         }
     }
 
-    @Inject(method = "onDeath", at = @At("HEAD"))
+    @Inject(method = "die", at = @At("HEAD"))
     private void onDeath(DamageSource source, CallbackInfo ci) {
         if (Chal_21_Hardcore.isActive()) {
-            ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
-            ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+            ServerPlayer player = (ServerPlayer) (Object) this;
+            ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
 
             if (data.getInitialDifficulty() > 0) {
                 data.setInitialDifficulty(0);
                 data.setTainted(true);
 
-                Text title = Text.translatable("challengecraft.hardcore.failed").formatted(Formatting.RED, Formatting.BOLD);
-                Text subtitle = Text.translatable("challengecraft.hardcore.failed.desc").formatted(Formatting.GRAY);
+                Component title = Component.translatable("challengecraft.hardcore.failed").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+                Component subtitle = Component.translatable("challengecraft.hardcore.failed.desc").withStyle(ChatFormatting.GRAY);
 
-                player.getServer().getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-                player.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
-                player.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+                player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+                player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+                player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
 
-                player.getServer().getWorlds().forEach(world -> {
-                    world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, SoundCategory.MASTER, 1.0f, 1.0f);
+                player.level().getServer().getAllLevels().forEach(world -> {
+                    world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.MASTER, 1.0f, 1.0f);
                 });
             }
         }

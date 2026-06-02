@@ -6,8 +6,8 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 /** Periodically syncs display playtime so HUD clocks remain stable under TPS changes. */
 public class PlayTimePacketHandler {
@@ -23,7 +23,7 @@ public class PlayTimePacketHandler {
 
             if (now - lastSyncMillis >= 1000L) {
                 lastSyncMillis = now;
-                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                     int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
                     ServerPlayNetworking.send(player, new PlayTimeSyncPacket(playTicks));
                 }
@@ -31,9 +31,9 @@ public class PlayTimePacketHandler {
         });
 
         ServerPlayConnectionEvents.JOIN.register(
-                (ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server) -> {
+                (ServerGamePacketListenerImpl handler, PacketSender sender, MinecraftServer server) -> {
                     server.execute(() -> {
-                        ServerPlayerEntity player = handler.player;
+                        ServerPlayer player = handler.player;
                         int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
 
                         sender.sendPacket(new PlayTimeSyncPacket(playTicks));

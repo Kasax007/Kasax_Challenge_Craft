@@ -1,33 +1,32 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Client-to-server XP snapshot used when joining from the title-screen cache. */
-public class ClientXpSyncPacket implements CustomPayload {
-    public static final Id<ClientXpSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "client_xp_sync"));
+public class ClientXpSyncPacket implements CustomPacketPayload {
+    public static final Type<ClientXpSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "client_xp_sync"));
     
     public final long xp;
     public final UUID uuid;
 
-    public static final PacketCodec<PacketByteBuf, ClientXpSyncPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<PacketByteBuf, ClientXpSyncPacket>() {
+    public static final StreamCodec<FriendlyByteBuf, ClientXpSyncPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<FriendlyByteBuf, ClientXpSyncPacket>() {
                 @Override
-                public void encode(ClientXpSyncPacket pkt, PacketByteBuf buf) {
+                public void encode(ClientXpSyncPacket pkt, FriendlyByteBuf buf) {
                     buf.writeLong(pkt.xp);
-                    buf.writeUuid(pkt.uuid);
+                    buf.writeUUID(pkt.uuid);
                 }
             },
-            new PacketDecoder<PacketByteBuf, ClientXpSyncPacket>() {
+            new StreamDecoder<FriendlyByteBuf, ClientXpSyncPacket>() {
                 @Override
-                public ClientXpSyncPacket decode(PacketByteBuf buf) {
-                    return new ClientXpSyncPacket(buf.readLong(), buf.readUuid());
+                public ClientXpSyncPacket decode(FriendlyByteBuf buf) {
+                    return new ClientXpSyncPacket(buf.readLong(), buf.readUUID());
                 }
             }
     );
@@ -38,7 +37,7 @@ public class ClientXpSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

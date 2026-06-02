@@ -1,30 +1,30 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Server-to-client display timer update. */
-public class PlayTimeSyncPacket implements CustomPayload {
+public class PlayTimeSyncPacket implements CustomPacketPayload {
     public final int playTicks;
 
-    public static final Id<PlayTimeSyncPacket> ID =
-            new Id<>(Identifier.of("challengecraft", "sync_playtime"));
+    public static final Type<PlayTimeSyncPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "sync_playtime"));
 
-    public static final PacketCodec<PacketByteBuf, PlayTimeSyncPacket> CODEC =
-            CustomPayload.codecOf(
-                    new ValueFirstEncoder<PacketByteBuf, PlayTimeSyncPacket>() {
+    public static final StreamCodec<FriendlyByteBuf, PlayTimeSyncPacket> CODEC =
+            CustomPacketPayload.codec(
+                    new StreamMemberEncoder<FriendlyByteBuf, PlayTimeSyncPacket>() {
                         @Override
-                        public void encode(PlayTimeSyncPacket pkt, PacketByteBuf buf) {
+                        public void encode(PlayTimeSyncPacket pkt, FriendlyByteBuf buf) {
                             buf.writeVarInt(pkt.playTicks);
                         }
                     },
-                    new PacketDecoder<PacketByteBuf, PlayTimeSyncPacket>() {
+                    new StreamDecoder<FriendlyByteBuf, PlayTimeSyncPacket>() {
                         @Override
-                        public PlayTimeSyncPacket decode(PacketByteBuf buf) {
+                        public PlayTimeSyncPacket decode(FriendlyByteBuf buf) {
                             return new PlayTimeSyncPacket(buf.readVarInt());
                         }
                     }
@@ -35,7 +35,7 @@ public class PlayTimeSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

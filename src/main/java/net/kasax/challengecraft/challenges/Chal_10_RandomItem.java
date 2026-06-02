@@ -1,10 +1,9 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,8 +14,8 @@ public class Chal_10_RandomItem {
     private static final List<Identifier> ITEMS = new ArrayList<>();
 
     static {
-        Registries.ITEM.forEach(item -> {
-            Identifier id = Registries.ITEM.getId(item);
+        BuiltInRegistries.ITEM.forEach(item -> {
+            Identifier id = BuiltInRegistries.ITEM.getKey(item);
             if (id.getNamespace().equals("challengecraft")) return;
             ITEMS.add(id);
         });
@@ -27,9 +26,9 @@ public class Chal_10_RandomItem {
             if (!active) return;
             tickCounter = (tickCounter + 1) % 600; // 600 ticks = 30s
             if (tickCounter == 0) {
-                server.getPlayerManager().getPlayerList().forEach(player -> {
-                    Identifier id = ITEMS.get(player.getWorld().random.nextInt(ITEMS.size()));
-                    player.giveItemStack(new ItemStack(Registries.ITEM.get(id)));
+                server.getPlayerList().getPlayers().forEach(player -> {
+                    Identifier id = ITEMS.get(player.level().getRandom().nextInt(ITEMS.size()));
+                    player.addItem(new ItemStack(BuiltInRegistries.ITEM.getValue(id)));
                 });
             }
         });

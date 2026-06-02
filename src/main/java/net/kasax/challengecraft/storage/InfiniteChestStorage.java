@@ -1,20 +1,23 @@
 package net.kasax.challengecraft.storage;
 
-import net.minecraft.component.ComponentMap;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.util.Identifier;
-
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.*;
 import java.util.stream.Collectors;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 /** Stores arbitrarily large item counts while keeping item components part of the identity. */
 public class InfiniteChestStorage {
+    private static final Codec<PersistedEntry> PERSISTED_ENTRY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            ItemStack.CODEC.fieldOf("stack").forGetter(PersistedEntry::stack),
+            Codec.LONG.fieldOf("count").forGetter(PersistedEntry::count)
+    ).apply(instance, PersistedEntry::new));
+
     private final Map<ItemStackKey, Long> storedItems = new HashMap<>();
     private List<StorageEntry> cachedSortedList = null;
 
@@ -54,7 +57,7 @@ public class InfiniteChestStorage {
                     .sorted((e1, e2) -> {
                         int cmp = Long.compare(e2.count(), e1.count());
                         if (cmp == 0) {
-                            return Registries.ITEM.getId(e1.key().item()).toString().compareTo(Registries.ITEM.getId(e2.key().item()).toString());
+                            return BuiltInRegistries.ITEM.getKey(e1.key().item()).toString().compareTo(BuiltInRegistries.ITEM.getKey(e2.key().item()).toString());
                         }
                         return cmp;
                     })
@@ -68,42 +71,27 @@ public class InfiniteChestStorage {
         if (search == null || search.isEmpty()) return sorted;
         String lowerSearch = search.toLowerCase(Locale.ROOT);
         return sorted.stream()
-                .filter(e -> e.key().item().getName().getString().toLowerCase(Locale.ROOT).contains(lowerSearch))
+                .filter(e -> e.key().item().getName(e.key().toStack(1)).getString().toLowerCase(Locale.ROOT).contains(lowerSearch))
                 .collect(Collectors.toList());
     }
 
-    public void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+    public void read(ValueInput input) {
         storedItems.clear();
-        if (nbt == null) return;
-        
-        nbt.getList("Items").ifPresent(list -> {
-            for (int i = 0; i < list.size(); i++) {
-                list.getCompound(i).ifPresent(entry -> {
-                    long count = entry.getLong("count").orElse(0L);
-                    entry.getCompound("stack").ifPresent(itemNbt -> {
-                        Optional<ItemStack> stack = ItemStack.fromNbt(registries, itemNbt);
-                        stack.ifPresent(s -> {
-                            if (!s.isEmpty() && count > 0) {
-                                storedItems.put(ItemStackKey.fromStack(s), count);
-                            }
-                        });
-                    });
-                });
+        for (PersistedEntry entry : input.listOrEmpty("Items", PERSISTED_ENTRY_CODEC)) {
+            ItemStack stack = entry.stack();
+            long count = entry.count();
+            if (!stack.isEmpty() && count > 0) {
+                storedItems.put(ItemStackKey.fromStack(stack), count);
             }
-        });
+        }
         cachedSortedList = null;
     }
 
-    public void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
-        NbtList list = new NbtList();
+    public void write(ValueOutput output) {
+        ValueOutput.TypedOutputList<PersistedEntry> list = output.list("Items", PERSISTED_ENTRY_CODEC);
         for (Map.Entry<ItemStackKey, Long> entry : storedItems.entrySet()) {
-            NbtCompound compound = new NbtCompound();
-            ItemStack stack = entry.getKey().toStack(1);
-            compound.put("stack", stack.toNbt(registries));
-            compound.putLong("count", entry.getValue());
-            list.add(compound);
+            list.add(new PersistedEntry(entry.getKey().toStack(1), entry.getValue()));
         }
-        nbt.put("Items", list);
     }
 
     public Map<ItemStackKey, Long> getStoredItems() {
@@ -119,14 +107,14 @@ public class InfiniteChestStorage {
         return storedItems.isEmpty();
     }
 
-    public record ItemStackKey(Item item, ComponentMap components) {
+    public record ItemStackKey(Item item, DataComponentMap components) {
         public static ItemStackKey fromStack(ItemStack stack) {
             return new ItemStackKey(stack.getItem(), stack.getComponents());
         }
 
         public ItemStack toStack(int count) {
             ItemStack stack = new ItemStack(item, count);
-            stack.applyComponentsFrom(components);
+            stack.applyComponents(components);
             return stack;
         }
 
@@ -145,4 +133,6 @@ public class InfiniteChestStorage {
     }
 
     public record StorageEntry(ItemStackKey key, long count) {}
+
+    private record PersistedEntry(ItemStack stack, long count) {}
 }

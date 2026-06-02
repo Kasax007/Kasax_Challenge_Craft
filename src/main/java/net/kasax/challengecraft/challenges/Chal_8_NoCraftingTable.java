@@ -1,8 +1,8 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.block.Blocks;
 
 /** Blocks direct crafting-table interaction without touching player inventories. */
 public class Chal_8_NoCraftingTable {
@@ -10,11 +10,11 @@ public class Chal_8_NoCraftingTable {
 
     public static void register() {
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
-            if (!active || world.isClient) return ActionResult.PASS;
-            if (world.getBlockState(hit.getBlockPos()).isOf(Blocks.CRAFTING_TABLE)) {
-                return ActionResult.FAIL;
+            if (!active || world.isClientSide()) return InteractionResult.PASS;
+            if (world.getBlockState(hit.getBlockPos()).is(Blocks.CRAFTING_TABLE)) {
+                return InteractionResult.FAIL;
             }
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
     public static void setActive(boolean v) { active = v; }

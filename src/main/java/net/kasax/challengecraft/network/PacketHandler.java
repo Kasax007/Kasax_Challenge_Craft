@@ -5,14 +5,14 @@ import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeManager;
 import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
 import net.kasax.challengecraft.data.ChallengeSavedData;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.server.permissions.Permissions;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 
 /** Server receivers for mutable client requests such as challenge edits and lockout actions. */
 public class PacketHandler {
@@ -24,19 +24,19 @@ public class PacketHandler {
                     var player = context.player();
 
                     server.execute(() -> {
-                        if (!player.hasPermissionLevel(2)) {
+                        if (!player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                             ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (no permission)", player.getName().getString());
-                            player.sendMessage(Text.translatable("challengecraft.permission.change_challenges").formatted(Formatting.RED), false);
+                            player.sendSystemMessage(Component.translatable("challengecraft.permission.change_challenges").withStyle(ChatFormatting.RED));
                             return;
                         }
 
-                        int playerLevel = net.kasax.challengecraft.LevelManager.getLevelForXp(net.kasax.challengecraft.data.XpManager.getXp(player.getUuid()));
-                        long playerXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
+                        int playerLevel = net.kasax.challengecraft.LevelManager.getLevelForXp(net.kasax.challengecraft.data.XpManager.getXp(player.getUUID()));
+                        long playerXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUUID());
                         
                         for (int cid : packet.active) {
                             if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(cid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (challenge {} locked for level {})", player.getName().getString(), cid, playerLevel);
-                                player.sendMessage(Text.translatable("challengecraft.requirement.challenge_level", cid).formatted(Formatting.RED), false);
+                                player.sendSystemMessage(Component.translatable("challengecraft.requirement.challenge_level", cid).withStyle(ChatFormatting.RED));
                                 return;
                             }
                         }
@@ -44,12 +44,12 @@ public class PacketHandler {
                             if (pid == net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON) {
                                 if (net.kasax.challengecraft.LevelManager.getStars(playerXp) < 20) {
                                     ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (Infinity Weapon perk locked)", player.getName().getString());
-                                    player.sendMessage(Text.translatable("challengecraft.requirement.infinity_weapon_stars").formatted(Formatting.RED), false);
+                                    player.sendSystemMessage(Component.translatable("challengecraft.requirement.infinity_weapon_stars").withStyle(ChatFormatting.RED));
                                     return;
                                 }
                             } else if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(pid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (perk {} locked for level {})", player.getName().getString(), pid, playerLevel);
-                                player.sendMessage(Text.translatable("challengecraft.requirement.perk_level", pid).formatted(Formatting.RED), false);
+                                player.sendSystemMessage(Component.translatable("challengecraft.requirement.perk_level", pid).withStyle(ChatFormatting.RED));
                                 return;
                             }
                         }
@@ -63,7 +63,7 @@ public class PacketHandler {
                                 packet.mobHealthMultiplier,
                                 packet.doubleTroubleMultiplier
                         );
-                        var world = server.getOverworld();
+                        var world = server.overworld();
                         ChallengeSavedData data = ChallengeSavedData.get(world);
                         java.util.List<Integer> prevPerks = new java.util.ArrayList<>(data.getActivePerks());
                         data.setActive(packet.active);
@@ -77,22 +77,22 @@ public class PacketHandler {
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         boolean hasAfter  = packet.perks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         if (!hadBefore && hasAfter) {
-                            for (var p : server.getPlayerManager().getPlayerList()) {
+                            for (var p : server.getPlayerList().getPlayers()) {
                                 net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
                             }
                         }
                         
                         if (!data.isTainted()) {
                             data.setTainted(true);
-                            Text title = Text.translatable("challengecraft.tainted.failed").formatted(Formatting.RED, Formatting.BOLD);
-                            Text subtitle = Text.translatable("challengecraft.tainted.failed.desc").formatted(Formatting.GRAY);
+                            Component title = Component.translatable("challengecraft.tainted.failed").withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+                            Component subtitle = Component.translatable("challengecraft.tainted.failed.desc").withStyle(ChatFormatting.GRAY);
 
-                            server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-                            server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
-                            server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+                            server.getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+                            server.getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+                            server.getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
 
-                            server.getWorlds().forEach(w -> {
-                                w.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, SoundCategory.MASTER, 1.0f, 1.0f);
+                            server.getAllLevels().forEach(w -> {
+                                w.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.MASTER, 1.0f, 1.0f);
                             });
                         }
                         if (packet.active.contains(7)) {
@@ -136,11 +136,11 @@ public class PacketHandler {
                     var server = context.server();
                     var player = context.player();
                     server.execute(() -> {
-                        if (player.getUuid().equals(packet.uuid)) {
-                            long serverXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUuid());
+                        if (player.getUUID().equals(packet.uuid)) {
+                            long serverXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUUID());
                             if (packet.xp > serverXp) {
                                 ChallengeCraft.LOGGER.info("[Server] Received XP sync from client {}: {} (current server XP: {})", player.getName().getString(), packet.xp, serverXp);
-                                net.kasax.challengecraft.data.XpManager.setXp(player.getUuid(), packet.xp);
+                                net.kasax.challengecraft.data.XpManager.setXp(player.getUUID(), packet.xp);
                             }
                             // The server remains authoritative if the client has stale local XP.
                             net.kasax.challengecraft.LevelManager.sync(player);
@@ -166,30 +166,32 @@ public class PacketHandler {
                     var server = context.server();
                     var player = context.player();
                     server.execute(() -> {
-                        var world = player.getWorld();
+                        var world = player.level();
                         if (world.getBlockEntity(packet.pos()) instanceof net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
                             var storage = be.getStorage();
                             if (packet.button() == -1) {
-                                net.minecraft.screen.ScreenHandler handler = player.currentScreenHandler;
+                                net.minecraft.world.inventory.AbstractContainerMenu handler = player.containerMenu;
                                 if (handler instanceof net.kasax.challengecraft.block.InfiniteChestScreenHandler) {
-                                    net.minecraft.item.ItemStack cursorStack = handler.getCursorStack();
+                                    net.minecraft.world.item.ItemStack cursorStack = handler.getCarried();
                                     if (!cursorStack.isEmpty()) {
                                         storage.addStack(cursorStack.copy());
                                         cursorStack.setCount(0);
-                                        handler.setCursorStack(net.minecraft.item.ItemStack.EMPTY);
+                                        handler.setCarried(net.minecraft.world.item.ItemStack.EMPTY);
                                         syncInfiniteChest(player, be);
                                     }
                                 }
                                 return;
                             }
-                            net.minecraft.item.ItemStack stack = packet.stack();
+                            net.minecraft.world.item.ItemStack stack = packet.stack();
                             if (!stack.isEmpty()) {
                                 net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey key = net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey.fromStack(stack);
                                 long amountToRemove = (packet.button() == 1) ? 1 : 64;
                                 long count = storage.removeItems(key, amountToRemove);
                                 if (count > 0) {
-                                    net.minecraft.item.ItemStack out = key.toStack((int) count);
-                                    player.getInventory().offerOrDrop(out);
+                                    net.minecraft.world.item.ItemStack out = key.toStack((int) count);
+                                    if (!player.getInventory().add(out)) {
+                                        player.drop(out, false);
+                                    }
                                 }
                                 syncInfiniteChest(player, be);
                             }
@@ -208,7 +210,7 @@ public class PacketHandler {
         );
     }
 
-    public static void syncInfiniteChest(net.minecraft.server.network.ServerPlayerEntity player, net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
+    public static void syncInfiniteChest(net.minecraft.server.level.ServerPlayer player, net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
         var storage = be.getStorage();
         java.util.List<InfiniteChestSyncPayload.Entry> entries = new java.util.ArrayList<>();
         storage.getStoredItems().forEach((key, count) -> {

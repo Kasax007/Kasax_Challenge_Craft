@@ -1,17 +1,16 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.util.Identifier;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Client-to-server challenge settings update plus restart intent. */
-public class ChallengePacket implements CustomPayload {
+public class ChallengePacket implements CustomPacketPayload {
     public final List<Integer> active;
     public final int           maxHearts;
     public final int          limitedInventorySlots;
@@ -21,14 +20,14 @@ public class ChallengePacket implements CustomPayload {
     public final List<Integer> perks;
     public final boolean       restart;
 
-    public static final Id<ChallengePacket> ID =
-            new Id<>(Identifier.of("challengecraft", "update_challenges"));
+    public static final Type<ChallengePacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "update_challenges"));
 
-    public static final PacketCodec<PacketByteBuf, ChallengePacket> CODEC =
-            CustomPayload.codecOf(
-                    new ValueFirstEncoder<PacketByteBuf, ChallengePacket>() {
+    public static final StreamCodec<FriendlyByteBuf, ChallengePacket> CODEC =
+            CustomPacketPayload.codec(
+                    new StreamMemberEncoder<FriendlyByteBuf, ChallengePacket>() {
                         @Override
-                        public void encode(ChallengePacket pkt, PacketByteBuf buf) {
+                        public void encode(ChallengePacket pkt, FriendlyByteBuf buf) {
                             buf.writeVarInt(pkt.active.size());
                             for (int id : pkt.active) buf.writeVarInt(id);
                             buf.writeVarInt(pkt.maxHearts);
@@ -41,9 +40,9 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeBoolean(pkt.restart);
                         }
                     },
-                    new PacketDecoder<PacketByteBuf, ChallengePacket>() {
+                    new StreamDecoder<FriendlyByteBuf, ChallengePacket>() {
                         @Override
-                        public ChallengePacket decode(PacketByteBuf buf) {
+                        public ChallengePacket decode(FriendlyByteBuf buf) {
                             int size = buf.readVarInt();
                             List<Integer> list = new ArrayList<>(size);
                             for (int i = 0; i < size; i++) {
@@ -80,7 +79,7 @@ public class ChallengePacket implements CustomPayload {
         this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, perks, false);
     }
 
-    public void write(PacketByteBuf buf) {
+    public void write(FriendlyByteBuf buf) {
         buf.writeVarInt(active.size());
         for (int id : active) buf.writeVarInt(id);
         buf.writeVarInt(maxHearts);
@@ -94,7 +93,7 @@ public class ChallengePacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

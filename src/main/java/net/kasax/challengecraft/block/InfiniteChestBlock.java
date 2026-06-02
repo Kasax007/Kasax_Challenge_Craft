@@ -1,63 +1,68 @@
 package net.kasax.challengecraft.block;
 
 import com.mojang.serialization.MapCodec;
-import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.loot.context.LootWorldContext;
-import net.minecraft.loot.context.LootContextParameters;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.state.StateManager;
-import net.minecraft.state.property.BooleanProperty;
-import net.minecraft.state.property.EnumProperty;
-import net.minecraft.state.property.Properties;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.fluid.Fluids;
-import net.minecraft.item.ItemPlacementContext;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.BlockView;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.world.level.block.SimpleWaterloggedBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
 /** World block for the infinite chest, including screen opening and waterlogging behavior. */
-public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable {
-    public static final MapCodec<InfiniteChestBlock> CODEC = createCodec(InfiniteChestBlock::new);
-    public static final EnumProperty<Direction> FACING = HorizontalFacingBlock.FACING;
-    public static final BooleanProperty WATERLOGGED = Properties.WATERLOGGED;
+public class InfiniteChestBlock extends BaseEntityBlock implements SimpleWaterloggedBlock {
+    public static final MapCodec<InfiniteChestBlock> CODEC = simpleCodec(InfiniteChestBlock::new);
+    public static final EnumProperty<Direction> FACING = HorizontalDirectionalBlock.FACING;
+    public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
-    protected static final VoxelShape BASE_SHAPE = Block.createCuboidShape(1.0, 0.0, 1.0, 15.0, 14.0, 15.0);
-    protected static final VoxelShape LATCH_NORTH = Block.createCuboidShape(7.0, 7.0, 0.0, 9.0, 11.0, 1.0);
-    protected static final VoxelShape LATCH_SOUTH = Block.createCuboidShape(7.0, 7.0, 15.0, 9.0, 11.0, 16.0);
-    protected static final VoxelShape LATCH_EAST = Block.createCuboidShape(15.0, 7.0, 7.0, 16.0, 11.0, 9.0);
-    protected static final VoxelShape LATCH_WEST = Block.createCuboidShape(0.0, 7.0, 7.0, 1.0, 11.0, 9.0);
+    protected static final VoxelShape BASE_SHAPE = Block.box(1.0, 0.0, 1.0, 15.0, 14.0, 15.0);
+    protected static final VoxelShape LATCH_NORTH = Block.box(7.0, 7.0, 0.0, 9.0, 11.0, 1.0);
+    protected static final VoxelShape LATCH_SOUTH = Block.box(7.0, 7.0, 15.0, 9.0, 11.0, 16.0);
+    protected static final VoxelShape LATCH_EAST = Block.box(15.0, 7.0, 7.0, 16.0, 11.0, 9.0);
+    protected static final VoxelShape LATCH_WEST = Block.box(0.0, 7.0, 7.0, 1.0, 11.0, 9.0);
 
-    protected static final VoxelShape SHAPE_NORTH = VoxelShapes.union(BASE_SHAPE, LATCH_NORTH);
-    protected static final VoxelShape SHAPE_SOUTH = VoxelShapes.union(BASE_SHAPE, LATCH_SOUTH);
-    protected static final VoxelShape SHAPE_EAST = VoxelShapes.union(BASE_SHAPE, LATCH_EAST);
-    protected static final VoxelShape SHAPE_WEST = VoxelShapes.union(BASE_SHAPE, LATCH_WEST);
+    protected static final VoxelShape SHAPE_NORTH = Shapes.or(BASE_SHAPE, LATCH_NORTH);
+    protected static final VoxelShape SHAPE_SOUTH = Shapes.or(BASE_SHAPE, LATCH_SOUTH);
+    protected static final VoxelShape SHAPE_EAST = Shapes.or(BASE_SHAPE, LATCH_EAST);
+    protected static final VoxelShape SHAPE_WEST = Shapes.or(BASE_SHAPE, LATCH_WEST);
 
-    public InfiniteChestBlock(Settings settings) {
+    public InfiniteChestBlock(Properties settings) {
         super(settings);
-        this.setDefaultState(this.stateManager.getDefaultState().with(FACING, Direction.NORTH).with(WATERLOGGED, false));
+        this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(WATERLOGGED, false));
     }
 
     @Override
-    public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos, ShapeContext context) {
-        return switch (state.get(FACING)) {
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext context) {
+        return switch (state.getValue(FACING)) {
             case NORTH -> SHAPE_NORTH;
             case SOUTH -> SHAPE_SOUTH;
             case WEST -> SHAPE_WEST;
@@ -67,53 +72,53 @@ public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable
     }
 
     @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING, WATERLOGGED);
     }
 
     @Override
-    public BlockState getPlacementState(ItemPlacementContext context) {
-        FluidState fluidState = context.getWorld().getFluidState(context.getBlockPos());
-        return this.getDefaultState().with(FACING, context.getHorizontalPlayerFacing().getOpposite()).with(WATERLOGGED, fluidState.getFluid() == Fluids.WATER);
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        FluidState fluidState = context.getLevel().getFluidState(context.getClickedPos());
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite()).setValue(WATERLOGGED, fluidState.getType() == Fluids.WATER);
     }
 
     @Override
     public FluidState getFluidState(BlockState state) {
-        return state.get(WATERLOGGED) ? Fluids.WATER.getStill(false) : super.getFluidState(state);
+        return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(state);
     }
 
     @Override
-    protected MapCodec<? extends BlockWithEntity> getCodec() {
+    protected MapCodec<? extends BaseEntityBlock> codec() {
         return CODEC;
     }
 
     @Nullable
     @Override
-    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new InfiniteChestBlockEntity(pos, state);
     }
 
     @Override
-    public BlockRenderType getRenderType(BlockState state) {
-        return BlockRenderType.MODEL;
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
     }
 
     @Override
-    public void randomDisplayTick(BlockState state, World world, BlockPos pos, Random random) {
-        if (state.get(WATERLOGGED)) {
+    public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random) {
+        if (state.getValue(WATERLOGGED)) {
             return;
         }
 
-        Direction facing = state.get(FACING);
+        Direction facing = state.getValue(FACING);
         double centerX = pos.getX() + 0.5;
         double centerY = pos.getY() + 0.75;
         double centerZ = pos.getZ() + 0.5;
-        double frontX = centerX + facing.getOffsetX() * 0.44;
-        double frontZ = centerZ + facing.getOffsetZ() * 0.44;
-        double sideX = facing.rotateYClockwise().getOffsetX() * 0.18;
-        double sideZ = facing.rotateYClockwise().getOffsetZ() * 0.18;
+        double frontX = centerX + facing.getStepX() * 0.44;
+        double frontZ = centerZ + facing.getStepZ() * 0.44;
+        double sideX = facing.getClockWise().getStepX() * 0.18;
+        double sideZ = facing.getClockWise().getStepZ() * 0.18;
 
-        world.addParticleClient(
+        world.addParticle(
                 ParticleTypes.ENCHANT,
                 frontX + sideX * (random.nextDouble() - 0.5),
                 centerY + (random.nextDouble() - 0.5) * 0.18,
@@ -124,7 +129,7 @@ public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable
         );
 
         if (random.nextFloat() < 0.35f) {
-            world.addImportantParticleClient(
+            world.addAlwaysVisibleParticle(
                     ParticleTypes.END_ROD,
                     centerX + (random.nextDouble() - 0.5) * 0.4,
                     pos.getY() + 0.92 + random.nextDouble() * 0.18,
@@ -136,7 +141,7 @@ public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable
         }
 
         if (random.nextFloat() < 0.18f) {
-            world.addParticleClient(
+            world.addParticle(
                     ParticleTypes.WITCH,
                     frontX,
                     pos.getY() + 0.56 + random.nextDouble() * 0.22,
@@ -149,42 +154,42 @@ public class InfiniteChestBlock extends BlockWithEntity implements Waterloggable
     }
 
     @Override
-    protected ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        if (!world.isClient) {
-            NamedScreenHandlerFactory screenHandlerFactory = state.createScreenHandlerFactory(world, pos);
+    protected InteractionResult useWithoutItem(BlockState state, Level world, BlockPos pos, Player player, BlockHitResult hit) {
+        if (!world.isClientSide()) {
+            MenuProvider screenHandlerFactory = state.getMenuProvider(world, pos);
             if (screenHandlerFactory != null) {
-                player.openHandledScreen(screenHandlerFactory);
+                player.openMenu(screenHandlerFactory);
                 if (world.getBlockEntity(pos) instanceof InfiniteChestBlockEntity be) {
-                    net.kasax.challengecraft.network.PacketHandler.syncInfiniteChest((net.minecraft.server.network.ServerPlayerEntity) player, be);
+                    net.kasax.challengecraft.network.PacketHandler.syncInfiniteChest((net.minecraft.server.level.ServerPlayer) player, be);
                 }
             }
         }
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
     @Override
-    protected List<ItemStack> getDroppedStacks(BlockState state, LootWorldContext.Builder builder) {
-        BlockEntity blockEntity = builder.getOptional(LootContextParameters.BLOCK_ENTITY);
+    protected List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
+        BlockEntity blockEntity = builder.getOptionalParameter(LootContextParams.BLOCK_ENTITY);
         if (blockEntity instanceof InfiniteChestBlockEntity be) {
-            builder.addDynamicDrop(ShulkerBoxBlock.CONTENTS_DYNAMIC_DROP_ID, (consumer) -> {
+            builder.withDynamicDrop(ShulkerBoxBlock.CONTENTS, (consumer) -> {
                 be.getStorage().getStoredItems().forEach((key, count) -> {
                     long remaining = count;
                     while (remaining > 0) {
-                        int toAdd = (int) Math.min(remaining, key.item().getMaxCount());
+                        int toAdd = (int) Math.min(remaining, key.item().getDefaultMaxStackSize());
                         consumer.accept(key.toStack(toAdd));
                         remaining -= toAdd;
                     }
                 });
             });
         }
-        return super.getDroppedStacks(state, builder);
+        return super.getDrops(state, builder);
     }
 
     @Override
-    protected void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean moved) {
-        if (!state.isOf(world.getBlockState(pos).getBlock())) {
-            world.updateComparators(pos, this);
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel world, BlockPos pos, boolean moved) {
+        if (!state.is(world.getBlockState(pos).getBlock())) {
+            world.updateNeighbourForOutputSignal(pos, this);
         }
-        super.onStateReplaced(state, world, pos, moved);
+        super.affectNeighborsAfterRemoval(state, world, pos, moved);
     }
 }

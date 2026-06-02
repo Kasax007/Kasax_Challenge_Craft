@@ -1,15 +1,15 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld;
-import net.minecraft.world.dimension.DimensionOptions;
-import net.minecraft.world.dimension.DimensionTypes;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.LevelStem;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(DimensionOptions.class)
+@Mixin(LevelStem.class)
 /** Swaps in custom dimension generators while creating challenge worlds. */
 public abstract class DimensionOptionsMixin {
 
@@ -17,14 +17,14 @@ public abstract class DimensionOptionsMixin {
     private void onGetChunkGenerator(CallbackInfoReturnable<ChunkGenerator> cir) {
         if (!Chal_11_SkyblockWorld.isActive()) return;
 
-        DimensionOptions self = (DimensionOptions) (Object) this;
+        LevelStem self = (LevelStem) (Object) this;
         
-        if (self.dimensionTypeEntry().matchesKey(DimensionTypes.OVERWORLD)) {
+        if (self.type().is(BuiltinDimensionTypes.OVERWORLD)) {
             ChunkGenerator skyOW = Chal_11_SkyblockWorld.getOverworldGenerator();
             if (skyOW != null) {
                 cir.setReturnValue(skyOW);
             }
-        } else if (self.dimensionTypeEntry().matchesKey(DimensionTypes.THE_NETHER)) {
+        } else if (self.type().is(BuiltinDimensionTypes.NETHER)) {
             ChunkGenerator skyNether = Chal_11_SkyblockWorld.getNetherGenerator();
             if (skyNether != null) {
                 cir.setReturnValue(skyNether);

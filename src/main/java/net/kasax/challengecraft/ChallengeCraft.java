@@ -2,23 +2,23 @@ package net.kasax.challengecraft;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.world.World;
 import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.*;
 import net.kasax.challengecraft.world.SkyblockChunkGenerator;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.data.ChallengeSavedData;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.network.ServerPlayerEntity;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +27,7 @@ public class ChallengeCraft implements ModInitializer {
 	public static final String MOD_ID = "challengecraft";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	public static final RegistryKey<World> LIMBO_KEY = RegistryKey.of(RegistryKeys.WORLD, Identifier.of(MOD_ID, "limbo"));
+	public static final ResourceKey<Level> LIMBO_KEY = ResourceKey.create(Registries.DIMENSION, Identifier.fromNamespaceAndPath(MOD_ID, "limbo"));
 
 	@Override
 	public void onInitialize() {
@@ -61,196 +61,196 @@ public class ChallengeCraft implements ModInitializer {
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 
 		net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			dispatcher.register(CommandManager.literal("challengecraft_skip_item")
-					.requires(source -> source.hasPermissionLevel(2))
+			dispatcher.register(Commands.literal("challengecraft_skip_item")
+					.requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
 					.executes(context -> {
 						Chal_22_AllItems.skipItem(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_item.single"), true);
+						context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_item.single"), true);
 						return 1;
 					})
-					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+					.then(Commands.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_22_AllItems.skipItem(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_item.multiple", amount), true);
+								context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_item.multiple", amount), true);
 								return 1;
 							}))
 			);
 
-			dispatcher.register(CommandManager.literal("challengecraft_all_items_list")
+			dispatcher.register(Commands.literal("challengecraft_all_items_list")
 					.executes(context -> {
-						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
-						ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+						ServerPlayer player = context.getSource().getPlayerOrException();
+						ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
 						if (Chal_22_AllItems.isActive()) {
 							ServerPlayNetworking.send(player, new AllItemsListPacket(data.getAllItemsOrder(), data.getAllItemsIndex()));
 						} else {
-							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_items.inactive"), false);
+							context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.all_items.inactive"), false);
 						}
 						return 1;
 					}));
 
-			dispatcher.register(CommandManager.literal("challengecraft_skip_entity")
-					.requires(source -> source.hasPermissionLevel(2))
+			dispatcher.register(Commands.literal("challengecraft_skip_entity")
+					.requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
 					.executes(context -> {
 						Chal_23_AllEntities.skipEntity(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_entity.single"), true);
+						context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_entity.single"), true);
 						return 1;
 					})
-					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+					.then(Commands.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_23_AllEntities.skipEntity(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_entity.multiple", amount), true);
+								context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_entity.multiple", amount), true);
 								return 1;
 							}))
 			);
 
-			dispatcher.register(CommandManager.literal("challengecraft_all_entities_list")
+			dispatcher.register(Commands.literal("challengecraft_all_entities_list")
 					.executes(context -> {
-						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
-						ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+						ServerPlayer player = context.getSource().getPlayerOrException();
+						ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
 						if (Chal_23_AllEntities.isActive()) {
 							ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.AllEntitiesListPacket(data.getAllEntitiesOrder(), data.getAllEntitiesIndex()));
 						} else {
-							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_entities.inactive"), false);
+							context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.all_entities.inactive"), false);
 						}
 						return 1;
 					}));
 
-			dispatcher.register(CommandManager.literal("challengecraft_skip_advancement")
-					.requires(source -> source.hasPermissionLevel(2))
+			dispatcher.register(Commands.literal("challengecraft_skip_advancement")
+					.requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
 					.executes(context -> {
 						Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), 1);
-						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_advancement.single"), true);
+						context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_advancement.single"), true);
 						return 1;
 					})
-					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+					.then(Commands.argument("amount", IntegerArgumentType.integer(1))
 							.executes(context -> {
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								Chal_26_AllAchievements.skipAdvancement(context.getSource().getServer(), amount);
-								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_advancement.multiple", amount), true);
+								context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.skip_advancement.multiple", amount), true);
 								return 1;
 							}))
 			);
 
-			dispatcher.register(CommandManager.literal("challengecraft_all_advancements_list")
+			dispatcher.register(Commands.literal("challengecraft_all_advancements_list")
 					.executes(context -> {
-						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						ServerPlayer player = context.getSource().getPlayerOrException();
 						if (Chal_26_AllAchievements.isActive()) {
 							Chal_26_AllAchievements.sendListToPlayer(player);
 						} else {
-							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.all_advancements.inactive"), false);
+							context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.all_advancements.inactive"), false);
 						}
 						return 1;
 					}));
 
-			dispatcher.register(CommandManager.literal("challengecraft_lockout_debug_solo")
-					.requires(source -> source.hasPermissionLevel(2))
+			dispatcher.register(Commands.literal("challengecraft_lockout_debug_solo")
+					.requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
 					.executes(context -> {
-						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						ServerPlayer player = context.getSource().getPlayerOrException();
 						Chal_40_LockoutBingo.startSoloDebugRun(player);
-						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_solo.started"), true);
+						context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_solo.started"), true);
 						return 1;
 					}));
 
-			dispatcher.register(CommandManager.literal("challengecraft_lockout_debug_claim")
-					.requires(source -> source.hasPermissionLevel(2))
+			dispatcher.register(Commands.literal("challengecraft_lockout_debug_claim")
+					.requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
 					.executes(context -> {
-						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						ServerPlayer player = context.getSource().getPlayerOrException();
 						int claimed = Chal_40_LockoutBingo.debugClaimTiles(player, 1);
 						if (claimed > 0) {
-							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
+							context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
 						} else {
-							context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.none"), false);
+							context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_claim.none"), false);
 						}
 						return claimed;
 					})
-					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1, 25))
+					.then(Commands.argument("amount", IntegerArgumentType.integer(1, 25))
 							.executes(context -> {
-								ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+								ServerPlayer player = context.getSource().getPlayerOrException();
 								int amount = IntegerArgumentType.getInteger(context, "amount");
 								int claimed = Chal_40_LockoutBingo.debugClaimTiles(player, amount);
 								if (claimed > 0) {
-									context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
+									context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_claim.result", claimed), true);
 								} else {
-									context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.lockout_debug_claim.none"), false);
+									context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_claim.none"), false);
 								}
 								return claimed;
 							}))
 			);
 		});
 
-		PayloadTypeRegistry.playC2S()
+		PayloadTypeRegistry.serverboundPlay()
 				.register(ChallengePacket.ID, ChallengePacket.CODEC);
-		PayloadTypeRegistry.playC2S()
+		PayloadTypeRegistry.serverboundPlay()
 				.register(ClientXpSyncPacket.ID, ClientXpSyncPacket.CODEC);
-		PayloadTypeRegistry.playC2S()
+		PayloadTypeRegistry.serverboundPlay()
 				.register(TriviaAnswerPacket.ID, TriviaAnswerPacket.CODEC);
-		PayloadTypeRegistry.playC2S()
+		PayloadTypeRegistry.serverboundPlay()
 				.register(net.kasax.challengecraft.network.InfiniteChestClickPayload.ID, net.kasax.challengecraft.network.InfiniteChestClickPayload.CODEC);
-		PayloadTypeRegistry.playC2S()
+		PayloadTypeRegistry.serverboundPlay()
 				.register(LockoutBingoActionPacket.ID, LockoutBingoActionPacket.CODEC);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				StatsSyncPacket.ID,
 				StatsSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				LevelSyncPacket.ID,
 				LevelSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				PlayTimeSyncPacket.ID,
 				PlayTimeSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				AllItemsSyncPacket.ID,
 				AllItemsSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				AllItemsListPacket.ID,
 				AllItemsListPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				net.kasax.challengecraft.network.AllEntitiesSyncPacket.ID,
 				net.kasax.challengecraft.network.AllEntitiesSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				ChallengeRewardPacket.ID,
 				ChallengeRewardPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				net.kasax.challengecraft.network.AllEntitiesListPacket.ID,
 				net.kasax.challengecraft.network.AllEntitiesListPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				AllAchievementsSyncPacket.ID,
 				AllAchievementsSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				AllAchievementsListPacket.ID,
 				AllAchievementsListPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				net.kasax.challengecraft.network.RestartPendingPacket.ID,
 				net.kasax.challengecraft.network.RestartPendingPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				TriviaQuestionPacket.ID,
 				TriviaQuestionPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID,
 				net.kasax.challengecraft.network.InfiniteChestSyncPayload.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				LockoutBingoSyncPacket.ID,
 				LockoutBingoSyncPacket.CODEC
 		);
-		PayloadTypeRegistry.playS2C().register(
+		PayloadTypeRegistry.clientboundPlay().register(
 				LockoutBingoOpenScreenPacket.ID,
 				LockoutBingoOpenScreenPacket.CODEC
 		);
@@ -259,8 +259,8 @@ public class ChallengeCraft implements ModInitializer {
 		PlayTimePacketHandler.registerServer();
 
 		Registry.register(
-				Registries.CHUNK_GENERATOR,
-				Identifier.of("challengecraft", "skyblock_chunk_generator"),
+				BuiltInRegistries.CHUNK_GENERATOR,
+				Identifier.fromNamespaceAndPath("challengecraft", "skyblock_chunk_generator"),
 				SkyblockChunkGenerator.MAP_CODEC
 		);
 
@@ -270,20 +270,20 @@ public class ChallengeCraft implements ModInitializer {
 		});
 	}
 
-	private static void sendProgressCommandReminders(ServerPlayerEntity player) {
-		ChallengeSavedData data = ChallengeSavedData.get(player.getServer().getOverworld());
+	private static void sendProgressCommandReminders(ServerPlayer player) {
+		ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
 
 		if (data.getActive().contains(22)) {
-			player.sendMessage(Text.translatable("challengecraft.command.all_items.reminder")
-					.formatted(Formatting.GOLD), false);
+			player.sendSystemMessage(Component.translatable("challengecraft.command.all_items.reminder")
+					.withStyle(ChatFormatting.GOLD), false);
 		}
 		if (data.getActive().contains(23)) {
-			player.sendMessage(Text.translatable("challengecraft.command.all_entities.reminder")
-					.formatted(Formatting.GOLD), false);
+			player.sendSystemMessage(Component.translatable("challengecraft.command.all_entities.reminder")
+					.withStyle(ChatFormatting.GOLD), false);
 		}
 		if (data.getActive().contains(26)) {
-			player.sendMessage(Text.translatable("challengecraft.command.all_advancements.reminder")
-					.formatted(Formatting.GOLD), false);
+			player.sendSystemMessage(Component.translatable("challengecraft.command.all_advancements.reminder")
+					.withStyle(ChatFormatting.GOLD), false);
 		}
 	}
 }

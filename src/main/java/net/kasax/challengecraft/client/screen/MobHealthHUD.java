@@ -2,21 +2,19 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.kasax.challengecraft.challenges.Chal_24_MobHealthMultiply;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.SpawnEggItem;
 import java.util.Locale;
 
 @Environment(EnvType.CLIENT)
@@ -24,20 +22,20 @@ import java.util.Locale;
 public class MobHealthHUD {
 
     public static void register() {
-        HudRenderCallback.EVENT.register(MobHealthHUD::onHudRender);
+        HudElementRegistry.addLast(net.minecraft.resources.Identifier.fromNamespaceAndPath("challengecraft", "mob_health_hud"), MobHealthHUD::onHudRender);
     }
 
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
+    private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
         if (!Chal_24_MobHealthMultiply.isActive()) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client.options.hideGui) return;
 
-        Entity targeted = client.targetedEntity;
+        Entity targeted = client.crosshairPickEntity;
         if (!(targeted instanceof LivingEntity living)) return;
 
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
+        Font tr = client.font;
+        int sw = client.getWindow().getGuiScaledWidth();
         int centerX = sw / 2;
 
         int y = 5;
@@ -45,30 +43,30 @@ public class MobHealthHUD {
             y = 45;
         }
 
-        Text nameText = living.getDisplayName().copy().formatted(Formatting.YELLOW, Formatting.BOLD);
+        Component nameText = living.getDisplayName().copy().withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD);
         float health = living.getHealth();
         float maxHealth = living.getMaxHealth();
         // HUD formatting should not change with the client's locale.
-        Text healthText = Text.translatable(
+        Component healthText = Component.translatable(
                 "challengecraft.mob_health.health",
                 String.format(Locale.US, "%.1f", health),
                 String.format(Locale.US, "%.1f", maxHealth)
-        ).formatted(Formatting.RED);
+        ).withStyle(ChatFormatting.RED);
 
         int boxWidth = 150;
         int boxHeight = 40;
         int x = centerX - boxWidth / 2;
 
         ctx.fill(x, y, x + boxWidth, y + boxHeight, 0x80000000);
-        ctx.drawBorder(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
+        ctx.outline(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
 
-        ItemStack icon = SpawnEggItem.forEntity(living.getType()) != null 
-                ? new ItemStack(SpawnEggItem.forEntity(living.getType()))
-                : new ItemStack(Items.ZOMBIE_SPAWN_EGG);
+        ItemStack icon = SpawnEggItem.byId(living.getType())
+                .map(item -> new ItemStack(item.value()))
+                .orElseGet(() -> new ItemStack(Items.ZOMBIE_SPAWN_EGG));
         
-        ctx.drawItem(icon, x + 10, y + 12);
+        ctx.item(icon, x + 10, y + 12);
 
-        ctx.drawTextWithShadow(tr, nameText, x + 40, y + 10, 0xFFFFFF);
-        ctx.drawTextWithShadow(tr, healthText, x + 40, y + 22, 0xFFFFFF);
+        ctx.text(tr, nameText, x + 40, y + 10, 0xFFFFFF);
+        ctx.text(tr, healthText, x + 40, y + 22, 0xFFFFFF);
     }
 }

@@ -4,13 +4,11 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.ChallengeManager;
-import net.minecraft.client.gui.ScreenRect;
-import net.minecraft.client.gui.tab.GridScreenTab;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.tabs.GridLayoutTab;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -18,20 +16,20 @@ import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 /** Create-world challenge configuration tab shown before the first server boot. */
-public class ChallengeTab extends GridScreenTab {
-    private static final Text TITLE = Text.translatable("challengecraft.challenge_tab.title");
+public class ChallengeTab extends GridLayoutTab {
+    private static final Component TITLE = Component.translatable("challengecraft.challenge_tab.title");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
             1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final List<ChallengeCardWidget> perkCards = new ArrayList<>();
-    private final SliderWidget maxHealthSlider;
-    private final SliderWidget inventorySlider;
-    private final SliderWidget mobHealthSlider;
-    private final SliderWidget doubleTroubleSlider;
-    private final SliderWidget gameSpeedSlider;
-    private Text difficultyText = Text.empty();
+    private final AbstractSliderButton maxHealthSlider;
+    private final AbstractSliderButton inventorySlider;
+    private final AbstractSliderButton mobHealthSlider;
+    private final AbstractSliderButton doubleTroubleSlider;
+    private final AbstractSliderButton gameSpeedSlider;
+    private Component difficultyText = Component.empty();
     private boolean hasConflict;
 
     private WidgetScrollPanel scrollPanel;
@@ -65,7 +63,7 @@ public class ChallengeTab extends GridScreenTab {
             perkCards.add(perkCard);
         }
 
-        this.maxHealthSlider = new SliderWidget(
+        this.maxHealthSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getHealthSliderText(0.5 + (sliderValue * 9.5)),
                 sliderValue
@@ -85,7 +83,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.inventorySlider = new SliderWidget(
+        this.inventorySlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getSlotsSliderText(36),
                 inventorySliderValue
@@ -104,7 +102,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.mobHealthSlider = new SliderWidget(
+        this.mobHealthSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getMobHealthSliderText(1),
                 mobHealthSliderValue
@@ -123,7 +121,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.doubleTroubleSlider = new SliderWidget(
+        this.doubleTroubleSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getDoubleTroubleSliderText(2),
                 doubleTroubleSliderValue
@@ -142,7 +140,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.gameSpeedSlider = new SliderWidget(
+        this.gameSpeedSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getGameSpeedSliderText(1),
                 gameSpeedSliderValue
@@ -162,7 +160,7 @@ public class ChallengeTab extends GridScreenTab {
         };
 
         // CreateWorldScreen keeps this widget reference, so later refreshes must reuse it.
-        this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
+        this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Component.empty());
         updateDifficultyText();
     }
 
@@ -177,24 +175,24 @@ public class ChallengeTab extends GridScreenTab {
 
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.hasConflict = true;
-            this.difficultyText = Text.translatable("challengecraft.warning.conflict");
+            this.difficultyText = Component.translatable("challengecraft.warning.conflict");
         } else {
             this.hasConflict = false;
             int playerCount = 0;
-            if (net.minecraft.client.MinecraftClient.getInstance().world != null) {
-                playerCount = net.minecraft.client.MinecraftClient.getInstance().world.getPlayers().size();
+            if (net.minecraft.client.Minecraft.getInstance().level != null) {
+                playerCount = net.minecraft.client.Minecraft.getInstance().level.players().size();
             }
             double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, gameSpeedMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
-            this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
+            this.difficultyText = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
 
     @Override
-    public void refreshGrid(ScreenRect tabArea) {
+    public void doLayout(ScreenRectangle tabArea) {
         int padding = 6;
 
-        int panelX = tabArea.getLeft() + padding;
-        int panelY = tabArea.getTop() + padding;
+        int panelX = tabArea.left() + padding;
+        int panelY = tabArea.top() + padding;
         int panelW = Math.max(60, tabArea.width() - padding * 2);
         int panelH = Math.max(60, tabArea.height() - padding * 2);
 
@@ -214,18 +212,18 @@ public class ChallengeTab extends GridScreenTab {
         int col = 0;
         int y = panelY + 4;
 
-        this.scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, Text.empty()) {
+        this.scrollPanel.addChild(new AbstractWidget(x0, y, panelW - 16, 20, Component.empty()) {
             @Override
-            public Text getMessage() {
+            public Component getMessage() {
                 return difficultyText;
             }
             @Override
-            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
+            protected void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
                 int color = hasConflict ? 0xFF5555 : 0xFFFF55;
-                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
+                context.centeredText(net.minecraft.client.Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
             }
             @Override
-            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+            protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {}
         });
         y += 24;
 
@@ -304,14 +302,14 @@ public class ChallengeTab extends GridScreenTab {
         
         if (col == 1) y += cardH + spacing;
         y += 15;
-        Text perkTitle = Text.translatable("challengecraft.challenge_selection.perks_header");
-        scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, perkTitle) {
+        Component perkTitle = Component.translatable("challengecraft.challenge_selection.perks_header");
+        scrollPanel.addChild(new AbstractWidget(x0, y, panelW - 16, 20, perkTitle) {
             @Override
-            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
+            protected void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+                context.centeredText(net.minecraft.client.Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
             }
             @Override
-            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+            protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {}
         });
         y += 24;
 
@@ -341,7 +339,7 @@ public class ChallengeTab extends GridScreenTab {
     }
 
     @Override
-    public void forEachChild(Consumer<ClickableWidget> consumer) {
+    public void visitChildren(Consumer<AbstractWidget> consumer) {
         consumer.accept(this.scrollPanel);
     }
 
@@ -397,23 +395,23 @@ public class ChallengeTab extends GridScreenTab {
         return active;
     }
 
-    private static Text getHealthSliderText(double hearts) {
-        return Text.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
+    private static Component getHealthSliderText(double hearts) {
+        return Component.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
     }
 
-    private static Text getSlotsSliderText(double slots) {
-        return Text.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
+    private static Component getSlotsSliderText(double slots) {
+        return Component.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
     }
 
-    private static Text getMobHealthSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getMobHealthSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 
-    private static Text getDoubleTroubleSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getDoubleTroubleSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 
-    private static Text getGameSpeedSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getGameSpeedSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 }

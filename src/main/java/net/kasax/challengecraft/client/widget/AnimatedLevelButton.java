@@ -1,18 +1,17 @@
 package net.kasax.challengecraft.client.widget;
 
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.network.chat.Component;
 
 /** Small animated entry point for the progression screen. */
-public class AnimatedLevelButton extends ButtonWidget {
-    public AnimatedLevelButton(int x, int y, int width, int height, Text message, PressAction onPress) {
-        super(x, y, width, height, message, onPress, DEFAULT_NARRATION_SUPPLIER);
+public class AnimatedLevelButton extends Button {
+    public AnimatedLevelButton(int x, int y, int width, int height, Component message, OnPress onPress) {
+        super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
     }
 
     @Override
-    public void drawMessage(DrawContext context, TextRenderer textRenderer, int color) {
+    protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         float time = (System.currentTimeMillis() % 2000) / 2000.0f;
         float sin = (float) Math.sin(time * 2 * Math.PI);
         
@@ -21,6 +20,7 @@ public class AnimatedLevelButton extends ButtonWidget {
         int b = (int) (0x00 + (0x55 - 0x00) * (0.5 + 0.5 * sin));
         
         int animatedColor = (0xFF << 24) | (r << 16) | (g << 8) | b;
-        super.drawMessage(context, textRenderer, animatedColor);
+        this.extractDefaultSprite(context);
+        context.centeredText(net.minecraft.client.Minecraft.getInstance().font, this.getMessage(), this.getX() + this.getWidth() / 2, this.getY() + (this.getHeight() - 8) / 2, animatedColor);
     }
 }

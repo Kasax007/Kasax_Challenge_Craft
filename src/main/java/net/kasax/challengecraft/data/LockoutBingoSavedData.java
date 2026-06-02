@@ -3,12 +3,12 @@ package net.kasax.challengecraft.data;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoTeam;
-import net.minecraft.datafixer.DataFixTypes;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateManager;
-import net.minecraft.world.PersistentStateType;
-
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.storage.SavedDataStorage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** Stores one lockout board, its team state, and per-run bookkeeping for the current world. */
-public class LockoutBingoSavedData extends PersistentState {
+public class LockoutBingoSavedData extends SavedData {
     private static final String KEY = "challengecraft_lockout_bingo";
 
     private static final Codec<Map<UUID, Integer>> UUID_INT_MAP_CODEC = Codec.unboundedMap(Codec.STRING, Codec.INT).xmap(
@@ -91,8 +91,8 @@ public class LockoutBingoSavedData extends PersistentState {
             Codec.LONG.optionalFieldOf("startedAtWorldTicks", -1L).forGetter(LockoutBingoSavedData::getStartedAtWorldTicks)
     ).apply(instance, LockoutBingoSavedData::new));
 
-    public static final PersistentStateType<LockoutBingoSavedData> TYPE =
-            new PersistentStateType<>(KEY, LockoutBingoSavedData::new, CODEC, DataFixTypes.LEVEL);
+    public static final SavedDataType<LockoutBingoSavedData> TYPE =
+            new SavedDataType<>(Identifier.fromNamespaceAndPath("challengecraft", KEY), LockoutBingoSavedData::new, CODEC, DataFixTypes.LEVEL);
 
     private final List<String> boardGoalIds = new ArrayList<>();
     private final List<Integer> claimedTeams = new ArrayList<>();
@@ -148,9 +148,9 @@ public class LockoutBingoSavedData extends PersistentState {
         normalizeClaimLists();
     }
 
-    public static LockoutBingoSavedData get(ServerWorld world) {
-        PersistentStateManager manager = world.getPersistentStateManager();
-        return manager.getOrCreate(TYPE);
+    public static LockoutBingoSavedData get(ServerLevel world) {
+        SavedDataStorage manager = world.getDataStorage();
+        return manager.computeIfAbsent(TYPE);
     }
 
     public List<String> getBoardGoalIds() {
@@ -238,7 +238,7 @@ public class LockoutBingoSavedData extends PersistentState {
         generatedSeed = 0L;
         runId = newRunId;
         startedAtWorldTicks = -1L;
-        markDirty();
+        setDirty();
     }
 
     public void clearBoard() {
@@ -254,7 +254,7 @@ public class LockoutBingoSavedData extends PersistentState {
         rewardedPlayers.clear();
         readyPlayers.clear();
         goalStatBaselines.clear();
-        markDirty();
+        setDirty();
     }
 
     public void setBoard(List<String> goalIds, long seed, long startedAtTicks) {
@@ -274,26 +274,26 @@ public class LockoutBingoSavedData extends PersistentState {
         ended = false;
         rewardedPlayers.clear();
         goalStatBaselines.clear();
-        markDirty();
+        setDirty();
     }
 
     public void setTeam(UUID uuid, String playerName, LockoutBingoTeam team) {
         teamAssignments.put(uuid, team.ordinal());
         playerNames.put(uuid, playerName);
-        markDirty();
+        setDirty();
     }
 
     public void removeTeam(UUID uuid) {
         teamAssignments.remove(uuid);
         readyPlayers.remove(uuid);
         playerNames.remove(uuid);
-        markDirty();
+        setDirty();
     }
 
     public void updatePlayerName(UUID uuid, String playerName) {
         if (!playerName.equals(playerNames.get(uuid))) {
             playerNames.put(uuid, playerName);
-            markDirty();
+            setDirty();
         }
     }
 
@@ -308,12 +308,12 @@ public class LockoutBingoSavedData extends PersistentState {
         } else {
             readyPlayers.remove(uuid);
         }
-        markDirty();
+        setDirty();
     }
 
     public void clearReady() {
         readyPlayers.clear();
-        markDirty();
+        setDirty();
     }
 
     public void retainPlayers(Set<UUID> uuids) {
@@ -322,7 +322,7 @@ public class LockoutBingoSavedData extends PersistentState {
         readyPlayers.retainAll(uuids);
         rewardedPlayers.retainAll(uuids);
         goalStatBaselines.keySet().retainAll(uuids);
-        markDirty();
+        setDirty();
     }
 
     public int getGoalStatBaseline(UUID uuid, String goalId) {
@@ -331,7 +331,7 @@ public class LockoutBingoSavedData extends PersistentState {
 
     public void setGoalStatBaseline(UUID uuid, String goalId, int value) {
         goalStatBaselines.computeIfAbsent(uuid, ignored -> new HashMap<>()).put(goalId, value);
-        markDirty();
+        setDirty();
     }
 
     public boolean isReady(UUID uuid) {
@@ -340,17 +340,17 @@ public class LockoutBingoSavedData extends PersistentState {
 
     public void setStarted(boolean started) {
         this.started = started;
-        markDirty();
+        setDirty();
     }
 
     public void setEnded(boolean ended) {
         this.ended = ended;
-        markDirty();
+        setDirty();
     }
 
     public void setWinnerTeam(LockoutBingoTeam team) {
         winnerTeamOrdinal = team == null ? -1 : team.ordinal();
-        markDirty();
+        setDirty();
     }
 
     public void claimTile(int index, LockoutBingoTeam team, UUID byUuid, String byName) {
@@ -359,7 +359,7 @@ public class LockoutBingoSavedData extends PersistentState {
         claimedByUuids.set(index, byUuid.toString());
         claimedByNames.set(index, byName);
         playerNames.put(byUuid, byName);
-        markDirty();
+        setDirty();
     }
 
     public LockoutBingoTeam getClaimedTeam(int index) {
@@ -393,7 +393,7 @@ public class LockoutBingoSavedData extends PersistentState {
 
     public void setRewarded(UUID uuid) {
         rewardedPlayers.add(uuid);
-        markDirty();
+        setDirty();
     }
 
     private void normalizeClaimLists() {

@@ -3,26 +3,24 @@ package net.kasax.challengecraft.data;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.datafixer.DataFixTypes;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateManager;
-import net.minecraft.world.PersistentStateType;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.storage.SavedDataStorage;
 
 import static net.kasax.challengecraft.ChallengeCraft.LOGGER;
 
-public class ChallengeSavedData extends PersistentState {
+public class ChallengeSavedData extends SavedData {
     private static final String KEY = "challengecraft_challenges";
 
     /** Persistent state for world-scoped challenge settings and ordered progress lists. */
@@ -54,8 +52,8 @@ public class ChallengeSavedData extends PersistentState {
             new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, progress.allAdvancementsOrder, progress.allAdvancementsIndex)
     ));
 
-    public static final PersistentStateType<ChallengeSavedData> TYPE =
-            new PersistentStateType<>(KEY, ChallengeSavedData::new, CODEC, DataFixTypes.LEVEL);
+    public static final SavedDataType<ChallengeSavedData> TYPE =
+            new SavedDataType<>(Identifier.fromNamespaceAndPath("challengecraft", KEY), ChallengeSavedData::new, CODEC, DataFixTypes.LEVEL);
 
     /** Active challenge IDs. */
     private final List<Integer> active = new ArrayList<>();
@@ -128,12 +126,12 @@ public class ChallengeSavedData extends PersistentState {
         this.allAdvancementsIndex = allAdvancementsIndex;
     }
 
-    public static ChallengeSavedData get(ServerWorld world) {
-        PersistentStateManager mgr = world.getPersistentStateManager();
-        return mgr.getOrCreate(TYPE);
+    public static ChallengeSavedData get(ServerLevel world) {
+        SavedDataStorage mgr = world.getDataStorage();
+        return mgr.computeIfAbsent(TYPE);
     }
 
-    public NbtCompound writeNbt(NbtCompound tag) {
+    public CompoundTag writeNbt(CompoundTag tag) {
         // Serialization is handled by CODEC through PersistentStateType.
         return tag;
     }
@@ -146,7 +144,7 @@ public class ChallengeSavedData extends PersistentState {
         active.clear();
         active.addAll(newActive);
         LOGGER.info("setActive ChallengeSavedData → " + active);
-        markDirty();
+        setDirty();
     }
 
     public int getMaxHeartsTicks() {
@@ -159,7 +157,7 @@ public class ChallengeSavedData extends PersistentState {
         if (this.maxHeartsTicks != ticks) {
             this.maxHeartsTicks = ticks;
             LOGGER.info("setMaxHeartsTicks ChallengeSavedData → " + ticks);
-            markDirty();
+            setDirty();
         }
     }
     public int getLimitedInventorySlots() {
@@ -168,7 +166,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setLimitedInventorySlots(int slots) {
         this.limitedInventorySlots = slots;
-        markDirty();
+        setDirty();
     }
 
     public double getInitialDifficulty() {
@@ -177,7 +175,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setInitialDifficulty(double difficulty) {
         this.initialDifficulty = difficulty;
-        markDirty();
+        setDirty();
     }
 
     public boolean isTainted() {
@@ -186,7 +184,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setTainted(boolean tainted) {
         this.tainted = tainted;
-        markDirty();
+        setDirty();
     }
 
     public boolean isXpAwarded(UUID uuid) {
@@ -195,7 +193,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setXpAwarded(UUID uuid, boolean xpAwarded) {
         this.playerXpAwarded.put(uuid, xpAwarded);
-        markDirty();
+        setDirty();
     }
 
     public void resetForNewWorld() {
@@ -209,7 +207,7 @@ public class ChallengeSavedData extends PersistentState {
         this.tainted = false;
         this.difficultySet = false;
         this.runIndex++;
-        markDirty();
+        setDirty();
     }
 
     public boolean isDifficultySet() {
@@ -218,7 +216,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDifficultySet(boolean difficultySet) {
         this.difficultySet = difficultySet;
-        markDirty();
+        setDirty();
     }
 
     public List<ItemStack> getAllItemsOrder() {
@@ -228,7 +226,7 @@ public class ChallengeSavedData extends PersistentState {
     public void setAllItemsOrder(List<ItemStack> order) {
         this.allItemsOrder.clear();
         this.allItemsOrder.addAll(order);
-        markDirty();
+        setDirty();
     }
 
     public int getAllItemsIndex() {
@@ -237,7 +235,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setAllItemsIndex(int index) {
         this.allItemsIndex = index;
-        markDirty();
+        setDirty();
     }
 
     public List<EntityType<?>> getAllEntitiesOrder() {
@@ -247,7 +245,7 @@ public class ChallengeSavedData extends PersistentState {
     public void setAllEntitiesOrder(List<EntityType<?>> order) {
         this.allEntitiesOrder.clear();
         this.allEntitiesOrder.addAll(order);
-        markDirty();
+        setDirty();
     }
 
     public int getAllEntitiesIndex() {
@@ -256,7 +254,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setAllEntitiesIndex(int index) {
         this.allEntitiesIndex = index;
-        markDirty();
+        setDirty();
     }
 
     public int getMobHealthMultiplier() {
@@ -265,7 +263,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setMobHealthMultiplier(int multiplier) {
         this.mobHealthMultiplier = multiplier;
-        markDirty();
+        setDirty();
     }
 
     public double getDamageWorldBorderSize() {
@@ -274,7 +272,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDamageWorldBorderSize(double size) {
         this.damageWorldBorderSize = size;
-        markDirty();
+        setDirty();
     }
 
     public List<Integer> getActivePerks() {
@@ -284,7 +282,7 @@ public class ChallengeSavedData extends PersistentState {
     public void setActivePerks(List<Integer> newPerks) {
         this.activePerks.clear();
         this.activePerks.addAll(newPerks);
-        markDirty();
+        setDirty();
     }
 
     public long getPlayerXp(UUID uuid) {
@@ -293,7 +291,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setPlayerXp(UUID uuid, long xp) {
         playerXp.put(uuid, xp);
-        markDirty();
+        setDirty();
     }
 
     public int getRunIndex() {
@@ -302,7 +300,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setRunIndex(int runIndex) {
         this.runIndex = runIndex;
-        markDirty();
+        setDirty();
     }
 
     public int getDoubleTroubleMultiplier() {
@@ -311,7 +309,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setDoubleTroubleMultiplier(int multiplier) {
         this.doubleTroubleMultiplier = multiplier;
-        markDirty();
+        setDirty();
     }
 
     public int getGameSpeedMultiplier() {
@@ -320,7 +318,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setGameSpeedMultiplier(int multiplier) {
         this.gameSpeedMultiplier = Math.max(1, Math.min(multiplier, 10));
-        markDirty();
+        setDirty();
     }
 
     public List<Identifier> getAllAdvancementsOrder() {
@@ -330,7 +328,7 @@ public class ChallengeSavedData extends PersistentState {
     public void setAllAdvancementsOrder(List<Identifier> order) {
         this.allAdvancementsOrder.clear();
         this.allAdvancementsOrder.addAll(order);
-        markDirty();
+        setDirty();
     }
 
     public int getAllAdvancementsIndex() {
@@ -339,7 +337,7 @@ public class ChallengeSavedData extends PersistentState {
 
     public void setAllAdvancementsIndex(int index) {
         this.allAdvancementsIndex = index;
-        markDirty();
+        setDirty();
     }
 
     private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {

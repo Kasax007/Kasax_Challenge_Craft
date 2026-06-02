@@ -2,18 +2,17 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.SpawnEggItem;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,21 +40,21 @@ public class AllEntitiesHUD {
     }
 
     public static void register() {
-        HudRenderCallback.EVENT.register(AllEntitiesHUD::onHudRender);
+        HudElementRegistry.addLast(net.minecraft.resources.Identifier.fromNamespaceAndPath("challengecraft", "all_entities_hud"), AllEntitiesHUD::onHudRender);
     }
 
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
+    private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
         if (!active || totalEntities == 0) return;
 
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
+        Minecraft client = Minecraft.getInstance();
+        if (client.options.hideGui) return;
 
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
+        Font tr = client.font;
+        int sw = client.getWindow().getGuiScaledWidth();
 
         boolean completed = currentIndex >= totalEntities;
-        Text entityName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : (currentEntity != null ? currentEntity.getName().copy().formatted(Formatting.RED) : Text.translatable("challengecraft.placeholder.unknown"));
-        Text progressText = Text.translatable("challengecraft.progress.obtained", currentIndex, totalEntities).formatted(Formatting.GRAY);
+        Component entityName = completed ? Component.translatable("challengecraft.completed").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD) : (currentEntity != null ? currentEntity.getDescription().copy().withStyle(ChatFormatting.RED) : Component.translatable("challengecraft.placeholder.unknown"));
+        Component progressText = Component.translatable("challengecraft.progress.obtained", currentIndex, totalEntities).withStyle(ChatFormatting.GRAY);
 
         int centerX = sw / 2;
         int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (active ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);
@@ -76,18 +75,18 @@ public class AllEntitiesHUD {
             icon = new ItemStack(Items.NETHER_STAR);
         } else if (currentEntity != null) {
             icon = ICON_CACHE.computeIfAbsent(currentEntity, type -> {
-                SpawnEggItem egg = SpawnEggItem.forEntity(type);
-                if (egg != null) {
-                    return new ItemStack(egg);
+                var egg = SpawnEggItem.byId(type);
+                if (egg.isPresent()) {
+                    return new ItemStack(egg.get().value());
                 }
                 return new ItemStack(Items.ZOMBIE_SPAWN_EGG);
             });
         } else {
             icon = new ItemStack(Items.BARRIER);
         }
-        ctx.drawItem(icon, centerX - 8, y);
+        ctx.item(icon, centerX - 8, y);
         
-        ctx.drawCenteredTextWithShadow(tr, entityName, centerX, y + 18, 0xFFFFFF);
-        ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
+        ctx.centeredText(tr, entityName, centerX, y + 18, 0xFFFFFF);
+        ctx.centeredText(tr, progressText, centerX, y + 28, 0xFFFFFF);
     }
 }

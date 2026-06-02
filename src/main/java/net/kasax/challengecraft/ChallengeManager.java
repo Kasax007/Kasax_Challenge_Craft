@@ -1,6 +1,6 @@
 package net.kasax.challengecraft;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -8,11 +8,11 @@ import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengeSyncPacket;
 import net.minecraft.nbt.*;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +27,7 @@ public class ChallengeManager {
     private static List<Integer> PRE_LOADED_PERKS = new ArrayList<>();
 
     public static void register() {
-        ServerWorldEvents.LOAD.register((server, world) -> {
+        ServerLevelEvents.LOAD.register((server, world) -> {
             applyTo(world);
         });
 
@@ -36,7 +36,7 @@ public class ChallengeManager {
         });
 
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            if (player instanceof ServerPlayerEntity serverPlayer) {
+            if (player instanceof ServerPlayer serverPlayer) {
                 Chal_19_MinePotionEffect.applyEffect(serverPlayer, state.getBlock());
             }
         });
@@ -45,14 +45,14 @@ public class ChallengeManager {
     /** Rebuilds challenge state after reloads and in-game configuration changes. */
     public static void applyAll(net.minecraft.server.MinecraftServer server) {
         LOGGER.info("ChallengeManager.applyAll: re-applying to all worlds");
-        for (ServerWorld world : server.getWorlds()) {
+        for (ServerLevel world : server.getAllLevels()) {
             applyTo(world);
         }
         syncToAll(server);
     }
 
     public static void syncToAll(net.minecraft.server.MinecraftServer server) {
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         List<Integer> active = data.getActive();
         List<Integer> perks = data.getActivePerks();
         ChallengeSyncPacket pkt = new ChallengeSyncPacket(
@@ -64,7 +64,7 @@ public class ChallengeManager {
                 data.getDoubleTroubleMultiplier(),
                 data.getGameSpeedMultiplier()
         );
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, pkt);
         }
         if (active.contains(22)) {
@@ -180,9 +180,9 @@ public class ChallengeManager {
         return false;
     }
 
-    private static void applyTo(ServerWorld world) {
+    private static void applyTo(ServerLevel world) {
         // The overworld owns the canonical saved state even when another dimension loads first.
-        ServerWorld overworld = world.getServer().getOverworld();
+        ServerLevel overworld = world.getServer().overworld();
         ChallengeSavedData data = ChallengeSavedData.get(overworld);
         List<Integer> saved = data.getActive();
 
@@ -190,7 +190,7 @@ public class ChallengeManager {
         boolean wasDamageBorderActive = Chal_25_DamageWorldBorder.isActive();
         boolean wasChunkHuntActive = Chal_38_ChunkHunt.isActive();
 
-        if (world.getRegistryKey() == World.OVERWORLD) {
+        if (world.dimension() == Level.OVERWORLD) {
             if (saved.contains(7)) {
                 int savedTicks = data.getMaxHeartsTicks();
                 float hearts   = savedTicks * 0.5f;
@@ -224,7 +224,7 @@ public class ChallengeManager {
             }
 
             if (!data.isDifficultySet()) {
-                boolean serverSide = world.getServer().isDedicated();
+                boolean serverSide = world.getServer().isDedicatedServer();
                 
                 if (serverSide) {
                     // Dedicated restarts restore static challenge flags before world state is available.
@@ -245,14 +245,14 @@ public class ChallengeManager {
                     }
 
                     if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36 || data.getGameSpeedMultiplier() != 1) {
-                        int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
+                        int playerCount = world.getServer().getPlayerList().getPlayers().size();
                         double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getGameSpeedMultiplier(), data.getDoubleTroubleMultiplier(), playerCount, data.getActivePerks());
                         data.setInitialDifficulty(initialDiff);
                         data.setDifficultySet(true);
                         LOGGER.info("ChallengeManager: seeded difficulty from existing data. Initial Difficulty: {}", initialDiff);
                     }
                 } else {
-                    int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
+                    int clientTicks = Mth.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                     int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
                     int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
                     int clientDoubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
@@ -266,7 +266,7 @@ public class ChallengeManager {
                     data.setDoubleTroubleMultiplier(clientDoubleMult);
                     data.setGameSpeedMultiplier(clientGameSpeedMult);
                     
-                    int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
+                    int playerCount = world.getServer().getPlayerList().getPlayers().size();
                     double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, clientGameSpeedMult, clientDoubleMult, playerCount, ChallengeCraftClient.SELECTED_PERKS);
                     data.setInitialDifficulty(initialDiff);
                     data.setDifficultySet(true);
@@ -292,7 +292,7 @@ public class ChallengeManager {
                 Chal_37_GameSpeed.setMultiplier(data.getGameSpeedMultiplier());
 
                 if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
-                    for (var p : world.getServer().getPlayerManager().getPlayerList()) {
+                    for (var p : world.getServer().getPlayerList().getPlayers()) {
                         net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
                     }
                 }
@@ -302,20 +302,20 @@ public class ChallengeManager {
                 if (isBorderOrSky) {
                     int x = 0;
                     int z = 0;
-                    int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, x, z);
+                    int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z);
                     
                     // Skyblock starts on a fixed island. Border worlds keep the first spawn inside the opening border.
                     if (y <= 0 || data.getActive().contains(11)) y = 64;
                     
-                    world.setSpawnPos(new net.minecraft.util.math.BlockPos(x, y, z), 0.0f);
-                    world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
+                    world.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(world.dimension(), new net.minecraft.core.BlockPos(x, y, z), 0.0f, 0.0f));
+                    world.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, world.getServer());
                     LOGGER.info("Forced world spawn to {}, {}, {} and spawnRadius to 0 due to active challenge (Border/Skyblock)", x, y, z);
                 } else {
-                    net.minecraft.util.math.BlockPos currentSpawn = world.getSpawnPos();
+                    net.minecraft.core.BlockPos currentSpawn = world.getRespawnData().pos();
                     if (currentSpawn.getY() <= 0) {
-                        int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, currentSpawn.getX(), currentSpawn.getZ());
+                        int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, currentSpawn.getX(), currentSpawn.getZ());
                         if (y <= 0) y = 64;
-                        world.setSpawnPos(new net.minecraft.util.math.BlockPos(currentSpawn.getX(), y, currentSpawn.getZ()), 0.0f);
+                        world.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(world.dimension(), new net.minecraft.core.BlockPos(currentSpawn.getX(), y, currentSpawn.getZ()), 0.0f, 0.0f));
                         LOGGER.info("Adjusted normal world spawn Y to safe location: {}", y);
                     }
                 }
@@ -339,41 +339,38 @@ public class ChallengeManager {
         if (Chal_9_ExpWorldBorder.isActive() || Chal_25_DamageWorldBorder.isActive()) {
             world.getWorldBorder().setCenter(0.5, 0.5);
             // A nonzero radius can place players outside the tiny opening border.
-            world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
+            world.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, world.getServer());
         }
 
-        var rules         = world.getGameRules();
-        var tileDropsRule = rules.get(GameRules.DO_TILE_DROPS);
-        var mobLootRule   = rules.get(GameRules.DO_MOB_LOOT);
-
-        tileDropsRule.set(!Chal_2_NoBlockDrops.isActive(), world.getServer());
-        mobLootRule .set(!Chal_3_NoMobDrops    .isActive(), world.getServer());
+        var rules = world.getGameRules();
+        rules.set(GameRules.BLOCK_DROPS, !Chal_2_NoBlockDrops.isActive(), world.getServer());
+        rules.set(GameRules.MOB_DROPS, !Chal_3_NoMobDrops.isActive(), world.getServer());
     }
 
-    private static void resetWorldBorder(ServerWorld world) {
+    private static void resetWorldBorder(ServerLevel world) {
         world.getWorldBorder().setSize(6.0E7);
-        world.getGameRules().get(GameRules.SPAWN_RADIUS).set(10, world.getServer());
+        world.getGameRules().set(GameRules.RESPAWN_RADIUS, 10, world.getServer());
     }
 
     public static boolean loadInitialActiveChallenges(Path worldDir) {
         Path dataFile = worldDir.resolve("data/challengecraft_challenges.dat");
         if (Files.exists(dataFile)) {
             try {
-                NbtCompound nbt = NbtIo.readCompressed(dataFile, NbtSizeTracker.ofUnlimitedBytes());
-                NbtElement dataElement = nbt.get("data");
-                if (dataElement instanceof NbtCompound data) {
-                    NbtElement activeElement = data.get("active");
-                    if (activeElement instanceof NbtList list) {
+                CompoundTag nbt = NbtIo.readCompressed(dataFile, NbtAccounter.unlimitedHeap());
+                Tag dataElement = nbt.get("data");
+                if (dataElement instanceof CompoundTag data) {
+                    Tag activeElement = data.get("active");
+                    if (activeElement instanceof ListTag list) {
                         List<Integer> active = new ArrayList<>();
                         for (int i = 0; i < list.size(); i++) {
-                            NbtElement e = list.get(i);
-                            if (e instanceof NbtInt nbtInt) {
+                            Tag e = list.get(i);
+                            if (e instanceof IntTag nbtInt) {
                                 active.add(nbtInt.intValue());
-                            } else if (e instanceof NbtByte nbtByte) {
+                            } else if (e instanceof ByteTag nbtByte) {
                                 active.add((int) nbtByte.byteValue());
-                            } else if (e instanceof NbtShort nbtShort) {
+                            } else if (e instanceof ShortTag nbtShort) {
                                 active.add((int) nbtShort.shortValue());
-                            } else if (e instanceof NbtLong nbtLong) {
+                            } else if (e instanceof LongTag nbtLong) {
                                 active.add((int) nbtLong.longValue());
                             }
                         }
@@ -403,7 +400,7 @@ public class ChallengeManager {
         return false;
     }
 
-    public static void applyActiveChallenges(List<Integer> activeIds, ServerWorld world, ChallengeSavedData data) {
+    public static void applyActiveChallenges(List<Integer> activeIds, ServerLevel world, ChallengeSavedData data) {
         LOGGER.info("ChallengeManager: turning all challenges OFF");
         setAllActive(false);
 
@@ -501,7 +498,7 @@ public class ChallengeManager {
         Chal_40_LockoutBingo.setActive(active);
     }
 
-    public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
+    public static void applyActiveFlag(int id, ServerLevel world, ChallengeSavedData data) {
         switch (id) {
             case 1  -> { Chal_1_LevelItem        .setActive(true); LOGGER.info("Challenge 1 ON"); }
             case 2  -> { Chal_2_NoBlockDrops     .setActive(true); LOGGER.info("Challenge 2 ON"); }

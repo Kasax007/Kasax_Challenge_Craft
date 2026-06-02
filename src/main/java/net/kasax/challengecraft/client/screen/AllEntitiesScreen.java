@@ -1,14 +1,13 @@
 package net.kasax.challengecraft.client.screen;
 
 import net.kasax.challengecraft.challenges.Chal_23_AllEntities;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.AlwaysSelectedEntryListWidget;
-import net.minecraft.entity.EntityType;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /** Scrollable list view for the ordered all-entities run. */
@@ -18,7 +17,7 @@ public class AllEntitiesScreen extends Screen {
     private EntityListWidget list;
 
     public AllEntitiesScreen(List<EntityType<?>> entities, int currentIndex) {
-        super(Text.translatable("challengecraft.all_entities_list.title"));
+        super(Component.translatable("challengecraft.all_entities_list.title"));
         this.entities = entities;
         this.currentIndex = currentIndex;
     }
@@ -26,28 +25,28 @@ public class AllEntitiesScreen extends Screen {
     @Override
     protected void init() {
         this.list = new EntityListWidget();
-        this.addDrawableChild(this.list);
+        this.addRenderableWidget(this.list);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
-        this.list.render(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 10, 0xFFFFFF);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
+        this.list.extractRenderState(context, mouseX, mouseY, delta);
+        context.centeredText(this.font, this.title, this.width / 2, 10, 0xFFFFFF);
     }
 
-    class EntityListWidget extends AlwaysSelectedEntryListWidget<EntityListWidget.Entry> {
+    class EntityListWidget extends ObjectSelectionList<EntityListWidget.Entry> {
         public EntityListWidget() {
-            super(AllEntitiesScreen.this.client, AllEntitiesScreen.this.width, AllEntitiesScreen.this.height - 60, 30, 20);
+            super(AllEntitiesScreen.this.minecraft, AllEntitiesScreen.this.width, AllEntitiesScreen.this.height - 60, 30, 20);
             for (int i = 0; i < entities.size(); i++) {
-                this.addEntry(new Entry(i, entities.get(i)));
+                this.addEntry(new net.kasax.challengecraft.client.screen.AllEntitiesScreen.EntityListWidget.Entry(i, entities.get(i)));
             }
-            if (currentIndex >= 0 && currentIndex < this.getEntryCount()) {
-                this.setSelected(this.getEntry(currentIndex));
+            if (currentIndex >= 0 && currentIndex < this.getItemCount()) {
+                this.setSelected(this.children().get(currentIndex));
             }
         }
 
-        class Entry extends AlwaysSelectedEntryListWidget.Entry<Entry> {
+        class Entry extends ObjectSelectionList.Entry<net.kasax.challengecraft.client.screen.AllEntitiesScreen.EntityListWidget.Entry> {
             private final int index;
             private final EntityType<?> type;
             private final ItemStack icon;
@@ -59,26 +58,29 @@ public class AllEntitiesScreen extends Screen {
             }
 
             @Override
-            public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+            public void extractContent(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+                int x = this.getContentX();
+                int y = this.getContentY();
+                int entryWidth = this.getContentWidth();
                 boolean collected = this.index < currentIndex;
                 boolean current = this.index == currentIndex;
                 
-                Formatting color = collected ? Formatting.GREEN : (current ? Formatting.GOLD : Formatting.GRAY);
-                Text name = type.getName().copy().formatted(color);
+                ChatFormatting color = collected ? ChatFormatting.GREEN : (current ? ChatFormatting.GOLD : ChatFormatting.GRAY);
+                Component name = type.getDescription().copy().withStyle(color);
                 
-                if (current) name = Text.empty().append("> ").append(name);
+                if (current) name = Component.empty().append("> ").append(name);
                 
-                context.drawItem(icon, x + 5, y);
-                context.drawTextWithShadow(client.textRenderer, name, x + 25, y + 5, 0xFFFFFF);
+                context.item(icon, x + 5, y);
+                context.text(minecraft.font, name, x + 25, y + 5, 0xFFFFFF);
                 
                 if (collected) {
-                    context.drawTextWithShadow(client.textRenderer, Text.empty().append("✓").formatted(Formatting.GREEN), x + entryWidth - 20, y + 5, 0xFFFFFF);
+                    context.text(minecraft.font, Component.empty().append("✓").withStyle(ChatFormatting.GREEN), x + entryWidth - 20, y + 5, 0xFFFFFF);
                 }
             }
 
             @Override
-            public Text getNarration() {
-                return type.getName();
+            public Component getNarration() {
+                return type.getDescription();
             }
         }
     }

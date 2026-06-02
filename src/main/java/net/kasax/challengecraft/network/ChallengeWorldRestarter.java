@@ -3,12 +3,12 @@ package net.kasax.challengecraft.network;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.mixin.MinecraftServerAccessor;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.WorldSavePath;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +56,10 @@ public class ChallengeWorldRestarter {
         
         server.execute(() -> {
             needsTeleport = false; // Reset inside execute to avoid race if multiple JOINS happen fast
-            server.getPlayerManager().getPlayerList().forEach(player -> {
-                ServerWorld overworld = server.getOverworld();
-                net.minecraft.util.math.BlockPos spawn = overworld.getSpawnPos();
-                player.requestTeleport(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
+            server.getPlayerList().getPlayers().forEach(player -> {
+                ServerLevel overworld = server.overworld();
+                net.minecraft.core.BlockPos spawn = overworld.getRespawnData().pos();
+                player.teleportTo(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
                 LOGGER.info("[Teleport] Teleported {} to safe spawn at {}", player.getName().getString(), spawn);
             });
         });
@@ -68,35 +68,35 @@ public class ChallengeWorldRestarter {
     public static void initiateRestart(MinecraftServer server) {
         LOGGER.info("Initiating world restart via offline rotation...");
 
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         data.resetForNewWorld();
         
         // Persist before stopping so the next run can keep challenge settings while resetting progress.
-        server.getOverworld().getPersistentStateManager().save();
+        server.overworld().getDataStorage().saveAndJoin();
         
         LOGGER.info("Reset challenge progress and saved persistent state for the upcoming new world.");
 
-        server.getPlayerManager().broadcast(Text.translatable("challengecraft.restart.broadcast").formatted(Formatting.GOLD, Formatting.BOLD), false);
+        server.getPlayerList().broadcastSystemMessage(Component.translatable("challengecraft.restart.broadcast").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
 
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.sendMessage(Text.translatable("challengecraft.restart.preparing").formatted(Formatting.YELLOW), false);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(Component.translatable("challengecraft.restart.preparing").withStyle(ChatFormatting.YELLOW));
         }
 
-        String worldName = ((MinecraftServerAccessor) server).getSession().getDirectoryName();
+        String worldName = ((MinecraftServerAccessor) server).getSession().getLevelId();
 
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, new RestartPendingPacket(worldName));
         }
 
         try {
-            Path worldDir = server.getSavePath(WorldSavePath.ROOT);
+            Path worldDir = server.getWorldPath(LevelResource.ROOT);
             Files.writeString(worldDir.resolve("challengecraft_restart_pending"), "true");
             LOGGER.info("Created restart flag file in {}", worldDir);
         } catch (IOException e) {
             LOGGER.error("Failed to create restart flag file!", e);
         }
 
-        server.stop(false);
+        server.halt(false);
     }
 
     public static void initializeGenerators(MinecraftServer server) {
@@ -105,22 +105,22 @@ public class ChallengeWorldRestarter {
 
         if (net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.isActive()) {
             try {
-                var registries = server.getRegistryManager();
-                var structLookup = registries.getOrThrow(net.minecraft.registry.RegistryKeys.STRUCTURE_SET);
-                var dimRegistry = registries.getOrThrow(net.minecraft.registry.RegistryKeys.DIMENSION);
+                var registries = server.registryAccess();
+                var structLookup = registries.lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE_SET);
+                var dimRegistry = registries.lookupOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM);
                 
-                var overworldOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.OVERWORLD);
+                var overworldOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
                 if (overworldOpt != null) {
-                    var biomeSource = overworldOpt.chunkGenerator().getBiomeSource();
+                    var biomeSource = overworldOpt.generator().getBiomeSource();
                     net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(
                         new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, false)
                     );
                     LOGGER.info("Initialized Skyblock Overworld generator for session.");
                 }
                 
-                var netherOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.NETHER);
+                var netherOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.NETHER);
                 if (netherOpt != null) {
-                    var biomeSource = netherOpt.chunkGenerator().getBiomeSource();
+                    var biomeSource = netherOpt.generator().getBiomeSource();
                     net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(
                         new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, true)
                     );
@@ -136,7 +136,7 @@ public class ChallengeWorldRestarter {
         if (!rotationPending) return;
         
         try {
-            net.minecraft.world.SaveProperties properties = ((net.kasax.challengecraft.mixin.MinecraftServerAccessor) server).getSaveProperties();
+            net.minecraft.world.level.storage.WorldData properties = ((net.kasax.challengecraft.mixin.MinecraftServerAccessor) server).getSaveProperties();
             if (properties == null) {
                 LOGGER.warn("SaveProperties is null during randomization!");
                 return;
@@ -151,7 +151,7 @@ public class ChallengeWorldRestarter {
             clearNbtFields(properties);
             
             try {
-                Object mainWorldProps = properties.getMainWorldProperties();
+                Object mainWorldProps = properties.overworldData();
                 if (mainWorldProps != null && mainWorldProps != properties) {
                     LOGGER.info("Cleaning internal MainWorldProperties...");
                     randomizeAllLongFields(mainWorldProps, newSeed);
@@ -159,11 +159,6 @@ public class ChallengeWorldRestarter {
                     clearNbtFields(mainWorldProps);
                 }
             } catch (Throwable ignored) {}
-
-            net.minecraft.world.gen.GeneratorOptions options = properties.getGeneratorOptions();
-            if (options != null) {
-                randomizeAllLongFields(options, newSeed);
-            }
 
             try {
                 for (java.lang.reflect.Field f : properties.getClass().getDeclaredFields()) {
@@ -269,7 +264,7 @@ public class ChallengeWorldRestarter {
                 Class<?> type = f.getType();
                 String typeName = type.getName();
                 
-                boolean isNbt = net.minecraft.nbt.NbtCompound.class.isAssignableFrom(type);
+                boolean isNbt = net.minecraft.nbt.CompoundTag.class.isAssignableFrom(type);
 
                 if (isNbt) {
                     String name = f.getName().toLowerCase();
@@ -287,7 +282,7 @@ public class ChallengeWorldRestarter {
                     
                     try {
                         f.setAccessible(true);
-                        f.set(obj, new net.minecraft.nbt.NbtCompound());
+                        f.set(obj, new net.minecraft.nbt.CompoundTag());
                         LOGGER.info("[SeedReset] Reset NBT field '{}.{}' to empty compound", clazz.getSimpleName(), f.getName());
                     } catch (Exception e) {
                         LOGGER.warn("[SeedReset] Could not clear NBT field '{}.{}'", clazz.getSimpleName(), f.getName());

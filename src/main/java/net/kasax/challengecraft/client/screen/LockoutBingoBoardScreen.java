@@ -8,12 +8,11 @@ import net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalPool;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoTeam;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -23,52 +22,51 @@ import java.util.UUID;
 public class LockoutBingoBoardScreen extends Screen {
     private static final int GRID_SIZE = 5;
     private static final int TILE_SIZE = 54;
-    private ButtonWidget teamButton;
+    private Button teamButton;
 
     public LockoutBingoBoardScreen() {
-        super(Text.translatable("challengecraft.worldcreate.challenge40"));
+        super(Component.translatable("challengecraft.worldcreate.challenge40"));
     }
 
     @Override
     protected void init() {
         ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.REQUEST_SYNC, -1));
-        teamButton = addDrawableChild(ButtonWidget.builder(
-                Text.translatable("challengecraft.lockout.board.open_team_screen"),
-                button -> this.client.setScreen(new LockoutBingoTeamScreen())
-        ).dimensions(this.width / 2 - 70, this.height - 26, 140, 20).build());
+        teamButton = addRenderableWidget(Button.builder(
+                Component.translatable("challengecraft.lockout.board.open_team_screen"),
+                button -> this.minecraft.setScreen(new LockoutBingoTeamScreen())
+        ).bounds(this.width / 2 - 70, this.height - 26, 140, 20).build());
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         LockoutBingoSyncPacket state = LockoutBingoClientState.get();
-        UUID playerUuid = this.client != null && this.client.player != null ? this.client.player.getUuid() : null;
+        UUID playerUuid = this.minecraft != null && this.minecraft.player != null ? this.minecraft.player.getUUID() : null;
         LockoutBingoTeam localTeam = playerUuid != null ? LockoutBingoClientState.getTeam(playerUuid) : null;
         LockoutBingoTeam winner = LockoutBingoTeam.fromOrdinal(state.winnerTeamId());
         LockoutBingoTeam targetTeam = localTeam != null ? localTeam : LockoutBingoClientState.getLeadingTeam();
         int clinchTarget = LockoutBingoClientState.getClinchTarget(targetTeam);
-        Text clinchTargetText = clinchTarget > 25
-                ? Text.translatable("challengecraft.placeholder.pending")
-                : Text.of(Integer.toString(clinchTarget));
+        Component clinchTargetText = clinchTarget > 25
+                ? Component.translatable("challengecraft.placeholder.pending")
+                : Component.nullToEmpty(Integer.toString(clinchTarget));
 
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 12, 0xFFFF55);
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.board.needed_to_win", clinchTargetText), 18, 28, 0xFFD8D8D8, false);
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.board.time", formatTicks(LockoutBingoClientState.getElapsedTicks())), 18, 40, 0xFFD8D8D8, false);
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.board.current_team", localTeam == null ? Text.translatable("challengecraft.lockout.team.none") : localTeam.displayName()), 18, 52, 0xFFD8D8D8, false);
+        context.centeredText(this.font, this.title, this.width / 2, 12, 0xFFFF55);
+        context.text(this.font, Component.translatable("challengecraft.lockout.board.needed_to_win", clinchTargetText), 18, 28, 0xFFD8D8D8, false);
+        context.text(this.font, Component.translatable("challengecraft.lockout.board.time", formatTicks(LockoutBingoClientState.getElapsedTicks())), 18, 40, 0xFFD8D8D8, false);
+        context.text(this.font, Component.translatable("challengecraft.lockout.board.current_team", localTeam == null ? Component.translatable("challengecraft.lockout.team.none") : localTeam.displayName()), 18, 52, 0xFFD8D8D8, false);
         if (winner != null) {
-            context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.board.winner", winner.displayName()), 18, 64, winner.color(), false);
+            context.text(this.font, Component.translatable("challengecraft.lockout.board.winner", winner.displayName()), 18, 64, winner.color(), false);
         } else if (LockoutBingoClientState.isDraw()) {
-            context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.board.draw"), 18, 64, 0xFFFFAA, false);
+            context.text(this.font, Component.translatable("challengecraft.lockout.board.draw"), 18, 64, 0xFFFFAA, false);
         }
 
         int scoreX = this.width - 170;
         int scoreY = 28;
         for (LockoutBingoTeam team : LockoutBingoTeam.values()) {
-            context.drawText(
-                    this.textRenderer,
-                    Text.translatable("challengecraft.lockout.board.score_entry", team.displayName(), LockoutBingoClientState.getScore(team)),
+            context.text(
+                    this.font,
+                    Component.translatable("challengecraft.lockout.board.score_entry", team.displayName(), LockoutBingoClientState.getScore(team)),
                     scoreX,
                     scoreY,
                     team.color(),
@@ -81,7 +79,7 @@ public class LockoutBingoBoardScreen extends Screen {
         teamButton.active = !state.started();
 
         if (state.boardGoalIds().isEmpty()) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.lockout.board.waiting"), this.width / 2, this.height / 2, 0xFFFFFFFF);
+            context.centeredText(this.font, Component.translatable("challengecraft.lockout.board.waiting"), this.width / 2, this.height / 2, 0xFFFFFFFF);
             return;
         }
 
@@ -107,7 +105,7 @@ public class LockoutBingoBoardScreen extends Screen {
         }
 
         if (hoveredGoal != null && hoveredIndex != null) {
-            List<Text> tooltip = new ArrayList<>();
+            List<Component> tooltip = new ArrayList<>();
             tooltip.add(hoveredGoal.title());
             tooltip.add(hoveredGoal.description());
             tooltip.add(hoveredGoal.condition());
@@ -115,19 +113,19 @@ public class LockoutBingoBoardScreen extends Screen {
             LockoutBingoTeam claimedTeam = LockoutBingoTeam.fromOrdinal(hoveredIndex < state.claimedTeams().size() ? state.claimedTeams().get(hoveredIndex) : -1);
             if (claimedTeam != null) {
                 String name = hoveredIndex < state.claimedByNames().size() ? state.claimedByNames().get(hoveredIndex) : "";
-                tooltip.add(Text.translatable("challengecraft.lockout.board.claimed_by", claimedTeam.displayName(), Text.of(name)));
+                tooltip.add(Component.translatable("challengecraft.lockout.board.claimed_by", claimedTeam.displayName(), Component.nullToEmpty(name)));
             }
 
-            context.drawTooltip(this.textRenderer, tooltip, mouseX, mouseY);
+            context.setComponentTooltipForNextFrame(this.font, tooltip, mouseX, mouseY);
         }
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
-    private void drawTile(DrawContext context, int x, int y, int mouseX, int mouseY, LockoutBingoGoal goal, LockoutBingoTeam claimedTeam) {
+    private void drawTile(GuiGraphicsExtractor context, int x, int y, int mouseX, int mouseY, LockoutBingoGoal goal, LockoutBingoTeam claimedTeam) {
         int fill = 0xAA1B1B1B;
         int border = 0xFF5A5A5A;
         if (claimedTeam != null) {
@@ -141,31 +139,31 @@ public class LockoutBingoBoardScreen extends Screen {
         }
 
         context.fill(x, y, x + TILE_SIZE, y + TILE_SIZE, fill);
-        context.drawBorder(x, y, TILE_SIZE, TILE_SIZE, border);
+        context.outline(x, y, TILE_SIZE, TILE_SIZE, border);
 
         if (goal == null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.placeholder.unknown"), x + TILE_SIZE / 2, y + 23, 0xFFFFFFFF);
+            context.centeredText(this.font, Component.translatable("challengecraft.placeholder.unknown"), x + TILE_SIZE / 2, y + 23, 0xFFFFFFFF);
             return;
         }
 
         ItemStack icon = goal.createIconStack();
-        context.drawItem(icon, x + 18, y + 6);
+        context.item(icon, x + 18, y + 6);
 
         String label = trimToWidth(goal.title().getString(), TILE_SIZE - 8);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.of(label), x + TILE_SIZE / 2, y + 28, 0xFFFFFFFF);
+        context.centeredText(this.font, Component.nullToEmpty(label), x + TILE_SIZE / 2, y + 28, 0xFFFFFFFF);
     }
 
     private String trimToWidth(String value, int maxWidth) {
-        if (this.textRenderer.getWidth(value) <= maxWidth) {
+        if (this.font.width(value) <= maxWidth) {
             return value;
         }
 
         String ellipsis = "...";
-        int targetWidth = Math.max(0, maxWidth - this.textRenderer.getWidth(ellipsis));
+        int targetWidth = Math.max(0, maxWidth - this.font.width(ellipsis));
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
             char character = value.charAt(i);
-            if (this.textRenderer.getWidth(builder.toString() + character) > targetWidth) {
+            if (this.font.width(builder.toString() + character) > targetWidth) {
                 break;
             }
             builder.append(character);

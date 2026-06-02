@@ -1,24 +1,26 @@
 package net.kasax.challengecraft.block;
 
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.kasax.challengecraft.storage.InfiniteChestStorage;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 /** Block entity backing the infinite chest GUI and Fabric transfer API view. */
-public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedScreenHandlerFactory<InfiniteChestScreenHandler.PacketData> {
+public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedMenuProvider<InfiniteChestScreenHandler.PacketData> {
     private final InfiniteChestStorage storage = new InfiniteChestStorage();
 
     public InfiniteChestBlockEntity(BlockPos pos, BlockState state) {
@@ -30,48 +32,42 @@ public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedScr
     }
 
     @Override
-    public void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.readNbt(nbt, registryLookup);
-        nbt.getCompound("Storage").ifPresent(storageNbt -> {
-            storage.readNbt(storageNbt, registryLookup);
-        });
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        input.child("Storage").ifPresent(storage::read);
     }
 
     @Override
-    protected void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
-        super.writeNbt(nbt, registryLookup);
-        NbtCompound storageNbt = new NbtCompound();
-        storage.writeNbt(storageNbt, registryLookup);
-        nbt.put("Storage", storageNbt);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        storage.write(output.child("Storage"));
     }
 
     @Override
-    public InfiniteChestScreenHandler.PacketData getScreenOpeningData(ServerPlayerEntity player) {
-        return new InfiniteChestScreenHandler.PacketData(this.pos);
+    public InfiniteChestScreenHandler.PacketData getScreenOpeningData(ServerPlayer player) {
+        return new InfiniteChestScreenHandler.PacketData(this.worldPosition);
     }
 
     @Override
-    public Text getDisplayName() {
-        return Text.translatable("block.challengecraft.infinite_chest");
+    public Component getDisplayName() {
+        return Component.translatable("block.challengecraft.infinite_chest");
     }
 
     @Nullable
     @Override
-    public ScreenHandler createMenu(int syncId, PlayerInventory playerInventory, PlayerEntity player) {
-        return new InfiniteChestScreenHandler(syncId, playerInventory, this.pos);
+    public AbstractContainerMenu createMenu(int syncId, Inventory playerInventory, Player player) {
+        return new InfiniteChestScreenHandler(syncId, playerInventory, this.worldPosition);
     }
 
     @Nullable
     @Override
-    public Packet<ClientPlayPacketListener> toUpdatePacket() {
-        return BlockEntityUpdateS2CPacket.create(this);
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
-    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup registryLookup) {
-        NbtCompound nbt = new NbtCompound();
-        writeNbt(nbt, registryLookup);
-        return nbt;
+    public CompoundTag getUpdateTag(HolderLookup.Provider registryLookup) {
+        return saveCustomOnly(registryLookup);
     }
     public net.fabricmc.fabric.api.transfer.v1.storage.Storage<net.fabricmc.fabric.api.transfer.v1.item.ItemVariant> getItemStorage() {
         return new net.fabricmc.fabric.api.transfer.v1.storage.Storage<net.fabricmc.fabric.api.transfer.v1.item.ItemVariant>() {
@@ -81,7 +77,7 @@ public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedScr
                 transaction.addCloseCallback((t, result) -> {
                     if (result.wasCommitted()) {
                         storage.addItems(InfiniteChestStorage.ItemStackKey.fromStack(resource.toStack()), maxAmount);
-                        markDirty();
+                        setChanged();
                     }
                 });
                 return maxAmount;
@@ -95,7 +91,7 @@ public class InfiniteChestBlockEntity extends BlockEntity implements ExtendedScr
                     transaction.addCloseCallback((t, result) -> {
                         if (result.wasCommitted()) {
                             storage.removeItems(InfiniteChestStorage.ItemStackKey.fromStack(resource.toStack()), toExtract);
-                            markDirty();
+                            setChanged();
                         }
                     });
                 }

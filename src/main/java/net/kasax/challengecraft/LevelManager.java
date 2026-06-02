@@ -5,11 +5,9 @@ import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.network.LevelSyncPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.text.Text;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import java.util.List;
 
 /** Owns the level curve, perk unlock thresholds, and XP sync fan-out. */
@@ -72,12 +70,12 @@ public class LevelManager {
         }
     }
 
-    public static XpResult addXp(ServerPlayerEntity player, long amount) {
-        long currentXp = XpManager.getXp(player.getUuid());
+    public static XpResult addXp(ServerPlayer player, long amount) {
+        long currentXp = XpManager.getXp(player.getUUID());
         int oldLevel = getLevelForXp(currentXp);
         
-        XpManager.addXp(player.getUuid(), amount);
-        long newXp = XpManager.getXp(player.getUuid());
+        XpManager.addXp(player.getUUID(), amount);
+        long newXp = XpManager.getXp(player.getUUID());
         
         int newLevel = getLevelForXp(newXp);
         if (newLevel > oldLevel && newLevel <= MAX_LEVEL) {
@@ -90,31 +88,31 @@ public class LevelManager {
         return new XpResult(currentXp, newXp, amount);
     }
 
-    private static void onLevelUp(ServerPlayerEntity player, int newLevel) {
-        player.sendMessage(Text.translatable("challengecraft.level.up", newLevel).formatted(Formatting.GOLD, Formatting.BOLD), false);
-        player.playSound(net.minecraft.sound.SoundEvents.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+    private static void onLevelUp(ServerPlayer player, int newLevel) {
+        player.sendSystemMessage(Component.translatable("challengecraft.level.up", newLevel).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        player.playSound(net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP, 1.0f, 1.0f);
         
         for (int perkId : ALL_PERKS) {
             if (getRequiredLevel(perkId) == newLevel) {
-                Text name = Text.translatable("challengecraft.perk." + perkId).copy().formatted(Formatting.YELLOW);
-                player.sendMessage(Text.translatable("challengecraft.level.unlock_perk", name).formatted(Formatting.GREEN), false);
+                Component name = Component.translatable("challengecraft.perk." + perkId).copy().withStyle(ChatFormatting.YELLOW);
+                player.sendSystemMessage(Component.translatable("challengecraft.level.unlock_perk", name).withStyle(ChatFormatting.GREEN));
             }
         }
 
         if (newLevel == 20) {
-            player.sendMessage(Text.translatable("challengecraft.level.master").formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
+            player.sendSystemMessage(Component.translatable("challengecraft.level.master").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
         }
     }
 
-    private static void onStarGain(ServerPlayerEntity player, int starCount, long oldXp, long newXp) {
-        player.sendMessage(Text.translatable("challengecraft.level.infinity_star", starCount).formatted(Formatting.YELLOW, Formatting.BOLD), false);
-        player.playSound(net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
+    private static void onStarGain(ServerPlayer player, int starCount, long oldXp, long newXp) {
+        player.sendSystemMessage(Component.translatable("challengecraft.level.infinity_star", starCount).withStyle(ChatFormatting.YELLOW, ChatFormatting.BOLD));
+        player.playSound(net.minecraft.sounds.SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f);
         
         if (starCount == 20) {
-             player.sendMessage(Text.translatable(
+             player.sendSystemMessage(Component.translatable(
                      "challengecraft.level.secret_unlock",
-                     Text.translatable("challengecraft.perk." + PERK_INFINITY_WEAPON).copy().formatted(Formatting.GOLD)
-             ).formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
+                     Component.translatable("challengecraft.perk." + PERK_INFINITY_WEAPON).copy().withStyle(ChatFormatting.GOLD)
+             ).withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD), false);
         }
 
         ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.ChallengeRewardPacket(oldXp, newXp, newXp - oldXp, false));
@@ -143,17 +141,17 @@ public class LevelManager {
         return null;
     }
 
-    public static void sync(ServerPlayerEntity player) {
-        long xp = XpManager.getXp(player.getUuid());
-        ChallengeCraft.LOGGER.info("[Server] Syncing XP for {} (UUID: {}): {}", player.getName().getString(), player.getUuid(), xp);
+    public static void sync(ServerPlayer player) {
+        long xp = XpManager.getXp(player.getUUID());
+        ChallengeCraft.LOGGER.info("[Server] Syncing XP for {} (UUID: {}): {}", player.getName().getString(), player.getUUID(), xp);
         
         // Other clients need this for name-tag styling, not just the local HUD.
-        LevelSyncPacket pkt = new LevelSyncPacket(xp, player.getUuid());
-        for (ServerPlayerEntity p : player.getServer().getPlayerManager().getPlayerList()) {
+        LevelSyncPacket pkt = new LevelSyncPacket(xp, player.getUUID());
+        for (ServerPlayer p : player.level().getServer().getPlayerList().getPlayers()) {
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, pkt);
         }
 
-        java.util.Map<Integer, Integer> times = StatsManager.getBestTimes(player.getUuidAsString());
+        java.util.Map<Integer, Integer> times = StatsManager.getBestTimes(player.getStringUUID());
         net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, new net.kasax.challengecraft.network.StatsSyncPacket(times));
         ChallengeCraft.LOGGER.info("[Server] Synced Level ({}) and Stats ({}) to player {}", getLevelForXp(xp), times.size(), player.getName().getString());
     }
@@ -200,8 +198,8 @@ public class LevelManager {
         };
     }
 
-    public static long getPlayerXp(net.minecraft.entity.player.PlayerEntity player) {
+    public static long getPlayerXp(net.minecraft.world.entity.player.Player player) {
         if (player == null) return 0;
-        return net.kasax.challengecraft.util.XpLookupProxy.getXp(player.getUuid());
+        return net.kasax.challengecraft.util.XpLookupProxy.getXp(player.getUUID());
     }
 }

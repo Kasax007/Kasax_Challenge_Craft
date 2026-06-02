@@ -5,16 +5,15 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.network.TriviaQuestionPacket;
-import net.minecraft.entity.EntityStatuses;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Items;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntityEvent;
+import net.minecraft.world.item.Items;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,16 +39,16 @@ public class Chal_36_TriviaChallenge {
                 if (globalTimer == TRIVIA_INTERVAL - 40) pitch = 1.2f;
                 if (globalTimer == TRIVIA_INTERVAL - 20) pitch = 1.5f;
 
-                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                    player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_NOTE_BLOCK_PLING, SoundCategory.MASTER, 1.0f, pitch);
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.NOTE_BLOCK_PLING, SoundSource.MASTER, 1.0f, pitch);
                 }
             }
 
             if (globalTimer >= TRIVIA_INTERVAL) {
                 globalTimer = 0;
-                if (!server.getPlayerManager().getPlayerList().isEmpty()) {
+                if (!server.getPlayerList().getPlayers().isEmpty()) {
                     TriviaQuestion question = TriviaQuestions.getRandom();
-                    for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                         triggerTrivia(player, question);
                     }
                 }
@@ -58,7 +57,7 @@ public class Chal_36_TriviaChallenge {
             long now = System.currentTimeMillis();
             for (UUID uuid : new java.util.HashSet<>(PENDING_TIMEOUTS.keySet())) {
                 if (now > PENDING_TIMEOUTS.get(uuid)) {
-                    ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
+                    ServerPlayer player = server.getPlayerList().getPlayer(uuid);
                     if (player != null) {
                         handleTimeout(player);
                     } else {
@@ -70,61 +69,61 @@ public class Chal_36_TriviaChallenge {
         });
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            PENDING_QUESTIONS.remove(handler.player.getUuid());
-            PENDING_TIMEOUTS.remove(handler.player.getUuid());
+            PENDING_QUESTIONS.remove(handler.player.getUUID());
+            PENDING_TIMEOUTS.remove(handler.player.getUUID());
         });
     }
 
-    private static void triggerTrivia(ServerPlayerEntity player, TriviaQuestion question) {
-        PENDING_QUESTIONS.put(player.getUuid(), question);
-        PENDING_TIMEOUTS.put(player.getUuid(), System.currentTimeMillis() + (TIMEOUT_SECONDS * 1000L));
+    private static void triggerTrivia(ServerPlayer player, TriviaQuestion question) {
+        PENDING_QUESTIONS.put(player.getUUID(), question);
+        PENDING_TIMEOUTS.put(player.getUUID(), System.currentTimeMillis() + (TIMEOUT_SECONDS * 1000L));
         ServerPlayNetworking.send(player, new TriviaQuestionPacket(question.question(), question.answers(), question.correctIndex()));
     }
 
-    public static void handleAnswer(ServerPlayerEntity player, int answerIndex) {
-        TriviaQuestion question = PENDING_QUESTIONS.remove(player.getUuid());
-        PENDING_TIMEOUTS.remove(player.getUuid());
+    public static void handleAnswer(ServerPlayer player, int answerIndex) {
+        TriviaQuestion question = PENDING_QUESTIONS.remove(player.getUUID());
+        PENDING_TIMEOUTS.remove(player.getUUID());
         if (question == null) return;
 
         if (answerIndex == question.correctIndex()) {
-            player.sendMessage(Text.translatable("challengecraft.trivia.correct").formatted(Formatting.GREEN), true);
-            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.MASTER, 1.0f, 1.0f);
+            player.sendOverlayMessage(Component.translatable("challengecraft.trivia.correct").withStyle(ChatFormatting.GREEN));
+            player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.MASTER, 1.0f, 1.0f);
         } else {
             processWrongAnswer(player, question);
         }
     }
 
-    private static void handleTimeout(ServerPlayerEntity player) {
-        TriviaQuestion question = PENDING_QUESTIONS.remove(player.getUuid());
-        PENDING_TIMEOUTS.remove(player.getUuid());
+    private static void handleTimeout(ServerPlayer player) {
+        TriviaQuestion question = PENDING_QUESTIONS.remove(player.getUUID());
+        PENDING_TIMEOUTS.remove(player.getUUID());
         if (question == null) return;
 
-        player.sendMessage(Text.translatable("challengecraft.trivia.timeout").formatted(Formatting.RED), false);
+        player.sendSystemMessage(Component.translatable("challengecraft.trivia.timeout").withStyle(ChatFormatting.RED));
         processWrongAnswer(player, question);
     }
 
-    private static void processWrongAnswer(ServerPlayerEntity player, TriviaQuestion question) {
-        if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING) || player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
-            player.getServerWorld().sendEntityStatus(player, EntityStatuses.USE_TOTEM_OF_UNDYING);
+    private static void processWrongAnswer(ServerPlayer player, TriviaQuestion question) {
+        if (player.getMainHandItem().is(Items.TOTEM_OF_UNDYING) || player.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) {
+            player.level().broadcastEntityEvent(player, EntityEvent.PROTECTED_FROM_DEATH);
 
-            if (player.getMainHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
-                player.getMainHandStack().decrement(1);
+            if (player.getMainHandItem().is(Items.TOTEM_OF_UNDYING)) {
+                player.getMainHandItem().shrink(1);
             } else {
-                player.getOffHandStack().decrement(1);
+                player.getOffhandItem().shrink(1);
             }
 
             // Mirror the survival effects players expect after a normal totem save.
             player.setHealth(1.0f);
-            player.clearStatusEffects();
-            player.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 900, 1));
-            player.addStatusEffect(new StatusEffectInstance(StatusEffects.FIRE_RESISTANCE, 800, 0));
-            player.addStatusEffect(new StatusEffectInstance(StatusEffects.ABSORPTION, 100, 1));
+            player.removeAllEffects();
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 900, 1));
+            player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 800, 0));
+            player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 100, 1));
 
-            player.sendMessage(Text.translatable("challengecraft.trivia.wrong_totem").formatted(Formatting.GOLD), true);
+            player.sendOverlayMessage(Component.translatable("challengecraft.trivia.wrong_totem").withStyle(ChatFormatting.GOLD));
         } else {
-            player.sendMessage(Text.translatable("challengecraft.trivia.wrong_answer", question.answers().get(question.correctIndex())).formatted(Formatting.RED), false);
-            player.damage(player.getServerWorld(), player.getDamageSources().genericKill(), 1000.0f);
-            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_VILLAGER_NO, SoundCategory.MASTER, 1.0f, 1.0f);
+            player.sendSystemMessage(Component.translatable("challengecraft.trivia.wrong_answer", question.answers().get(question.correctIndex())).withStyle(ChatFormatting.RED));
+            player.hurtServer(player.level(), player.damageSources().genericKill(), 1000.0f);
+            player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.VILLAGER_NO, SoundSource.MASTER, 1.0f, 1.0f);
         }
     }
 
