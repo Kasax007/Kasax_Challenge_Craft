@@ -4,6 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.ChallengeManager;
+import net.kasax.challengecraft.client.ui.CraftUI;
 import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.tab.GridScreenTab;
 import net.minecraft.client.gui.tooltip.Tooltip;
@@ -33,8 +34,10 @@ public class ChallengeTab extends GridScreenTab {
     private final SliderWidget gameSpeedSlider;
     private Text difficultyText = Text.empty();
     private boolean hasConflict;
+    private double currentDifficulty = -1;
 
     private WidgetScrollPanel scrollPanel;
+    private ClickableWidget infoBar;
 
     // Slider values are normalized for the widget; ticks keep the exact gameplay units.
     private double sliderValue = 1.0;
@@ -163,6 +166,33 @@ public class ChallengeTab extends GridScreenTab {
 
         // CreateWorldScreen keeps this widget reference, so later refreshes must reuse it.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
+
+        // Pinned info bar showing difficulty + projected XP payout at the top of the tab.
+        this.infoBar = new ClickableWidget(0, 0, 1, 20, Text.empty()) {
+            @Override
+            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
+                CraftUI.panelFloat(context, getX(), getY(), getWidth(), getHeight(), CraftUI.GOLD);
+                var tr = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
+                Text line;
+                int color;
+                if (hasConflict) {
+                    line = Text.translatable("challengecraft.warning.conflict");
+                    color = CraftUI.DANGER;
+                } else {
+                    long payout = currentDifficulty <= 0 ? 0 : Math.round(100.0 * currentDifficulty);
+                    line = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", currentDifficulty))
+                            .copy().append(Text.literal("   •   "))
+                            .append(Text.translatable("challengecraft.worldcreate.xp_payout", String.format(Locale.ROOT, "%,d", payout)));
+                    color = CraftUI.WARNING;
+                }
+                context.drawCenteredTextWithShadow(tr, line, getX() + getWidth() / 2, getY() + (getHeight() - tr.fontHeight) / 2 + 1, color);
+            }
+
+            @Override
+            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
+            }
+        };
+
         updateDifficultyText();
     }
 
@@ -177,6 +207,7 @@ public class ChallengeTab extends GridScreenTab {
 
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.hasConflict = true;
+            this.currentDifficulty = -1;
             this.difficultyText = Text.translatable("challengecraft.warning.conflict");
         } else {
             this.hasConflict = false;
@@ -185,6 +216,7 @@ public class ChallengeTab extends GridScreenTab {
                 playerCount = net.minecraft.client.MinecraftClient.getInstance().world.getPlayers().size();
             }
             double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, gameSpeedMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
+            this.currentDifficulty = total;
             this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
@@ -198,10 +230,17 @@ public class ChallengeTab extends GridScreenTab {
         int panelW = Math.max(60, tabArea.width() - padding * 2);
         int panelH = Math.max(60, tabArea.height() - padding * 2);
 
+        int infoBarH = 20;
+        this.infoBar.setX(panelX);
+        this.infoBar.setY(panelY);
+        this.infoBar.setWidth(panelW);
+        this.infoBar.setHeight(infoBarH);
+
+        int listY = panelY + infoBarH + 4;
         this.scrollPanel.setX(panelX);
-        this.scrollPanel.setY(panelY);
+        this.scrollPanel.setY(listY);
         this.scrollPanel.setWidth(panelW);
-        this.scrollPanel.setHeight(panelH);
+        this.scrollPanel.setHeight(Math.max(40, panelH - infoBarH - 4));
 
         // Child bounds depend on the current tab size, but the panel instance stays stable.
         this.scrollPanel.clearChildren();
@@ -212,22 +251,7 @@ public class ChallengeTab extends GridScreenTab {
         int x0 = panelX + 8;
         int x1 = x0 + cardW + spacing;
         int col = 0;
-        int y = panelY + 4;
-
-        this.scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, Text.empty()) {
-            @Override
-            public Text getMessage() {
-                return difficultyText;
-            }
-            @Override
-            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                int color = hasConflict ? 0xFF5555 : 0xFFFF55;
-                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
-            }
-            @Override
-            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
-        });
-        y += 24;
+        int y = listY + 4;
 
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
@@ -342,6 +366,7 @@ public class ChallengeTab extends GridScreenTab {
 
     @Override
     public void forEachChild(Consumer<ClickableWidget> consumer) {
+        consumer.accept(this.infoBar);
         consumer.accept(this.scrollPanel);
     }
 

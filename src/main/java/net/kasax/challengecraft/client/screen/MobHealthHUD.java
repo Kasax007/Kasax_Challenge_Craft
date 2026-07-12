@@ -2,73 +2,45 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.kasax.challengecraft.challenges.Chal_24_MobHealthMultiply;
+import net.kasax.challengecraft.client.ui.CraftUI;
+import net.kasax.challengecraft.client.ui.HudCard;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
-import java.util.Locale;
 
 @Environment(EnvType.CLIENT)
-/** HUD element that exposes the current mob-health multiplier to players. */
+/** Target HUD card showing the looked-at mob's remaining hearts out of its total. */
 public class MobHealthHUD {
 
-    public static void register() {
-        HudRenderCallback.EVENT.register(MobHealthHUD::onHudRender);
-    }
-
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
-        if (!Chal_24_MobHealthMultiply.isActive()) return;
-
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
-
-        Entity targeted = client.targetedEntity;
-        if (!(targeted instanceof LivingEntity living)) return;
-
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
-        int centerX = sw / 2;
-
-        int y = 5;
-        if (AllItemsHUD.isActive() || AllEntitiesHUD.isActive() || AllAchievementsHUD.isActive()) {
-            y = 45;
+    public static HudCard buildCard() {
+        if (!Chal_24_MobHealthMultiply.isActive()) {
+            return null;
         }
 
-        Text nameText = living.getDisplayName().copy().formatted(Formatting.YELLOW, Formatting.BOLD);
+        MinecraftClient client = MinecraftClient.getInstance();
+        Entity targeted = client.targetedEntity;
+        if (!(targeted instanceof LivingEntity living)) {
+            return null;
+        }
+
         float health = living.getHealth();
         float maxHealth = living.getMaxHealth();
-        // HUD formatting should not change with the client's locale.
-        Text healthText = Text.translatable(
-                "challengecraft.mob_health.health",
-                String.format(Locale.US, "%.1f", health),
-                String.format(Locale.US, "%.1f", maxHealth)
-        ).formatted(Formatting.RED);
+        int hearts = (int) Math.ceil(health / 2f);
+        int maxHearts = (int) Math.ceil(maxHealth / 2f);
+        float progress = maxHealth > 0f ? health / maxHealth : 0f;
 
-        int boxWidth = 150;
-        int boxHeight = 40;
-        int x = centerX - boxWidth / 2;
-
-        ctx.fill(x, y, x + boxWidth, y + boxHeight, 0x80000000);
-        ctx.drawBorder(x, y, boxWidth, boxHeight, 0xFFFFFFFF);
-
-        ItemStack icon = SpawnEggItem.forEntity(living.getType()) != null 
+        ItemStack icon = SpawnEggItem.forEntity(living.getType()) != null
                 ? new ItemStack(SpawnEggItem.forEntity(living.getType()))
                 : new ItemStack(Items.ZOMBIE_SPAWN_EGG);
-        
-        ctx.drawItem(icon, x + 10, y + 12);
 
-        ctx.drawTextWithShadow(tr, nameText, x + 40, y + 10, 0xFFFFFF);
-        ctx.drawTextWithShadow(tr, healthText, x + 40, y + 22, 0xFFFFFF);
+        Text value = Text.of(hearts + " / " + maxHearts);
+        // Bar shifts red→amber→green with remaining health.
+        int accent = progress > 0.5f ? CraftUI.SUCCESS : (progress > 0.25f ? CraftUI.WARNING : CraftUI.DANGER);
+        return new HudCard("mob_health", icon, living.getDisplayName(), value, progress, accent, hearts);
     }
 }

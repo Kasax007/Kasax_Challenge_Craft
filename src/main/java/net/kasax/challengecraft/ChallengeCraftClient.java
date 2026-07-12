@@ -39,10 +39,13 @@ public class ChallengeCraftClient implements ClientModInitializer {
       		StatsSyncHandler.register();
         net.kasax.challengecraft.network.EnderDragonDefeatHandler.register();
         ChallengeRewardOverlay.register();
-        net.kasax.challengecraft.client.screen.AllItemsHUD.register();
-        net.kasax.challengecraft.client.screen.AllEntitiesHUD.register();
-        net.kasax.challengecraft.client.screen.AllAchievementsHUD.register();
-        net.kasax.challengecraft.client.screen.MobHealthHUD.register();
+
+        // Objective HUDs share one auto-laid-out stack (row 0), the target HUD sits below (row 1).
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllItemsHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllEntitiesHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllAchievementsHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
+        net.kasax.challengecraft.client.ui.HudStack.register();
 
         net.minecraft.client.gui.screen.ingame.HandledScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
 

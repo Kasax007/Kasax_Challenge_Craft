@@ -2,6 +2,8 @@ package net.kasax.challengecraft.client.screen;
 
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.LevelManager;
+import net.kasax.challengecraft.client.ui.Anim;
+import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.data.StatsManager;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -27,6 +29,7 @@ public class ChallengeCardWidget extends ClickableWidget {
     private final Integer pbTicks;
     private final boolean locked;
     private final int requiredLevel;
+    private final Anim.Tween hover = new Anim.Tween(0f);
 
     public ChallengeCardWidget(int x, int y, int width, int height, int challengeId, boolean active, Consumer<Boolean> onToggle) {
         super(x, y, width, height, Text.empty());
@@ -41,23 +44,23 @@ public class ChallengeCardWidget extends ClickableWidget {
         }
         this.active = active;
         this.onToggle = onToggle;
-        
+
         String uuid = "global";
         if (MinecraftClient.getInstance().getSession() != null && MinecraftClient.getInstance().getSession().getUuidOrNull() != null) {
             uuid = MinecraftClient.getInstance().getSession().getUuidOrNull().toString();
         }
         this.pbTicks = StatsManager.getBestTimes(uuid).get(challengeId);
-        
+
         long currentXp = ChallengeCraftClient.LOCAL_PLAYER_XP;
         int currentLevel = LevelManager.getLevelForXp(currentXp);
         this.requiredLevel = LevelManager.getRequiredLevel(challengeId);
-        
+
         if (challengeId == LevelManager.PERK_INFINITY_WEAPON) {
             this.locked = LevelManager.getStars(currentXp) < 20;
         } else {
             this.locked = currentLevel < requiredLevel;
         }
-        
+
         if (locked) {
             Text requirement = challengeId == LevelManager.PERK_INFINITY_WEAPON
                     ? Text.translatable("challengecraft.requirement.infinity_stars", 20)
@@ -75,48 +78,47 @@ public class ChallengeCardWidget extends ClickableWidget {
 
     @Override
     protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        int textColor = active ? 0xFFFFFFFF : 0xFFA0A0A0;
-        int bgColor = active ? 0x6000FF00 : 0x60000000;
-        if (locked) {
-            textColor = 0xFF555555;
-            bgColor = 0x80222222;
-        } else if (isHovered()) {
-            bgColor = active ? 0x9000FF00 : 0x90555555;
+        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+        CraftUI.CardState state = locked ? CraftUI.CardState.LOCKED
+                : (active ? CraftUI.CardState.ACTIVE : CraftUI.CardState.IDLE);
+
+        float g = hover.approach(!locked && isHovered() ? 1f : 0f, 12f);
+        int lift = Math.round(g * 1.5f);
+        int x = getX();
+        int y = getY() - lift;
+        int w = getWidth();
+        int h = getHeight();
+
+        if (g > 0.01f) {
+            context.fill(x - 1, y - 1, x + w + 1, y + h + 1, CraftUI.applyAlpha(state.accent, 0.22f * g));
         }
 
-        context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), bgColor);
-        context.drawBorder(getX(), getY(), getWidth(), getHeight(), isFocused() ? 0xFFFFFFFF : 0xFFAAAAAA);
+        int fill = CraftUI.mix(state.fill, 0xCC243449, g * 0.45f);
+        int border = isFocused() ? CraftUI.TEXT_PRIMARY : CraftUI.mix(state.border, state.accent, g);
+        CraftUI.panel(context, x, y, w, h, fill, border, state.accent);
 
+        int textX;
         if (locked) {
             Text label = challengeId == LevelManager.PERK_INFINITY_WEAPON
-                    ? Text.translatable("challengecraft.challenge_card.locked_stars_short", 20).formatted(Formatting.RED)
-                    : Text.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel).formatted(Formatting.RED);
-            context.drawText(MinecraftClient.getInstance().textRenderer, label, getX() + 4, getY() + (getHeight() - 8) / 2, 0xFFFFFFFF, true);
+                    ? Text.translatable("challengecraft.challenge_card.locked_stars_short", 20)
+                    : Text.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel);
+            int chipW = CraftUI.labelChip(context, tr, label, x + 4, y + (h - 12) / 2, CraftUI.DANGER);
+            textX = x + 4 + chipW + 4;
         } else {
-            ChallengeIconProvider.drawIcon(context, getX() + 4, getY() + (getHeight() - 16) / 2, challengeId);
+            CraftUI.iconTileItem(context, icon, x + 3, y + (h - 18) / 2, 18, state.accent);
+            textX = x + 25;
         }
 
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
-        
-        Text renderedTitle = title;
-        int xOffset = locked ? 48 : 24;
-        if (tr.getWidth(title) > getWidth() - xOffset - 4) {
-             String s = tr.trimToWidth(title.getString(), getWidth() - xOffset - 12) + "...";
-             renderedTitle = Text.of(s);
-        }
+        int textColor = locked ? CraftUI.TEXT_MUTED : (active ? CraftUI.TEXT_PRIMARY : CraftUI.TEXT_SECONDARY);
+        int maxTextWidth = w - (textX - x) - 6;
+        String titleStr = CraftUI.trimToWidth(tr, title.getString(), maxTextWidth);
 
         if (pbTicks != null && !locked) {
-            int titleY = getY() + (getHeight() / 2) - 9;
-            context.drawText(tr, renderedTitle, getX() + xOffset, titleY, textColor, true);
-            
-            String timeStr = formatTicks(pbTicks);
-            MutableText pbText = Text.translatable("challengecraft.challenge_card.completed_time", timeStr).formatted(Formatting.GREEN);
-            
-            int pbY = getY() + (getHeight() / 2) + 1;
-            context.drawText(tr, pbText, getX() + xOffset, pbY, 0xFFFFFF, true);
+            context.drawText(tr, Text.of(titleStr), textX, y + (h / 2) - 9, textColor, false);
+            MutableText pbText = Text.translatable("challengecraft.challenge_card.completed_time", formatTicks(pbTicks));
+            context.drawText(tr, CraftUI.trimToWidth(tr, pbText.getString(), maxTextWidth), textX, y + (h / 2) + 1, CraftUI.SUCCESS, false);
         } else {
-            int textY = getY() + (getHeight() - 8) / 2;
-            context.drawText(tr, renderedTitle, getX() + xOffset, textY, textColor, true);
+            context.drawText(tr, Text.of(titleStr), textX, y + (h - tr.fontHeight) / 2, textColor, false);
         }
     }
 
@@ -149,7 +151,7 @@ public class ChallengeCardWidget extends ClickableWidget {
     public boolean isActive() {
         return active;
     }
-    
+
     public void setActive(boolean active) {
         this.active = active;
     }

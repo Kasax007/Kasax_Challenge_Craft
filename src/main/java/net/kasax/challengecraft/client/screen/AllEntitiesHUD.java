@@ -2,23 +2,19 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
+import net.kasax.challengecraft.client.ui.CraftUI;
+import net.kasax.challengecraft.client.ui.HudCard;
 import net.minecraft.entity.EntityType;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Environment(EnvType.CLIENT)
-/** Compact HUD for the current all-entities target. */
+/** Compact HUD card for the current all-entities target. */
 public class AllEntitiesHUD {
     private static EntityType<?> currentEntity = null;
     private static int currentIndex = 0;
@@ -40,54 +36,34 @@ public class AllEntitiesHUD {
         return active;
     }
 
-    public static void register() {
-        HudRenderCallback.EVENT.register(AllEntitiesHUD::onHudRender);
-    }
-
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
-        if (!active || totalEntities == 0) return;
-
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden) return;
-
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
+    public static HudCard buildCard() {
+        if (!active || totalEntities == 0) {
+            return null;
+        }
 
         boolean completed = currentIndex >= totalEntities;
-        Text entityName = completed ? Text.translatable("challengecraft.completed").formatted(Formatting.GREEN, Formatting.BOLD) : (currentEntity != null ? currentEntity.getName().copy().formatted(Formatting.RED) : Text.translatable("challengecraft.placeholder.unknown"));
-        Text progressText = Text.translatable("challengecraft.progress.obtained", currentIndex, totalEntities).formatted(Formatting.GRAY);
-
-        int centerX = sw / 2;
-        int activeCount = (AllItemsHUD.isActive() ? 1 : 0) + (active ? 1 : 0) + (AllAchievementsHUD.isActive() ? 1 : 0);
-        
-        if (activeCount == 3) {
-            centerX = sw / 2;
-        } else if (activeCount == 2) {
-            if (AllItemsHUD.isActive()) {
-                centerX = sw / 2 + 70; // AllItems is at -70
-            } else if (AllAchievementsHUD.isActive()) {
-                centerX = sw / 2 - 70; // AllAchievements is at +70
-            }
-        }
-        int y = 5;
-
+        Text title;
         ItemStack icon;
+        int accent;
         if (completed) {
+            title = Text.translatable("challengecraft.completed");
             icon = new ItemStack(Items.NETHER_STAR);
+            accent = CraftUI.SUCCESS;
         } else if (currentEntity != null) {
+            title = currentEntity.getName();
             icon = ICON_CACHE.computeIfAbsent(currentEntity, type -> {
                 SpawnEggItem egg = SpawnEggItem.forEntity(type);
-                if (egg != null) {
-                    return new ItemStack(egg);
-                }
-                return new ItemStack(Items.ZOMBIE_SPAWN_EGG);
+                return egg != null ? new ItemStack(egg) : new ItemStack(Items.ZOMBIE_SPAWN_EGG);
             });
+            accent = CraftUI.DANGER;
         } else {
+            title = Text.translatable("challengecraft.placeholder.unknown");
             icon = new ItemStack(Items.BARRIER);
+            accent = CraftUI.DANGER;
         }
-        ctx.drawItem(icon, centerX - 8, y);
-        
-        ctx.drawCenteredTextWithShadow(tr, entityName, centerX, y + 18, 0xFFFFFF);
-        ctx.drawCenteredTextWithShadow(tr, progressText, centerX, y + 28, 0xFFFFFF);
+
+        float progress = totalEntities == 0 ? 0f : currentIndex / (float) totalEntities;
+        Text value = Text.of(currentIndex + " / " + totalEntities);
+        return new HudCard("all_entities", icon, title, value, progress, accent, currentIndex);
     }
 }

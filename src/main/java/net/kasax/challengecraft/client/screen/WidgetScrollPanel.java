@@ -42,6 +42,10 @@ public class WidgetScrollPanel extends ScrollableWidget {
         children.forEach(consumer);
     }
 
+    public boolean isEmpty() {
+        return children.isEmpty();
+    }
+
     @Override
     protected int getContentsHeightWithPadding() {
         return Math.max(this.contentHeight + 20, this.height);

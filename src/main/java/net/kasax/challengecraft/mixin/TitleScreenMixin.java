@@ -1,7 +1,9 @@
 package net.kasax.challengecraft.mixin;
 
+import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.client.screen.LevelingScreen;
+import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.AnimatedLevelButton;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -61,12 +63,23 @@ public abstract class TitleScreenMixin extends Screen {
         } else {
             totalXp = XpManager.getTotalXp();
         }
-        Text text = Text.translatable("challengecraft.mainmenu.lifetime_xp", totalXp);
-        context.drawTextWithShadow(
-                this.textRenderer,
-                text,
-                5, 5,
-                0xFFFF55
-        );
+
+        int level = LevelManager.getLevelForXp(totalXp);
+        int stars = LevelManager.getStars(totalXp);
+        String xpString = String.format(java.util.Locale.ROOT, "%,d", totalXp);
+        Text badge = stars > 0
+                ? Text.translatable("challengecraft.mainmenu.badge_stars", stars, xpString)
+                : Text.translatable("challengecraft.mainmenu.badge", level, xpString);
+
+        // Intentional profile badge in the corner instead of floating debug text.
+        int textWidth = this.textRenderer.getWidth(badge);
+        int panelX = CraftUI.S.SM;
+        int panelY = CraftUI.S.SM;
+        int panelW = 22 + textWidth + 10;
+        int panelH = 20;
+        CraftUI.panelFloat(context, panelX, panelY, panelW, panelH, CraftUI.GOLD);
+        CraftUI.gem(context, panelX + 12, panelY + panelH / 2, CraftUI.GOLD);
+        context.drawText(this.textRenderer, badge, panelX + 22,
+                panelY + (panelH - this.textRenderer.fontHeight) / 2 + 1, CraftUI.TEXT_PRIMARY, false);
     }
 }
