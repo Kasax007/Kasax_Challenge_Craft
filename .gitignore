@@ -42,3 +42,4 @@ replay_*.log
 /.aiassistant/
 /.ai/
 /.claude/
+/CLAUDE.md

@@ -73,6 +73,7 @@ public class PacketHandler {
                         data.setMobHealthMultiplier(packet.mobHealthMultiplier);
                         data.setDoubleTroubleMultiplier(packet.doubleTroubleMultiplier);
                         data.setGameSpeedMultiplier(packet.gameSpeedMultiplier);
+                        data.setForceItemBattleMinutes(packet.forceItemBattleMinutes);
 
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         boolean hasAfter  = packet.perks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
@@ -204,6 +205,16 @@ public class PacketHandler {
                     var server = context.server();
                     var player = context.player();
                     server.execute(() -> Chal_40_LockoutBingo.handleAction(player, packet));
+                }
+        );
+
+        ServerPlayNetworking.registerGlobalReceiver(
+                ForceItemActionPacket.ID,
+                (packet, context) -> {
+                    var server = context.server();
+                    var player = context.player();
+                    server.execute(() -> net.kasax.challengecraft.challenges.Chal_45_ForceItemBattle
+                            .handleTeamAction(player, packet.action(), packet.teamId()));
                 }
         );
     }

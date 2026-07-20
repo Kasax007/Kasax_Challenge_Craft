@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 public class ChallengeTab extends GridScreenTab {
     private static final Text TITLE = Text.translatable("challengecraft.challenge_tab.title");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
@@ -32,6 +32,7 @@ public class ChallengeTab extends GridScreenTab {
     private final SliderWidget mobHealthSlider;
     private final SliderWidget doubleTroubleSlider;
     private final SliderWidget gameSpeedSlider;
+    private final SliderWidget fibMinutesSlider;
     private Text difficultyText = Text.empty();
     private boolean hasConflict;
     private double currentDifficulty = -1;
@@ -55,8 +56,17 @@ public class ChallengeTab extends GridScreenTab {
     private double gameSpeedSliderValue = 0.0;
     private int gameSpeedMultiplier = 1;
 
+    // 15–180 min in 5-minute steps; 60 min default.
+    private double fibMinutesSliderValue = (60 - 15) / 165.0;
+    private int fibMinutes = 60;
+
     public ChallengeTab() {
         super(TITLE);
+
+        // The tab is built at the title screen, after the DISCONNECT handler has zeroed
+        // LOCAL_PLAYER_XP — without this refresh every card constructed below reads level 1
+        // and locks itself until something else (e.g. opening the leveling screen) refreshes it.
+        ChallengeCraftClient.refreshLocalPlayerXp();
 
         for (int id : IDS) {
             ChallengeCardWidget card = new ChallengeCardWidget(0, 0, 100, 20, id, false, val -> updateDifficultyText());
@@ -164,6 +174,24 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
+        this.fibMinutesSlider = new SliderWidget(
+                0, 0, 210, 20,
+                getFibMinutesSliderText(fibMinutes),
+                fibMinutesSliderValue
+        ) {
+            @Override
+            protected void updateMessage() {
+                setMessage(getFibMinutesSliderText(15 + (int) Math.round(this.value * 33) * 5));
+            }
+
+            @Override
+            protected void applyValue() {
+                fibMinutes = 15 + (int) Math.round(this.value * 33) * 5;
+                this.value = (fibMinutes - 15) / 165.0;
+                updateDifficultyText();
+            }
+        };
+
         // CreateWorldScreen keeps this widget reference, so later refreshes must reuse it.
         this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
 
@@ -256,7 +284,7 @@ public class ChallengeTab extends GridScreenTab {
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);
 
-            if ((id == 7 || id == 12 || id == 24 || id == 35 || id == 37) && col == 1) {
+            if ((id == 7 || id == 12 || id == 24 || id == 35 || id == 37 || id == 45) && col == 1) {
                 y += cardH + spacing;
                 col = 0;
             }
@@ -321,6 +349,16 @@ public class ChallengeTab extends GridScreenTab {
                 gameSpeedSlider.setWidth(cardW);
                 gameSpeedSlider.setHeight(cardH);
                 this.scrollPanel.addChild(gameSpeedSlider);
+                y += cardH + spacing;
+                col = 0;
+            }
+
+            if (id == 45 && fibMinutesSlider != null) {
+                fibMinutesSlider.setX(x1);
+                fibMinutesSlider.setY(y);
+                fibMinutesSlider.setWidth(cardW);
+                fibMinutesSlider.setHeight(cardH);
+                this.scrollPanel.addChild(fibMinutesSlider);
                 y += cardH + spacing;
                 col = 0;
             }
@@ -419,6 +457,12 @@ public class ChallengeTab extends GridScreenTab {
             ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER = 1;
         }
 
+        if (fibMinutesSlider != null && active.contains(45)) {
+            ChallengeCraftClient.SELECTED_FIB_MINUTES = fibMinutes;
+        } else {
+            ChallengeCraftClient.SELECTED_FIB_MINUTES = 60;
+        }
+
         return active;
     }
 
@@ -440,5 +484,9 @@ public class ChallengeTab extends GridScreenTab {
 
     private static Text getGameSpeedSliderText(double multiplier) {
         return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getFibMinutesSliderText(int minutes) {
+        return Text.translatable("challengecraft.slider.fib_minutes", minutes);
     }
 }

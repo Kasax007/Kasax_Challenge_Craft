@@ -164,13 +164,13 @@ public class LevelManager {
 
     public static int getRequiredLevel(int id) {
         return switch (id) {
-            case 1, 10, 16, 17, 18, 40 -> 1;
-            case 4, 5 -> 2;
+            case 1, 10, 16, 17, 18, 40, 45 -> 1;
+            case 4, 5, 42 -> 2;
             case 6, 7, 37 -> 3;
-            case 8, 13 -> 4;
+            case 8, 13, 43 -> 4;
             case 11, 12, 27 -> 5;
-            case 20, 26 -> 6;
-            case 21, 38 -> 7;
+            case 20, 26, 44 -> 6;
+            case 21, 38, 41 -> 7;
             case 24, 28, 30 -> 8;
             case 25, 31 -> 9;
             case 9, 32 -> 10;

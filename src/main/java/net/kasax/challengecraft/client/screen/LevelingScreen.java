@@ -104,14 +104,15 @@ public class LevelingScreen extends Screen {
         this.parent = parent;
         this.legacyLayoutMode = ChallengeCraftClient.USE_LEGACY_LEVEL_SCREEN_LAYOUT;
 
-        if (MinecraftClient.getInstance().player == null) {
-            UUID uuid = MinecraftClient.getInstance().getSession().getUuidOrNull();
-            if (uuid != null) {
-                ChallengeCraftClient.LOCAL_PLAYER_XP = XpManager.getXp(uuid);
-            } else {
-                ChallengeCraftClient.LOCAL_PLAYER_XP = XpManager.getTotalXp();
-            }
-        }
+        // Self-heals the post-disconnect/pre-sync zero value (see the accessor's javadoc);
+        // LevelSyncHandler additionally rebuilds this screen in place if the authoritative
+        // value arrives while it is open.
+        ChallengeCraftClient.refreshLocalPlayerXp();
+    }
+
+    /** Lets a live XP correction (see {@code LevelSyncHandler}) rebuild this screen in place. */
+    public Screen getParentScreen() {
+        return this.parent;
     }
 
     @Override
@@ -557,7 +558,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 40; challengeId++) {
+        for (int challengeId = 1; challengeId <= 45; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Text.translatable("challengecraft.worldcreate.challenge" + challengeId),

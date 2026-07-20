@@ -36,6 +36,13 @@ public class ModItems {
                     .maxCount(1)
     );
 
+    public static final Item FORCE_ITEM_TRACKER = register(
+            "force_item_tracker",
+            ForceItemTrackerItem::new,
+            new Item.Settings()
+                    .maxCount(1)
+    );
+
     public static void initialize() {
         ChallengeCraft.LOGGER.info("Registered items for {}", ChallengeCraft.MOD_ID);
     }

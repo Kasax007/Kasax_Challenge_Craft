@@ -57,6 +57,11 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_38_ChunkHunt.register();
 		Chal_39_NoFood.register();
 		Chal_40_LockoutBingo.register();
+		Chal_42_RandomMobSpawn.register();
+		Chal_43_OnlyDown.register();
+		Chal_44_ProgressiveBlockDrops.register();
+		Chal_45_ForceItemBattle.register();
+		net.kasax.challengecraft.data.BlockSurvey.register();
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
 
@@ -144,6 +149,114 @@ public class ChallengeCraft implements ModInitializer {
 						return 1;
 					}));
 
+			dispatcher.register(CommandManager.literal("challengecraft_fib_teams")
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						ServerPlayNetworking.send(player, new ForceItemOpenScreenPacket());
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_fib_joker")
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						Chal_45_ForceItemBattle.useJoker(player);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_fib_skip")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						Chal_45_ForceItemBattle.skipItem(player);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.fib_skip.done"), true);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_fib_results")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						Chal_45_ForceItemBattle.triggerResults(context.getSource().getServer());
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.fib_results.done"), true);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_fib_debug_solo")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						ServerPlayerEntity player = context.getSource().getPlayerOrThrow();
+						Chal_45_ForceItemBattle.startBattle(context.getSource().getServer(), player, true);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.fib_debug_solo.started"), true);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_fib_restart")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						Chal_45_ForceItemBattle.restartBattle(context.getSource().getServer());
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.fib_restart.done"), true);
+						return 1;
+					}));
+
+			dispatcher.register(CommandManager.literal("challengecraft_block_survey")
+					.requires(source -> source.hasPermissionLevel(2))
+					.then(CommandManager.literal("start").executes(context -> {
+						net.kasax.challengecraft.data.BlockSurvey.start();
+						context.getSource().sendFeedback(() -> Text.translatable(
+								"challengecraft.command.block_survey.started",
+								net.kasax.challengecraft.data.BlockSurvey.getCollectedCount()), true);
+						return 1;
+					}))
+					.then(CommandManager.literal("stop").executes(context -> {
+						net.kasax.challengecraft.data.BlockSurvey.stop();
+						context.getSource().sendFeedback(() -> Text.translatable(
+								"challengecraft.command.block_survey.stopped",
+								net.kasax.challengecraft.data.BlockSurvey.getCollectedCount(),
+								net.kasax.challengecraft.data.BlockSurvey.getTotalBlocksCounted()), true);
+						return 1;
+					}))
+					.then(CommandManager.literal("status").executes(context -> {
+						String state = net.kasax.challengecraft.data.BlockSurvey.isGenerating() ? "GENERATING"
+								: (net.kasax.challengecraft.data.BlockSurvey.isActive() ? "ON" : "OFF");
+						context.getSource().sendFeedback(() -> Text.translatable(
+								"challengecraft.command.block_survey.status",
+								state,
+								net.kasax.challengecraft.data.BlockSurvey.getCollectedCount(),
+								net.kasax.challengecraft.data.BlockSurvey.getTotalBlocksCounted(),
+								net.kasax.challengecraft.data.BlockSurvey.getScannedChunkCount()), false);
+						return 1;
+					}))
+					.then(CommandManager.literal("generate")
+							.executes(context -> {
+								net.kasax.challengecraft.data.BlockSurvey.startGenerate(context.getSource().getServer(), 16);
+								context.getSource().sendFeedback(() -> Text.translatable(
+										"challengecraft.command.block_survey.generating", 16), true);
+								return 1;
+							})
+							.then(CommandManager.argument("radius", IntegerArgumentType.integer(1, 128))
+									.executes(context -> {
+										int radius = IntegerArgumentType.getInteger(context, "radius");
+										net.kasax.challengecraft.data.BlockSurvey.startGenerate(context.getSource().getServer(), radius);
+										context.getSource().sendFeedback(() -> Text.translatable(
+												"challengecraft.command.block_survey.generating", radius), true);
+										return 1;
+									}))));
+
+			dispatcher.register(CommandManager.literal("challengecraft_skip_block")
+					.requires(source -> source.hasPermissionLevel(2))
+					.executes(context -> {
+						Chal_44_ProgressiveBlockDrops.skipBlock(context.getSource().getServer(), 1);
+						context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_block.single"), true);
+						return 1;
+					})
+					.then(CommandManager.argument("amount", IntegerArgumentType.integer(1))
+							.executes(context -> {
+								int amount = IntegerArgumentType.getInteger(context, "amount");
+								Chal_44_ProgressiveBlockDrops.skipBlock(context.getSource().getServer(), amount);
+								context.getSource().sendFeedback(() -> Text.translatable("challengecraft.command.skip_block.multiple", amount), true);
+								return 1;
+							}))
+			);
+
 			dispatcher.register(CommandManager.literal("challengecraft_lockout_debug_solo")
 					.requires(source -> source.hasPermissionLevel(2))
 					.executes(context -> {
@@ -190,6 +303,8 @@ public class ChallengeCraft implements ModInitializer {
 				.register(net.kasax.challengecraft.network.InfiniteChestClickPayload.ID, net.kasax.challengecraft.network.InfiniteChestClickPayload.CODEC);
 		PayloadTypeRegistry.playC2S()
 				.register(LockoutBingoActionPacket.ID, LockoutBingoActionPacket.CODEC);
+		PayloadTypeRegistry.playC2S()
+				.register(ForceItemActionPacket.ID, ForceItemActionPacket.CODEC);
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
@@ -249,6 +364,22 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(
 				LockoutBingoSyncPacket.ID,
 				LockoutBingoSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				ProgressiveBlocksSyncPacket.ID,
+				ProgressiveBlocksSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				ForceItemSyncPacket.ID,
+				ForceItemSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				ForceItemResultsPacket.ID,
+				ForceItemResultsPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				ForceItemOpenScreenPacket.ID,
+				ForceItemOpenScreenPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
 				LockoutBingoOpenScreenPacket.ID,

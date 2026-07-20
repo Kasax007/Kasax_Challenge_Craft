@@ -22,6 +22,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
     public static int SELECTED_MOB_HEALTH_MULTIPLIER = 1;
     public static int SELECTED_DOUBLE_TROUBLE_MULTIPLIER = 2;
     public static int SELECTED_GAME_SPEED_MULTIPLIER = 1;
+    public static int SELECTED_FIB_MINUTES = 60;
     /** World-creation selections are cached until the integrated server starts. */
     public static List<Integer> LAST_CHOSEN = Collections.emptyList();
     public static List<Integer> SELECTED_PERKS = Collections.emptyList();
@@ -29,6 +30,32 @@ public class ChallengeCraftClient implements ClientModInitializer {
     public static long LOCAL_PLAYER_XP = 0;
     public static java.util.Map<java.util.UUID, Long> PLAYER_XP_MAP = new java.util.HashMap<>();
     public static boolean USE_LEGACY_LEVEL_SCREEN_LAYOUT = false;
+
+    /**
+     * Refreshes {@link #LOCAL_PLAYER_XP} from the on-disk XP cache and returns it.
+     *
+     * <p>The DISCONNECT handler below zeroes the field on every world exit, and only the world-join
+     * path or a {@code LevelSyncPacket} repopulates it — so any title-screen UI (create-world
+     * challenge tab, leveling screen) reading the raw field right after leaving a world sees
+     * Level 1 with everything locked. Outside a world the flat file is the only source of truth,
+     * so re-read it unconditionally; in-world the join/sync path is authoritative, so the file is
+     * only used to seed a still-unsynced {@code 0} (0 reliably means "not synced yet this
+     * session", never a stale value, precisely because of the disconnect reset).
+     *
+     * <p>Screen-construction code should call this instead of reading the field directly.
+     */
+    public static long refreshLocalPlayerXp() {
+        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        if (client.player == null) {
+            java.util.UUID uuid = client.getSession() != null ? client.getSession().getUuidOrNull() : null;
+            LOCAL_PLAYER_XP = uuid != null
+                    ? net.kasax.challengecraft.data.XpManager.getXp(uuid)
+                    : net.kasax.challengecraft.data.XpManager.getTotalXp();
+        } else if (LOCAL_PLAYER_XP == 0) {
+            LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUuid());
+        }
+        return LOCAL_PLAYER_XP;
+    }
 
 
     @Override
@@ -44,6 +71,9 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllItemsHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllEntitiesHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllAchievementsHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ProgressiveBlocksHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ForceItemHUD::buildCard, 0);
+        net.kasax.challengecraft.client.screen.ForceItemHeadIconRenderer.register();
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
         net.kasax.challengecraft.client.ui.HudStack.register();
 
@@ -84,6 +114,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
             PLAYER_XP_MAP.clear();
             LOCAL_PLAYER_XP = 0;
             LockoutBingoClientState.clear();
+            net.kasax.challengecraft.client.screen.ForceItemClientState.clear();
         });
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {

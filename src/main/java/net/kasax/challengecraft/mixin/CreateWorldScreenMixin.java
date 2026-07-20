@@ -65,8 +65,9 @@ public class CreateWorldScreenMixin {
             int mobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
             int doubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
             int gameSpeedMult = ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER;
+            int fibMinutes = ChallengeCraftClient.SELECTED_FIB_MINUTES;
             ClientPlayNetworking.send(
-                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, doubleTroubleMult, gameSpeedMult, perkList)
+                    new ChallengePacket(chosenList, maxHearts, limitedInventorySlots, mobHealthMult, doubleTroubleMult, gameSpeedMult, fibMinutes, perkList)
             );
             ChallengeCraft.LOGGER.info("[Client:CreateWorld] sent ChallengePacket");
         }

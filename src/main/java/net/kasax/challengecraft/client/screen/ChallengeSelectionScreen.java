@@ -27,7 +27,7 @@ import java.util.Map;
 /** In-world challenge editor used after a save already exists. */
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 40, 4, 5, 6, 7, 37, 8, 13, 11, 27, 12, 20, 26, 21, 38, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private enum Category {
@@ -45,8 +45,8 @@ public class ChallengeSelectionScreen extends Screen {
 
     private static Category categoryOf(int id) {
         return switch (id) {
-            case 2, 3, 4, 14, 15, 34 -> Category.DROPS;
-            case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39 -> Category.COMBAT;
+            case 2, 3, 4, 14, 15, 34, 44 -> Category.DROPS;
+            case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39, 41, 42, 43 -> Category.COMBAT;
             case 10, 13, 16, 17, 18, 19, 20, 33, 36, 37 -> Category.CHAOS;
             default -> Category.WORLD;
         };
@@ -62,6 +62,7 @@ public class ChallengeSelectionScreen extends Screen {
     private SliderWidget mobHealthSlider;
     private SliderWidget doubleTroubleSlider;
     private SliderWidget gameSpeedSlider;
+    private SliderWidget fibMinutesSlider;
 
     private WidgetScrollPanel scrollPanel;
     private CraftButton saveButton;
@@ -86,6 +87,8 @@ public class ChallengeSelectionScreen extends Screen {
     private int doubleTroubleMultiplier;
     private double gameSpeedSliderValue;
     private int gameSpeedMultiplier;
+    private double fibMinutesSliderValue;
+    private int fibMinutes;
 
     private Text difficultyText = Text.empty();
     private double currentDifficulty = -1;
@@ -125,6 +128,10 @@ public class ChallengeSelectionScreen extends Screen {
         cardById.clear();
         sliderById.clear();
 
+        // Cards snapshot the player's level at construction; refresh first so opening this
+        // screen right after joining (before the XP sync lands) doesn't show everything locked.
+        ChallengeCraftClient.refreshLocalPlayerXp();
+
         MinecraftClient client = MinecraftClient.getInstance();
         MinecraftServer server = client.getServer();
 
@@ -135,6 +142,7 @@ public class ChallengeSelectionScreen extends Screen {
         int savedMobHealthMult;
         int savedDoubleTroubleMult;
         int savedGameSpeedMult;
+        int savedFibMinutes;
 
         if (server != null) {
             ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
@@ -145,6 +153,7 @@ public class ChallengeSelectionScreen extends Screen {
             savedMobHealthMult = data.getMobHealthMultiplier();
             savedDoubleTroubleMult = data.getDoubleTroubleMultiplier();
             savedGameSpeedMult = data.getGameSpeedMultiplier();
+            savedFibMinutes = data.getForceItemBattleMinutes();
         } else {
             active = ChallengeCraftClient.LAST_CHOSEN;
             activePerks = ChallengeCraftClient.SELECTED_PERKS;
@@ -153,6 +162,7 @@ public class ChallengeSelectionScreen extends Screen {
             savedMobHealthMult = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
             savedDoubleTroubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
             savedGameSpeedMult = ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER;
+            savedFibMinutes = ChallengeCraftClient.SELECTED_FIB_MINUTES;
         }
 
         if (savedMaxHeartsTicks <= 0) savedMaxHeartsTicks = 20;
@@ -160,6 +170,7 @@ public class ChallengeSelectionScreen extends Screen {
         if (savedMobHealthMult <= 0) savedMobHealthMult = 1;
         if (savedDoubleTroubleMult <= 0) savedDoubleTroubleMult = 2;
         if (savedGameSpeedMult <= 0) savedGameSpeedMult = 1;
+        if (savedFibMinutes <= 0) savedFibMinutes = 60;
 
         sliderTicks = savedMaxHeartsTicks;
         sliderValue = (sliderTicks - 1) / 19.0;
@@ -171,6 +182,8 @@ public class ChallengeSelectionScreen extends Screen {
         doubleTroubleSliderValue = (doubleTroubleMultiplier - 2) / 8.0;
         gameSpeedMultiplier = savedGameSpeedMult;
         gameSpeedSliderValue = (gameSpeedMultiplier - 1) / 9.0;
+        fibMinutes = savedFibMinutes;
+        fibMinutesSliderValue = (fibMinutes - 15) / 165.0;
 
         this.panelWidth = 300;
         this.panelX = width / 2 - panelWidth / 2;
@@ -266,11 +279,22 @@ public class ChallengeSelectionScreen extends Screen {
             }
         };
 
+        // 15–180 minutes in 5-minute steps (33 steps over a 165-minute range).
+        this.fibMinutesSlider = new SliderWidget(0, 0, 139, 20, getFibMinutesSliderText(fibMinutes), fibMinutesSliderValue) {
+            @Override protected void updateMessage() { setMessage(getFibMinutesSliderText(15 + (int) Math.round(this.value * 33) * 5)); }
+            @Override protected void applyValue() {
+                fibMinutes = 15 + (int) Math.round(this.value * 33) * 5;
+                this.value = (fibMinutes - 15) / 165.0;
+                updateDifficultyText();
+            }
+        };
+
         sliderById.put(7, maxHealthSlider);
         sliderById.put(12, slotsSlider);
         sliderById.put(24, mobHealthSlider);
         sliderById.put(35, doubleTroubleSlider);
         sliderById.put(37, gameSpeedSlider);
+        sliderById.put(45, fibMinutesSlider);
     }
 
     /** Rebuilds the scroll-panel contents from the current expanded/collapsed state. */
@@ -365,13 +389,14 @@ public class ChallengeSelectionScreen extends Screen {
         int mobHealthMult = newActive.contains(24) ? this.mobHealthMultiplier : 1;
         int doubleMult = newActive.contains(35) ? this.doubleTroubleMultiplier : 2;
         int gameSpeedMult = newActive.contains(37) ? this.gameSpeedMultiplier : 1;
+        int fibMin = newActive.contains(45) ? this.fibMinutes : 60;
 
         ChallengeCraft.LOGGER.info(
                 "[Client:Selection] sending ChallengePacket → active = {} , perks = {}, maxHearts ticks = {}, slots = {}, mobHealth = {}, doubleTrouble = {}, restart = {}",
                 newActive, newPerks, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, restart
         );
 
-        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, newPerks, restart));
+        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, fibMin, newPerks, restart));
     }
 
     private List<Integer> getActiveIds() {
@@ -458,6 +483,10 @@ public class ChallengeSelectionScreen extends Screen {
 
     private static Text getGameSpeedSliderText(double multiplier) {
         return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
+    }
+
+    private static Text getFibMinutesSliderText(int minutes) {
+        return Text.translatable("challengecraft.slider.fib_minutes", minutes);
     }
 
     /** Collapsible category header row inside the scroll panel. */

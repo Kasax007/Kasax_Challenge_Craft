@@ -27,7 +27,10 @@
     "ToolUsageMixin",
     "SizeMattersMixin",
     "ItemEntityMixin",
-    "MobEntityMixin"
+    "MobEntityMixin",
+    "MobEntityAccessor",
+    "NoJumpingMixin",
+    "ProgressiveBlockDropsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

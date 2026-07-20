@@ -9,6 +9,11 @@ import net.kasax.challengecraft.client.screen.AllEntitiesScreen;
 import net.kasax.challengecraft.client.screen.AllItemsHUD;
 import net.kasax.challengecraft.client.screen.AllItemsScreen;
 import net.kasax.challengecraft.client.screen.LockoutBingoBoardScreen;
+import net.kasax.challengecraft.client.screen.ForceItemClientState;
+import net.kasax.challengecraft.client.screen.ForceItemHUD;
+import net.kasax.challengecraft.client.screen.ForceItemResultsScreen;
+import net.kasax.challengecraft.client.screen.ForceItemTeamScreen;
+import net.kasax.challengecraft.client.screen.ProgressiveBlocksHUD;
 import net.kasax.challengecraft.client.screen.LockoutBingoClientState;
 import net.kasax.challengecraft.client.screen.LockoutBingoTeamScreen;
 import net.kasax.challengecraft.client.screen.TimerOverlay;
@@ -31,12 +36,16 @@ public class ChallengeSyncHandler {
                 AllItemsHUD.setActive(false);
                 AllEntitiesHUD.setActive(false);
                 AllAchievementsHUD.setActive(false);
+                ProgressiveBlocksHUD.setActive(false);
+                ForceItemHUD.setActive(false);
 
                 for (int id : payload.active) {
                     ChallengeManager.applyActiveFlag(id, null, null);
                     if (id == 22) AllItemsHUD.setActive(true);
                     if (id == 23) AllEntitiesHUD.setActive(true);
                     if (id == 26) AllAchievementsHUD.setActive(true);
+                    if (id == 44) ProgressiveBlocksHUD.setActive(true);
+                    if (id == 45) ForceItemHUD.setActive(true);
                 }
 
                 ChallengeCraftClient.LAST_CHOSEN = payload.active;
@@ -46,6 +55,7 @@ public class ChallengeSyncHandler {
                 ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = payload.mobHealthMultiplier;
                 ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = payload.doubleTroubleMultiplier;
                 ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER = payload.gameSpeedMultiplier;
+                ChallengeCraftClient.SELECTED_FIB_MINUTES = payload.forceItemBattleMinutes;
                 
                 Chal_24_MobHealthMultiply.setMultiplier(payload.mobHealthMultiplier);
                 Chal_35_DoubleTrouble.setMultiplier(payload.doubleTroubleMultiplier);
@@ -64,6 +74,30 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(AllItemsListPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 context.client().setScreen(new AllItemsScreen(payload.items, payload.currentIndex));
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ForceItemSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> ForceItemClientState.update(payload));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ForceItemResultsPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                if (context.client().currentScreen instanceof ForceItemResultsScreen screen) {
+                    screen.updateFromPacket(payload);
+                } else {
+                    context.client().setScreen(new ForceItemResultsScreen(payload));
+                }
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ForceItemOpenScreenPacket.ID, (payload, context) -> {
+            context.client().execute(() -> context.client().setScreen(new ForceItemTeamScreen()));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ProgressiveBlocksSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                ProgressiveBlocksHUD.update(payload.targetBlockId, payload.currentIndex, payload.totalBlocks);
             });
         });
 

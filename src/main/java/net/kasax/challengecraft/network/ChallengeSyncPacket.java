@@ -21,6 +21,7 @@ public class ChallengeSyncPacket implements CustomPayload {
     public final int mobHealthMultiplier;
     public final int doubleTroubleMultiplier;
     public final int gameSpeedMultiplier;
+    public final int forceItemBattleMinutes;
 
     public static final PacketCodec<PacketByteBuf, ChallengeSyncPacket> CODEC = CustomPayload.codecOf(
             new ValueFirstEncoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -35,6 +36,7 @@ public class ChallengeSyncPacket implements CustomPayload {
                     buf.writeVarInt(pkt.mobHealthMultiplier);
                     buf.writeVarInt(pkt.doubleTroubleMultiplier);
                     buf.writeVarInt(pkt.gameSpeedMultiplier);
+                    buf.writeVarInt(pkt.forceItemBattleMinutes);
                 }
             },
             new PacketDecoder<PacketByteBuf, ChallengeSyncPacket>() {
@@ -51,12 +53,13 @@ public class ChallengeSyncPacket implements CustomPayload {
                     int mobMult = buf.readVarInt();
                     int doubleTroubleMult = buf.readVarInt();
                     int gameSpeedMult = buf.readVarInt();
-                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult, gameSpeedMult);
+                    int fibMinutes = buf.readVarInt();
+                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult, gameSpeedMult, fibMinutes);
                 }
             }
     );
 
-    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult, int gameSpeedMult) {
+    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult, int gameSpeedMult, int forceItemBattleMinutes) {
         this.active = active;
         this.perks = perks;
         this.maxHearts = maxHearts;
@@ -64,6 +67,7 @@ public class ChallengeSyncPacket implements CustomPayload {
         this.mobHealthMultiplier = mobMult;
         this.doubleTroubleMultiplier = doubleTroubleMult;
         this.gameSpeedMultiplier = gameSpeedMult;
+        this.forceItemBattleMinutes = forceItemBattleMinutes;
     }
 
     @Override

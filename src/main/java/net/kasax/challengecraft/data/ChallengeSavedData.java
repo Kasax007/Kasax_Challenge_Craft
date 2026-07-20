@@ -49,9 +49,12 @@ public class ChallengeSavedData extends PersistentState {
             Codec.INT.optionalFieldOf("runIndex", 0).forGetter(ChallengeSavedData::getRunIndex),
             Codec.INT.optionalFieldOf("doubleTroubleMultiplier", 2).forGetter(ChallengeSavedData::getDoubleTroubleMultiplier),
             Codec.INT.optionalFieldOf("gameSpeedMultiplier", 1).forGetter(ChallengeSavedData::getGameSpeedMultiplier),
-            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex))
-    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, progress) ->
-            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, progress.allAdvancementsOrder, progress.allAdvancementsIndex)
+            // NOTE: this group is now at RecordCodecBuilder's 16-field maximum. The next new
+            // field must go into a nested record (see ChallengeProgress) instead.
+            Codec.INT.optionalFieldOf("forceItemBattleMinutes", 60).forGetter(ChallengeSavedData::getForceItemBattleMinutes),
+            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex, data.progressiveBlocksOrder, data.progressiveBlocksIndex))
+    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress) ->
+            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress.allAdvancementsOrder, progress.allAdvancementsIndex, progress.progressiveBlocksOrder, progress.progressiveBlocksIndex)
     ));
 
     public static final PersistentStateType<ChallengeSavedData> TYPE =
@@ -92,13 +95,18 @@ public class ChallengeSavedData extends PersistentState {
     private int runIndex = 0;
     private int doubleTroubleMultiplier = 2;
     private int gameSpeedMultiplier = 1;
+    private int forceItemBattleMinutes = 60;
 
     private final List<Identifier> allAdvancementsOrder = new ArrayList<>();
     private int allAdvancementsIndex = 0;
 
+    /** Progressive Block Drops (44): shuffled block-id order + how many are unlocked. */
+    private final List<String> progressiveBlocksOrder = new ArrayList<>();
+    private int progressiveBlocksIndex = 0;
+
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, int gameSpeedMultiplier, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, int gameSpeedMultiplier, int forceItemBattleMinutes, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -123,9 +131,13 @@ public class ChallengeSavedData extends PersistentState {
         this.runIndex = runIndex;
         this.doubleTroubleMultiplier = doubleTroubleMultiplier;
         this.gameSpeedMultiplier = gameSpeedMultiplier;
+        this.forceItemBattleMinutes = forceItemBattleMinutes;
         this.allAdvancementsOrder.clear();
         this.allAdvancementsOrder.addAll(allAdvancementsOrder);
         this.allAdvancementsIndex = allAdvancementsIndex;
+        this.progressiveBlocksOrder.clear();
+        this.progressiveBlocksOrder.addAll(progressiveBlocksOrder);
+        this.progressiveBlocksIndex = progressiveBlocksIndex;
     }
 
     public static ChallengeSavedData get(ServerWorld world) {
@@ -206,6 +218,8 @@ public class ChallengeSavedData extends PersistentState {
         this.allItemsOrder.clear();
         this.allEntitiesOrder.clear();
         this.allAdvancementsOrder.clear();
+        this.progressiveBlocksOrder.clear();
+        this.progressiveBlocksIndex = 0;
         this.tainted = false;
         this.difficultySet = false;
         this.runIndex++;
@@ -323,6 +337,15 @@ public class ChallengeSavedData extends PersistentState {
         markDirty();
     }
 
+    public int getForceItemBattleMinutes() {
+        return forceItemBattleMinutes;
+    }
+
+    public void setForceItemBattleMinutes(int minutes) {
+        this.forceItemBattleMinutes = Math.max(15, Math.min(minutes, 180));
+        markDirty();
+    }
+
     public List<Identifier> getAllAdvancementsOrder() {
         return List.copyOf(allAdvancementsOrder);
     }
@@ -342,14 +365,35 @@ public class ChallengeSavedData extends PersistentState {
         markDirty();
     }
 
-    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex) {
+    public List<String> getProgressiveBlocksOrder() {
+        return List.copyOf(progressiveBlocksOrder);
+    }
+
+    public void setProgressiveBlocksOrder(List<String> order) {
+        this.progressiveBlocksOrder.clear();
+        this.progressiveBlocksOrder.addAll(order);
+        markDirty();
+    }
+
+    public int getProgressiveBlocksIndex() {
+        return progressiveBlocksIndex;
+    }
+
+    public void setProgressiveBlocksIndex(int index) {
+        this.progressiveBlocksIndex = index;
+        markDirty();
+    }
+
+    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex) {
         public static final MapCodec<ChallengeProgress> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeProgress::allItemsOrder),
                 Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeProgress::allItemsIndex),
                 Codec.list(EntityType.CODEC).optionalFieldOf("allEntitiesOrder", List.of()).forGetter(ChallengeProgress::allEntitiesOrder),
                 Codec.INT.optionalFieldOf("allEntitiesIndex", 0).forGetter(ChallengeProgress::allEntitiesIndex),
                 Codec.list(Identifier.CODEC).optionalFieldOf("allAdvancementsOrder", List.of()).forGetter(ChallengeProgress::allAdvancementsOrder),
-                Codec.INT.optionalFieldOf("allAdvancementsIndex", 0).forGetter(ChallengeProgress::allAdvancementsIndex)
+                Codec.INT.optionalFieldOf("allAdvancementsIndex", 0).forGetter(ChallengeProgress::allAdvancementsIndex),
+                Codec.list(Codec.STRING).optionalFieldOf("progressiveBlocksOrder", List.of()).forGetter(ChallengeProgress::progressiveBlocksOrder),
+                Codec.INT.optionalFieldOf("progressiveBlocksIndex", 0).forGetter(ChallengeProgress::progressiveBlocksIndex)
         ).apply(instance, ChallengeProgress::new));
     }
 }

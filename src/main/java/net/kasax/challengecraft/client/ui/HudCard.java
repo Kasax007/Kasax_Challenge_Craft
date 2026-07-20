@@ -33,29 +33,44 @@ public final class HudCard {
         this.progressKey = progressKey;
     }
 
-    public int width(TextRenderer tr) {
+    // Layout constants: icon column (x+34 text start), and the top line holds the title on the
+    // left and the value right-aligned, so the card must be wide enough for BOTH side by side.
+    private static final int ICON_COL = 34;
+    private static final int TITLE_VALUE_GAP = 8;
+    private static final int RIGHT_PAD = 8;
+    private static final int MIN_WIDTH = 132;
+
+    /**
+     * Natural card width for the given max, sized to fit the full title AND value on one line
+     * (not {@code max(title, value)} — they render together). Grows with content up to
+     * {@code maxWidth} (a screen-relative cap so the card never overflows).
+     */
+    public int width(TextRenderer tr, int maxWidth) {
         int titleW = tr.getWidth(title);
         int valueW = tr.getWidth(value);
-        int content = Math.max(titleW, valueW + 44);
-        return MathHelper.clamp(34 + content + 10, 132, 220);
+        int natural = ICON_COL + titleW + TITLE_VALUE_GAP + valueW + RIGHT_PAD;
+        return MathHelper.clamp(natural, MIN_WIDTH, Math.max(MIN_WIDTH, maxWidth));
     }
 
-    /** {@code flash} 0..1 briefly brightens the accent when progress advances. */
-    public void render(DrawContext context, TextRenderer tr, int x, int y, float flash) {
-        int w = width(tr);
+    /** {@code flash} 0..1 briefly brightens the accent when progress advances. {@code w} is the
+     *  width HudStack already laid out this card at (so layout and render never disagree). */
+    public void render(DrawContext context, TextRenderer tr, int x, int y, float flash, int w) {
         int acc = CraftUI.mix(accent, 0xFFFFFFFF, 0.65f * flash);
         CraftUI.panelFloat(context, x, y, w, HEIGHT, acc);
 
         CraftUI.iconTileItem(context, icon, x + 7, y + 7, 20, acc);
 
-        int textX = x + 34;
-        String trimmedTitle = CraftUI.trimToWidth(tr, title.getString(), w - 34 - tr.getWidth(value) - 14);
+        int textX = x + ICON_COL;
+        int valueW = tr.getWidth(value);
+        // Title trims only if it still can't fit (i.e. the card hit the screen-relative cap).
+        int titleRoom = w - ICON_COL - TITLE_VALUE_GAP - valueW - RIGHT_PAD;
+        String trimmedTitle = CraftUI.trimToWidth(tr, title.getString(), titleRoom);
         context.drawText(tr, Text.of(trimmedTitle), textX, y + 6, CraftUI.TEXT_PRIMARY, false);
-        context.drawText(tr, value, x + w - tr.getWidth(value) - 8, y + 6, CraftUI.TEXT_SECONDARY, false);
+        context.drawText(tr, value, x + w - valueW - RIGHT_PAD, y + 6, CraftUI.TEXT_SECONDARY, false);
 
         int barX = textX;
         int barY = y + 21;
-        int barW = w - 34 - 10;
+        int barW = w - ICON_COL - 10;
         CraftUI.progressBar(context, barX, barY, barW, 5, progress, accent);
     }
 }

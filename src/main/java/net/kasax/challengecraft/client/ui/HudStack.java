@@ -74,12 +74,18 @@ public final class HudStack {
 
         int sw = client.getWindow().getScaledWidth();
         long now = System.currentTimeMillis();
+        // Cards grow with their content but never wider than the screen (minus a small margin).
+        int maxCardWidth = sw - 12;
 
         for (Map.Entry<Integer, List<HudCard>> entry : rows.entrySet()) {
             List<HudCard> cards = entry.getValue();
+            // Compute each card's width once so layout and render stay consistent.
+            Map<HudCard, Integer> widths = new HashMap<>();
             int total = -GAP;
             for (HudCard card : cards) {
-                total += card.width(tr) + GAP;
+                int w = card.width(tr, maxCardWidth);
+                widths.put(card, w);
+                total += w + GAP;
             }
             int x = (sw - total) / 2;
             int rowY = TOP + entry.getKey() * (HudCard.HEIGHT + GAP);
@@ -97,8 +103,9 @@ public final class HudStack {
                 float flash = Math.max(0f, 1f - (now - state.flashAt) / 400f);
 
                 int slide = Math.round((1f - appear) * -(HudCard.HEIGHT + 10));
-                card.render(context, tr, x, rowY + slide, flash);
-                x += card.width(tr) + GAP;
+                int w = widths.get(card);
+                card.render(context, tr, x, rowY + slide, flash, w);
+                x += w + GAP;
             }
         }
 

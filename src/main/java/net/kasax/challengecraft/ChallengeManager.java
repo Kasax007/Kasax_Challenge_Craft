@@ -62,7 +62,8 @@ public class ChallengeManager {
                 data.getLimitedInventorySlots(),
                 data.getMobHealthMultiplier(),
                 data.getDoubleTroubleMultiplier(),
-                data.getGameSpeedMultiplier()
+                data.getGameSpeedMultiplier(),
+                data.getForceItemBattleMinutes()
         );
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             ServerPlayNetworking.send(player, pkt);
@@ -78,6 +79,12 @@ public class ChallengeManager {
         }
         if (active.contains(40)) {
             net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.syncToAll(server);
+        }
+        if (active.contains(44)) {
+            net.kasax.challengecraft.challenges.Chal_44_ProgressiveBlockDrops.syncProgressToAll(server, data);
+        }
+        if (active.contains(45)) {
+            net.kasax.challengecraft.challenges.Chal_45_ForceItemBattle.syncBattleToAll(server);
         }
     }
 
@@ -135,6 +142,11 @@ public class ChallengeManager {
             case 38 -> 5.0;  // Chunk Hunt
             case 39 -> 1.3;  // No Food
             case 40 -> 0.0;  // Lockout Bingo
+            case 41 -> 1.5;  // No Jumping
+            case 42 -> 1.5;  // Random Mob Spawn (constant mob pressure, incl. aggressive passives)
+            case 43 -> 6.0;  // Only Down (any upward movement is lethal; stricter than Walk=Damage/Chunk Hunt)
+            case 44 -> 6.0;  // Progressive Block Drops (full drop lockout; 600 XP on completion)
+            case 45 -> 0.0;  // Force Item Battle (minigame: flat 100-XP prize instead)
             default -> 0.0;
         };
     }
@@ -176,6 +188,17 @@ public class ChallengeManager {
         if (ids.contains(28) && ids.contains(25)) return true;
 
         if (ids.contains(29) && perks.contains(LevelManager.PERK_FIRE_RESISTANCE)) return true;
+
+        if (ids.contains(41) && ids.contains(43)) return true; // Only Down already implies No Jumping
+        if (ids.contains(44) && ids.contains(2)) return true;  // Progressive Block Drops + No Block Drops
+        if (ids.contains(44) && ids.contains(14)) return true; // Progressive Block Drops + Random Block Drops
+
+        // Force Item Battle is a standalone minigame like Lockout Bingo.
+        if (ids.contains(45) && ids.contains(22)) return true;
+        if (ids.contains(45) && ids.contains(23)) return true;
+        if (ids.contains(45) && ids.contains(26)) return true;
+        if (ids.contains(45) && ids.contains(38)) return true;
+        if (ids.contains(45) && ids.contains(40)) return true;
 
         return false;
     }
@@ -265,6 +288,7 @@ public class ChallengeManager {
                     data.setMobHealthMultiplier(clientMult);
                     data.setDoubleTroubleMultiplier(clientDoubleMult);
                     data.setGameSpeedMultiplier(clientGameSpeedMult);
+                    data.setForceItemBattleMinutes(ChallengeCraftClient.SELECTED_FIB_MINUTES);
                     
                     int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
                     double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, clientGameSpeedMult, clientDoubleMult, playerCount, ChallengeCraftClient.SELECTED_PERKS);
@@ -455,6 +479,11 @@ public class ChallengeManager {
         if (Chal_38_ChunkHunt.isActive()) ids.add(38);
         if (Chal_39_NoFood.isActive()) ids.add(39);
         if (Chal_40_LockoutBingo.isActive()) ids.add(40);
+        if (Chal_41_NoJumping.isActive()) ids.add(41);
+        if (Chal_42_RandomMobSpawn.isActive()) ids.add(42);
+        if (Chal_43_OnlyDown.isActive()) ids.add(43);
+        if (Chal_44_ProgressiveBlockDrops.isActive()) ids.add(44);
+        if (Chal_45_ForceItemBattle.isActive()) ids.add(45);
         return ids;
     }
 
@@ -499,6 +528,11 @@ public class ChallengeManager {
         Chal_38_ChunkHunt.setActive(active);
         Chal_39_NoFood.setActive(active);
         Chal_40_LockoutBingo.setActive(active);
+        Chal_41_NoJumping.setActive(active);
+        Chal_42_RandomMobSpawn.setActive(active);
+        Chal_43_OnlyDown.setActive(active);
+        Chal_44_ProgressiveBlockDrops.setActive(active);
+        Chal_45_ForceItemBattle.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -577,6 +611,24 @@ public class ChallengeManager {
                     Chal_40_LockoutBingo.onActivated(world);
                 }
                 LOGGER.info("Challenge 40 ON");
+            }
+            case 41 -> { Chal_41_NoJumping.setActive(true); LOGGER.info("Challenge 41 ON"); }
+            case 42 -> { Chal_42_RandomMobSpawn.setActive(true); LOGGER.info("Challenge 42 ON"); }
+            case 43 -> { Chal_43_OnlyDown.setActive(true); LOGGER.info("Challenge 43 ON"); }
+            case 44 -> {
+                Chal_44_ProgressiveBlockDrops.setActive(true);
+                if (world != null) {
+                    Chal_44_ProgressiveBlockDrops.onActivated(world);
+                    if (data != null) Chal_44_ProgressiveBlockDrops.syncProgressToAll(world.getServer(), data);
+                }
+                LOGGER.info("Challenge 44 ON");
+            }
+            case 45 -> {
+                Chal_45_ForceItemBattle.setActive(true);
+                if (world != null) {
+                    Chal_45_ForceItemBattle.onActivated(world);
+                }
+                LOGGER.info("Challenge 45 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

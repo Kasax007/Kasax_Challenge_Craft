@@ -18,6 +18,7 @@ public class ChallengePacket implements CustomPayload {
     public final int          mobHealthMultiplier;
     public final int          doubleTroubleMultiplier;
     public final int          gameSpeedMultiplier;
+    public final int          forceItemBattleMinutes;
     public final List<Integer> perks;
     public final boolean       restart;
 
@@ -36,6 +37,7 @@ public class ChallengePacket implements CustomPayload {
                             buf.writeVarInt(pkt.mobHealthMultiplier);
                             buf.writeVarInt(pkt.doubleTroubleMultiplier);
                             buf.writeVarInt(pkt.gameSpeedMultiplier);
+                            buf.writeVarInt(pkt.forceItemBattleMinutes);
                             buf.writeVarInt(pkt.perks.size());
                             for (int id : pkt.perks) buf.writeVarInt(id);
                             buf.writeBoolean(pkt.restart);
@@ -54,30 +56,32 @@ public class ChallengePacket implements CustomPayload {
                             int mobHealth = buf.readVarInt();
                             int doubleTrouble = buf.readVarInt();
                             int gameSpeed = buf.readVarInt();
+                            int fibMinutes = buf.readVarInt();
                             int perkSize = buf.readVarInt();
                             List<Integer> perks = new ArrayList<>(perkSize);
                             for (int i = 0; i < perkSize; i++) {
                                 perks.add(buf.readVarInt());
                             }
                             boolean restart = buf.readBoolean();
-                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, perks, restart);
+                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, fibMinutes, perks, restart);
                         }
                     }
             );
 
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, List<Integer> perks, boolean restart) {
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks, boolean restart) {
         this.active    = active;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
         this.mobHealthMultiplier = mobHealth;
         this.doubleTroubleMultiplier = doubleTrouble;
         this.gameSpeedMultiplier = gameSpeed;
+        this.forceItemBattleMinutes = forceItemBattleMinutes;
         this.perks = perks;
         this.restart = restart;
     }
 
-    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, List<Integer> perks) {
-        this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, perks, false);
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks) {
+        this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, forceItemBattleMinutes, perks, false);
     }
 
     public void write(PacketByteBuf buf) {
@@ -88,6 +92,7 @@ public class ChallengePacket implements CustomPayload {
         buf.writeVarInt(mobHealthMultiplier);
         buf.writeVarInt(doubleTroubleMultiplier);
         buf.writeVarInt(gameSpeedMultiplier);
+        buf.writeVarInt(forceItemBattleMinutes);
         buf.writeVarInt(perks.size());
         for (int id : perks) buf.writeVarInt(id);
         buf.writeBoolean(restart);

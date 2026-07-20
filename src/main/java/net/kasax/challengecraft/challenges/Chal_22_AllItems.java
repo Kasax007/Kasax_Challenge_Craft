@@ -110,7 +110,8 @@ public class Chal_22_AllItems {
         syncProgressToAll(server, data);
     }
 
-    private static List<ItemStack> getSurvivalItems(DynamicRegistryManager registryManager) {
+    /** Shared with Force Item Battle (45), which draws per-player targets from the same pool. */
+    public static List<ItemStack> getSurvivalItems(DynamicRegistryManager registryManager) {
         List<ItemStack> items = new ArrayList<>();
         Registry<Item> itemRegistry = registryManager.getOrThrow(RegistryKeys.ITEM);
         Registry<Potion> potionRegistry = registryManager.getOrThrow(RegistryKeys.POTION);

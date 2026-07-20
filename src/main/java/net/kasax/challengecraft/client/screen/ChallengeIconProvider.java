@@ -51,7 +51,12 @@ public class ChallengeIconProvider {
         ICONS.put(38, new ItemStack(Items.GLOW_INK_SAC));
         ICONS.put(39, new ItemStack(Items.COOKED_BEEF));
         ICONS.put(40, new ItemStack(Items.FILLED_MAP));
-        
+        ICONS.put(41, new ItemStack(Items.HONEY_BLOCK));
+        ICONS.put(42, new ItemStack(Items.PIG_SPAWN_EGG));
+        ICONS.put(43, new ItemStack(Items.LADDER));
+        ICONS.put(44, new ItemStack(Items.STONE));
+        ICONS.put(45, new ItemStack(Items.ITEM_FRAME));
+
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));
         ICONS.put(102, new ItemStack(Items.FEATHER));
