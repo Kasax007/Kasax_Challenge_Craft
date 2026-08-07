@@ -30,7 +30,8 @@
     "MobEntityMixin",
     "MobEntityAccessor",
     "NoJumpingMixin",
-    "ProgressiveBlockDropsMixin"
+    "ProgressiveBlockDropsMixin",
+    "DiceMovementMixin"
   ],
   "injectors": {
     "defaultRequire": 1

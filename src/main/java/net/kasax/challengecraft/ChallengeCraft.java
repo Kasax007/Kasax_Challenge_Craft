@@ -34,6 +34,9 @@ public class ChallengeCraft implements ModInitializer {
 		LOGGER.info("Challenge Craft loaded");
 
 		ModItems.initialize();
+		// Registering an entity type obliges the client to register a renderer for it —
+		// see ChallengeCraftClient, or a dev client crashes on resource reload.
+		net.kasax.challengecraft.entity.ModEntities.initialize();
 		ChallengeManager.register();
 		Chal_1_LevelItem.register();
 		Chal_5_NoRegen.register();
@@ -61,6 +64,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_43_OnlyDown.register();
 		Chal_44_ProgressiveBlockDrops.register();
 		Chal_45_ForceItemBattle.register();
+		net.kasax.challengecraft.challenges.Chal_46_Dice.register();
 		net.kasax.challengecraft.data.BlockSurvey.register();
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
@@ -308,6 +312,10 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(
 				ChallengeSyncPacket.ID,
 				ChallengeSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.playS2C().register(
+				net.kasax.challengecraft.network.DiceSyncPacket.ID,
+				net.kasax.challengecraft.network.DiceSyncPacket.CODEC
 		);
 		PayloadTypeRegistry.playS2C().register(
 				StatsSyncPacket.ID,

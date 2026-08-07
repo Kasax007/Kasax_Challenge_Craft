@@ -56,6 +56,7 @@ public class ChallengeIconProvider {
         ICONS.put(43, new ItemStack(Items.LADDER));
         ICONS.put(44, new ItemStack(Items.STONE));
         ICONS.put(45, new ItemStack(Items.ITEM_FRAME));
+        ICONS.put(46, new ItemStack(net.kasax.challengecraft.item.ModItems.DICE));
 
         // Perks
         ICONS.put(101, new ItemStack(Items.GOLDEN_CARROT));

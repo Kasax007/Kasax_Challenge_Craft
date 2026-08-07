@@ -12,6 +12,7 @@ import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 
@@ -26,9 +27,24 @@ public class LockoutBingoBoardScreen extends Screen {
     private static final int TILE_SIZE = 54;
     private static final int BOARD_TILE_COUNT = 25;
     private static final int SIDE_PANEL_WIDTH = 150;
+    private static final int BOARD_TOP = 58;
+
+    /**
+     * The board is a fixed-size design: 6 + 150 panel + 12 gap + 270 board + 12 gap + 150 panel + 6.
+     * It is drawn in this coordinate space and uniformly scaled to fit, because at GUI scale 4 on a
+     * 1080p screen the usable area is only 480x270 — far too small for the natural 606x342 layout,
+     * which previously ran off the bottom of the screen and overlapped the side panels.
+     */
+    private static final int DESIGN_WIDTH = 6 + SIDE_PANEL_WIDTH + 12 + (GRID_SIZE * TILE_SIZE) + 12 + SIDE_PANEL_WIDTH + 6;
+    private static final int DESIGN_HEIGHT = BOARD_TOP + (GRID_SIZE * TILE_SIZE) + 14;
+    /** Screen-space strip reserved at the bottom for the (unscaled) team button. */
+    private static final int BOTTOM_BAR = 34;
 
     private CraftButton teamButton;
     private List<Text> pendingTooltip;
+    private float layoutScale = 1f;
+    private float layoutOffsetX;
+    private float layoutOffsetY;
 
     public LockoutBingoBoardScreen() {
         super(Text.translatable("challengecraft.worldcreate.challenge40"));
@@ -55,6 +71,29 @@ public class LockoutBingoBoardScreen extends Screen {
         super.renderBackground(context, mouseX, mouseY, delta);
         this.pendingTooltip = null;
 
+        int usableHeight = Math.max(1, this.height - BOTTOM_BAR);
+        this.layoutScale = Math.min(1f, Math.min(this.width / (float) DESIGN_WIDTH,
+                usableHeight / (float) DESIGN_HEIGHT));
+        this.layoutOffsetX = (this.width - DESIGN_WIDTH * this.layoutScale) / 2f;
+        this.layoutOffsetY = Math.max(0f, (usableHeight - DESIGN_HEIGHT * this.layoutScale) / 2f);
+
+        // Hit testing happens in design space, so convert the cursor into it.
+        int localMouseX = Math.round((mouseX - this.layoutOffsetX) / this.layoutScale);
+        int localMouseY = Math.round((mouseY - this.layoutOffsetY) / this.layoutScale);
+
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.translate(this.layoutOffsetX, this.layoutOffsetY, 0f);
+        matrices.scale(this.layoutScale, this.layoutScale, 1f);
+        try {
+            drawBoard(context, localMouseX, localMouseY);
+        } finally {
+            matrices.pop();
+        }
+    }
+
+    /** Draws the whole board in fixed design coordinates; the caller applies the fit scale. */
+    private void drawBoard(DrawContext context, int mouseX, int mouseY) {
         LockoutBingoSyncPacket state = LockoutBingoClientState.get();
         UUID playerUuid = this.client != null && this.client.player != null ? this.client.player.getUuid() : null;
         LockoutBingoTeam localTeam = playerUuid != null ? LockoutBingoClientState.getTeam(playerUuid) : null;
@@ -66,17 +105,14 @@ public class LockoutBingoBoardScreen extends Screen {
                 : Text.of(Integer.toString(clinchTarget));
 
         int boardW = GRID_SIZE * TILE_SIZE;
-        int boardLeft = this.width / 2 - boardW / 2;
-        int boardTop = 58;
+        int boardLeft = DESIGN_WIDTH / 2 - boardW / 2;
+        int boardTop = BOARD_TOP;
 
         // ---- Title ----
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 16, CraftUI.GOLD);
+        context.drawCenteredTextWithShadow(this.textRenderer, this.title, DESIGN_WIDTH / 2, 16, CraftUI.GOLD);
 
-        // ---- Left info panel ----
+        // ---- Left info panel ---- (design space always has room; no clamping needed)
         int infoX = boardLeft - SIDE_PANEL_WIDTH - 12;
-        if (infoX < 6) {
-            infoX = 6;
-        }
         int infoY = boardTop;
         int infoH = boardW;
         CraftUI.panelFloat(context, infoX, infoY, SIDE_PANEL_WIDTH, infoH, CraftUI.INFO);
@@ -96,9 +132,6 @@ public class LockoutBingoBoardScreen extends Screen {
 
         // ---- Right scoreboard panel ----
         int scoreX = boardLeft + boardW + 12;
-        if (scoreX + SIDE_PANEL_WIDTH > this.width - 6) {
-            scoreX = this.width - 6 - SIDE_PANEL_WIDTH;
-        }
         CraftUI.panelFloat(context, scoreX, infoY, SIDE_PANEL_WIDTH, infoH, CraftUI.GOLD);
         CraftUI.sectionHeader(context, this.textRenderer, Text.translatable("challengecraft.lockout.board.scores_header"),
                 scoreX + 8, infoY + 8, SIDE_PANEL_WIDTH - 16, CraftUI.GOLD);
@@ -121,7 +154,7 @@ public class LockoutBingoBoardScreen extends Screen {
 
         if (state.boardGoalIds().isEmpty()) {
             context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.lockout.board.waiting"),
-                    this.width / 2, boardTop + boardW / 2, CraftUI.TEXT_SECONDARY);
+                    DESIGN_WIDTH / 2, boardTop + boardW / 2, CraftUI.TEXT_SECONDARY);
             return;
         }
 

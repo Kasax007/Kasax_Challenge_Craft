@@ -558,7 +558,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 45; challengeId++) {
+        for (int challengeId = 1; challengeId <= 46; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Text.translatable("challengecraft.worldcreate.challenge" + challengeId),

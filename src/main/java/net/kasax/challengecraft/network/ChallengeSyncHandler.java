@@ -81,6 +81,14 @@ public class ChallengeSyncHandler {
             context.client().execute(() -> ForceItemClientState.update(payload));
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(DiceSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                net.kasax.challengecraft.client.screen.DiceClientState.update(payload);
+                // The movement mixin runs on the client and reads this, not the server map.
+                net.kasax.challengecraft.challenges.Chal_46_Dice.setClientRemaining(payload.remaining);
+            });
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(ForceItemResultsPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 if (context.client().currentScreen instanceof ForceItemResultsScreen screen) {

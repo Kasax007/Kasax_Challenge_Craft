@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "challengecraft:item/dice_1",
+    "up": "challengecraft:item/dice_1",
+    "north": "challengecraft:item/dice_2",
+    "west": "challengecraft:item/dice_3",
+    "east": "challengecraft:item/dice_4",
+    "south": "challengecraft:item/dice_5",
+    "down": "challengecraft:item/dice_6"
+  }
+}

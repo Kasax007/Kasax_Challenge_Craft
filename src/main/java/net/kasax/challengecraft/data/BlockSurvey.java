@@ -326,12 +326,23 @@ public class BlockSurvey {
         return ids;
     }
 
-    /** Dataset location: the dev repo's generated-data folder when present, else the game dir. */
+    /** Classpath copy shipped inside the built jar, used when no writable dataset exists yet. */
+    private static final String BUNDLED_RESOURCE = "/data/challengecraft/block_survey.json";
+
+    /**
+     * Dataset location: the dev repo's <b>resources</b> folder when present, else the game dir.
+     *
+     * <p>Deliberately NOT under {@code src/main/generated/} — datagen prunes every file there it
+     * did not itself write ({@code runDatagen} logs "removed stale: 1" and deleted this dataset
+     * once). {@code src/main/resources/} is untouched by datagen, and has the bonus that the
+     * dataset ships inside the built jar, so players get a good Chal_44 block pool without having
+     * to run a survey themselves.
+     */
     private static Path surveyFile() {
         Path gameDir = FabricLoader.getInstance().getGameDir();
-        Path generated = gameDir.resolve("..").resolve("src").resolve("main").resolve("generated").normalize();
-        if (Files.isDirectory(generated)) {
-            return generated.resolve("data").resolve("challengecraft").resolve("block_survey.json");
+        Path resources = gameDir.resolve("..").resolve("src").resolve("main").resolve("resources").normalize();
+        if (Files.isDirectory(resources)) {
+            return resources.resolve("data").resolve("challengecraft").resolve("block_survey.json");
         }
         return gameDir.resolve("challengecraft_block_survey.json");
     }
@@ -340,15 +351,33 @@ public class BlockSurvey {
         if (loaded) return;
         loaded = true;
         Path file = surveyFile();
-        if (!Files.exists(file)) return;
-        try {
-            String json = Files.readString(file);
-            Map<String, Long> counts = GSON.fromJson(json, new TypeToken<Map<String, Long>>() {}.getType());
-            if (counts != null) blockCounts.putAll(counts);
-            LOGGER.info("[Survey] loaded {} block types from {}", blockCounts.size(), file);
-        } catch (Exception e) {
-            LOGGER.error("[Survey] failed to load {}", file, e);
+        if (Files.exists(file)) {
+            try {
+                if (mergeJson(Files.readString(file))) {
+                    LOGGER.info("[Survey] loaded {} block types from {}", blockCounts.size(), file);
+                    return;
+                }
+            } catch (Exception e) {
+                LOGGER.error("[Survey] failed to load {}", file, e);
+            }
         }
+        // No writable dataset yet — fall back to the copy bundled in the jar so a shipped build
+        // still has a usable block pool.
+        try (java.io.InputStream in = BlockSurvey.class.getResourceAsStream(BUNDLED_RESOURCE)) {
+            if (in == null) return;
+            if (mergeJson(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))) {
+                LOGGER.info("[Survey] loaded {} block types from the bundled dataset", blockCounts.size());
+            }
+        } catch (Exception e) {
+            LOGGER.error("[Survey] failed to load bundled dataset", e);
+        }
+    }
+
+    private static boolean mergeJson(String json) {
+        Map<String, Long> counts = GSON.fromJson(json, new TypeToken<Map<String, Long>>() {}.getType());
+        if (counts == null || counts.isEmpty()) return false;
+        blockCounts.putAll(counts);
+        return true;
     }
 
     public static synchronized void save() {

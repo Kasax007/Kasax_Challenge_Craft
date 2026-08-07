@@ -43,6 +43,13 @@ public class ModItems {
                     .maxCount(1)
     );
 
+    public static final Item DICE = register(
+            "dice",
+            DiceItem::new,
+            new Item.Settings()
+                    .maxCount(1)
+    );
+
     public static void initialize() {
         ChallengeCraft.LOGGER.info("Registered items for {}", ChallengeCraft.MOD_ID);
     }

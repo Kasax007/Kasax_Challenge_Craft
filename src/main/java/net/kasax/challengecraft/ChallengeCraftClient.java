@@ -68,11 +68,23 @@ public class ChallengeCraftClient implements ClientModInitializer {
         ChallengeRewardOverlay.register();
 
         // Objective HUDs share one auto-laid-out stack (row 0), the target HUD sits below (row 1).
+        // Model layer MUST be registered before the renderer, which resolves the baked part in
+        // its constructor. Skipping the renderer entirely crashes the dev client via
+        // MinecraftClient.checkGameData -> EntityRenderers.isMissingRendererFactories.
+        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+                net.kasax.challengecraft.client.render.DiceEntityRenderer.DICE_LAYER,
+                net.kasax.challengecraft.client.render.DiceEntityRenderer::getTexturedModelData);
+        net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+                net.kasax.challengecraft.entity.ModEntities.DICE,
+                net.kasax.challengecraft.client.render.DiceEntityRenderer::new);
+
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllItemsHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllEntitiesHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllAchievementsHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ProgressiveBlocksHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ForceItemHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.DiceHUD::buildCard, 0);
+        net.kasax.challengecraft.client.screen.DiceReachRenderer.register();
         net.kasax.challengecraft.client.screen.ForceItemHeadIconRenderer.register();
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
         net.kasax.challengecraft.client.ui.HudStack.register();
@@ -115,6 +127,8 @@ public class ChallengeCraftClient implements ClientModInitializer {
             LOCAL_PLAYER_XP = 0;
             LockoutBingoClientState.clear();
             net.kasax.challengecraft.client.screen.ForceItemClientState.clear();
+            net.kasax.challengecraft.client.screen.DiceClientState.clear();
+            net.kasax.challengecraft.challenges.Chal_46_Dice.setClientRemaining(0.0);
         });
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {

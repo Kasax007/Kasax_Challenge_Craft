@@ -149,7 +149,7 @@ public class ChallengeRewardOverlay {
                     rewards.add("MASTER");
                 }
 
-                for (int id = 1; id <= 45; id++) {
+                for (int id = 1; id <= 46; id++) {
                     if (LevelManager.getRequiredLevel(id) == l) {
                         rewards.add(id);
                     }

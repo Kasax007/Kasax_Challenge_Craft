@@ -147,6 +147,7 @@ public class ChallengeManager {
             case 43 -> 6.0;  // Only Down (any upward movement is lethal; stricter than Walk=Damage/Chunk Hunt)
             case 44 -> 6.0;  // Progressive Block Drops (full drop lockout; 600 XP on completion)
             case 45 -> 0.0;  // Force Item Battle (minigame: flat 100-XP prize instead)
+            case 46 -> 7.0;  // Dice Movement (walking gated by a die roll; enormously lengthens a run)
             default -> 0.0;
         };
     }
@@ -199,6 +200,12 @@ public class ChallengeManager {
         if (ids.contains(45) && ids.contains(26)) return true;
         if (ids.contains(45) && ids.contains(38)) return true;
         if (ids.contains(45) && ids.contains(40)) return true;
+
+        // Dice Movement gates walking behind a die roll, which makes the timed/race minigames
+        // literally unplayable rather than merely harder — so those combinations are blocked.
+        if (ids.contains(46) && ids.contains(40)) return true; // + Lockout Bingo
+        if (ids.contains(46) && ids.contains(45)) return true; // + Force Item Battle
+        if (ids.contains(46) && ids.contains(38)) return true; // + Chunk Hunt (must reach the mob)
 
         return false;
     }
@@ -484,6 +491,7 @@ public class ChallengeManager {
         if (Chal_43_OnlyDown.isActive()) ids.add(43);
         if (Chal_44_ProgressiveBlockDrops.isActive()) ids.add(44);
         if (Chal_45_ForceItemBattle.isActive()) ids.add(45);
+        if (net.kasax.challengecraft.challenges.Chal_46_Dice.isActive()) ids.add(46);
         return ids;
     }
 
@@ -533,6 +541,7 @@ public class ChallengeManager {
         Chal_43_OnlyDown.setActive(active);
         Chal_44_ProgressiveBlockDrops.setActive(active);
         Chal_45_ForceItemBattle.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
@@ -629,6 +638,10 @@ public class ChallengeManager {
                     Chal_45_ForceItemBattle.onActivated(world);
                 }
                 LOGGER.info("Challenge 45 ON");
+            }
+            case 46 -> {
+                net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(true);
+                LOGGER.info("Challenge 46 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

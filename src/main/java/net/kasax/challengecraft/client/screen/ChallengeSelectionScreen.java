@@ -27,7 +27,7 @@ import java.util.Map;
 /** In-world challenge editor used after a save already exists. */
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 46, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private enum Category {
@@ -46,7 +46,7 @@ public class ChallengeSelectionScreen extends Screen {
     private static Category categoryOf(int id) {
         return switch (id) {
             case 2, 3, 4, 14, 15, 34, 44 -> Category.DROPS;
-            case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39, 41, 42, 43 -> Category.COMBAT;
+            case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39, 41, 42, 43, 46 -> Category.COMBAT;
             case 10, 13, 16, 17, 18, 19, 20, 33, 36, 37 -> Category.CHAOS;
             default -> Category.WORLD;
         };
