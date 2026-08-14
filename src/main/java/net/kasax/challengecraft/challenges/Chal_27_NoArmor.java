@@ -3,9 +3,9 @@ package net.kasax.challengecraft.challenges;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.util.BlockedBarrierItem;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /** Blocks armor slots with synthetic barrier items so the disabled state is visible in inventory screens. */
 public class Chal_27_NoArmor {
@@ -14,7 +14,7 @@ public class Chal_27_NoArmor {
     public static void register() {
         ServerTickEvents.START_SERVER_TICK.register(server -> {
             if (!active) return;
-            for (PlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (Player player : server.getPlayerList().getPlayers()) {
                 blockArmor(player);
             }
         });
@@ -26,16 +26,16 @@ public class Chal_27_NoArmor {
         ChallengeCraft.LOGGER.info("[Chal27] {}", active ? "activated" : "deactivated");
     }
 
-    private static void blockArmor(PlayerEntity player) {
+    private static void blockArmor(Player player) {
         var inv = player.getInventory();
         for (int i = 0; i < 4; i++) {
             int slot = 36 + i;
-            ItemStack current = inv.getStack(slot);
+            ItemStack current = inv.getItem(slot);
             if (current.getItem() != Items.BARRIER) {
                 if (!current.isEmpty()) {
-                    player.dropItem(current, false);
+                    player.drop(current, false);
                 }
-                inv.setStack(slot, BlockedBarrierItem.create());
+                inv.setItem(slot, BlockedBarrierItem.create());
             }
         }
     }

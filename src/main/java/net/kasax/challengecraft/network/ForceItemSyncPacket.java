@@ -1,65 +1,64 @@
 package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /** Full Force Item Battle snapshot: battle state, remaining ticks, everyone's target/score. */
-public class ForceItemSyncPacket implements CustomPayload {
+public class ForceItemSyncPacket implements CustomPacketPayload {
     public record PlayerEntry(UUID uuid, String name, String itemId, int score, int jokers, int teamId,
                               List<String> collected) {
     }
 
-    public static final Id<ForceItemSyncPacket> ID =
-            new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "force_item_sync"));
+    public static final Type<ForceItemSyncPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "force_item_sync"));
 
-    public static final PacketCodec<PacketByteBuf, ForceItemSyncPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<>() {
+    public static final StreamCodec<FriendlyByteBuf, ForceItemSyncPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<>() {
                 @Override
-                public void encode(ForceItemSyncPacket packet, PacketByteBuf buf) {
+                public void encode(ForceItemSyncPacket packet, FriendlyByteBuf buf) {
                     buf.writeVarInt(packet.state);
                     buf.writeLong(packet.remainingTicks);
                     buf.writeVarInt(packet.players.size());
                     for (PlayerEntry entry : packet.players) {
-                        buf.writeUuid(entry.uuid());
-                        buf.writeString(entry.name());
-                        buf.writeString(entry.itemId());
+                        buf.writeUUID(entry.uuid());
+                        buf.writeUtf(entry.name());
+                        buf.writeUtf(entry.itemId());
                         buf.writeVarInt(entry.score());
                         buf.writeVarInt(entry.jokers());
                         buf.writeVarInt(entry.teamId());
                         buf.writeVarInt(entry.collected().size());
                         for (String itemId : entry.collected()) {
-                            buf.writeString(itemId);
+                            buf.writeUtf(itemId);
                         }
                     }
                 }
             },
-            new PacketDecoder<>() {
+            new StreamDecoder<>() {
                 @Override
-                public ForceItemSyncPacket decode(PacketByteBuf buf) {
+                public ForceItemSyncPacket decode(FriendlyByteBuf buf) {
                     int state = buf.readVarInt();
                     long remaining = buf.readLong();
                     int count = buf.readVarInt();
                     List<PlayerEntry> players = new ArrayList<>(count);
                     for (int i = 0; i < count; i++) {
-                        UUID uuid = buf.readUuid();
-                        String name = buf.readString();
-                        String itemId = buf.readString();
+                        UUID uuid = buf.readUUID();
+                        String name = buf.readUtf();
+                        String itemId = buf.readUtf();
                         int score = buf.readVarInt();
                         int jokers = buf.readVarInt();
                         int teamId = buf.readVarInt();
                         int collectedCount = buf.readVarInt();
                         List<String> collected = new ArrayList<>(collectedCount);
                         for (int j = 0; j < collectedCount; j++) {
-                            collected.add(buf.readString());
+                            collected.add(buf.readUtf());
                         }
                         players.add(new PlayerEntry(uuid, name, itemId, score, jokers, teamId, collected));
                     }
@@ -91,7 +90,7 @@ public class ForceItemSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

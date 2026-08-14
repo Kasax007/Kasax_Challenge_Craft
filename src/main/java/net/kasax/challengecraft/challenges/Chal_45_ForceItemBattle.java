@@ -4,7 +4,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.network.ForceItemOpenScreenPacket;
-import net.minecraft.util.ActionResult;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoTeam;
@@ -12,24 +11,23 @@ import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.ForceItemBattleSavedData;
 import net.kasax.challengecraft.network.ForceItemResultsPacket;
 import net.kasax.challengecraft.network.ForceItemSyncPacket;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.PositionFlag;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.registry.Registries;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Relative;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -57,47 +55,47 @@ public class Chal_45_ForceItemBattle {
             tickCounter++;
             if (tickCounter % 20 != 0) return; // once per second, like the All Items scan
 
-            ServerWorld overworld = server.getOverworld();
+            ServerLevel overworld = server.overworld();
             ForceItemBattleSavedData data = ForceItemBattleSavedData.get(overworld);
 
             // Tracker item is the command-free entry point — hand it out in every state so
             // lobby players (and late joiners) can always open the game screen.
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 if (!player.isSpectator()) ensureTracker(player);
             }
 
             if (data.getState() != ForceItemBattleSavedData.STATE_RUNNING) return;
 
-            if (data.getEndGameTime() >= 0 && overworld.getTime() >= data.getEndGameTime()) {
+            if (data.getEndGameTime() >= 0 && overworld.getGameTime() >= data.getEndGameTime()) {
                 endBattle(server, data);
                 return;
             }
 
             boolean changed = false;
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 if (player.isSpectator()) continue;
-                data.ensurePlayer(player.getUuid(), player.getName().getString());
+                data.ensurePlayer(player.getUUID(), player.getName().getString());
 
-                String itemId = data.getCurrentItem(player.getUuid());
+                String itemId = data.getCurrentItem(player.getUUID());
                 if (itemId.isEmpty()) {
-                    assignNextItem(server, data, player.getUuid());
+                    assignNextItem(server, data, player.getUUID());
                     changed = true;
                     continue;
                 }
 
-                Item target = Registries.ITEM.get(Identifier.of(itemId));
+                Item target = BuiltInRegistries.ITEM.getValue(Identifier.parse(itemId));
                 if (target != Items.AIR && hasItem(player, target)) {
-                    data.addScore(player.getUuid());
-                    data.addCollectedItem(player.getUuid(), itemId);
-                    int score = data.getScore(player.getUuid());
-                    assignNextItem(server, data, player.getUuid());
+                    data.addScore(player.getUUID());
+                    data.addCollectedItem(player.getUUID(), itemId);
+                    int score = data.getScore(player.getUUID());
+                    assignNextItem(server, data, player.getUUID());
                     changed = true;
 
-                    server.getPlayerManager().broadcast(
-                            Text.translatable("challengecraft.fib.collected",
-                                    player.getName(), target.getName(), score).formatted(Formatting.GRAY),
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.translatable("challengecraft.fib.collected",
+                                    player.getName(), new ItemStack(target).getItemName(), score).withStyle(ChatFormatting.GRAY),
                             false);
-                    player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
+                    player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f, 1.2f);
                 }
             }
 
@@ -109,16 +107,16 @@ public class Chal_45_ForceItemBattle {
 
         // Right-clicking the tracker item opens the game screen — the command-free entry point.
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (!active) return ActionResult.PASS;
-            if (!player.getStackInHand(hand).isOf(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER)) {
-                return ActionResult.PASS;
+            if (!active) return InteractionResult.PASS;
+            if (!player.getItemInHand(hand).is(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER)) {
+                return InteractionResult.PASS;
             }
-            if (world.isClient()) return ActionResult.SUCCESS;
-            if (player instanceof ServerPlayerEntity serverPlayer) {
+            if (world.isClientSide()) return InteractionResult.SUCCESS;
+            if (player instanceof ServerPlayer serverPlayer) {
                 ServerPlayNetworking.send(serverPlayer, new ForceItemOpenScreenPacket());
-                return ActionResult.SUCCESS_SERVER;
+                return InteractionResult.SUCCESS_SERVER;
             }
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 
@@ -254,7 +252,7 @@ public class Chal_45_ForceItemBattle {
 // --- Mob drops ---
             "minecraft:prismarine_shard", "minecraft:prismarine_crystals",
             "minecraft:nautilus_shell", "minecraft:heart_of_the_sea",
-            "minecraft:echo_shard", "minecraft:scute",
+            "minecraft:echo_shard", "minecraft:turtle_scute",
             "minecraft:turtle_egg", "minecraft:goat_horn",
             "minecraft:totem_of_undying", "minecraft:dragon_breath",
             "minecraft:dragon_egg", "minecraft:sniffer_egg",
@@ -325,7 +323,7 @@ public class Chal_45_ForceItemBattle {
         if (!itemPool.isEmpty()) return;
         List<Item> pool = new ArrayList<>();
         for (String id : FORCE_ITEM_IDS) {
-            Item item = Registries.ITEM.get(Identifier.of(id));
+            Item item = BuiltInRegistries.ITEM.getValue(Identifier.parse(id));
             if (item == Items.AIR) {
                 ChallengeCraft.LOGGER.warn("[Chal45] unknown item id in FORCE_ITEM_IDS, skipping: {}", id);
                 continue;
@@ -336,9 +334,9 @@ public class Chal_45_ForceItemBattle {
         ChallengeCraft.LOGGER.info("[Chal45] item pool built from FORCE_ITEM_IDS ({} items)", itemPool.size());
     }
 
-    private static boolean hasItem(ServerPlayerEntity player, Item target) {
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            if (player.getInventory().getStack(i).isOf(target)) return true;
+    private static boolean hasItem(ServerPlayer player, Item target) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            if (player.getInventory().getItem(i).is(target)) return true;
         }
         return false;
     }
@@ -349,8 +347,8 @@ public class Chal_45_ForceItemBattle {
         String previous = data.getCurrentItem(uuid);
         String next = previous;
         for (int attempt = 0; attempt < 5 && next.equals(previous); attempt++) {
-            Item candidate = itemPool.get(server.getOverworld().random.nextInt(itemPool.size()));
-            next = Registries.ITEM.getId(candidate).toString();
+            Item candidate = itemPool.get(server.overworld().getRandom().nextInt(itemPool.size()));
+            next = BuiltInRegistries.ITEM.getKey(candidate).toString();
         }
         data.setCurrentItem(uuid, next);
     }
@@ -360,12 +358,12 @@ public class Chal_45_ForceItemBattle {
      * timer does NOT start (world creation must never auto-start the battle). Starting happens
      * explicitly via {@link #startBattle} (game-screen button, or the solo debug command).
      */
-    public static void onActivated(ServerWorld world) {
+    public static void onActivated(ServerLevel world) {
         MinecraftServer server = world.getServer();
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.isSpectator()) continue;
-            data.ensurePlayer(player.getUuid(), player.getName().getString());
+            data.ensurePlayer(player.getUUID(), player.getName().getString());
         }
         syncBattleToAll(server);
     }
@@ -375,35 +373,35 @@ public class Chal_45_ForceItemBattle {
      * (anti XP-farming); {@code debug} bypasses that for solo testing and marks the run as
      * ineligible for the XP prize.
      */
-    public static void startBattle(MinecraftServer server, ServerPlayerEntity initiator, boolean debug) {
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+    public static void startBattle(MinecraftServer server, ServerPlayer initiator, boolean debug) {
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         if (!active || data.getState() != ForceItemBattleSavedData.STATE_IDLE) {
             if (initiator != null) {
-                initiator.sendMessage(Text.translatable("challengecraft.fib.already_running").formatted(Formatting.RED), false);
+                initiator.sendSystemMessage(Component.translatable("challengecraft.fib.already_running").withStyle(ChatFormatting.RED));
             }
             return;
         }
 
-        long participants = server.getPlayerManager().getPlayerList().stream()
+        long participants = server.getPlayerList().getPlayers().stream()
                 .filter(p -> !p.isSpectator()).count();
         if (!debug && participants < 2) {
             if (initiator != null) {
-                initiator.sendMessage(Text.translatable("challengecraft.fib.need_two_players").formatted(Formatting.RED), false);
+                initiator.sendSystemMessage(Component.translatable("challengecraft.fib.need_two_players").withStyle(ChatFormatting.RED));
             }
             return;
         }
 
         data.setDebugRun(debug);
-        int minutes = ChallengeSavedData.get(server.getOverworld()).getForceItemBattleMinutes();
+        int minutes = ChallengeSavedData.get(server.overworld()).getForceItemBattleMinutes();
         data.setState(ForceItemBattleSavedData.STATE_RUNNING);
-        data.setEndGameTime(server.getOverworld().getTime() + minutes * 60L * 20L);
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        data.setEndGameTime(server.overworld().getGameTime() + minutes * 60L * 20L);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.isSpectator()) continue;
-            data.ensurePlayer(player.getUuid(), player.getName().getString());
-            assignNextItem(server, data, player.getUuid());
+            data.ensurePlayer(player.getUUID(), player.getName().getString());
+            assignNextItem(server, data, player.getUUID());
         }
-        server.getPlayerManager().broadcast(
-                Text.translatable("challengecraft.fib.started", minutes).formatted(Formatting.GOLD, Formatting.BOLD),
+        server.getPlayerList().broadcastSystemMessage(
+                Component.translatable("challengecraft.fib.started", minutes).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
                 false);
         ChallengeCraft.LOGGER.info("[Chal45] battle started ({} min, debug={})", minutes, debug);
         syncBattleToAll(server);
@@ -413,19 +411,19 @@ public class Chal_45_ForceItemBattle {
         data.setState(ForceItemBattleSavedData.STATE_ENDED);
         data.setEndGameTime(-1L);
 
-        ServerWorld overworld = server.getOverworld();
-        BlockPos spawn = overworld.getSpawnPos();
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.teleport(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
-                    Set.<PositionFlag>of(), player.getYaw(), player.getPitch(), false);
+        ServerLevel overworld = server.overworld();
+        BlockPos spawn = overworld.getRespawnData().pos();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.teleportTo(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
+                    Set.<Relative>of(), player.getYRot(), player.getXRot(), false);
             player.playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f);
         }
 
-        Text title = Text.translatable("challengecraft.fib.time_up").formatted(Formatting.GOLD, Formatting.BOLD);
-        Text subtitle = Text.translatable("challengecraft.fib.await_results").formatted(Formatting.GRAY);
-        server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-        server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
-        server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+        Component title = Component.translatable("challengecraft.fib.time_up").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        Component subtitle = Component.translatable("challengecraft.fib.await_results").withStyle(ChatFormatting.GRAY);
+        server.getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+        server.getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+        server.getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
 
         syncBattleToAll(server);
         ChallengeCraft.LOGGER.info("[Chal45] battle ended, awaiting results command");
@@ -436,68 +434,68 @@ public class Chal_45_ForceItemBattle {
      * Scoring must not wait for the once-per-second inventory scan — that let rapid clicks
      * burn several jokers on the same target before the scan caught up.
      */
-    public static void useJoker(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+    public static void useJoker(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         if (!active || data.getState() != ForceItemBattleSavedData.STATE_RUNNING) {
-            player.sendMessage(Text.translatable("challengecraft.fib.not_running").formatted(Formatting.RED), false);
+            player.sendSystemMessage(Component.translatable("challengecraft.fib.not_running").withStyle(ChatFormatting.RED));
             return;
         }
-        int left = data.getJokersLeft(player.getUuid());
+        int left = data.getJokersLeft(player.getUUID());
         if (left <= 0) {
-            player.sendMessage(Text.translatable("challengecraft.fib.no_jokers").formatted(Formatting.RED), false);
+            player.sendSystemMessage(Component.translatable("challengecraft.fib.no_jokers").withStyle(ChatFormatting.RED));
             return;
         }
-        String itemId = data.getCurrentItem(player.getUuid());
-        Item target = Registries.ITEM.get(Identifier.of(itemId));
+        String itemId = data.getCurrentItem(player.getUUID());
+        Item target = BuiltInRegistries.ITEM.getValue(Identifier.parse(itemId));
         if (target == Items.AIR) return;
 
-        data.setJokersLeft(player.getUuid(), left - 1);
-        player.giveItemStack(new ItemStack(target));
-        data.addScore(player.getUuid());
-        data.addCollectedItem(player.getUuid(), itemId);
-        assignNextItem(server, data, player.getUuid());
-        player.sendMessage(Text.translatable("challengecraft.fib.joker_used", target.getName(), left - 1)
-                .formatted(Formatting.LIGHT_PURPLE), false);
+        data.setJokersLeft(player.getUUID(), left - 1);
+        player.addItem(new ItemStack(target));
+        data.addScore(player.getUUID());
+        data.addCollectedItem(player.getUUID(), itemId);
+        assignNextItem(server, data, player.getUUID());
+        player.sendSystemMessage(Component.translatable("challengecraft.fib.joker_used", new ItemStack(target).getItemName(), left - 1)
+                .withStyle(ChatFormatting.LIGHT_PURPLE));
         syncBattleToAll(server);
     }
 
     /** ensureMap idiom from Lockout: dedupe extra trackers, hand one out if missing. */
-    private static void ensureTracker(ServerPlayerEntity player) {
+    private static void ensureTracker(ServerPlayer player) {
         var inventory = player.getInventory();
         int firstSlot = -1;
-        for (int i = 0; i < inventory.size(); i++) {
-            if (!inventory.getStack(i).isOf(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER)) continue;
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (!inventory.getItem(i).is(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER)) continue;
             if (firstSlot == -1) {
                 firstSlot = i;
             } else {
-                inventory.setStack(i, ItemStack.EMPTY);
+                inventory.setItem(i, ItemStack.EMPTY);
             }
         }
         if (firstSlot == -1) {
-            inventory.insertStack(new ItemStack(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER));
+            inventory.add(new ItemStack(net.kasax.challengecraft.item.ModItems.FORCE_ITEM_TRACKER));
         }
     }
 
     /** Op helper: replaces the player's current item without scoring (stuck-item escape hatch). */
-    public static void skipItem(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+    public static void skipItem(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         if (!active || data.getState() != ForceItemBattleSavedData.STATE_RUNNING) return;
-        assignNextItem(server, data, player.getUuid());
+        assignNextItem(server, data, player.getUUID());
         syncBattleToAll(server);
     }
 
-    public static void handleTeamAction(ServerPlayerEntity player, net.kasax.challengecraft.network.ForceItemActionPacket.Action action, int teamId) {
-        MinecraftServer server = player.getServer();
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+    public static void handleTeamAction(ServerPlayer player, net.kasax.challengecraft.network.ForceItemActionPacket.Action action, int teamId) {
+        MinecraftServer server = player.level().getServer();
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         switch (action) {
             case JOIN_TEAM -> {
                 if (LockoutBingoTeam.fromOrdinal(teamId) != null) {
-                    data.setTeam(player.getUuid(), player.getName().getString(), teamId);
+                    data.setTeam(player.getUUID(), player.getName().getString(), teamId);
                 }
             }
-            case LEAVE_TEAM -> data.removeTeam(player.getUuid());
+            case LEAVE_TEAM -> data.removeTeam(player.getUUID());
             case REQUEST_SYNC -> { } // fall through to the sync below
             case USE_JOKER -> { useJoker(player); return; }        // already syncs
             case START_BATTLE -> { startBattle(server, player, false); return; }  // already syncs
@@ -539,7 +537,7 @@ public class Chal_45_ForceItemBattle {
 
     /** Starts the ceremony: award the flat 100-XP prize once (guarded), open stage 1 everywhere. */
     public static void triggerResults(MinecraftServer server) {
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         List<ForceItemResultsPacket.Entry> standings = computeStandings(data);
         if (standings.isEmpty()) return;
 
@@ -550,9 +548,9 @@ public class Chal_45_ForceItemBattle {
                 int best = standings.get(0).score();
                 for (ForceItemResultsPacket.Entry entry : standings) {
                     if (entry.score() != best) continue;
-                    for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+                    for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                         boolean isWinner = entry.teamId() >= 0
-                                ? entry.teamId() == orDefault(data.getTeamOrdinal(player.getUuid()))
+                                ? entry.teamId() == orDefault(data.getTeamOrdinal(player.getUUID()))
                                 : entry.name().equals(player.getName().getString());
                         if (isWinner) {
                             LevelManager.addXp(player, 100);
@@ -570,7 +568,7 @@ public class Chal_45_ForceItemBattle {
     /** Continue button (any player): advance the synced ceremony to the next placement. */
     public static void advanceCeremony(MinecraftServer server) {
         if (ceremonyStage <= 0) return;
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         List<ForceItemResultsPacket.Entry> standings = computeStandings(data);
         if (standings.isEmpty()) return;
         ceremonyStage = Math.min(ceremonyStage + 1, standings.size());
@@ -579,7 +577,7 @@ public class Chal_45_ForceItemBattle {
 
     private static void broadcastResults(MinecraftServer server, List<ForceItemResultsPacket.Entry> standings) {
         ForceItemResultsPacket packet = new ForceItemResultsPacket(ceremonyStage, standings);
-        server.getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, packet));
+        server.getPlayerList().getPlayers().forEach(p -> ServerPlayNetworking.send(p, packet));
     }
 
     private static int orDefault(Integer value) {
@@ -588,17 +586,17 @@ public class Chal_45_ForceItemBattle {
 
     /** Op reset: wipes battle state and immediately starts a fresh battle. */
     public static void restartBattle(MinecraftServer server) {
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         data.resetForNewBattle();
         if (active) {
-            onActivated(server.getOverworld());
+            onActivated(server.overworld());
         }
     }
 
     public static void syncBattleToAll(MinecraftServer server) {
-        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.getOverworld());
+        ForceItemBattleSavedData data = ForceItemBattleSavedData.get(server.overworld());
         long remaining = data.getState() == ForceItemBattleSavedData.STATE_RUNNING && data.getEndGameTime() >= 0
-                ? Math.max(0, data.getEndGameTime() - server.getOverworld().getTime())
+                ? Math.max(0, data.getEndGameTime() - server.overworld().getGameTime())
                 : 0;
 
         List<ForceItemSyncPacket.PlayerEntry> entries = new ArrayList<>();
@@ -616,7 +614,7 @@ public class Chal_45_ForceItemBattle {
         }
 
         ForceItemSyncPacket packet = new ForceItemSyncPacket(data.getState(), remaining, entries);
-        server.getPlayerManager().getPlayerList().forEach(p -> ServerPlayNetworking.send(p, packet));
+        server.getPlayerList().getPlayers().forEach(p -> ServerPlayNetworking.send(p, packet));
     }
 
     public static void setActive(boolean v) {

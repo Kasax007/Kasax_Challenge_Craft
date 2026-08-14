@@ -45,18 +45,40 @@ public class ChallengeCraftClient implements ClientModInitializer {
      * <p>Screen-construction code should call this instead of reading the field directly.
      */
     public static long refreshLocalPlayerXp() {
-        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+        net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
         if (client.player == null) {
-            java.util.UUID uuid = client.getSession() != null ? client.getSession().getUuidOrNull() : null;
+            java.util.UUID uuid = client.getUser() != null ? client.getUser().getProfileId() : null;
             LOCAL_PLAYER_XP = uuid != null
                     ? net.kasax.challengecraft.data.XpManager.getXp(uuid)
                     : net.kasax.challengecraft.data.XpManager.getTotalXp();
         } else if (LOCAL_PLAYER_XP == 0) {
-            LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUuid());
+            LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUUID());
         }
         return LOCAL_PLAYER_XP;
     }
 
+
+    /**
+     * Draws the first-run tutorial over ANY screen — including vanilla ones like the title screen,
+     * the world list and world creation, which the mod does not own and cannot subclass.
+     * {@code ScreenEvents.afterExtract} is what makes that possible.
+     */
+    private static void registerTutorial() {
+        net.kasax.challengecraft.client.tutorial.TutorialManager.start();
+
+        net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+            net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterExtract(screen).register(
+                    (sc, ctx, mouseX, mouseY, delta) ->
+                            net.kasax.challengecraft.client.tutorial.TutorialOverlay.render(ctx, sc, mouseX, mouseY));
+
+            // Claim the click BEFORE the screen sees it, so the skip button cannot be shadowed by a
+            // widget underneath it and a pure-explanation step can be dismissed by clicking away.
+            // Returning false CANCELS the click, so it never reaches the screen underneath.
+            net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register(
+                    (sc, event) -> !net.kasax.challengecraft.client.tutorial.TutorialOverlay
+                            .onClick(sc, event.x(), event.y()));
+        });
+    }
 
     @Override
     public void onInitializeClient() {
@@ -71,12 +93,14 @@ public class ChallengeCraftClient implements ClientModInitializer {
         // Model layer MUST be registered before the renderer, which resolves the baked part in
         // its constructor. Skipping the renderer entirely crashes the dev client via
         // MinecraftClient.checkGameData -> EntityRenderers.isMissingRendererFactories.
-        net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry.registerModelLayer(
+        net.fabricmc.fabric.api.client.rendering.v1.ModelLayerRegistry.registerModelLayer(
                 net.kasax.challengecraft.client.render.DiceEntityRenderer.DICE_LAYER,
                 net.kasax.challengecraft.client.render.DiceEntityRenderer::getTexturedModelData);
         net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
                 net.kasax.challengecraft.entity.ModEntities.DICE,
                 net.kasax.challengecraft.client.render.DiceEntityRenderer::new);
+
+        registerTutorial();
 
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllItemsHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllEntitiesHUD::buildCard, 0);
@@ -89,34 +113,34 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
         net.kasax.challengecraft.client.ui.HudStack.register();
 
-        net.minecraft.client.gui.screen.ingame.HandledScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
+        net.minecraft.client.gui.screens.MenuScreens.register(net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, net.kasax.challengecraft.screen.InfiniteChestScreen::new);
 
         ClientPlayNetworking.registerGlobalReceiver(net.kasax.challengecraft.network.InfiniteChestSyncPayload.ID, (payload, context) -> {
             context.client().execute(() -> {
-                if (context.client().currentScreen instanceof net.kasax.challengecraft.screen.InfiniteChestScreen screen) {
+                if (context.client().gui.screen() instanceof net.kasax.challengecraft.screen.InfiniteChestScreen screen) {
                     screen.updateEntries(payload.entries());
                 }
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(RestartPendingPacket.ID, (payload, context) -> {
-            boolean isSP = context.client().getServer() != null;
+            boolean isSP = context.client().getSingleplayerServer() != null;
             RestartManager.setRestartPending(true, payload.worldName(), isSP);
         });
 
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (RestartManager.isRestartPending() && client.getNetworkHandler() == null && client.world == null) {
+            if (RestartManager.isRestartPending() && client.getConnection() == null && client.level == null) {
                 boolean isSP = RestartManager.isSinglePlayer();
                 String worldName = RestartManager.getLastWorldName();
                 RestartManager.setRestartPending(false, null, false);
                 
                 if (isSP && worldName != null) {
                     client.execute(() -> {
-                        client.createIntegratedServerLoader().start(worldName, () -> {});
+                        client.createWorldOpenFlows().openWorld(worldName, () -> {});
                     });
                 } else if (!isSP) {
                     client.execute(() -> {
-                        client.setScreen(new DedicatedRestartScreen());
+                        client.setScreenAndShow(new DedicatedRestartScreen());
                     });
                 }
             }
@@ -126,6 +150,13 @@ public class ChallengeCraftClient implements ClientModInitializer {
             PLAYER_XP_MAP.clear();
             LOCAL_PLAYER_XP = 0;
             LockoutBingoClientState.clear();
+            // Ordered-progress HUDs keep their counters in statics. Leaving a world must drop them,
+            // or a save-and-restart shows the previous world's progress until the new world's first
+            // progress packet lands — which reads exactly like the restart failed to reset anything.
+            net.kasax.challengecraft.client.screen.AllItemsHUD.reset();
+            net.kasax.challengecraft.client.screen.AllEntitiesHUD.reset();
+            net.kasax.challengecraft.client.screen.AllAchievementsHUD.reset();
+            net.kasax.challengecraft.client.screen.ProgressiveBlocksHUD.reset();
             net.kasax.challengecraft.client.screen.ForceItemClientState.clear();
             net.kasax.challengecraft.client.screen.DiceClientState.clear();
             net.kasax.challengecraft.challenges.Chal_46_Dice.setClientRemaining(0.0);
@@ -135,12 +166,12 @@ public class ChallengeCraftClient implements ClientModInitializer {
             if (client.player != null) {
                 // Joining directly into a world bypasses the title-screen XP preload.
                 if (LOCAL_PLAYER_XP == 0) {
-                    LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUuid());
+                    LOCAL_PLAYER_XP = net.kasax.challengecraft.data.XpManager.getXp(client.player.getUUID());
                     ChallengeCraft.LOGGER.info("Loaded initial local XP from file on join: {}", LOCAL_PLAYER_XP);
                 }
                 
                 if (ClientPlayNetworking.canSend(net.kasax.challengecraft.network.ClientXpSyncPacket.ID)) {
-                    ClientPlayNetworking.send(new net.kasax.challengecraft.network.ClientXpSyncPacket(LOCAL_PLAYER_XP, client.player.getUuid()));
+                    ClientPlayNetworking.send(new net.kasax.challengecraft.network.ClientXpSyncPacket(LOCAL_PLAYER_XP, client.player.getUUID()));
                     ChallengeCraft.LOGGER.info("Sent local XP sync to server: {}", LOCAL_PLAYER_XP);
                 }
             }

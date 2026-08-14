@@ -18,9 +18,7 @@ public class TriviaQuestions {
         add("Which biome is known for its tall spruce trees?", "Plains", "Forest", "Taiga", "Swamp", 2);
         add("What is the name of the boss that resides in the End dimension?", "Wither", "Ender Dragon", "Elder Guardian", "Warden", 1);
         add("What food restores the most hunger points?", "Steak", "Apple", "Bread", "Cooked Cod", 0);
-        add("What is the most recently added food item in the game?", "Glow berries", "Sweet berries", "Honey bottle", "Dried Kelp", 0);
         add("What do Endermen drop when defeated?", "Ender Pearl", "Eye of Ender", "End Stone", "Chorus Fruit", 0);
-        add("What item does Notch drop upon death?", "Golden Apple", "An Apple", "Diamond", "Nothing", 1);
         add("Which direction does a sunflower always face?", "North", "South", "East", "West", 2);
         add("What do you have to do in order to get the advancement Tactical Fishing?", "Catch a fish in a bucket", "Catch a fish with a rod", "Kill a fish with a sword", "Tame a cat with a fish", 0);
         add("What item will you always find in a Buried Treasure chest?", "Diamond", "Golden Apple", "Heart of the Sea", "Iron Ingot", 2);
@@ -31,17 +29,12 @@ public class TriviaQuestions {
         add("How tall is a standard Minecraft player?", "1.5 blocks", "1.8 blocks", "2.0 blocks", "1.6 blocks", 1);
         add("What item is needed to make a banner pattern?", "Wool", "Paper", "Leather", "String", 1);
         add("What type of block do you need to create an enchantment table?", "Obsidian", "Crying Obsidian", "Bedrock", "Cobblestone", 0);
-        add("How can players safely store their valuable items?", "In chests", "In fire", "Throw them on the ground", "In water", 0);
         add("What potion is made by brewing a Fermented Spider Eye in a Water Bottle?", "Potion of Strength", "Potion of Weakness", "Potion of Harming", "Potion of Slowness", 1);
         add("What happens when you feed Raw Cod to a Dolphin?", "It heals the player", "It leads to treasure", "It attacks the player", "Nothing", 1);
-        add("What block is the taskbar icon of the Minecraft game?", "Dirt block", "Crafting table", "Grass block", "Diamond block", 2);
         add("Does a lightning strike turn a Rabbit into a Killer Rabbit?", "Yes", "No", "Only if it is raining", "Only in Java Edition", 1);
         add("What is the maximum size for a Nether portal?", "10x10", "23x23", "21x21", "Unlimited", 1);
         add("What food item is made by cooking raw pork?", "Cooked Beef", "Cooked Porkchop", "Cooked Mutton", "Bacon", 1);
         add("Which passengers can a Strider naturally spawn with?", "Zombie", "Baby Strider or Zombified Piglin", "Enderman", "Creeper", 1);
-        add("How many mobs can be in a 'mob farm' area for spawning at a time?", "64", "128", "256", "Unlimited", 1);
-        add("What is the highest number of blocks an unarmored player can fall without dying?", "20", "23", "25", "30", 1);
-        add("How many Seecret updates were there?", "5", "10", "12", "15", 1);
         add("What entity is known for its ability to teleport?", "Creeper", "Enderman", "Ghast", "Phantom", 1);
         add("What is the only hostile mob that you can breed?", "Zombie", "Hoglin", "Creeper", "Blaze", 1);
         add("What biome is known for its large mushrooms and mycelium blocks?", "Dark Forest", "Mushroom Fields", "Swamp", "Jungle", 1);
@@ -54,7 +47,7 @@ public class TriviaQuestions {
         add("What type of block can Sugar Cane not be placed on?", "Sand", "Gravel", "Dirt", "Grass", 1);
         add("Which creature drops feathers?", "Sheep", "Chickens", "Pigs", "Cows", 1);
         add("Aside from Plains, what biome can Donkeys spawn in?", "Forest", "Savanna", "Desert", "Taiga", 1);
-        add("How many different songs can be played with a Goat Horn?", "5", "7", "10", "12", 1);
+        add("How many different songs can be played with a Goat Horn?", "5", "7", "8", "12", 2);
         add("What happens when lightning strikes a pig?", "It dies", "It turns into a Zombified Piglin", "It turns into a Hoglin", "Nothing", 1);
         add("Which mob is no longer tamable?", "Wolf", "Ocelot", "Cat", "Parrot", 1);
         add("What color is the 'mall' Music Disc?", "Green", "Purple", "Red", "Blue", 1);
@@ -85,7 +78,6 @@ public class TriviaQuestions {
         add("What unique tribute appears in the film?", "A statue of Steve", "A pig wearing a crown", "A gold block", "A custom cape", 1);
         add("Who composed the music for the movie?", "C418", "Daniel Pemberton", "Hans Zimmer", "Lena Raine", 1);
         add("A famous YouTuber is said to have a cameo in the film. Who is it?", "MrBeast", "DanTDM", "Dream", "PewDiePie", 1);
-        add("What year was A Minecraft Movie released?", "2024", "2025", "2026", "2023", 1);
         add("Which actor was originally cast as Steve, but had to back out?", "Jack Black", "Matt Berry", "Jason Momoa", "Ryan Reynolds", 1);
         add("Who wins the fight, Steve or Chicken Jockey?", "Chicken Jockey", "Steve!", "It's a draw", "Neither", 1);
         add("What does an Ender Pearl do?", "Summons a mob", "Allows you to teleport", "Heals the player", "Creates a portal", 1);
@@ -100,7 +92,6 @@ public class TriviaQuestions {
         add("What’s the name of the world where the Piglins live?", "The Overworld", "The Nether", "The End", "The Void", 1);
         add("What happens when you mix hot lava and Chicken?", "It burns", "A Roasted Lava Chicken", "It explodes", "Nothing", 1);
         add("What material is used to build Steve’s third house?", "Wood", "Sheep’s wool", "Stone", "Dirt", 1);
-        add("Who is the ruler of the Nether in the movie?", "The Wither", "Malgosha", "Herobrine", "Piglin King", 1);
         add("Who saved Henry’s team from the Zombies?", "Garrett", "Steve", "Alex", "Notch", 1);
         add("What mob explodes when it gets close to a player?", "Skeleton", "Creeper", "Zombie", "Enderman", 1);
         add("What was the first thing The Garbage Man crafted?", "A sword", "A bucket", "A pickaxe", "A torch", 1);
@@ -112,14 +103,12 @@ public class TriviaQuestions {
         add("What classic item is used to defeat the final boss in the movie?", "Diamond Sword", "A wooden shovel", "Bow and Arrow", "TNT", 1);
         add("What viral scene features a baby zombie riding a chicken?", "Chicken Jockey scene", "Spider Jockey scene", "Zombie Siege", "Village Raid", 0);
         add("What food item becomes a major plot point halfway through the movie?", "Golden Apple", "Suspicious stew", "Cake", "Bread", 1);
-        add("How much armor does a full set of Netherite provide?", "8 points", "10 points", "20 points", "15 points", 1);
         add("Which Minecraft creature can swim and attack players underwater?", "Zombie", "Drowned", "Skeleton", "Creeper", 1);
         add("What is the name of the dimension that is accessed by building a portal with obsidian?", "The End", "The Nether", "The Aether", "The Void", 1);
         add("When was the very first version of Minecraft released?", "May 17, 2011", "May 17, 2009", "June 1, 2010", "November 18, 2011", 1);
         add("What is the maximum height of the Nether?", "256", "128", "320", "64", 1);
         add("What is not a villager profession?", "Librarian", "Engineer", "Farmer", "Cleric", 1);
         add("Which Cat variant exists as a texture file, but is never used in game?", "Siamese", "Gray Tabby", "Black", "Tuxedo", 1);
-        add("How fast does lava flow in the Nether?", "1 block/s", "2 blocks per second", "5 blocks/s", "Instant", 1);
         add("In order to produce a vibraphone sound, what do you place under a Note Block?", "Block of Gold", "Block of Iron", "Stone", "Wood", 1);
         add("How do you duplicate Allays?", "Feed them cookies", "Give it an Amethyst Shard while it’s dancing", "Use a spawn egg", "They cannot be duplicated", 1);
         add("What color are Frogs spawned in the End?", "Orange", "Green", "White", "Purple", 1);
@@ -127,21 +116,17 @@ public class TriviaQuestions {
         add("Which mob has the highest total health in the game?", "Ender Dragon", "The Warden", "Wither", "Iron Golem", 1);
         add("What is the collective noun for a group of Endermen?", "A pack", "A haunting", "A swarm", "A group", 1);
         add("What mineral must be used to craft a beacon?", "A Diamond", "A Nether star", "A Dragon Egg", "A Netherite Ingot", 1);
-        add("How many different types of Music Discs are there?", "10", "15", "20", "12", 1);
         add("Which block is completely unbreakable in Survival mode?", "Obsidian", "Bedrock", "Ancient Debris", "Iron Block", 1);
         add("What is the unused sound belonging to the Ghast?", "Friendly Purr", "Affectionate Scream", "Happy Meow", "Sad Cry", 1);
         add("What is the drop rate of Wither Skeleton Skulls?", "5%", "2.5%", "1%", "10%", 1);
         add("Which mineral can generate naturally in both the Overworld and the Nether?", "Diamond", "Gold", "Iron", "Coal", 1);
         add("What blocks can an Ender Dragon not destroy?", "Obsidian", "Iron Bars, End Stone, Obsidian, and Respawn Anchor", "Stone Bricks", "Diamond Blocks", 1);
-        add("How many advancements are there in total?", "80", "102", "150", "50", 1);
         add("What is the original source of the Ghast sound?", "A baby", "C418’s cat", "A vacuum cleaner", "A wind chime", 1);
         add("Which mod developer helped with modeling the Horse?", "Mojang", "DrZhark", "Jeb", "Dinnerbone", 1);
         add("Right-clicking on what food item allows you to eat it faster?", "Dried Kelp", "Cake", "Steak", "Apple", 1);
         add("Which biome has the most passive mobs?", "Forest", "Plains", "Desert", "Mountains", 1);
         add("How many pieces of Netherite scrap would you need to build a fully powered beacon pyramid with all Netherite blocks?", "1000", "5904", "2000", "100", 1);
         add("How were the Enderman sounds made?", "Synthesizer", "Using a person’s distorted speech", "Animal noises", "Random clicks", 1);
-        add("How many things can Diamonds be used to craft?", "10", "13", "15", "8", 1);
-        add("Is Herobrine real?", "Yes", "No", "Only on Halloween", "In Bedrock Edition", 1);
         add("What was the game originally going to be called?", "Builder Game", "Cave Game", "Block World", "Mine & Craft", 1);
         add("What enchantment increases a player’s speed while wearing boots in water?", "Frost Walker", "Depth Strider", "Speed I", "Soul Speed", 1);
         add("Before its crafting recipe was removed, how did you craft an Enchanted Golden Apple?", "8 Gold Ingots", "An Apple and 8 blocks of Gold", "8 Diamonds", "8 Emeralds", 1);
@@ -275,7 +260,6 @@ public class TriviaQuestions {
         add("Which mob can drop a Rabbit's Foot?", "Rabbit", "Wolf", "Fox", "Cat", 0);
         add("What is the name of the block used to make a Map?", "Crafting Table", "Cartography Table", "Loom", "Fletcher Table", 1);
         add("Which item is used to dye a Sheep?", "Dye", "Flower", "Lapis Lazuli", "All of the above", 0);
-        add("How many hits does it take to kill a Chicken with a bare hand?", "1", "2", "3", "4", 1);
         add("Which mob is known for stealing blocks?", "Enderman", "Zombie", "Villager", "Piglin", 0);
         add("What is the name of the structure where the Piglins live?", "Nether Fortress", "Bastion Remnant", "Stronghold", "Village", 1);
         add("Which item is used to craft a Shield?", "Wood and Iron", "Wood and Gold", "Stone and Iron", "Leather and Wood", 0);
@@ -291,11 +275,9 @@ public class TriviaQuestions {
         add("Which mob is afraid of the Phantom?", "None (Players are afraid of Phantoms)", "Cat", "Creeper", "Zombie", 1);
         add("What is the name of the enchantment that increases the damage to undead mobs?", "Sharpness", "Smite", "Bane of Arthropods", "Knockback", 1);
         add("Which block is found in the Nether and is yellow?", "Glowstone", "Gold Ore", "Quartz", "Netherrack", 0);
-        add("How many blocks does a Beacon affect at max level?", "20", "30", "50", "92", 3);
         add("Which mob can drop a Music Disc when killed by a Skeleton?", "Zombie", "Creeper", "Enderman", "Spider", 1);
         add("What is the name of the item used to repair an Anvil?", "Iron Ingot", "Iron Block", "None (Anvils cannot be repaired)", "Hammer", 2);
         add("Which item is used to craft an Item Frame?", "Leather and Sticks", "Paper and Sticks", "Wool and Sticks", "Leather and Iron", 0);
-        add("How many hearts does the Wither have on Bedrock Edition?", "150", "300", "600", "100", 1);
         add("Which mob can be found in the End Cities?", "Enderman", "Shulker", "Ghast", "Phantom", 1);
         add("What is the name of the effect given by eating a Chorus Fruit?", "Teleportation", "Levitation", "Invisibility", "Hunger", 0);
         add("Which block is used to craft a Lantern?", "Iron Ingots and Torch", "Iron Nuggets and Torch", "Gold Nuggets and Torch", "Glass and Torch", 1);
@@ -316,10 +298,8 @@ public class TriviaQuestions {
         add("What is the name of the enchantment that returns damage to the attacker?", "Sharpness", "Thorns", "Knockback", "Protection", 1);
         add("Which block is used to craft a Lectern?", "Wood Slabs and Bookshelf", "Wood Planks and Bookshelf", "Sticks and Bookshelf", "Wood Slabs and Books", 0);
         add("How many items does a Large Chest hold?", "27", "54", "64", "100", 1);
-        add("Which mob is known for being a 'distorted' version of a player?", "Zombie", "Enderman", "Creeper", "Herobrine", 1);
         add("What is the name of the item used to craft a Pumpkin Pie?", "Pumpkin, Sugar, and Egg", "Pumpkin, Sugar, and Wheat", "Pumpkin, Egg, and Wheat", "Pumpkin and Sugar only", 0);
         add("Which block can be used to craft a Honey Block?", "4 Honey Bottles", "9 Honey Bottles", "4 Honeycomb", "9 Honeycomb", 0);
-        add("How many hits can a wooden pickaxe take before breaking?", "50", "60", "32", "100", 1);
         add("Which mob can drop a Slimeball?", "Slime", "Panda", "Both Slime and Panda", "None", 2);
         add("What is the name of the enchantment that increases the damage to arthropods?", "Sharpness", "Smite", "Bane of Arthropods", "Fire Aspect", 2);
         add("Which block is used to craft a Target?", "Hay Bale and Redstone", "Wheat and Redstone", "Wool and Redstone", "Target Block and Redstone", 0);
@@ -395,7 +375,6 @@ public class TriviaQuestions {
         add("Which mob can be found in a Mega Taiga?", "Wolf", "Fox", "Bear", "Both Wolf and Fox", 3);
         add("What is the name of the enchantment that allows a crossbow to shoot 3 arrows at once?", "Multishot", "Piercing", "Quick Charge", "Power", 0);
         add("Which block can be used to craft a Dispenser?", "7 Cobblestone, 1 Bow, 1 Redstone", "7 Cobblestone, 1 Dropper, 1 Redstone", "7 Stone, 1 Bow, 1 Redstone", "7 Cobblestone, 1 Bow, 1 String", 0);
-        add("How many hearts does a Silverfish have?", "4", "8", "10", "1", 3);
         add("Which mob can be found in a Mushroom Forest?", "Mooshroom", "Cow", "Sheep", "Pig", 0);
         add("What is the name of the enchantment that allows a tool to mine blocks exactly as they are?", "Fortune", "Silk Touch", "Efficiency", "Unbreaking", 1);
         add("Which block can be used to craft a Dropper?", "7 Cobblestone and 1 Redstone", "7 Stone and 1 Redstone", "7 Cobblestone and 1 Bow", "7 Cobblestone and 1 Iron", 0);
@@ -419,12 +398,10 @@ public class TriviaQuestions {
         add("How many vibrations must a player trigger to spawn a Warden?", "2", "3", "4", "5", 2);
         add("What is the hardness value of an Obsidian block?", "10", "50", "100", "1200", 1);
         add("Which mob has the highest base health in the game?", "Ender Dragon", "Wither", "Warden", "Giant", 2);
-        add("What is the base damage of a Warden's sonic boom attack?", "10", "15", "20", "25", 1);
         add("What is the exact speed of a Boat on Blue Ice in blocks per second?", "20", "40.3", "72.7", "100.1", 2);
         add("What is the blast resistance of Bedrock?", "1,000,000", "3,600,000", "12,000", "Unlimited", 1);
         add("How many durability points does a Netherite Chestplate have?", "492", "592", "692", "792", 1);
         add("What is the name of the advancement for having every potion effect applied at once?", "A Furious Cocktail", "How Did We Get Here?", "The End Again", "Overkill", 1);
-        add("How many different types of tropical fish can exist in Minecraft?", "1000", "2700", "3584", "5000", 2);
         add("In what version was the 'Sprinting' mechanic officially introduced?", "Beta 1.7", "Beta 1.8", "1.0", "1.2", 1);
         add("What was the first block ever added to Minecraft during its development?", "Stone", "Dirt", "Grass", "Cobblestone", 2);
         add("What is the maximum level for the 'Luck of the Sea' enchantment?", "II", "III", "IV", "V", 1);
@@ -460,15 +437,13 @@ public class TriviaQuestions {
         add("Which status effect can a spider NOT naturally spawn with on Hard?", "Strength", "Speed", "Invisibility", "Slowness", 3);
         add("What is the hardness value of a block of Deepslate?", "3", "4.5", "6", "1.5", 0);
         add("How many items can a single block of dried kelp smelt?", "10", "20", "30", "40", 1);
-        add("What is the chance of a Skeleton Horse trap spawning during a thunderstorm on Normal?", "1.5-4%", "0.75-1.5%", "3.75-10%", "5-10%", 0);
         add("How many chunks are stored in a single Minecraft Region (.mca) file?", "256", "512", "1024", "2048", 2);
         add("What is the maximum level of a Sharpness enchantment book found in a Loot Chest?", "III", "IV", "V", "II", 2);
-        add("How many hearts of health does a Wither have in Minecraft: Bedrock Edition?", "150", "300", "600", "1000", 1);
         add("What is the width of an Enderman's hitbox in blocks?", "0.5", "0.6", "0.7", "0.8", 1);
         add("How many blocks per second is the terminal velocity of a falling player?", "20", "50", "78.4", "100", 2);
         add("What is the name of the sound file used for a Creeper's fuse?", "fuse", "hiss", "prime", "random.fuse", 3);
         add("How many levels of the 'Haste' effect can be obtained from a full Beacon?", "I", "II", "III", "IV", 1);
-        add("What is the blast resistance of a block of Netherite?", "100", "600", "1200", "1200", 2);
+        add("What is the blast resistance of a block of Netherite?", "100", "600", "1200", "2400", 2);
         add("How many items can a single Bamboo smelt?", "0.25", "0.5", "0.75", "0.1", 0);
         add("What is the name of the advancement for entering a Stronghold?", "Eye Spy", "Stronghold", "The End?", "Into the Void", 0);
         add("How many experience points are dropped by the Ender Dragon on subsequent deaths?", "100", "500", "1000", "2000", 1);
@@ -511,6 +486,16 @@ public class TriviaQuestions {
         add("Which mob has the ID 'minecraft:giant'?", "Iron Golem", "Giant", "Warden", "Ender Dragon", 1);
         add("What is the maximum number of items in a single Hopper slot?", "16", "32", "64", "1", 2);
         add("Which item is used to duplicate a Smithing Template?", "Netherite", "Diamond", "Gold", "Emerald", 1);
+
+        // --- verified against 26.2's own data files (see .claude/skills/.../audit_trivia.py) ---
+        add("How many goat horn instruments exist?", "4", "6", "8", "12", 2);
+        add("Which mob drops a Breeze Rod?", "Blaze", "Breeze", "Vex", "Evoker", 1);
+        add("Which mob drops an Armadillo Scute?", "Turtle", "Armadillo", "Sniffer", "Frog", 1);
+        add("Which block does a Creaking come from?", "Creaking Heart", "Pale Oak Log", "Resin Block", "Sculk Catalyst", 0);
+        add("Which item is needed to open a Vault?", "Trial Key", "Tripwire Hook", "Ominous Bottle", "Echo Shard", 0);
+        add("Which item is combined with a Breeze Rod to craft a Mace?", "Netherite Ingot", "Heavy Core", "Echo Shard", "Diamond", 1);
+        add("What does a Bogged shoot?", "Normal arrows", "Poisoned arrows", "Fire charges", "Wind charges", 1);
+        add("Which armour can be crafted from Armadillo Scutes?", "Horse Armour", "Wolf Armour", "Leather Armour", "Turtle Shell", 1);
     }
 
     private static void add(String q, String a1, String a2, String a3, String a4, int correct) {

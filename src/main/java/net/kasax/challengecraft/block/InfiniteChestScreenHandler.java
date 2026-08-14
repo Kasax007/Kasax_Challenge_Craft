@@ -1,26 +1,25 @@
 package net.kasax.challengecraft.block;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 
 /** Server/client screen handler bridge for the infinite chest UI. */
-public class InfiniteChestScreenHandler extends ScreenHandler {
+public class InfiniteChestScreenHandler extends AbstractContainerMenu {
     private final BlockPos pos;
-    private final net.minecraft.entity.player.PlayerInventory playerInventory;
+    private final net.minecraft.world.entity.player.Inventory playerInventory;
 
-    public InfiniteChestScreenHandler(int syncId, net.minecraft.entity.player.PlayerInventory playerInventory, PacketData data) {
+    public InfiniteChestScreenHandler(int syncId, net.minecraft.world.entity.player.Inventory playerInventory, PacketData data) {
         this(syncId, playerInventory, data.pos());
     }
 
-    public InfiniteChestScreenHandler(int syncId, net.minecraft.entity.player.PlayerInventory playerInventory, BlockPos pos) {
+    public InfiniteChestScreenHandler(int syncId, net.minecraft.world.entity.player.Inventory playerInventory, BlockPos pos) {
         super(InfiniteChestRegistry.INFINITE_CHEST_SCREEN_HANDLER, syncId);
         this.pos = pos;
         this.playerInventory = playerInventory;
@@ -37,24 +36,24 @@ public class InfiniteChestScreenHandler extends ScreenHandler {
     }
 
     @Override
-    public ItemStack quickMove(PlayerEntity player, int slotIndex) {
+    public ItemStack quickMoveStack(Player player, int slotIndex) {
         ItemStack itemStack = ItemStack.EMPTY;
         Slot slot = this.slots.get(slotIndex);
-        if (slot != null && slot.hasStack()) {
-            ItemStack itemStack2 = slot.getStack();
+        if (slot != null && slot.hasItem()) {
+            ItemStack itemStack2 = slot.getItem();
             itemStack = itemStack2.copy();
             
-            if (player.getWorld().getBlockEntity(pos) instanceof InfiniteChestBlockEntity be) {
-                if (!player.getWorld().isClient) {
+            if (player.level().getBlockEntity(pos) instanceof InfiniteChestBlockEntity be) {
+                if (!player.level().isClientSide()) {
                     be.getStorage().addStack(itemStack2);
-                    be.markDirty();
-                    if (player instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+                    be.setChanged();
+                    if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                         net.kasax.challengecraft.network.PacketHandler.syncInfiniteChest(serverPlayer, be);
                     }
                 }
                 itemStack2.setCount(0);
-                slot.setStack(ItemStack.EMPTY);
-                slot.markDirty();
+                slot.setByPlayer(ItemStack.EMPTY);
+                slot.setChanged();
             } else {
                 return ItemStack.EMPTY;
             }
@@ -63,7 +62,7 @@ public class InfiniteChestScreenHandler extends ScreenHandler {
     }
 
     @Override
-    public boolean canUse(PlayerEntity player) {
+    public boolean stillValid(Player player) {
         return true;
     }
 
@@ -71,15 +70,15 @@ public class InfiniteChestScreenHandler extends ScreenHandler {
         return pos;
     }
 
-    public record PacketData(BlockPos pos) implements CustomPayload {
-        public static final Id<PacketData> ID = new Id<>(Identifier.of("challengecraft", "infinite_chest_open"));
-        public static final PacketCodec<RegistryByteBuf, PacketData> PACKET_CODEC = PacketCodec.of(
+    public record PacketData(BlockPos pos) implements CustomPacketPayload {
+        public static final Type<PacketData> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "infinite_chest_open"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, PacketData> PACKET_CODEC = StreamCodec.ofMember(
                 (data, buf) -> buf.writeBlockPos(data.pos()),
                 buf -> new PacketData(buf.readBlockPos())
         );
 
         @Override
-        public Id<? extends CustomPayload> getId() {
+        public Type<? extends CustomPacketPayload> type() {
             return ID;
         }
     }

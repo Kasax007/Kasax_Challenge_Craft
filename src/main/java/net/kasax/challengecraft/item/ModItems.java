@@ -1,53 +1,52 @@
 package net.kasax.challengecraft.item;
 
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import java.util.function.Function;
 
 /** Registers standalone items used by challenges and progression rewards. */
 public class ModItems {
     public static Item register(String name,
-                                Function<Item.Settings, Item> factory,
-                                Item.Settings settings) {
-        Identifier id = Identifier.of(ChallengeCraft.MOD_ID, name);
-        RegistryKey<Item> key = RegistryKey.of(RegistryKeys.ITEM, id);
-        Item item = factory.apply(settings.registryKey(key));
-        Registry.register(Registries.ITEM, id, item);
+                                Function<Item.Properties, Item> factory,
+                                Item.Properties settings) {
+        Identifier id = Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, name);
+        ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
+        Item item = factory.apply(settings.setId(key));
+        Registry.register(BuiltInRegistries.ITEM, id, item);
         return item;
     }
 
     public static final Item CHALLENGE_STICK = register(
             "challenge_stick",
             Item::new,
-            new Item.Settings()
-                    .maxCount(1)
+            new Item.Properties()
+                    .stacksTo(1)
     );
 
     public static final Item LOCKOUT_BINGO_MAP = register(
             "lockout_bingo_map",
             LockoutBingoMapItem::new,
-            new Item.Settings()
-                    .maxCount(1)
+            new Item.Properties()
+                    .stacksTo(1)
     );
 
     public static final Item FORCE_ITEM_TRACKER = register(
             "force_item_tracker",
             ForceItemTrackerItem::new,
-            new Item.Settings()
-                    .maxCount(1)
+            new Item.Properties()
+                    .stacksTo(1)
     );
 
     public static final Item DICE = register(
             "dice",
             DiceItem::new,
-            new Item.Settings()
-                    .maxCount(1)
+            new Item.Properties()
+                    .stacksTo(1)
     );
 
     public static void initialize() {

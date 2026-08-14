@@ -4,18 +4,21 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.util.math.MatrixStack;
-
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
+import org.joml.Matrix3x2fStack;
 import java.awt.*;
 
 @Environment(EnvType.CLIENT)
 /** Shared run timer overlay backed by server-synced display time. */
 public class TimerOverlay {
+    /** Id of the HUD element this overlay draws through (26.2 replaced the draw callback). */
+    private static final Identifier ELEMENT_ID = Identifier.fromNamespaceAndPath("challengecraft", "timer_overlay");
+
     private static int basePlayTicks = -1;
     private static double extraTicks = 0.0;
     private static long lastUpdateMillis = -1L;
@@ -30,7 +33,7 @@ public class TimerOverlay {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             long now = System.currentTimeMillis();
 
-            if (basePlayTicks < 0 || client.player == null || client.world == null) {
+            if (basePlayTicks < 0 || client.player == null || client.level == null) {
                 lastUpdateMillis = now;
                 return;
             }
@@ -55,11 +58,12 @@ public class TimerOverlay {
             lastUpdateMillis = -1L;
         });
 
-        HudRenderCallback.EVENT.register(TimerOverlay::onHudRender);
+        // Drawn after every vanilla element, exactly where the old HudRenderCallback sat.
+        HudElementRegistry.addLast(ELEMENT_ID, TimerOverlay::onHudRender);
     }
 
-    private static void onHudRender(DrawContext ctx, RenderTickCounter tickDelta) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
+        Minecraft client = Minecraft.getInstance();
         if (client.player == null || basePlayTicks < 0) {
             return;
         }
@@ -73,12 +77,12 @@ public class TimerOverlay {
                 ? String.format("%d:%02d:%02d", hrs, mins, secs)
                 : String.format("%02d:%02d", mins, secs);
 
-        TextRenderer tr = client.textRenderer;
-        int sw = client.getWindow().getScaledWidth();
-        int sh = client.getWindow().getScaledHeight();
+        Font tr = client.font;
+        int sw = client.getWindow().getGuiScaledWidth();
+        int sh = client.getWindow().getGuiScaledHeight();
 
         float scale = 1.5f;
-        int textW = tr.getWidth(timeString);
+        int textW = tr.width(timeString);
         int x0 = (sw - (int)(textW * scale)) / 2;
         int y0 = sh - 60;
 
@@ -97,25 +101,26 @@ public class TimerOverlay {
         float stripeCX = (textW + stripeW) * shineT - stripeW / 2f;
         float halfW = stripeW / 2f;
 
-        MatrixStack ms = ctx.getMatrices();
-        ms.push();
-        ms.translate(x0, y0, 0);
-        ms.scale(scale, scale, 1f);
-        ctx.drawText(tr, timeString, 0, 0, baseGold, true);
+        // 26.2's GUI matrix stack is a 2D affine one, so translate/scale lose their Z argument.
+        Matrix3x2fStack ms = ctx.pose();
+        ms.pushMatrix();
+        ms.translate(x0, y0);
+        ms.scale(scale, scale);
+        ctx.text(tr, timeString, 0, 0, baseGold, true);
 
         float xAcc = 0f;
         int highlight = 0xFFD4AF37;
 
         for (char c : timeString.toCharArray()) {
             String s = String.valueOf(c);
-            float cw = tr.getWidth(s);
+            float cw = tr.width(s);
             float cx = xAcc + cw / 2f;
             if (Math.abs(cx - stripeCX) <= halfW) {
-                ctx.drawText(tr, s, Math.round(xAcc), 0, highlight, true);
+                ctx.text(tr, s, Math.round(xAcc), 0, highlight, true);
             }
             xAcc += cw;
         }
 
-        ms.pop();
+        ms.popMatrix();
     }
 }

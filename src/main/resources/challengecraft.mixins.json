@@ -1,10 +1,9 @@
 {
   "required": true,
   "package": "net.kasax.challengecraft.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
     "EntityTypeMixin",
-    "LevelInfoAccessor",
     "MixinPlayerEntityDrop",
     "MixinPlayerEntityPreventBarrierDrop",
     "MixinScreenHandler",
@@ -42,14 +41,5 @@
     "InGameHudMixin",
     "GameMenuScreenMixin",
     "MinecraftClientMixin"
-  ],
-  "server": [
-    "EntityTypeMixin",
-    "NoBlockDropsMixin",
-    "NoChestLootMixin",
-    "NoMobDropsMixin",
-    "RandomMobDropsMixin",
-    "RandomChunkBlocksMixin",
-    "ChunkRegionMixin"
   ]
 }

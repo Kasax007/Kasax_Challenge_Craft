@@ -3,15 +3,16 @@ package net.kasax.challengecraft.network;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.mixin.MinecraftServerAccessor;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.WorldSavePath;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Set;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
@@ -56,10 +57,10 @@ public class ChallengeWorldRestarter {
         
         server.execute(() -> {
             needsTeleport = false; // Reset inside execute to avoid race if multiple JOINS happen fast
-            server.getPlayerManager().getPlayerList().forEach(player -> {
-                ServerWorld overworld = server.getOverworld();
-                net.minecraft.util.math.BlockPos spawn = overworld.getSpawnPos();
-                player.requestTeleport(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
+            server.getPlayerList().getPlayers().forEach(player -> {
+                ServerLevel overworld = server.overworld();
+                net.minecraft.core.BlockPos spawn = overworld.getRespawnData().pos();
+                player.teleportTo(spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5);
                 LOGGER.info("[Teleport] Teleported {} to safe spawn at {}", player.getName().getString(), spawn);
             });
         });
@@ -68,59 +69,66 @@ public class ChallengeWorldRestarter {
     public static void initiateRestart(MinecraftServer server) {
         LOGGER.info("Initiating world restart via offline rotation...");
 
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         data.resetForNewWorld();
         
         // Persist before stopping so the next run can keep challenge settings while resetting progress.
-        server.getOverworld().getPersistentStateManager().save();
+        server.overworld().getDataStorage().saveAndJoin();
         
         LOGGER.info("Reset challenge progress and saved persistent state for the upcoming new world.");
 
-        server.getPlayerManager().broadcast(Text.translatable("challengecraft.restart.broadcast").formatted(Formatting.GOLD, Formatting.BOLD), false);
+        server.getPlayerList().broadcastSystemMessage(Component.translatable("challengecraft.restart.broadcast").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
 
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.sendMessage(Text.translatable("challengecraft.restart.preparing").formatted(Formatting.YELLOW), false);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(Component.translatable("challengecraft.restart.preparing").withStyle(ChatFormatting.YELLOW));
         }
 
-        String worldName = ((MinecraftServerAccessor) server).getSession().getDirectoryName();
+        String worldName = ((MinecraftServerAccessor) server).getSession().getLevelId();
 
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, new RestartPendingPacket(worldName));
         }
 
         try {
-            Path worldDir = server.getSavePath(WorldSavePath.ROOT);
+            Path worldDir = server.getWorldPath(LevelResource.ROOT);
             Files.writeString(worldDir.resolve("challengecraft_restart_pending"), "true");
             LOGGER.info("Created restart flag file in {}", worldDir);
         } catch (IOException e) {
             LOGGER.error("Failed to create restart flag file!", e);
         }
 
-        server.stop(false);
+        server.halt(false);
     }
 
     public static void initializeGenerators(MinecraftServer server) {
         net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(null);
         net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(null);
+        net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setVanillaOverworldGenerator(null);
+        net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setVanillaNetherGenerator(null);
+
+        if (!net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.isActive()) {
+            restoreVanillaGenerators(server);
+            return;
+        }
 
         if (net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.isActive()) {
             try {
-                var registries = server.getRegistryManager();
-                var structLookup = registries.getOrThrow(net.minecraft.registry.RegistryKeys.STRUCTURE_SET);
-                var dimRegistry = registries.getOrThrow(net.minecraft.registry.RegistryKeys.DIMENSION);
+                var registries = server.registryAccess();
+                var structLookup = registries.lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE_SET);
+                var dimRegistry = registries.lookupOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM);
                 
-                var overworldOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.OVERWORLD);
+                var overworldOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
                 if (overworldOpt != null) {
-                    var biomeSource = overworldOpt.chunkGenerator().getBiomeSource();
+                    var biomeSource = overworldOpt.generator().getBiomeSource();
                     net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setOverworldGenerator(
                         new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, false)
                     );
                     LOGGER.info("Initialized Skyblock Overworld generator for session.");
                 }
                 
-                var netherOpt = dimRegistry.get(net.minecraft.world.dimension.DimensionOptions.NETHER);
+                var netherOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.NETHER);
                 if (netherOpt != null) {
-                    var biomeSource = netherOpt.chunkGenerator().getBiomeSource();
+                    var biomeSource = netherOpt.generator().getBiomeSource();
                     net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setNetherGenerator(
                         new net.kasax.challengecraft.world.SkyblockChunkGenerator(structLookup, biomeSource, true)
                     );
@@ -132,11 +140,51 @@ public class ChallengeWorldRestarter {
         }
     }
 
+    /**
+     * Builds vanilla generators to replace a Skyblock generator still stored in the world settings.
+     *
+     * <p>Only relevant when the challenge is OFF. Minecraft persists whatever
+     * {@code LevelStem.generator()} returned, so a world that was ever Skyblock keeps saying so;
+     * without this, deselecting the challenge and restarting produced another Skyblock world. The
+     * biome source is taken from the stored generator itself — the Skyblock generator wraps the
+     * original one — so the replacement keeps the world's own biome layout and only the terrain
+     * shaping goes back to vanilla.
+     */
+    private static void restoreVanillaGenerators(MinecraftServer server) {
+        try {
+            var registries = server.registryAccess();
+            var noiseSettings = registries.lookupOrThrow(net.minecraft.core.registries.Registries.NOISE_SETTINGS);
+            var dimRegistry = registries.lookupOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM);
+
+            var overworldOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
+            if (overworldOpt != null
+                    && overworldOpt.generator() instanceof net.kasax.challengecraft.world.SkyblockChunkGenerator sky) {
+                net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setVanillaOverworldGenerator(
+                        new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(
+                                sky.getBiomeSource(),
+                                noiseSettings.getOrThrow(net.minecraft.world.level.levelgen.NoiseGeneratorSettings.OVERWORLD)));
+                LOGGER.info("[Skyblock] Challenge is off but the world still stored a Skyblock overworld generator — restored the vanilla one");
+            }
+
+            var netherOpt = dimRegistry.getValue(net.minecraft.world.level.dimension.LevelStem.NETHER);
+            if (netherOpt != null
+                    && netherOpt.generator() instanceof net.kasax.challengecraft.world.SkyblockChunkGenerator sky) {
+                net.kasax.challengecraft.challenges.Chal_11_SkyblockWorld.setVanillaNetherGenerator(
+                        new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(
+                                sky.getBiomeSource(),
+                                noiseSettings.getOrThrow(net.minecraft.world.level.levelgen.NoiseGeneratorSettings.NETHER)));
+                LOGGER.info("[Skyblock] Restored the vanilla nether generator");
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to restore vanilla generators after Skyblock was switched off!", e);
+        }
+    }
+
     public static void randomizeSeed(MinecraftServer server) {
         if (!rotationPending) return;
         
         try {
-            net.minecraft.world.SaveProperties properties = ((net.kasax.challengecraft.mixin.MinecraftServerAccessor) server).getSaveProperties();
+            net.minecraft.world.level.storage.WorldData properties = ((net.kasax.challengecraft.mixin.MinecraftServerAccessor) server).getSaveProperties();
             if (properties == null) {
                 LOGGER.warn("SaveProperties is null during randomization!");
                 return;
@@ -144,25 +192,54 @@ public class ChallengeWorldRestarter {
             long newSeed = new java.util.Random().nextLong();
             LOGGER.info("Randomizing seed in memory for fresh world. New seed: {}", newSeed);
 
-            randomizeAllLongFields(properties, newSeed);
-            
+            // Reset the clock instead of randomising every long on the level data.
+            //
+            // The blanket randomiser dates from when the seed WAS a long field here. It no longer
+            // is (see the WorldGenSettings block below), so all it hit was PrimaryLevelData's one
+            // remaining long: gameTime — which it set to the seed, roughly 1.6e18 ticks. Measured,
+            // not guessed: the restart self-test printed `gameTime=1629089990846195763` on the
+            // second boot.
+            //
+            // That is what made a fresh world open at night. ClientClockManager advances the day
+            // clock by the DELTA between game-time updates, so a seed-sized jump throws the sky to
+            // an arbitrary hour on the client — while the server's own clock, which is separate
+            // saved data and archived with the rest of the world, still reads a correct morning.
+            // Hence a bug visible in-game but invisible to a headless server test.
+            //
+            // A brand-new vanilla world starts at gameTime 0, so that is what a restart restores.
             resetSpawnFields(properties);
-
             clearNbtFields(properties);
-            
+
             try {
-                Object mainWorldProps = properties.getMainWorldProperties();
+                net.minecraft.world.level.storage.ServerLevelData mainWorldProps = properties.overworldData();
+                if (mainWorldProps != null) {
+                    mainWorldProps.setGameTime(0L);
+                    LOGGER.info("[SeedReset] Reset gameTime to 0 for the fresh world");
+                }
                 if (mainWorldProps != null && mainWorldProps != properties) {
                     LOGGER.info("Cleaning internal MainWorldProperties...");
-                    randomizeAllLongFields(mainWorldProps, newSeed);
                     resetSpawnFields(mainWorldProps);
                     clearNbtFields(mainWorldProps);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                LOGGER.warn("[SeedReset] Could not reset gameTime: {}", t.toString());
+            }
 
-            net.minecraft.world.gen.GeneratorOptions options = properties.getGeneratorOptions();
+            // THE SEED. In 26.2 it no longer lives on the level data at all — the chain is
+            //   MinecraftServer.getWorldGenSettings() -> WorldGenSettings.options() -> WorldOptions.seed
+            // (confirmed by disassembling ServerLevel.getSeed). Searching SaveProperties, as this
+            // code used to, found only PrimaryLevelData.gameTime and left the seed untouched: the
+            // world really was regenerated, with the OLD seed, so a restart produced a
+            // pixel-identical world and looked like it had done nothing at all.
+            net.minecraft.world.level.levelgen.WorldGenSettings genSettings = server.getWorldGenSettings();
+            Object options = genSettings == null ? null
+                    : findFieldOfType(genSettings, net.minecraft.world.level.levelgen.WorldOptions.class);
             if (options != null) {
                 randomizeAllLongFields(options, newSeed);
+                LOGGER.info("[SeedReset] New world seed applied via WorldGenSettings: {}", newSeed);
+            } else {
+                LOGGER.error("[SeedReset] Could not reach WorldOptions through WorldGenSettings — "
+                        + "the restarted world WILL reuse the old seed. This needs fixing, not ignoring.");
             }
 
             try {
@@ -183,6 +260,27 @@ public class ChallengeWorldRestarter {
         } catch (Exception e) {
             LOGGER.error("Critical failure during seed randomization!", e);
         }
+    }
+
+    /** First field on {@code obj} (or a superclass) assignable to {@code type}, or null. */
+    private static Object findFieldOfType(Object obj, Class<?> type) {
+        if (obj == null) return null;
+        Class<?> clazz = obj.getClass();
+        while (clazz != null && clazz != Object.class) {
+            for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                if (type.isAssignableFrom(f.getType())) {
+                    try {
+                        f.setAccessible(true);
+                        Object value = f.get(obj);
+                        if (value != null) return value;
+                    } catch (Exception ignored) {
+                        // Fall through and keep looking.
+                    }
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return null;
     }
 
     private static void randomizeAllLongFields(Object obj, long newVal) {
@@ -269,7 +367,7 @@ public class ChallengeWorldRestarter {
                 Class<?> type = f.getType();
                 String typeName = type.getName();
                 
-                boolean isNbt = net.minecraft.nbt.NbtCompound.class.isAssignableFrom(type);
+                boolean isNbt = net.minecraft.nbt.CompoundTag.class.isAssignableFrom(type);
 
                 if (isNbt) {
                     String name = f.getName().toLowerCase();
@@ -287,7 +385,7 @@ public class ChallengeWorldRestarter {
                     
                     try {
                         f.setAccessible(true);
-                        f.set(obj, new net.minecraft.nbt.NbtCompound());
+                        f.set(obj, new net.minecraft.nbt.CompoundTag());
                         LOGGER.info("[SeedReset] Reset NBT field '{}.{}' to empty compound", clazz.getSimpleName(), f.getName());
                     } catch (Exception e) {
                         LOGGER.warn("[SeedReset] Could not clear NBT field '{}.{}'", clazz.getSimpleName(), f.getName());
@@ -401,51 +499,58 @@ public class ChallengeWorldRestarter {
 
         LOGGER.info("Performing offline world rotation to {}", archiveDir);
 
-        String[] toMove = {
-            "region", "poi", "entities", "DIM1", "DIM-1", 
-            "playerdata", "advancements", "stats", "data",
-            "level.dat", "level.dat_old", "uid.dat"
-        };
+        // Move EVERYTHING except a short keep-list, rather than naming the folders to move.
+        //
+        // This used to be an allow-list of "region", "poi", "entities", "DIM1", "DIM-1",
+        // "playerdata", ... — the pre-26.2 save layout. 26.2 moved the chunk data under
+        // `dimensions/` and the player data under `players/`, so every one of those names simply
+        // did not exist any more. The loop skipped them all WITHOUT WARNING (it only logged on
+        // IOException, never on "not found"), archived `level.dat` and `data`, and left the actual
+        // chunks in place. The restart then regenerated a world that already had its terrain on
+        // disk: a brand-new seed, byte-identical spawn, and a log full of success messages.
+        //
+        // A deny-list survives the next layout change; an allow-list silently stops working.
+        Set<String> keep = Set.of(
+                "old worlds",     // the archive we are writing into
+                "session.lock"    // held open by the running server; moving it breaks the session
+        );
 
-        for (String name : toMove) {
-            Path src = worldDir.resolve(name);
-            if (Files.exists(src)) {
-                boolean isDir = Files.isDirectory(src);
+        int moved = 0, skipped = 0;
+        try (Stream<Path> entries = Files.list(worldDir)) {
+            for (Path src : entries.collect(Collectors.toList())) {
+                String name = src.getFileName().toString();
+                if (keep.contains(name)) {
+                    skipped++;
+                    continue;
+                }
                 try {
                     moveOrRecursive(src, archiveDir.resolve(name));
-                    // Minecraft expects these directories to exist again before the next save pass.
-                    if (isDir && (name.equals("playerdata") || name.equals("advancements") || name.equals("stats") || 
-                                  name.equals("region") || name.equals("poi") || name.equals("entities"))) {
-                        Files.createDirectories(src);
-                        LOGGER.info("[Rotation] Recreated empty directory: {}", name);
-                    }
+                    moved++;
+                    LOGGER.info("[Rotation] Archived '{}'", name);
                 } catch (IOException e) {
-                    LOGGER.warn("Could not move {} during offline rotation: {}", name, e.getMessage());
+                    // Loud on purpose: anything left behind here is old world state that will bleed
+                    // into the "fresh" world.
+                    LOGGER.error("[Rotation] FAILED to archive '{}' — the new world will inherit it: {}",
+                            name, e.getMessage());
                 }
             }
         }
+        LOGGER.info("[Rotation] Archived {} entr(ies), kept {}", moved, skipped);
         
-        // Keep the challenge configuration file in place so the next run preserves the chosen rules.
-        Path dataDir = worldDir.resolve("data");
-        if (Files.exists(dataDir)) {
-            Path archiveDataDir = archiveDir.resolve("data");
-            Files.createDirectories(archiveDataDir);
-            try (Stream<Path> files = Files.list(dataDir)) {
-                for (Path p : files.collect(Collectors.toList())) {
-                    String fileName = p.getFileName().toString();
-                    if (!fileName.equals("challengecraft_challenges.dat")) {
-                        try {
-                            moveOrRecursive(p, archiveDataDir.resolve(fileName));
-                        } catch (IOException e) {
-                            LOGGER.warn("Could not move data item {}: {}", fileName, e.getMessage());
-                        }
-                    }
-                }
-            }
+        // The whole `data` folder has just been archived, so bring the one file back that must
+        // survive: the chosen challenge set. (Previously this ran against the live folder and
+        // depended on `data` NOT having been moved — the two halves contradicted each other.)
+        Path savedChallenges = archiveDir.resolve("data").resolve("challengecraft_challenges.dat");
+        if (Files.exists(savedChallenges)) {
+            Path liveData = worldDir.resolve("data");
+            Files.createDirectories(liveData);
+            Files.copy(savedChallenges, liveData.resolve("challengecraft_challenges.dat"),
+                    StandardCopyOption.REPLACE_EXISTING);
+            LOGGER.info("[Rotation] Restored challenge configuration into the fresh world");
+        } else {
+            LOGGER.warn("[Rotation] No challenge configuration found to carry over — "
+                    + "the new world will fall back to whatever the client seeds");
         }
-        
-        deleteRecursive(worldDir.resolve("DIM1"));
-        deleteRecursive(worldDir.resolve("DIM-1"));
     }
 
     private static void deleteRecursive(Path path) {

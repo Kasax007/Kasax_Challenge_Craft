@@ -8,11 +8,10 @@ import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.CraftButton;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
-
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -36,7 +35,7 @@ public class LockoutBingoTeamScreen extends Screen {
     private final int[] rosterMax = new int[4];
 
     public LockoutBingoTeamScreen() {
-        super(Text.translatable("challengecraft.lockout.team.title"));
+        super(Component.translatable("challengecraft.lockout.team.title"));
     }
 
     @Override
@@ -58,35 +57,35 @@ public class LockoutBingoTeamScreen extends Screen {
             panelY[i] = ROW_TOP + rowIdx * (panelH + panelGap);
 
             int joinW = 46;
-            addDrawableChild(new CraftButton(panelX[i] + panelW - joinW - 6, panelY[i] + 5, joinW, 14,
-                    Text.translatable("challengecraft.lockout.team.join_short"), CraftButton.Style.NEUTRAL,
+            addRenderableWidget(new CraftButton(panelX[i] + panelW - joinW - 6, panelY[i] + 5, joinW, 14,
+                    Component.translatable("challengecraft.lockout.team.join_short"), CraftButton.Style.NEUTRAL,
                     b -> ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.JOIN_TEAM, team.ordinal()))));
         }
 
-        leaveButton = addDrawableChild(new CraftButton(this.width / 2 - 124, this.height - 30, 120, 20,
-                Text.translatable("challengecraft.lockout.team.leave"), CraftButton.Style.NEUTRAL,
+        leaveButton = addRenderableWidget(new CraftButton(this.width / 2 - 124, this.height - 30, 120, 20,
+                Component.translatable("challengecraft.lockout.team.leave"), CraftButton.Style.NEUTRAL,
                 b -> ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.LEAVE_TEAM, -1))));
 
-        readyButton = addDrawableChild(new CraftButton(this.width / 2 + 4, this.height - 30, 120, 20,
-                Text.translatable("challengecraft.lockout.team.ready"), CraftButton.Style.PRIMARY, b -> sendReadyToggle()));
+        readyButton = addRenderableWidget(new CraftButton(this.width / 2 + 4, this.height - 30, 120, 20,
+                Component.translatable("challengecraft.lockout.team.ready"), CraftButton.Style.PRIMARY, b -> sendReadyToggle()));
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.renderBackground(context, mouseX, mouseY, delta);
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractBackground(context, mouseX, mouseY, delta);
 
         LockoutBingoSyncPacket state = LockoutBingoClientState.get();
-        UUID localUuid = this.client != null && this.client.player != null ? this.client.player.getUuid() : null;
+        UUID localUuid = this.minecraft != null && this.minecraft.player != null ? this.minecraft.player.getUUID() : null;
         LockoutBingoTeam localTeam = localUuid != null ? LockoutBingoClientState.getTeam(localUuid) : null;
         boolean localReady = localUuid != null && LockoutBingoClientState.isReady(localUuid);
 
         if (readyButton != null) {
-            readyButton.setMessage(Text.translatable(localReady
+            readyButton.setMessage(Component.translatable(localReady
                     ? "challengecraft.lockout.team.unready" : "challengecraft.lockout.team.ready"));
             readyButton.active = localTeam != null && !state.started();
         }
@@ -94,7 +93,7 @@ public class LockoutBingoTeamScreen extends Screen {
             leaveButton.active = localTeam != null && !state.started();
         }
 
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 14, CraftUI.TEXT_PRIMARY);
+        context.centeredText(this.font, this.title, this.width / 2, 14, CraftUI.TEXT_PRIMARY);
 
         int onlineParticipants = 0;
         int onlineTeams = 0;
@@ -121,27 +120,27 @@ public class LockoutBingoTeamScreen extends Screen {
         }
 
         boolean started = state.started();
-        context.drawCenteredTextWithShadow(this.textRenderer,
-                Text.translatable(started ? "challengecraft.lockout.team.started_hint" : "challengecraft.lockout.team.auto_start_hint"),
+        context.centeredText(this.font,
+                Component.translatable(started ? "challengecraft.lockout.team.started_hint" : "challengecraft.lockout.team.auto_start_hint"),
                 this.width / 2, this.height - 46, started ? CraftUI.INFO : CraftUI.TEXT_SECONDARY);
     }
 
-    private void drawRequirementChips(DrawContext context, int y, int players, int teams, boolean ready, int readyCount) {
-        Text p = Text.translatable("challengecraft.lockout.team.require_players", players, 2);
-        Text t = Text.translatable("challengecraft.lockout.team.require_teams", teams, 2);
-        Text r = Text.translatable("challengecraft.lockout.team.require_ready", readyCount, Math.max(players, 1));
-        int wp = this.textRenderer.getWidth(p) + 10;
-        int wt = this.textRenderer.getWidth(t) + 10;
-        int wr = this.textRenderer.getWidth(r) + 10;
+    private void drawRequirementChips(GuiGraphicsExtractor context, int y, int players, int teams, boolean ready, int readyCount) {
+        Component p = Component.translatable("challengecraft.lockout.team.require_players", players, 2);
+        Component t = Component.translatable("challengecraft.lockout.team.require_teams", teams, 2);
+        Component r = Component.translatable("challengecraft.lockout.team.require_ready", readyCount, Math.max(players, 1));
+        int wp = this.font.width(p) + 10;
+        int wt = this.font.width(t) + 10;
+        int wr = this.font.width(r) + 10;
         int gap = 8;
         int total = wp + wt + wr + gap * 2;
         int x = this.width / 2 - total / 2;
-        x += CraftUI.labelChip(context, this.textRenderer, p, x, y, players >= 2 ? CraftUI.SUCCESS : CraftUI.DANGER) + gap;
-        x += CraftUI.labelChip(context, this.textRenderer, t, x, y, teams >= 2 ? CraftUI.SUCCESS : CraftUI.DANGER) + gap;
-        CraftUI.labelChip(context, this.textRenderer, r, x, y, ready ? CraftUI.SUCCESS : CraftUI.DANGER);
+        x += CraftUI.labelChip(context, this.font, p, x, y, players >= 2 ? CraftUI.SUCCESS : CraftUI.DANGER) + gap;
+        x += CraftUI.labelChip(context, this.font, t, x, y, teams >= 2 ? CraftUI.SUCCESS : CraftUI.DANGER) + gap;
+        CraftUI.labelChip(context, this.font, r, x, y, ready ? CraftUI.SUCCESS : CraftUI.DANGER);
     }
 
-    private void drawTeamPanel(DrawContext context, LockoutBingoTeam team,
+    private void drawTeamPanel(GuiGraphicsExtractor context, LockoutBingoTeam team,
                                List<LockoutBingoSyncPacket.PlayerState> players, LockoutBingoTeam localTeam) {
         int i = team.ordinal();
         int x = panelX[i];
@@ -151,8 +150,8 @@ public class LockoutBingoTeamScreen extends Screen {
         CraftUI.panel(context, x, y, panelW, panelH, fill, isLocal ? team.color() : CraftUI.BORDER, team.color());
 
         // Team-coloured header with an underline hairline and member count.
-        context.drawText(this.textRenderer, team.displayName(), x + 8, y + 7, team.color(), false);
-        int underlineY = y + 7 + this.textRenderer.fontHeight + 2;
+        context.text(this.font, team.displayName(), x + 8, y + 7, team.color(), false);
+        int underlineY = y + 7 + this.font.lineHeight + 2;
         context.fill(x + 8, underlineY, x + panelW - 54, underlineY + 1, CraftUI.applyAlpha(team.color(), 0.7f));
 
         List<LockoutBingoSyncPacket.PlayerState> teamPlayers = new ArrayList<>(players.stream()
@@ -166,10 +165,10 @@ public class LockoutBingoTeamScreen extends Screen {
         int rowH = 12;
         int contentH = teamPlayers.size() * rowH;
         rosterMax[i] = Math.max(0, contentH - visibleH);
-        rosterOffset[i] = MathHelper.clamp(rosterOffset[i], 0f, rosterMax[i]);
+        rosterOffset[i] = Mth.clamp(rosterOffset[i], 0f, rosterMax[i]);
 
         if (teamPlayers.isEmpty()) {
-            context.drawText(this.textRenderer, Text.translatable("challengecraft.lockout.team.empty"),
+            context.text(this.font, Component.translatable("challengecraft.lockout.team.empty"),
                     x + 8, rosterTop + 4, CraftUI.TEXT_MUTED, false);
             return;
         }
@@ -177,25 +176,25 @@ public class LockoutBingoTeamScreen extends Screen {
         context.enableScissor(x + 4, rosterTop, x + panelW - 4, rosterBottom);
         int lineY = rosterTop - Math.round(rosterOffset[i]);
         for (LockoutBingoSyncPacket.PlayerState player : teamPlayers) {
-            Text badge;
+            Component badge;
             int accent;
             if (!player.online()) {
-                badge = Text.translatable("challengecraft.lockout.team.badge_offline");
+                badge = Component.translatable("challengecraft.lockout.team.badge_offline");
                 accent = CraftUI.TEXT_MUTED;
             } else if (player.ready()) {
-                badge = Text.translatable("challengecraft.lockout.team.badge_ready");
+                badge = Component.translatable("challengecraft.lockout.team.badge_ready");
                 accent = CraftUI.SUCCESS;
             } else {
-                badge = Text.translatable("challengecraft.lockout.team.badge_online");
+                badge = Component.translatable("challengecraft.lockout.team.badge_online");
                 accent = CraftUI.INFO;
             }
-            int chipW = this.textRenderer.getWidth(badge) + 10;
+            int chipW = this.font.width(badge) + 10;
             int chipX = x + panelW - chipW - 8;
-            CraftUI.labelChip(context, this.textRenderer, badge, chipX, lineY, accent);
+            CraftUI.labelChip(context, this.font, badge, chipX, lineY, accent);
 
-            String name = CraftUI.trimToWidth(this.textRenderer, player.name(), chipX - (x + 8) - 4);
+            String name = CraftUI.trimToWidth(this.font, player.name(), chipX - (x + 8) - 4);
             int nameColor = player.online() ? CraftUI.TEXT_PRIMARY : CraftUI.TEXT_MUTED;
-            context.drawText(this.textRenderer, Text.of(name), x + 8, lineY + 1, nameColor, false);
+            context.text(this.font, Component.nullToEmpty(name), x + 8, lineY + 1, nameColor, false);
             lineY += rowH;
         }
         context.disableScissor();
@@ -205,7 +204,7 @@ public class LockoutBingoTeamScreen extends Screen {
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         for (int i = 0; i < 4; i++) {
             if (mouseX >= panelX[i] && mouseX <= panelX[i] + panelW && mouseY >= panelY[i] && mouseY <= panelY[i] + panelH) {
-                rosterOffset[i] = MathHelper.clamp(rosterOffset[i] - (float) verticalAmount * 10f, 0f, rosterMax[i]);
+                rosterOffset[i] = Mth.clamp(rosterOffset[i] - (float) verticalAmount * 10f, 0f, rosterMax[i]);
                 return true;
             }
         }
@@ -213,10 +212,10 @@ public class LockoutBingoTeamScreen extends Screen {
     }
 
     private void sendReadyToggle() {
-        if (this.client == null || this.client.player == null) {
+        if (this.minecraft == null || this.minecraft.player == null) {
             return;
         }
-        UUID uuid = this.client.player.getUuid();
+        UUID uuid = this.minecraft.player.getUUID();
         boolean ready = LockoutBingoClientState.isReady(uuid);
         ClientPlayNetworking.send(new LockoutBingoActionPacket(
                 ready ? LockoutBingoActionPacket.Action.UNREADY : LockoutBingoActionPacket.Action.READY, -1));
@@ -229,7 +228,7 @@ public class LockoutBingoTeamScreen extends Screen {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 }

@@ -1,21 +1,19 @@
 package net.kasax.challengecraft.challenges;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.ServerRecipeManager;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeType;
 import java.util.*;
 
 /** Shuffles crafting outputs within each recipe type while preserving recipe inputs. */
 public class Chal_20_RandomizedCrafting {
     private static boolean active = false;
-    private static final Map<RecipeType<?>, Map<RegistryKey<Recipe<?>>, RecipeEntry<?>>> SHUFFLED_BY_TYPE = new HashMap<>();
+    private static final Map<RecipeType<?>, Map<ResourceKey<Recipe<?>>, RecipeHolder<?>>> SHUFFLED_BY_TYPE = new HashMap<>();
     private static long currentSeed = -1;
 
     public static void register() {
@@ -30,21 +28,21 @@ public class Chal_20_RandomizedCrafting {
     }
 
     public static void shuffleRecipes(MinecraftServer server) {
-        long seed = server.getOverworld().getSeed();
+        long seed = server.overworld().getSeed();
         if (seed == currentSeed && !SHUFFLED_BY_TYPE.isEmpty()) return;
         currentSeed = seed;
         SHUFFLED_BY_TYPE.clear();
 
-        ServerRecipeManager manager = (ServerRecipeManager) server.getRecipeManager();
-        Collection<RecipeEntry<?>> allRecipes = manager.values();
+        RecipeManager manager = (RecipeManager) server.getRecipeManager();
+        Collection<RecipeHolder<?>> allRecipes = manager.getRecipes();
 
-        Map<RecipeType<?>, List<RecipeEntry<?>>> grouped = new HashMap<>();
-        for (RecipeEntry<?> entry : allRecipes) {
-            Identifier id = entry.id().getValue();
+        Map<RecipeType<?>, List<RecipeHolder<?>>> grouped = new HashMap<>();
+        for (RecipeHolder<?> entry : allRecipes) {
+            Identifier id = entry.id().identifier();
             if (id.getNamespace().equals("challengecraft")) continue;
 
             RecipeType<?> type = entry.value().getType();
-            List<RecipeEntry<?>> group = grouped.get(type);
+            List<RecipeHolder<?>> group = grouped.get(type);
             if (group == null) {
                 group = new ArrayList<>();
                 grouped.put(type, group);
@@ -52,14 +50,14 @@ public class Chal_20_RandomizedCrafting {
             group.add(entry);
         }
 
-        for (Map.Entry<RecipeType<?>, List<RecipeEntry<?>>> groupEntry : grouped.entrySet()) {
-            List<RecipeEntry<?>> list = groupEntry.getValue();
-            list.sort(Comparator.comparing(e -> e.id().getValue().toString()));
+        for (Map.Entry<RecipeType<?>, List<RecipeHolder<?>>> groupEntry : grouped.entrySet()) {
+            List<RecipeHolder<?>> list = groupEntry.getValue();
+            list.sort(Comparator.comparing(e -> e.id().identifier().toString()));
 
-            List<RecipeEntry<?>> shuffled = new ArrayList<>(list);
-            Collections.shuffle(shuffled, new Random(seed + Registries.RECIPE_TYPE.getRawId(groupEntry.getKey())));
+            List<RecipeHolder<?>> shuffled = new ArrayList<>(list);
+            Collections.shuffle(shuffled, new Random(seed + BuiltInRegistries.RECIPE_TYPE.getId(groupEntry.getKey())));
 
-            Map<RegistryKey<Recipe<?>>, RecipeEntry<?>> typeMap = new HashMap<>();
+            Map<ResourceKey<Recipe<?>>, RecipeHolder<?>> typeMap = new HashMap<>();
             for (int i = 0; i < list.size(); i++) {
                 typeMap.put(list.get(i).id(), shuffled.get(i));
             }
@@ -67,15 +65,15 @@ public class Chal_20_RandomizedCrafting {
         }
     }
 
-    public static <T extends Recipe<?>> Optional<RecipeEntry<T>> getShuffledEntry(RecipeType<T> type, Optional<RecipeEntry<T>> original, MinecraftServer server) {
+    public static <T extends Recipe<?>> Optional<RecipeHolder<T>> getShuffledEntry(RecipeType<T> type, Optional<RecipeHolder<T>> original, MinecraftServer server) {
         if (!active || original.isEmpty()) return original;
         shuffleRecipes(server);
-        Map<RegistryKey<Recipe<?>>, RecipeEntry<?>> typeMap = SHUFFLED_BY_TYPE.get(type);
+        Map<ResourceKey<Recipe<?>>, RecipeHolder<?>> typeMap = SHUFFLED_BY_TYPE.get(type);
         if (typeMap != null) {
-            RecipeEntry<?> shuffled = typeMap.get(original.get().id());
+            RecipeHolder<?> shuffled = typeMap.get(original.get().id());
             if (shuffled != null) {
                 // This cast is safe because we shuffle within the same RecipeType.
-                return Optional.of((RecipeEntry<T>) shuffled);
+                return Optional.of((RecipeHolder<T>) shuffled);
             }
         }
         return original;

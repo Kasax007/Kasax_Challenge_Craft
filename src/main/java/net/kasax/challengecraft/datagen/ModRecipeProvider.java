@@ -1,42 +1,37 @@
 package net.kasax.challengecraft.datagen;
 
-import net.fabricmc.fabric.api.datagen.v1.FabricDataOutput;
+import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricRecipeProvider;
 import net.kasax.challengecraft.item.ModItems;
-import net.minecraft.data.recipe.RecipeExporter;
-import net.minecraft.data.recipe.RecipeGenerator;
-import net.minecraft.data.recipe.ShapedRecipeJsonBuilder;
-import net.minecraft.data.recipe.ShapelessRecipeJsonBuilder;
-import net.minecraft.item.ItemConvertible;
-import net.minecraft.item.Items;
-import net.minecraft.recipe.book.RecipeCategory;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.recipes.RecipeOutput;
+import net.minecraft.data.recipes.RecipeProvider;
+import net.minecraft.data.recipes.ShapedRecipeBuilder;
+import net.minecraft.world.item.Items;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /** Generates crafting recipes for mod items and blocks. */
 public class ModRecipeProvider extends FabricRecipeProvider {
 
-    public ModRecipeProvider(FabricDataOutput output, CompletableFuture<RegistryWrapper.WrapperLookup> registriesFuture) {
+    public ModRecipeProvider(FabricPackOutput output, CompletableFuture<HolderLookup.Provider> registriesFuture) {
         super(output, registriesFuture);
     }
 
     @Override
-    protected RecipeGenerator getRecipeGenerator(RegistryWrapper.WrapperLookup wrapperLookup, RecipeExporter recipeExporter) {
-        return new RecipeGenerator(wrapperLookup, recipeExporter) {
+    protected RecipeProvider createRecipeProvider(HolderLookup.Provider wrapperLookup, RecipeOutput recipeExporter) {
+        return new RecipeProvider(wrapperLookup, recipeExporter) {
             @Override
-            public void generate() {
-                ShapedRecipeJsonBuilder.create(wrapperLookup.getOrThrow(net.minecraft.registry.RegistryKeys.ITEM), net.minecraft.recipe.book.RecipeCategory.MISC, net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_ITEM.asItem())
+            public void buildRecipes() {
+                ShapedRecipeBuilder.shaped(wrapperLookup.lookupOrThrow(net.minecraft.core.registries.Registries.ITEM), net.minecraft.data.recipes.RecipeCategory.MISC, net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_ITEM.asItem())
                         .pattern("DDD")
                         .pattern("DCD")
                         .pattern("DDD")
-                        .input('D', Items.DIAMOND_BLOCK.asItem())
-                        .input('C', Items.CHEST.asItem())
-                        .criterion(hasItem(Items.DIAMOND_BLOCK.asItem()), conditionsFromItem(Items.DIAMOND_BLOCK.asItem()))
-                        .criterion(hasItem(Items.CHEST.asItem()), conditionsFromItem(Items.CHEST.asItem()))
-                        .offerTo(exporter);
+                        .define('D', Items.DIAMOND_BLOCK.asItem())
+                        .define('C', Items.CHEST.asItem())
+                        .unlockedBy(getHasName(Items.DIAMOND_BLOCK.asItem()), has(Items.DIAMOND_BLOCK.asItem()))
+                        .unlockedBy(getHasName(Items.CHEST.asItem()), has(Items.CHEST.asItem()))
+                        .save(output);
             }
         };
     }

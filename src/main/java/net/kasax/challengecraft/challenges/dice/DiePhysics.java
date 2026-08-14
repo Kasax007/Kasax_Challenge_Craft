@@ -1,7 +1,7 @@
 package net.kasax.challengecraft.challenges.dice;
 
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -54,13 +54,13 @@ public final class DiePhysics {
     /** Which body face points at world +Y for the body→world rotation {@code q}. */
     public static Direction topFace(Quaternionf q) {
         Vector3f up = q.transformInverseUnit(new Vector3f(0f, 1f, 0f));
-        return Direction.getFacing(up.x, up.y, up.z);
+        return Direction.getApproximateNearest(up.x, up.y, up.z);
     }
 
     /** cos(tilt) of the top face: 1.0 flat on a face, 0.707 on an edge, 0.577 on a corner. */
     public static float flatness(Quaternionf q) {
         Vector3f up = q.transformInverseUnit(new Vector3f(0f, 1f, 0f));
-        Vector3f faceVec = new Vector3f(Direction.getFacing(up.x, up.y, up.z).getFloatVector());
+        Vector3f faceVec = new Vector3f(Direction.getApproximateNearest(up.x, up.y, up.z).getUnitVec3f());
         return up.dot(faceVec);
     }
 
@@ -72,7 +72,7 @@ public final class DiePhysics {
         int i = 0;
         Vector3f worldUp = new Vector3f(0f, 1f, 0f);
         for (Direction face : Direction.values()) {
-            Quaternionf base = new Quaternionf().rotateTo(face.getUnitVector(), worldUp).normalize();
+            Quaternionf base = new Quaternionf().rotateTo(face.step(), worldUp).normalize();
             for (int k = 0; k < 4; k++) {
                 ORIENTATIONS[i] = new Quaternionf()
                         .rotateY(k * (float) (java.lang.Math.PI / 2.0))
@@ -102,7 +102,7 @@ public final class DiePhysics {
      * <p>Note a plain {@code rotateY(random)} would NOT do — a yaw about +Y maps the ±Y faces to
      * themselves and only shuffles the four sides.
      */
-    public static Quaternionf randomStart(Random random) {
+    public static Quaternionf randomStart(RandomSource random) {
         return new Quaternionf(ORIENTATIONS[random.nextInt(24)]);
     }
 

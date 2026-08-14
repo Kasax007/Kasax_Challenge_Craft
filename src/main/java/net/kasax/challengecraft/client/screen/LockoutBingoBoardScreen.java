@@ -10,12 +10,11 @@ import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.CraftButton;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import org.joml.Matrix3x2fStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,34 +40,36 @@ public class LockoutBingoBoardScreen extends Screen {
     private static final int BOTTOM_BAR = 34;
 
     private CraftButton teamButton;
-    private List<Text> pendingTooltip;
+    private List<Component> pendingTooltip;
     private float layoutScale = 1f;
     private float layoutOffsetX;
     private float layoutOffsetY;
 
     public LockoutBingoBoardScreen() {
-        super(Text.translatable("challengecraft.worldcreate.challenge40"));
+        super(Component.translatable("challengecraft.worldcreate.challenge40"));
     }
 
     @Override
     protected void init() {
         ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.REQUEST_SYNC, -1));
-        teamButton = addDrawableChild(new CraftButton(this.width / 2 - 70, this.height - 28, 140, 20,
-                Text.translatable("challengecraft.lockout.board.open_team_screen"), CraftButton.Style.NEUTRAL,
-                button -> this.client.setScreen(new LockoutBingoTeamScreen())));
+        teamButton = addRenderableWidget(new CraftButton(this.width / 2 - 70, this.height - 28, 140, 20,
+                Component.translatable("challengecraft.lockout.board.open_team_screen"), CraftButton.Style.NEUTRAL,
+                button -> this.minecraft.setScreenAndShow(new LockoutBingoTeamScreen())));
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
         if (pendingTooltip != null && !pendingTooltip.isEmpty()) {
-            context.drawTooltip(this.textRenderer, pendingTooltip, mouseX, mouseY);
+            // Deferred until after the widgets are extracted, and positioned in raw screen space —
+            // this runs outside the design-space transform applied in extractBackground.
+            context.setComponentTooltipForNextFrame(this.font, pendingTooltip, mouseX, mouseY);
         }
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.renderBackground(context, mouseX, mouseY, delta);
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractBackground(context, mouseX, mouseY, delta);
         this.pendingTooltip = null;
 
         int usableHeight = Math.max(1, this.height - BOTTOM_BAR);
@@ -81,68 +82,69 @@ public class LockoutBingoBoardScreen extends Screen {
         int localMouseX = Math.round((mouseX - this.layoutOffsetX) / this.layoutScale);
         int localMouseY = Math.round((mouseY - this.layoutOffsetY) / this.layoutScale);
 
-        MatrixStack matrices = context.getMatrices();
-        matrices.push();
-        matrices.translate(this.layoutOffsetX, this.layoutOffsetY, 0f);
-        matrices.scale(this.layoutScale, this.layoutScale, 1f);
+        // 26.2's GUI matrix is a 2D affine stack, so the old no-op z arguments simply drop away.
+        Matrix3x2fStack matrices = context.pose();
+        matrices.pushMatrix();
+        matrices.translate(this.layoutOffsetX, this.layoutOffsetY);
+        matrices.scale(this.layoutScale, this.layoutScale);
         try {
             drawBoard(context, localMouseX, localMouseY);
         } finally {
-            matrices.pop();
+            matrices.popMatrix();
         }
     }
 
     /** Draws the whole board in fixed design coordinates; the caller applies the fit scale. */
-    private void drawBoard(DrawContext context, int mouseX, int mouseY) {
+    private void drawBoard(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         LockoutBingoSyncPacket state = LockoutBingoClientState.get();
-        UUID playerUuid = this.client != null && this.client.player != null ? this.client.player.getUuid() : null;
+        UUID playerUuid = this.minecraft != null && this.minecraft.player != null ? this.minecraft.player.getUUID() : null;
         LockoutBingoTeam localTeam = playerUuid != null ? LockoutBingoClientState.getTeam(playerUuid) : null;
         LockoutBingoTeam winner = LockoutBingoTeam.fromOrdinal(state.winnerTeamId());
         LockoutBingoTeam targetTeam = localTeam != null ? localTeam : LockoutBingoClientState.getLeadingTeam();
         int clinchTarget = LockoutBingoClientState.getClinchTarget(targetTeam);
-        Text clinchText = clinchTarget > 25
-                ? Text.translatable("challengecraft.placeholder.pending")
-                : Text.of(Integer.toString(clinchTarget));
+        Component clinchText = clinchTarget > 25
+                ? Component.translatable("challengecraft.placeholder.pending")
+                : Component.nullToEmpty(Integer.toString(clinchTarget));
 
         int boardW = GRID_SIZE * TILE_SIZE;
         int boardLeft = DESIGN_WIDTH / 2 - boardW / 2;
         int boardTop = BOARD_TOP;
 
         // ---- Title ----
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, DESIGN_WIDTH / 2, 16, CraftUI.GOLD);
+        context.centeredText(this.font, this.title, DESIGN_WIDTH / 2, 16, CraftUI.GOLD);
 
         // ---- Left info panel ---- (design space always has room; no clamping needed)
         int infoX = boardLeft - SIDE_PANEL_WIDTH - 12;
         int infoY = boardTop;
         int infoH = boardW;
         CraftUI.panelFloat(context, infoX, infoY, SIDE_PANEL_WIDTH, infoH, CraftUI.INFO);
-        CraftUI.sectionHeader(context, this.textRenderer, Text.translatable("challengecraft.lockout.board.info_header"),
+        CraftUI.sectionHeader(context, this.font, Component.translatable("challengecraft.lockout.board.info_header"),
                 infoX + 8, infoY + 8, SIDE_PANEL_WIDTH - 16, CraftUI.INFO);
-        int infoRowY = infoY + 8 + this.textRenderer.fontHeight + 8;
-        infoRowY = infoRow(context, infoX + 8, infoRowY, Text.translatable("challengecraft.lockout.board.needed_to_win", clinchText), CraftUI.GOLD);
-        infoRowY = infoRow(context, infoX + 8, infoRowY, Text.translatable("challengecraft.lockout.board.time", formatTicks(LockoutBingoClientState.getElapsedTicks())), CraftUI.INFO);
-        Text teamValue = localTeam == null ? Text.translatable("challengecraft.lockout.team.none") : localTeam.displayName();
-        infoRowY = infoRow(context, infoX + 8, infoRowY, Text.translatable("challengecraft.lockout.board.current_team", teamValue),
+        int infoRowY = infoY + 8 + this.font.lineHeight + 8;
+        infoRowY = infoRow(context, infoX + 8, infoRowY, Component.translatable("challengecraft.lockout.board.needed_to_win", clinchText), CraftUI.GOLD);
+        infoRowY = infoRow(context, infoX + 8, infoRowY, Component.translatable("challengecraft.lockout.board.time", formatTicks(LockoutBingoClientState.getElapsedTicks())), CraftUI.INFO);
+        Component teamValue = localTeam == null ? Component.translatable("challengecraft.lockout.team.none") : localTeam.displayName();
+        infoRowY = infoRow(context, infoX + 8, infoRowY, Component.translatable("challengecraft.lockout.board.current_team", teamValue),
                 localTeam == null ? CraftUI.TEXT_MUTED : localTeam.color());
         if (winner != null) {
-            infoRow(context, infoX + 8, infoRowY, Text.translatable("challengecraft.lockout.board.winner", winner.displayName()), winner.color());
+            infoRow(context, infoX + 8, infoRowY, Component.translatable("challengecraft.lockout.board.winner", winner.displayName()), winner.color());
         } else if (LockoutBingoClientState.isDraw()) {
-            infoRow(context, infoX + 8, infoRowY, Text.translatable("challengecraft.lockout.board.draw"), CraftUI.WARNING);
+            infoRow(context, infoX + 8, infoRowY, Component.translatable("challengecraft.lockout.board.draw"), CraftUI.WARNING);
         }
 
         // ---- Right scoreboard panel ----
         int scoreX = boardLeft + boardW + 12;
         CraftUI.panelFloat(context, scoreX, infoY, SIDE_PANEL_WIDTH, infoH, CraftUI.GOLD);
-        CraftUI.sectionHeader(context, this.textRenderer, Text.translatable("challengecraft.lockout.board.scores_header"),
+        CraftUI.sectionHeader(context, this.font, Component.translatable("challengecraft.lockout.board.scores_header"),
                 scoreX + 8, infoY + 8, SIDE_PANEL_WIDTH - 16, CraftUI.GOLD);
-        int scoreRowY = infoY + 8 + this.textRenderer.fontHeight + 10;
+        int scoreRowY = infoY + 8 + this.font.lineHeight + 10;
         for (LockoutBingoTeam team : LockoutBingoTeam.values()) {
             // Colour swatch + name + score.
             context.fill(scoreX + 8, scoreRowY, scoreX + 8 + 8, scoreRowY + 8, team.color());
-            context.drawBorder(scoreX + 8, scoreRowY, 8, 8, CraftUI.darken(team.color(), 0.6f));
-            context.drawText(this.textRenderer, team.displayName(), scoreX + 22, scoreRowY, team.color(), false);
-            Text score = Text.of(Integer.toString(LockoutBingoClientState.getScore(team)));
-            context.drawText(this.textRenderer, score, scoreX + SIDE_PANEL_WIDTH - this.textRenderer.getWidth(score) - 10, scoreRowY, CraftUI.TEXT_PRIMARY, false);
+            context.outline(scoreX + 8, scoreRowY, 8, 8, CraftUI.darken(team.color(), 0.6f));
+            context.text(this.font, team.displayName(), scoreX + 22, scoreRowY, team.color(), false);
+            Component score = Component.nullToEmpty(Integer.toString(LockoutBingoClientState.getScore(team)));
+            context.text(this.font, score, scoreX + SIDE_PANEL_WIDTH - this.font.width(score) - 10, scoreRowY, CraftUI.TEXT_PRIMARY, false);
             scoreRowY += 16;
         }
 
@@ -153,7 +155,7 @@ public class LockoutBingoBoardScreen extends Screen {
         CraftUI.panelFloat(context, boardLeft - 6, boardTop - 6, boardW + 12, boardW + 12, CraftUI.ACCENT_HAIRLINE);
 
         if (state.boardGoalIds().isEmpty()) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.lockout.board.waiting"),
+            context.centeredText(this.font, Component.translatable("challengecraft.lockout.board.waiting"),
                     DESIGN_WIDTH / 2, boardTop + boardW / 2, CraftUI.TEXT_SECONDARY);
             return;
         }
@@ -178,7 +180,7 @@ public class LockoutBingoBoardScreen extends Screen {
         }
 
         if (hoveredGoal != null && hoveredIndex != null) {
-            List<Text> tooltip = new ArrayList<>();
+            List<Component> tooltip = new ArrayList<>();
             tooltip.add(hoveredGoal.title());
             tooltip.add(hoveredGoal.description());
             tooltip.add(hoveredGoal.condition());
@@ -186,23 +188,23 @@ public class LockoutBingoBoardScreen extends Screen {
             LockoutBingoTeam claimedTeam = LockoutBingoTeam.fromOrdinal(hoveredIndex < state.claimedTeams().size() ? state.claimedTeams().get(hoveredIndex) : -1);
             if (claimedTeam != null) {
                 String name = hoveredIndex < state.claimedByNames().size() ? state.claimedByNames().get(hoveredIndex) : "";
-                tooltip.add(Text.translatable("challengecraft.lockout.board.claimed_by", claimedTeam.displayName(), Text.of(name)));
+                tooltip.add(Component.translatable("challengecraft.lockout.board.claimed_by", claimedTeam.displayName(), Component.nullToEmpty(name)));
             }
             this.pendingTooltip = tooltip;
         }
     }
 
-    private int infoRow(DrawContext context, int x, int y, Text text, int color) {
-        context.drawText(this.textRenderer, text, x, y, color, false);
-        return y + this.textRenderer.fontHeight + 5;
+    private int infoRow(GuiGraphicsExtractor context, int x, int y, Component text, int color) {
+        context.text(this.font, text, x, y, color, false);
+        return y + this.font.lineHeight + 5;
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
-    private void drawTile(DrawContext context, int x, int y, int mouseX, int mouseY,
+    private void drawTile(GuiGraphicsExtractor context, int x, int y, int mouseX, int mouseY,
                           LockoutBingoGoal goal, LockoutBingoTeam claimedTeam, String claimant) {
         boolean hovered = mouseX >= x && mouseX < x + TILE_SIZE && mouseY >= y && mouseY < y + TILE_SIZE;
 
@@ -226,22 +228,22 @@ public class LockoutBingoBoardScreen extends Screen {
         }
 
         if (goal == null) {
-            context.drawCenteredTextWithShadow(this.textRenderer, Text.translatable("challengecraft.placeholder.unknown"),
+            context.centeredText(this.font, Component.translatable("challengecraft.placeholder.unknown"),
                     x + TILE_SIZE / 2, y + 22, CraftUI.TEXT_SECONDARY);
             return;
         }
 
         ItemStack icon = goal.createIconStack();
-        context.drawItem(icon, x + TILE_SIZE / 2 - 8, y + 6);
+        context.item(icon, x + TILE_SIZE / 2 - 8, y + 6);
 
-        String label = CraftUI.trimToWidth(this.textRenderer, goal.title().getString(), TILE_SIZE - 8);
-        context.drawCenteredTextWithShadow(this.textRenderer, Text.of(label), x + TILE_SIZE / 2, y + 28, CraftUI.TEXT_PRIMARY);
+        String label = CraftUI.trimToWidth(this.font, goal.title().getString(), TILE_SIZE - 8);
+        context.centeredText(this.font, Component.nullToEmpty(label), x + TILE_SIZE / 2, y + 28, CraftUI.TEXT_PRIMARY);
 
         if (claimedTeam != null && !claimant.isEmpty()) {
             // Small claimant-initial chip in the corner.
             String initial = claimant.substring(0, 1).toUpperCase(java.util.Locale.ROOT);
             CraftUI.chip(context, x + 3, y + 3, 11, 11, CraftUI.applyAlpha(claimedTeam.color(), 0.85f), claimedTeam.color());
-            context.drawText(this.textRenderer, Text.of(initial), x + 6, y + 5, 0xFF10151F, false);
+            context.text(this.font, Component.nullToEmpty(initial), x + 6, y + 5, 0xFF10151F, false);
         }
     }
 

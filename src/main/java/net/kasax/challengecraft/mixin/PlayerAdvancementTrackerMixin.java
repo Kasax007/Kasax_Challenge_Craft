@@ -5,16 +5,16 @@ import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.kasax.challengecraft.util.ChallengeTimeUtil;
-import net.minecraft.advancement.AdvancementEntry;
-import net.minecraft.advancement.PlayerAdvancementTracker;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.server.PlayerAdvancements;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -25,23 +25,25 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerAdvancementTracker.class)
+@Mixin(PlayerAdvancements.class)
 /** Observes completed advancements for ordered advancement progression. */
 public class PlayerAdvancementTrackerMixin {
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-Advancement");
 
+    // 26.2 renamed this field from 'owner' to 'player'. @Shadow matches by signature,
+    // so a stale name is invisible to source remapping and kills the whole mixin at apply.
     @Shadow
-    private ServerPlayerEntity owner;
+    private ServerPlayer player;
 
-    @Inject(method = "grantCriterion", at = @At("RETURN"))
-    private void onGrantCriterion(AdvancementEntry entry, String criterionName, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "award", at = @At("RETURN"))
+    private void onGrantCriterion(AdvancementHolder entry, String criterionName, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue()) {
             String id = entry.id().toString();
             LOGGER.info("[Advancement] criterion {} granted for {}", criterionName, id);
 
             if (id.equals("minecraft:end/kill_dragon")) {
-                if (this.owner.getAdvancementTracker().getProgress(entry).isDone()) {
-                    ChallengeSavedData data = ChallengeSavedData.get(owner.getServer().getOverworld());
+                if (this.player.getAdvancements().getOrStartProgress(entry).isDone()) {
+                    ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
                     LOGGER.info("[Advancement] Free the End completed. Tainted: {}, Initial Difficulty: {}", data.isTainted(), data.getInitialDifficulty());
 
                     if (data.getActive().contains(22) || data.getActive().contains(23)) {
@@ -49,15 +51,17 @@ public class PlayerAdvancementTrackerMixin {
                         return;
                     }
 
-                    List<ServerPlayerEntity> eligiblePlayers = owner.getServer().getPlayerManager().getPlayerList().stream()
-                            .filter(p -> !data.isXpAwarded(p.getUuid()))
+                    List<ServerPlayer> eligiblePlayers = player.level().getServer().getPlayerList().getPlayers().stream()
+                            .filter(p -> !data.isXpAwarded(p.getUUID()))
                             .toList();
 
                     if (!eligiblePlayers.isEmpty()) {
                         for (int cid : data.getActive()) {
                             eligiblePlayers.forEach(p -> {
-                                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
-                                StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
+                                // The world's run clock, not this player's play time: a friend invited a minute
+                                // before the finish must record the run's real duration, not their own.
+                                int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
+                                StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
                             });
                         }
                         
@@ -70,29 +74,29 @@ public class PlayerAdvancementTrackerMixin {
                             final long baseAmount = xpAmount;
                             eligiblePlayers.forEach(p -> {
                                 LevelManager.XpResult res = LevelManager.addXp(p, baseAmount);
-                                data.setXpAwarded(p.getUuid(), true);
+                                data.setXpAwarded(p.getUUID(), true);
                                 // Dragon completion is a reward trigger, not a full run-completion screen.
                                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, false));
                                 
-                                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
+                                p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
                             });
                             
-                            Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
-                                    .formatted(Formatting.GOLD, Formatting.BOLD);
-                            owner.getServer().getPlayerManager().broadcast(chatMsg, false);
+                            Component chatMsg = Component.translatable("challengecraft.reward.xp_earned", xpAmount)
+                                    .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+                            player.level().getServer().getPlayerList().broadcastSystemMessage(chatMsg, false);
                             
-                            Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
-                            Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
+                            Component title = Component.translatable("challengecraft.reward.title").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD);
+                            Component subtitle = Component.translatable("challengecraft.reward.xp_earned", xpAmount).withStyle(ChatFormatting.GOLD);
                             
-                            owner.getServer().getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-                            owner.getServer().getPlayerManager().sendToAll(new TitleS2CPacket(title));
-                            owner.getServer().getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+                            player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+                            player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+                            player.level().getServer().getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
                             
-                            LOGGER.info("[Advancement] Awarded {} XP to eligible players (triggered by {})", xpAmount, owner.getName().getString());
+                            LOGGER.info("[Advancement] Awarded {} XP to eligible players (triggered by {})", xpAmount, player.getName().getString());
                         } else {
                             if (data.isTainted()) {
-                                owner.sendMessage(Text.translatable("challengecraft.reward.no_xp")
-                                        .formatted(Formatting.RED), false);
+                                player.sendSystemMessage(Component.translatable("challengecraft.reward.no_xp")
+                                        .withStyle(ChatFormatting.RED));
                                 LOGGER.info("[Advancement] No XP awarded (world is tainted)");
                             } else {
                                 LOGGER.info("[Advancement] No XP awarded (difficulty was 0 or negative: {})", difficulty);

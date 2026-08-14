@@ -1,9 +1,8 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.world.border.WorldBorder;
-
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.border.WorldBorder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -14,16 +13,16 @@ public class Chal_9_ExpWorldBorder {
     private static final Map<UUID, Integer> lastLevels = new HashMap<>();
 
     public static void register() {
-        ServerTickEvents.END_WORLD_TICK.register((world) -> {
+        ServerTickEvents.END_LEVEL_TICK.register((world) -> {
             if (!active) return;
             WorldBorder border = world.getWorldBorder();
 
             int maxLvl = 0;
             boolean anyPlayer = false;
-            for (ServerPlayerEntity player : world.getServer().getPlayerManager().getPlayerList()) {
+            for (ServerPlayer player : world.getServer().getPlayerList().getPlayers()) {
                 anyPlayer = true;
                 maxLvl = Math.max(maxLvl, player.experienceLevel);
-                lastLevels.put(player.getUuid(), player.experienceLevel);
+                lastLevels.put(player.getUUID(), player.experienceLevel);
             }
 
             if (!anyPlayer) return;
@@ -31,11 +30,13 @@ public class Chal_9_ExpWorldBorder {
             double target = Math.max(1.0, (double) maxLvl);
             double current = border.getSize();
 
-            if (current > 1000000 || (Math.abs(current - target) > 0.1 && border.getSizeLerpTime() <= 0)) {
+            if (current > 1000000 || (Math.abs(current - target) > 0.1 && border.getLerpTime() <= 0)) {
                 if (current > 1000000 || target < current) {
                     border.setSize(target);
                 } else {
-                    border.interpolateSize(current, target, (long) ((target - current) * 1000));
+                    // 26.2: duration is in game TICKS now, and the start time is passed explicitly
+                    // (see MovementAndDamageMixin for the evidence). 1000 ms == 20 ticks.
+                    border.lerpSizeBetween(current, target, (long) ((target - current) * 20), world.getGameTime());
                 }
             }
 
@@ -45,10 +46,10 @@ public class Chal_9_ExpWorldBorder {
             }
 
             // Safety teleport for players outside the border
-            for (ServerPlayerEntity player : world.getPlayers()) {
-                if (!border.contains(player.getX(), player.getZ())) {
-                    int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, 0, 0);
-                    player.requestTeleport(0.5, (double) y, 0.5);
+            for (ServerPlayer player : world.players()) {
+                if (!border.isWithinBounds(player.getX(), player.getZ())) {
+                    int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, 0, 0);
+                    player.teleportTo(0.5, (double) y, 0.5);
                 }
             }
         });

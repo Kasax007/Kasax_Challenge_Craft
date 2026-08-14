@@ -1,18 +1,17 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Server-to-client snapshot of challenge personal-best times. */
-public record StatsSyncPacket(Map<Integer, Integer> bestTimes) implements CustomPayload {
-    public static final Id<StatsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "stats_sync"));
+public record StatsSyncPacket(Map<Integer, Integer> bestTimes) implements CustomPacketPayload {
+    public static final Type<StatsSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "stats_sync"));
 
-    public static final PacketCodec<PacketByteBuf, StatsSyncPacket> CODEC = CustomPayload.codecOf(
+    public static final StreamCodec<FriendlyByteBuf, StatsSyncPacket> CODEC = CustomPacketPayload.codec(
             (pkt, buf) -> {
                 buf.writeInt(pkt.bestTimes.size());
                 pkt.bestTimes.forEach((id, ticks) -> {
@@ -31,7 +30,7 @@ public record StatsSyncPacket(Map<Integer, Integer> bestTimes) implements Custom
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

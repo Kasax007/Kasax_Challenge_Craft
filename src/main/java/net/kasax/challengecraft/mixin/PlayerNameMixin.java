@@ -1,24 +1,24 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.LevelManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(PlayerEntity.class)
+@Mixin(Player.class)
 /** Adds progression-based name colors on the client. */
 public abstract class PlayerNameMixin {
     @Inject(method = "getDisplayName", at = @At("RETURN"), cancellable = true)
-    private void onGetDisplayName(CallbackInfoReturnable<Text> cir) {
+    private void onGetDisplayName(CallbackInfoReturnable<Component> cir) {
         try {
-            PlayerEntity player = (PlayerEntity) (Object) this;
-            if (player == null || player.getUuid() == null || player.getWorld() == null) {
+            Player player = (Player) (Object) this;
+            if (player == null || player.getUUID() == null || player.level() == null) {
                 return;
             }
 
@@ -27,26 +27,26 @@ public abstract class PlayerNameMixin {
             int stars = LevelManager.getStars(xp);
             int level = LevelManager.getLevelForXp(xp);
 
-            Text original = cir.getReturnValue();
+            Component original = cir.getReturnValue();
             if (original == null) {
                 return;
             }
 
-            if (original.getString().contains(Text.translatable("challengecraft.player_name.prefix_guard").getString())) {
+            if (original.getString().contains(Component.translatable("challengecraft.player_name.prefix_guard").getString())) {
                 return;
             }
 
-            Text colored = original;
+            Component colored = original;
             String colorName = LevelManager.getNameColor(stars);
             if (colorName != null) {
                 colored = applyColor(original, colorName);
             }
 
-            MutableText prefix = Text.translatable("challengecraft.player_name.prefix_level", level).formatted(Formatting.GRAY);
+            MutableComponent prefix = Component.translatable("challengecraft.player_name.prefix_level", level).withStyle(ChatFormatting.GRAY);
             if (stars > 0) {
-                prefix.append(Text.translatable("challengecraft.player_name.prefix_stars", stars).formatted(Formatting.YELLOW));
+                prefix.append(Component.translatable("challengecraft.player_name.prefix_stars", stars).withStyle(ChatFormatting.YELLOW));
             }
-            prefix.append(Text.translatable("challengecraft.player_name.prefix_suffix").formatted(Formatting.GRAY));
+            prefix.append(Component.translatable("challengecraft.player_name.prefix_suffix").withStyle(ChatFormatting.GRAY));
 
             cir.setReturnValue(prefix.append(colored));
         } catch (Throwable t) {
@@ -55,36 +55,36 @@ public abstract class PlayerNameMixin {
     }
 
     @Unique
-    private Text applyColor(Text text, String color) {
+    private Component applyColor(Component text, String color) {
         if ("rainbow".equals(color)) {
             String name = text.getString();
-            Formatting[] rainbow = {
-                    Formatting.AQUA,
-                    Formatting.GREEN,
-                    Formatting.YELLOW,
-                    Formatting.RED,
-                    Formatting.LIGHT_PURPLE,
-                    Formatting.BLUE
+            ChatFormatting[] rainbow = {
+                    ChatFormatting.AQUA,
+                    ChatFormatting.GREEN,
+                    ChatFormatting.YELLOW,
+                    ChatFormatting.RED,
+                    ChatFormatting.LIGHT_PURPLE,
+                    ChatFormatting.BLUE
             };
-            MutableText result = Text.empty();
+            MutableComponent result = Component.empty();
             for (int i = 0; i < name.length(); i++) {
-                Formatting f = rainbow[i % rainbow.length];
-                result.append(Text.empty().append(String.valueOf(name.charAt(i))).formatted(f, Formatting.BOLD));
+                ChatFormatting f = rainbow[i % rainbow.length];
+                result.append(Component.empty().append(String.valueOf(name.charAt(i))).withStyle(f, ChatFormatting.BOLD));
             }
             return result;
         }
 
-        Formatting formatting = switch (color) {
-            case "green" -> Formatting.GREEN;
-            case "blue" -> Formatting.BLUE;
-            case "red" -> Formatting.RED;
-            case "purple" -> Formatting.DARK_PURPLE;
-            case "gold" -> Formatting.GOLD;
+        ChatFormatting formatting = switch (color) {
+            case "green" -> ChatFormatting.GREEN;
+            case "blue" -> ChatFormatting.BLUE;
+            case "red" -> ChatFormatting.RED;
+            case "purple" -> ChatFormatting.DARK_PURPLE;
+            case "gold" -> ChatFormatting.GOLD;
             default -> null;
         };
 
         if (formatting != null) {
-            return text.copy().formatted(formatting);
+            return text.copy().withStyle(formatting);
         }
         return text;
     }

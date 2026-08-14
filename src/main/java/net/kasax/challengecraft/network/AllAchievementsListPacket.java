@@ -1,16 +1,15 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Full ordered advancement list sent when the player opens the detail screen. */
-public class AllAchievementsListPacket implements CustomPayload {
-    public static final Id<AllAchievementsListPacket> ID = new Id<>(Identifier.of("challengecraft", "all_achievements_list"));
+public class AllAchievementsListPacket implements CustomPacketPayload {
+    public static final Type<AllAchievementsListPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "all_achievements_list"));
 
     public final List<AdvancementInfo> advancements;
     public final int currentIndex;
@@ -20,7 +19,7 @@ public class AllAchievementsListPacket implements CustomPayload {
         this.currentIndex = currentIndex;
     }
 
-    public static final PacketCodec<RegistryByteBuf, AllAchievementsListPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, AllAchievementsListPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
                 buf.writeVarInt(pkt.advancements.size());
                 for (AdvancementInfo info : pkt.advancements) {
@@ -40,7 +39,7 @@ public class AllAchievementsListPacket implements CustomPayload {
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

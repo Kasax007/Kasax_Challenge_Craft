@@ -6,10 +6,9 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.network.ChallengePacket;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.world.CreateWorldScreen;
-import net.minecraft.client.gui.tab.Tab;
-import net.minecraft.client.gui.widget.TabNavigationWidget;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.tabs.Tab;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -29,7 +28,13 @@ public class CreateWorldScreenMixin {
             method = "init",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/widget/TabNavigationWidget$Builder;tabs([Lnet/minecraft/client/gui/tab/Tab;)Lnet/minecraft/client/gui/widget/TabNavigationWidget$Builder;"
+                    // Hand-maintained: inner-class builder methods are invisible to any source
+                    // remapper. Yarn TabNavigationWidget$Builder.tabs(Tab[]) became Mojmap
+                    // addTabs(Tab...), and in 26.2 the create-world screen switched builders
+                    // entirely — it now goes through MenuTabBar$Builder (a TabNavigationBar$Builder
+                    // subclass), so the OWNER changed even though the method did not. Confirmed by
+                    // disassembling CreateWorldScreen.init, which calls exactly this descriptor.
+                    target = "Lnet/minecraft/client/gui/components/tabs/MenuTabBar$Builder;addTabs([Lnet/minecraft/client/gui/components/tabs/Tab;)Lnet/minecraft/client/gui/components/tabs/MenuTabBar$Builder;"
             ),
             index = 0
     )
@@ -41,7 +46,7 @@ public class CreateWorldScreenMixin {
         return extended;
     }
 
-    @Inject(method = "createLevel", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "onCreate", at = @At("HEAD"), cancellable = true)
     private void onCreateLevel(CallbackInfo ci) {
         List<Integer> chosen = this.challengeTab.getActive();
         List<Integer> perks = this.challengeTab.getSelectedPerks();
@@ -57,7 +62,7 @@ public class CreateWorldScreenMixin {
         ChallengeCraftClient.LAST_CHOSEN = List.copyOf(chosen);
         ChallengeCraftClient.SELECTED_PERKS = List.copyOf(perks);
 
-        if (MinecraftClient.getInstance().getNetworkHandler() != null) {
+        if (Minecraft.getInstance().getConnection() != null) {
             List<Integer> chosenList = ChallengeCraftClient.LAST_CHOSEN;
             List<Integer> perkList = ChallengeCraftClient.SELECTED_PERKS;
             int maxHearts = ChallengeCraftClient.SELECTED_MAX_HEARTS;

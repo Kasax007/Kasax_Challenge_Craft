@@ -1,13 +1,13 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_46_Dice;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-@Mixin(PlayerEntity.class)
+@Mixin(Player.class)
 /** Freezes horizontal movement once the Würfel movement budget is spent. */
 public abstract class DiceMovementMixin {
 
@@ -28,24 +28,24 @@ public abstract class DiceMovementMixin {
      * deleting explosion and mob knockback for everyone.
      */
     @ModifyVariable(method = "travel", at = @At("HEAD"), argsOnly = true)
-    private Vec3d challengecraft$clampDiceMovement(Vec3d input) {
+    private Vec3 challengecraft$clampDiceMovement(Vec3 input) {
         if (!Chal_46_Dice.isActive()) {
             return input;
         }
 
-        PlayerEntity self = (PlayerEntity) (Object) this;
-        if (self.isCreative() || self.isSpectator() || self.hasVehicle()) {
+        Player self = (Player) (Object) this;
+        if (self.isCreative() || self.isSpectator() || self.isPassenger()) {
             return input;
         }
         if (Chal_46_Dice.getBudgetFor(self) > 0.0) {
             return input;
         }
 
-        if (self.getWorld().isClient) {
-            Vec3d velocity = self.getVelocity();
-            self.setVelocity(0.0, velocity.y, 0.0);
+        if (self.level().isClientSide()) {
+            Vec3 velocity = self.getDeltaMovement();
+            self.setDeltaMovement(0.0, velocity.y, 0.0);
         }
         // Keep Y: falling, jumping and swimming ascent stay free, only walking is spent.
-        return new Vec3d(0.0, input.y, 0.0);
+        return new Vec3(0.0, input.y, 0.0);
     }
 }

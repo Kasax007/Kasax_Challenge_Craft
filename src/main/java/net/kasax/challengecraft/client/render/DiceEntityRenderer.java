@@ -1,24 +1,25 @@
 package net.kasax.challengecraft.client.render;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.entity.DiceEntity;
-import net.minecraft.client.model.ModelData;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.model.ModelPartBuilder;
-import net.minecraft.client.model.ModelPartData;
-import net.minecraft.client.model.ModelTransform;
-import net.minecraft.client.model.TexturedModelData;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.render.entity.model.EntityModelLayer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.Identifier;
 
 /**
  * Draws the tumbling d6 as a single textured cuboid rotated by the entity's orientation
@@ -28,11 +29,11 @@ import net.minecraft.util.Identifier;
  */
 @Environment(EnvType.CLIENT)
 public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRenderState> {
-    public static final EntityModelLayer DICE_LAYER =
-            new EntityModelLayer(Identifier.of(ChallengeCraft.MOD_ID, "dice"), "main");
+    public static final ModelLayerLocation DICE_LAYER =
+            new ModelLayerLocation(Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "dice"), "main");
 
     private static final Identifier TEXTURE =
-            Identifier.of(ChallengeCraft.MOD_ID, "textures/entity/dice.png");
+            Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "textures/entity/dice.png");
 
     /** Cuboid positions are divided by 16 when baked, so a 16-unit cube is 1.0 block. */
     private static final float MODEL_EDGE_BLOCKS = 1.0F;
@@ -43,11 +44,11 @@ public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRen
 
     private final ModelPart cube;
 
-    public DiceEntityRenderer(EntityRendererFactory.Context ctx) {
+    public DiceEntityRenderer(EntityRendererProvider.Context ctx) {
         super(ctx);
-        this.cube = ctx.getPart(DICE_LAYER);
+        this.cube = ctx.bakeLayer(DICE_LAYER);
         this.shadowRadius = 0.18F;
-        this.shadowOpacity = 0.60F;
+        this.shadowStrength = 0.60F;
     }
 
     /**
@@ -62,15 +63,15 @@ public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRen
      * {@code DiePhysics.pipsForLocalFace} maps the same faces to pip counts — the three must
      * stay in agreement or the die shows a different number than it awards.
      */
-    public static TexturedModelData getTexturedModelData() {
-        ModelData data = new ModelData();
-        ModelPartData root = data.getRoot();
-        root.addChild("cube",
-                ModelPartBuilder.create()
-                        .uv(0, 0)
-                        .cuboid(-8.0F, -8.0F, -8.0F, 16.0F, 16.0F, 16.0F),
-                ModelTransform.NONE);
-        return TexturedModelData.of(data, 64, 32);
+    public static LayerDefinition getTexturedModelData() {
+        MeshDefinition data = new MeshDefinition();
+        PartDefinition root = data.getRoot();
+        root.addOrReplaceChild("cube",
+                CubeListBuilder.create()
+                        .texOffs(0, 0)
+                        .addBox(-8.0F, -8.0F, -8.0F, 16.0F, 16.0F, 16.0F),
+                PartPose.ZERO);
+        return LayerDefinition.create(data, 64, 32);
     }
 
     @Override
@@ -79,22 +80,28 @@ public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRen
     }
 
     @Override
-    public void updateRenderState(DiceEntity entity, DiceEntityRenderState state, float tickDelta) {
-        super.updateRenderState(entity, state, tickDelta);
+    public void extractRenderState(DiceEntity entity, DiceEntityRenderState state, float tickDelta) {
+        super.extractRenderState(entity, state, tickDelta);
         state.orientation.set(entity.getLastOrientation())
                 .slerp(entity.getOrientation(), tickDelta)
                 .normalize();
     }
 
+    /**
+     * 26.2 replaced immediate-mode entity drawing with the submit-node model: instead of pulling a
+     * {@code VertexConsumer} out of a {@code MultiBufferSource} (both gone) and writing vertices,
+     * the renderer hands the collector a model part plus a pose and the engine batches it.
+     * {@code PoseStack} itself is unchanged — only the GUI moved to a 2D matrix.
+     */
     @Override
-    public void render(DiceEntityRenderState state, MatrixStack matrices,
-                       VertexConsumerProvider vertexConsumers, int light) {
-        matrices.push();
+    public void submit(DiceEntityRenderState state, PoseStack matrices,
+                       SubmitNodeCollector collector, CameraRenderState camera) {
+        matrices.pushPose();
 
         // The dispatcher has already translated to the entity origin (bottom-centre); lift to the
         // cube's centre so it spins about itself rather than about its base.
         matrices.translate(0.0F, DIE_EDGE_BLOCKS * 0.5F, 0.0F);
-        matrices.multiply(state.orientation);
+        matrices.mulPose(state.orientation);
 
         float scale = DIE_EDGE_BLOCKS / MODEL_EDGE_BLOCKS;
         matrices.scale(scale, scale, scale);
@@ -103,10 +110,10 @@ public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRen
         // physics side can use plain world normals for up-face detection. The cost is that the
         // four SIDE texture regions are sampled bottom-up — that is intentional, don't "fix" it
         // without also negating the model-space normals in DiePhysics.
-        VertexConsumer consumer = vertexConsumers.getBuffer(RenderLayer.getEntitySolid(TEXTURE));
-        this.cube.render(matrices, consumer, light, OverlayTexture.DEFAULT_UV);
+        collector.submitModelPart(this.cube, matrices, RenderTypes.entitySolid(TEXTURE),
+                state.lightCoords, OverlayTexture.NO_OVERLAY, null);
 
-        matrices.pop();
-        super.render(state, matrices, vertexConsumers, light);
+        matrices.popPose();
+        super.submit(state, matrices, collector, camera);
     }
 }

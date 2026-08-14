@@ -1,15 +1,15 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EntityType;
 
 /** Incremental HUD sync for the current entity target. */
-public class AllEntitiesSyncPacket implements CustomPayload {
-    public static final Id<AllEntitiesSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_entities_sync"));
+public class AllEntitiesSyncPacket implements CustomPacketPayload {
+    public static final Type<AllEntitiesSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "all_entities_sync"));
 
     public final EntityType<?> currentEntity;
     public final int currentIndex;
@@ -21,11 +21,11 @@ public class AllEntitiesSyncPacket implements CustomPayload {
         this.totalEntities = totalEntities;
     }
 
-    public static final PacketCodec<RegistryByteBuf, AllEntitiesSyncPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, AllEntitiesSyncPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
                 buf.writeBoolean(pkt.currentEntity != null);
                 if (pkt.currentEntity != null) {
-                    buf.writeIdentifier(Registries.ENTITY_TYPE.getId(pkt.currentEntity));
+                    buf.writeIdentifier(BuiltInRegistries.ENTITY_TYPE.getKey(pkt.currentEntity));
                 }
                 buf.writeVarInt(pkt.currentIndex);
                 buf.writeVarInt(pkt.totalEntities);
@@ -34,14 +34,14 @@ public class AllEntitiesSyncPacket implements CustomPayload {
                 EntityType<?> entity = null;
                 if (buf.readBoolean()) {
                     Identifier id = buf.readIdentifier();
-                    entity = Registries.ENTITY_TYPE.get(id);
+                    entity = BuiltInRegistries.ENTITY_TYPE.getValue(id);
                 }
                 return new AllEntitiesSyncPacket(entity, buf.readVarInt(), buf.readVarInt());
             }
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

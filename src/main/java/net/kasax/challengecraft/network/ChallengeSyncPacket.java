@@ -1,18 +1,17 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Server-to-client snapshot of active challenge settings. */
-public class ChallengeSyncPacket implements CustomPayload {
-    public static final Id<ChallengeSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "sync_challenges"));
+public class ChallengeSyncPacket implements CustomPacketPayload {
+    public static final Type<ChallengeSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "sync_challenges"));
     
     public final List<Integer> active;
     public final List<Integer> perks;
@@ -23,10 +22,10 @@ public class ChallengeSyncPacket implements CustomPayload {
     public final int gameSpeedMultiplier;
     public final int forceItemBattleMinutes;
 
-    public static final PacketCodec<PacketByteBuf, ChallengeSyncPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<PacketByteBuf, ChallengeSyncPacket>() {
+    public static final StreamCodec<FriendlyByteBuf, ChallengeSyncPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<FriendlyByteBuf, ChallengeSyncPacket>() {
                 @Override
-                public void encode(ChallengeSyncPacket pkt, PacketByteBuf buf) {
+                public void encode(ChallengeSyncPacket pkt, FriendlyByteBuf buf) {
                     buf.writeVarInt(pkt.active.size());
                     for (int id : pkt.active) buf.writeVarInt(id);
                     buf.writeVarInt(pkt.perks.size());
@@ -39,9 +38,9 @@ public class ChallengeSyncPacket implements CustomPayload {
                     buf.writeVarInt(pkt.forceItemBattleMinutes);
                 }
             },
-            new PacketDecoder<PacketByteBuf, ChallengeSyncPacket>() {
+            new StreamDecoder<FriendlyByteBuf, ChallengeSyncPacket>() {
                 @Override
-                public ChallengeSyncPacket decode(PacketByteBuf buf) {
+                public ChallengeSyncPacket decode(FriendlyByteBuf buf) {
                     int size = buf.readVarInt();
                     List<Integer> list = new ArrayList<>(size);
                     for (int i = 0; i < size; i++) list.add(buf.readVarInt());
@@ -71,7 +70,7 @@ public class ChallengeSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

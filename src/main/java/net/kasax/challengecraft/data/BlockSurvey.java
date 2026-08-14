@@ -5,15 +5,15 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +53,15 @@ import java.util.Set;
  * survey on the first server tick.
  */
 public class BlockSurvey {
+    /**
+     * 26.2 turned {@code ChunkPos} into a record with only an {@code (int, int)} constructor, so the
+     * old {@code new ChunkPos(BlockPos)} is gone. This reproduces exactly what it did — the block to
+     * chunk conversion is a plain arithmetic shift.
+     */
+    private static ChunkPos chunkOf(net.minecraft.core.BlockPos pos) {
+        return new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4);
+    }
+
     private static final Logger LOGGER = LoggerFactory.getLogger("ChallengeCraft-BlockSurvey");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -76,7 +85,7 @@ public class BlockSurvey {
     private static final long GEN_TIME_BUDGET_NANOS = 10_000_000L; // 10 ms (worldgen is heavy)
     private static final int GEN_LOG_INTERVAL = 64;
     private static boolean generating = false;
-    private static ServerWorld genWorld = null;
+    private static ServerLevel genWorld = null;
     private static ChunkPos genCenter = null;
     private static int genRadius = 0;
     private static int genRing = 0;
@@ -84,7 +93,7 @@ public class BlockSurvey {
     private static List<int[]> genRingCoords = null;
     private static int genGenerated = 0;
 
-    private record PendingChunk(ServerWorld world, int cx, int cz, String key) {
+    private record PendingChunk(ServerLevel world, int cx, int cz, String key) {
     }
 
     private static final String AUTOSTART_MODE = System.getenv("CHALLENGECRAFT_SURVEY_AUTOSTART");
@@ -143,8 +152,8 @@ public class BlockSurvey {
     /** Begins force-generating chunks outward from the overworld spawn up to {@code radius}. */
     public static void startGenerate(MinecraftServer server, int radius) {
         ensureLoaded();
-        genWorld = server.getOverworld();
-        genCenter = new ChunkPos(genWorld.getSpawnPos());
+        genWorld = server.overworld();
+        genCenter = chunkOf(genWorld.getRespawnData().pos());
         genRadius = Math.max(1, radius);
         genRing = 0;
         genRingIndex = 0;
@@ -165,13 +174,13 @@ public class BlockSurvey {
                 finishGeneration();
                 return;
             }
-            int cx = genCenter.x + offset[0];
-            int cz = genCenter.z + offset[1];
-            String key = genWorld.getRegistryKey().getValue() + ":" + cx + ":" + cz;
+            int cx = genCenter.x() + offset[0];
+            int cz = genCenter.z() + offset[1];
+            String key = genWorld.dimension().identifier() + ":" + cx + ":" + cz;
             if (scannedChunks.contains(key)) continue; // already counted (e.g. spawn) — don't regen
             // FULL + create=true forces synchronous worldgen (features + structures). No
             // persistent ticket, so the chunk unloads naturally afterwards.
-            Chunk chunk = genWorld.getChunk(cx, cz, ChunkStatus.FULL, true);
+            ChunkAccess chunk = genWorld.getChunk(cx, cz, ChunkStatus.FULL, true);
             countChunkSections(chunk);
             scannedChunks.add(key);
             dirty = true;
@@ -226,29 +235,29 @@ public class BlockSurvey {
 
     /** Enqueue unscanned loaded chunks around every player (or spawn, when the server is empty). */
     private static void sweep(MinecraftServer server) {
-        int radius = Math.max(2, server.getPlayerManager().getViewDistance());
-        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        int radius = Math.max(2, server.getPlayerList().getViewDistance());
+        List<ServerPlayer> players = server.getPlayerList().getPlayers();
 
         if (players.isEmpty()) {
-            ServerWorld overworld = server.getOverworld();
-            enqueueAround(overworld, new ChunkPos(overworld.getSpawnPos()), radius);
+            ServerLevel overworld = server.overworld();
+            enqueueAround(overworld, chunkOf(overworld.getRespawnData().pos()), radius);
             return;
         }
-        for (ServerPlayerEntity player : players) {
+        for (ServerPlayer player : players) {
             if (player.isSpectator()) continue;
-            enqueueAround((ServerWorld) player.getWorld(), player.getChunkPos(), radius);
+            enqueueAround((ServerLevel) player.level(), player.chunkPosition(), radius);
         }
     }
 
-    private static void enqueueAround(ServerWorld world, ChunkPos center, int radius) {
-        String dimId = world.getRegistryKey().getValue().toString();
+    private static void enqueueAround(ServerLevel world, ChunkPos center, int radius) {
+        String dimId = world.dimension().identifier().toString();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                int cx = center.x + dx;
-                int cz = center.z + dz;
+                int cx = center.x() + dx;
+                int cz = center.z() + dz;
                 String key = dimId + ":" + cx + ":" + cz;
                 if (scannedChunks.contains(key) || queuedKeys.contains(key)) continue;
-                if (!world.isChunkLoaded(cx, cz)) continue;
+                if (!world.hasChunk(cx, cz)) continue;
                 queuedKeys.add(key);
                 queue.add(new PendingChunk(world, cx, cz, key));
             }
@@ -257,11 +266,11 @@ public class BlockSurvey {
 
     private static void scanChunk(PendingChunk pending) {
         queuedKeys.remove(pending.key());
-        ServerWorld world = pending.world();
-        if (!world.isChunkLoaded(pending.cx(), pending.cz())) {
+        ServerLevel world = pending.world();
+        if (!world.hasChunk(pending.cx(), pending.cz())) {
             return; // unloaded since enqueue — NOT marked scanned, a later sweep retries it
         }
-        WorldChunk chunk = world.getChunk(pending.cx(), pending.cz());
+        LevelChunk chunk = world.getChunk(pending.cx(), pending.cz());
         countChunkSections(chunk);
         scannedChunks.add(pending.key());
         dirty = true;
@@ -272,12 +281,12 @@ public class BlockSurvey {
      * occurrence count in one pass — no per-block state lookups at all. Shared by the passive
      * scanner and the generation mode.
      */
-    private static void countChunkSections(Chunk chunk) {
-        for (ChunkSection section : chunk.getSectionArray()) {
-            if (section == null || section.isEmpty()) continue;
-            section.getBlockStateContainer().count((state, count) -> {
+    private static void countChunkSections(ChunkAccess chunk) {
+        for (LevelChunkSection section : chunk.getSections()) {
+            if (section == null || section.hasOnlyAir()) continue;
+            section.getStates().count((state, count) -> {
                 if (state.isAir()) return;
-                String id = Registries.BLOCK.getId(state.getBlock()).toString();
+                String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
                 blockCounts.merge(id, (long) count, Long::sum);
             });
         }

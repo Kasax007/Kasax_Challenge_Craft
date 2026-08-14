@@ -1,15 +1,15 @@
 package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Lobby action sent from the lockout client UI to the server. */
-public class LockoutBingoActionPacket implements CustomPayload {
+public class LockoutBingoActionPacket implements CustomPacketPayload {
     public enum Action {
         JOIN_TEAM,
         LEAVE_TEAM,
@@ -18,20 +18,20 @@ public class LockoutBingoActionPacket implements CustomPayload {
         REQUEST_SYNC
     }
 
-    public static final Id<LockoutBingoActionPacket> ID =
-            new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "lockout_bingo_action"));
+    public static final Type<LockoutBingoActionPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "lockout_bingo_action"));
 
-    public static final PacketCodec<PacketByteBuf, LockoutBingoActionPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<>() {
+    public static final StreamCodec<FriendlyByteBuf, LockoutBingoActionPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<>() {
                 @Override
-                public void encode(LockoutBingoActionPacket packet, PacketByteBuf buf) {
+                public void encode(LockoutBingoActionPacket packet, FriendlyByteBuf buf) {
                     buf.writeVarInt(packet.action.ordinal());
                     buf.writeVarInt(packet.teamId);
                 }
             },
-            new PacketDecoder<>() {
+            new StreamDecoder<>() {
                 @Override
-                public LockoutBingoActionPacket decode(PacketByteBuf buf) {
+                public LockoutBingoActionPacket decode(FriendlyByteBuf buf) {
                     Action action = Action.values()[buf.readVarInt()];
                     int teamId = buf.readVarInt();
                     return new LockoutBingoActionPacket(action, teamId);
@@ -56,7 +56,7 @@ public class LockoutBingoActionPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

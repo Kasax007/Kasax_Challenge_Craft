@@ -2,13 +2,12 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.world.World;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -31,18 +30,18 @@ public class Chal_43_OnlyDown {
     private static final Map<UUID, Baseline> BASELINES = new HashMap<>();
 
     private static final class Baseline {
-        RegistryKey<World> dimension;
+        ResourceKey<Level> dimension;
         double minY;
         double lastX;
         double lastY;
         double lastZ;
 
-        Baseline(ServerPlayerEntity player) {
+        Baseline(ServerPlayer player) {
             reset(player);
         }
 
-        void reset(ServerPlayerEntity player) {
-            this.dimension = player.getWorld().getRegistryKey();
+        void reset(ServerPlayer player) {
+            this.dimension = player.level().dimension();
             this.minY = player.getY();
             this.lastX = player.getX();
             this.lastY = player.getY();
@@ -54,16 +53,16 @@ public class Chal_43_OnlyDown {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (!active) return;
 
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                if (player.isCreative() || player.isSpectator() || player.isDead()) continue;
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                if (player.isCreative() || player.isSpectator() || player.isDeadOrDying()) continue;
 
-                Baseline baseline = BASELINES.get(player.getUuid());
+                Baseline baseline = BASELINES.get(player.getUUID());
                 if (baseline == null) {
-                    BASELINES.put(player.getUuid(), new Baseline(player));
+                    BASELINES.put(player.getUUID(), new Baseline(player));
                     continue;
                 }
 
-                if (baseline.dimension != player.getWorld().getRegistryKey()) {
+                if (baseline.dimension != player.level().dimension()) {
                     baseline.reset(player);
                     continue;
                 }
@@ -82,11 +81,11 @@ public class Chal_43_OnlyDown {
                 baseline.minY = Math.min(baseline.minY, player.getY());
 
                 if (player.getY() > baseline.minY + UP_TOLERANCE) {
-                    ServerWorld world = (ServerWorld) player.getWorld();
-                    player.sendMessage(Text.translatable("challengecraft.worldcreate.challenge43.death")
-                            .formatted(Formatting.RED, Formatting.BOLD), false);
-                    player.damage(world, world.getDamageSources().genericKill(), Float.MAX_VALUE);
-                    BASELINES.remove(player.getUuid());
+                    ServerLevel world = (ServerLevel) player.level();
+                    player.sendSystemMessage(Component.translatable("challengecraft.worldcreate.challenge43.death")
+                            .withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+                    player.hurtServer(world, world.damageSources().genericKill(), Float.MAX_VALUE);
+                    BASELINES.remove(player.getUUID());
                 }
             }
         });
@@ -94,7 +93,7 @@ public class Chal_43_OnlyDown {
         // Without this, respawning at a bed less than 12 blocks from (and above) the death spot
         // would inherit the old baseline and kill the player again instantly.
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
-            BASELINES.remove(newPlayer.getUuid());
+            BASELINES.remove(newPlayer.getUUID());
         });
     }
 

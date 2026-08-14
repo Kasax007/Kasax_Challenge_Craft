@@ -1,14 +1,12 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -20,7 +18,7 @@ public class Chal_14_RandomBlockDrops {
 
     public static void register() {
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
-            if (active && !player.isCreative() && world instanceof ServerWorld serverWorld) {
+            if (active && !player.isCreative() && world instanceof ServerLevel serverWorld) {
                 // The custom chest must survive as itself so its storage contract stays intact.
                 if (state.getBlock() == net.kasax.challengecraft.block.InfiniteChestRegistry.INFINITE_CHEST_BLOCK) {
                     return true;
@@ -28,9 +26,9 @@ public class Chal_14_RandomBlockDrops {
                 
                 ItemStack stack = getRandomDrop(state.getBlock(), serverWorld);
                 if (!stack.isEmpty()) {
-                    Block.dropStack(world, pos, stack);
+                    Block.popResource(world, pos, stack);
                 }
-                world.breakBlock(pos, false, player);
+                world.destroyBlock(pos, false, player);
                 return false;
             }
             return true;
@@ -45,12 +43,12 @@ public class Chal_14_RandomBlockDrops {
         return active;
     }
 
-    public static ItemStack getRandomDrop(Block block, ServerWorld world) {
+    public static ItemStack getRandomDrop(Block block, ServerLevel world) {
         if (ITEM_LIST == null) {
             ITEM_LIST = new ArrayList<>();
-            Registries.ITEM.forEach(item -> {
+            BuiltInRegistries.ITEM.forEach(item -> {
                 // Skip air to avoid getting air drops
-                Identifier id = Registries.ITEM.getId(item);
+                Identifier id = BuiltInRegistries.ITEM.getKey(item);
                 if (id.toString().equals("minecraft:air")) return;
                 if (id.getNamespace().equals("challengecraft")) return;
                 ITEM_LIST.add(item);
@@ -60,7 +58,7 @@ public class Chal_14_RandomBlockDrops {
         if (ITEM_LIST.isEmpty()) return ItemStack.EMPTY;
 
         long seed = world.getSeed();
-        Identifier blockId = Registries.BLOCK.getId(block);
+        Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
         
         // Consistent seed per block and world
         long combinedSeed = seed + blockId.toString().hashCode();

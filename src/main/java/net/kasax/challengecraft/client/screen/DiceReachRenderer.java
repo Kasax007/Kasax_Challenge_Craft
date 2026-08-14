@@ -2,18 +2,16 @@ package net.kasax.challengecraft.client.screen;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.kasax.challengecraft.challenges.Chal_46_Dice;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,7 +51,7 @@ public final class DiceReachRenderer {
     private static final List<Edge> EDGES = new ArrayList<>();
     private static long cacheOrigin = Long.MIN_VALUE;
     private static int cacheBudgetTenths = -1;
-    private static Vec3d cachePos = null;
+    private static Vec3 cachePos = null;
     private static long lastRebuildTick = 0L;
 
     private record Edge(double x1, double z1, double x2, double z2, int y) {
@@ -63,26 +61,26 @@ public final class DiceReachRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (!Chal_46_Dice.isActive() || client.world == null || client.player == null) return;
+        LevelRenderEvents.COLLECT_SUBMITS.register(context -> {
+            Minecraft client = Minecraft.getInstance();
+            if (!Chal_46_Dice.isActive() || client.level == null || client.player == null) return;
             if (client.player.isSpectator() || client.player.isCreative()) return;
 
             float budget = DiceClientState.getRemaining();
             if (budget <= 0.05f) return;
 
-            BlockPos origin = client.player.getBlockPos();
-            Vec3d exact = client.player.getPos();
+            BlockPos origin = client.player.blockPosition();
+            Vec3 exact = client.player.position();
             int tenths = Math.round(budget * 10f);
             // The ring now depends on the player's sub-block position, so a block-position cache
             // alone would leave it visibly stale while walking within one block.
-            boolean moved = cachePos == null || cachePos.squaredDistanceTo(exact) > 0.01;
+            boolean moved = cachePos == null || cachePos.distanceToSqr(exact) > 0.01;
             boolean stale = origin.asLong() != cacheOrigin || tenths != cacheBudgetTenths || moved;
 
             // Throttle to at most one rebuild every REBUILD_COOLDOWN_TICKS. The ring is drawn from
             // the cached edges every frame regardless, so this only limits how often the reachable
             // set is recomputed — it stays smooth, just cheaper.
-            long now = client.world.getTime();
+            long now = client.level.getGameTime();
             boolean firstBuild = cachePos == null;
             // `now < lastRebuildTick` catches switching to a world with a lower time, which would
             // otherwise make the cooldown look like it never expires.
@@ -93,23 +91,33 @@ public final class DiceReachRenderer {
                 cacheBudgetTenths = tenths;
                 cachePos = exact;
                 lastRebuildTick = now;
-                rebuild(client.world, origin, exact, budget);
+                rebuild(client.level, origin, exact, budget);
             }
             if (EDGES.isEmpty()) return;
 
-            Vec3d cam = context.camera().getPos();
-            MatrixStack matrices = context.matrixStack();
-            VertexConsumer consumer = context.consumers().getBuffer(RenderLayer.getDebugQuads());
+            // 26.2: the camera lives on the render state, and geometry is SUBMITTED rather than
+            // written straight into a buffer. ShapeRenderer is gone with no replacement, so the
+            // quads are emitted by hand — each edge is a single upward-facing quad, exactly what
+            // renderFace(Direction.UP, ...) produced.
+            Vec3 cam = context.levelState().cameraRenderState.pos;
+            PoseStack matrices = context.poseStack();
 
-            matrices.push();
+            matrices.pushPose();
             matrices.translate(-cam.x, -cam.y, -cam.z);
-            for (Edge e : EDGES) {
-                VertexRendering.drawSide(matrices, consumer, Direction.UP,
-                        (float) e.x1(), e.y() + LIFT, (float) e.z1(),
-                        (float) e.x2(), e.y() + LIFT, (float) e.z2(),
-                        R, G, B, A);
-            }
-            matrices.pop();
+            context.submitNodeCollector().submitCustomGeometry(matrices, RenderTypes.debugQuads(),
+                    (pose, consumer) -> {
+                        for (Edge e : EDGES) {
+                            float y = e.y() + LIFT;
+                            float x1 = (float) e.x1(), z1 = (float) e.z1();
+                            float x2 = (float) e.x2(), z2 = (float) e.z2();
+                            // Counter-clockwise seen from above, so the face points up.
+                            consumer.addVertex(pose, x1, y, z1).setColor(R, G, B, A);
+                            consumer.addVertex(pose, x1, y, z2).setColor(R, G, B, A);
+                            consumer.addVertex(pose, x2, y, z2).setColor(R, G, B, A);
+                            consumer.addVertex(pose, x2, y, z1).setColor(R, G, B, A);
+                        }
+                    });
+            matrices.popPose();
         });
     }
 
@@ -118,7 +126,7 @@ public final class DiceReachRenderer {
      * outline of the resulting set. Max budget is 6, so the region is at most ~15×15 columns —
      * a few hundred cheap block lookups, only on the ticks where something actually changed.
      */
-    private static void rebuild(World world, BlockPos origin, Vec3d playerPos, double budget) {
+    private static void rebuild(Level world, BlockPos origin, Vec3 playerPos, double budget) {
         EDGES.clear();
         int radius = (int) Math.ceil(Math.min(budget, MAX_BUDGET)) + 1;
 
@@ -239,13 +247,13 @@ public final class DiceReachRenderer {
      * The Y a player would stand at in this column, searched near {@code nearY}. Returns null when
      * there is nowhere sensible to stand (a wall, a big drop, or a ceiling in the way).
      */
-    private static Integer surfaceY(World world, int x, int z, int nearY) {
+    private static Integer surfaceY(Level world, int x, int z, int nearY) {
         for (int y = nearY + 1; y >= nearY - 1; y--) {
             BlockPos feet = new BlockPos(x, y, z);
-            BlockPos below = feet.down();
-            if (!world.getBlockState(below).isSolidBlock(world, below)) continue;
+            BlockPos below = feet.below();
+            if (!world.getBlockState(below).isRedstoneConductor(world, below)) continue;
             if (!world.getBlockState(feet).getCollisionShape(world, feet).isEmpty()) continue;
-            BlockPos head = feet.up();
+            BlockPos head = feet.above();
             if (!world.getBlockState(head).getCollisionShape(world, head).isEmpty()) continue;
             return y;
         }

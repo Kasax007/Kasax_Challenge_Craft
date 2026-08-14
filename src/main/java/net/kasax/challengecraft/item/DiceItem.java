@@ -1,6 +1,6 @@
 package net.kasax.challengecraft.item;
 
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 /**
  * The Würfel (d6) thrown by challenge 46. A bare shell on purpose: like
@@ -11,7 +11,7 @@ import net.minecraft.item.Item;
  * <p>The item is never consumed by throwing — the callback only spawns a {@code DiceEntity}.
  */
 public class DiceItem extends Item {
-    public DiceItem(Settings settings) {
+    public DiceItem(Properties settings) {
         super(settings);
     }
 }

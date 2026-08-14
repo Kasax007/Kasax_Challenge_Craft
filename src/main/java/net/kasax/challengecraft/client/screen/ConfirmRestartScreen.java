@@ -3,10 +3,9 @@ package net.kasax.challengecraft.client.screen;
 import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.ui.Modals;
 import net.kasax.challengecraft.client.widget.CraftButton;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import java.util.List;
 
 /** Confirmation screen shown before applying challenge changes that require a restart. */
@@ -20,7 +19,7 @@ public class ConfirmRestartScreen extends Screen {
     private int panelY;
 
     public ConfirmRestartScreen(Screen parent, Runnable onConfirm) {
-        super(Text.translatable("challengecraft.restart.confirm.title"));
+        super(Component.translatable("challengecraft.restart.confirm.title"));
         this.parent = parent;
         this.onConfirm = onConfirm;
     }
@@ -35,32 +34,32 @@ public class ConfirmRestartScreen extends Screen {
         int buttonsY = panelY + PANEL_HEIGHT - 14 - 20;
         int buttonsX = panelX + Modals.WIDTH / 2 - buttonWidth - gap / 2;
 
-        addDrawableChild(new CraftButton(buttonsX, buttonsY, buttonWidth, 20,
-                Text.translatable("challengecraft.restart.confirm.accept"), CraftButton.Style.DANGER, button -> {
+        addRenderableWidget(new CraftButton(buttonsX, buttonsY, buttonWidth, 20,
+                Component.translatable("challengecraft.restart.confirm.accept"), CraftButton.Style.DANGER, button -> {
             onConfirm.run();
-            this.client.setScreen(null);
+            this.minecraft.setScreenAndShow(null);
         }));
-        addDrawableChild(new CraftButton(buttonsX + buttonWidth + gap, buttonsY, buttonWidth, 20,
-                Text.translatable("challengecraft.restart.confirm.cancel"), CraftButton.Style.NEUTRAL, button -> {
-            this.client.setScreen(parent);
+        addRenderableWidget(new CraftButton(buttonsX + buttonWidth + gap, buttonsY, buttonWidth, 20,
+                Component.translatable("challengecraft.restart.confirm.cancel"), CraftButton.Style.NEUTRAL, button -> {
+            this.minecraft.setScreenAndShow(parent);
         }));
     }
 
     @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.renderBackground(context, mouseX, mouseY, delta);
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractBackground(context, mouseX, mouseY, delta);
 
-        Modals.header(context, this.textRenderer, this.title, Modals.Icon.WARNING, panelX, panelY, PANEL_HEIGHT, CraftUI.DANGER);
-        int y = Modals.bodyTop(panelY, this.textRenderer);
-        y = Modals.bodyLines(context, this.textRenderer, panelX, y,
-                List.of(Text.translatable("challengecraft.restart.confirm.prompt")), CraftUI.TEXT_PRIMARY);
-        Modals.bodyLines(context, this.textRenderer, panelX, y + 4,
-                List.of(Text.translatable("challengecraft.restart.confirm.new_world"),
-                        Text.translatable("challengecraft.restart.confirm.archive")), CraftUI.TEXT_SECONDARY);
+        Modals.header(context, this.font, this.title, Modals.Icon.WARNING, panelX, panelY, PANEL_HEIGHT, CraftUI.DANGER);
+        int y = Modals.bodyTop(panelY, this.font);
+        y = Modals.bodyLines(context, this.font, panelX, y,
+                List.of(Component.translatable("challengecraft.restart.confirm.prompt")), CraftUI.TEXT_PRIMARY);
+        Modals.bodyLines(context, this.font, panelX, y + 4,
+                List.of(Component.translatable("challengecraft.restart.confirm.new_world"),
+                        Component.translatable("challengecraft.restart.confirm.archive")), CraftUI.TEXT_SECONDARY);
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
 }

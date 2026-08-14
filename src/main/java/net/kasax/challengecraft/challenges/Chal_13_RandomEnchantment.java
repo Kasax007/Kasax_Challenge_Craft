@@ -1,12 +1,10 @@
 package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 
 /** Adds a random enchantment level to each player's held item on a timer. */
 public class Chal_13_RandomEnchantment {
@@ -18,14 +16,14 @@ public class Chal_13_RandomEnchantment {
             if (!active) return;
             tickCounter = (tickCounter + 1) % 600; // 600 ticks = 30s
             if (tickCounter == 0) {
-                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                    ItemStack stack = player.getMainHandStack();
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    ItemStack stack = player.getMainHandItem();
                     if (stack.isEmpty()) continue;
 
-                    var registry = player.getWorld().getRegistryManager().getOrThrow(RegistryKeys.ENCHANTMENT);
-                    registry.getRandom(player.getWorld().getRandom()).ifPresent(enchantEntry -> {
-                        int currentLevel = EnchantmentHelper.getLevel(enchantEntry, stack);
-                        stack.addEnchantment(enchantEntry, currentLevel + 1);
+                    var registry = player.level().registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+                    registry.getRandom(player.level().getRandom()).ifPresent(enchantEntry -> {
+                        int currentLevel = EnchantmentHelper.getItemEnchantmentLevel(enchantEntry, stack);
+                        stack.enchant(enchantEntry, currentLevel + 1);
                     });
                 }
             }

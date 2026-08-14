@@ -1,13 +1,13 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Incremental HUD sync for the current progressive-block target ("" = all unlocked). */
-public class ProgressiveBlocksSyncPacket implements CustomPayload {
-    public static final Id<ProgressiveBlocksSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "progressive_blocks_sync"));
+public class ProgressiveBlocksSyncPacket implements CustomPacketPayload {
+    public static final Type<ProgressiveBlocksSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "progressive_blocks_sync"));
 
     public final String targetBlockId;
     public final int currentIndex;
@@ -19,21 +19,21 @@ public class ProgressiveBlocksSyncPacket implements CustomPayload {
         this.totalBlocks = totalBlocks;
     }
 
-    public static final PacketCodec<RegistryByteBuf, ProgressiveBlocksSyncPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, ProgressiveBlocksSyncPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
-                buf.writeString(pkt.targetBlockId);
+                buf.writeUtf(pkt.targetBlockId);
                 buf.writeVarInt(pkt.currentIndex);
                 buf.writeVarInt(pkt.totalBlocks);
             },
             buf -> new ProgressiveBlocksSyncPacket(
-                    buf.readString(),
+                    buf.readUtf(),
                     buf.readVarInt(),
                     buf.readVarInt()
             )
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

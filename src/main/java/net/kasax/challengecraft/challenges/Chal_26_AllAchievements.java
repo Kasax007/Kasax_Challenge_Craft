@@ -10,20 +10,19 @@ import net.kasax.challengecraft.network.AllAchievementsListPacket;
 import net.kasax.challengecraft.network.AllAchievementsSyncPacket;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.kasax.challengecraft.util.ChallengeTimeUtil;
-import net.minecraft.advancement.AdvancementEntry;
-import net.minecraft.advancement.AdvancementProgress;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
+import net.minecraft.ChatFormatting;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
 import java.util.*;
 
 /** Tracks the ordered advancement run and mirrors the current target to clients. */
@@ -34,7 +33,7 @@ public class Chal_26_AllAchievements {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             if (!active) return;
 
-            ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+            ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
             List<Identifier> order = data.getAllAdvancementsOrder();
             if (order.isEmpty()) {
                 generateOrder(server, data);
@@ -45,7 +44,7 @@ public class Chal_26_AllAchievements {
             if (index >= order.size()) return;
 
             Identifier currentAdvId = order.get(index);
-            AdvancementEntry currentAdv = server.getAdvancementLoader().get(currentAdvId);
+            AdvancementHolder currentAdv = server.getAdvancements().get(currentAdvId);
 
             if (currentAdv == null) {
                 // Datapacks can remove advancements between sessions; do not stall the run on stale IDs.
@@ -56,8 +55,8 @@ public class Chal_26_AllAchievements {
             }
 
             boolean found = false;
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                AdvancementProgress progress = player.getAdvancementTracker().getProgress(currentAdv);
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                AdvancementProgress progress = player.getAdvancements().getOrStartProgress(currentAdv);
                 if (progress.isDone()) {
                     found = true;
                     break;
@@ -72,7 +71,7 @@ public class Chal_26_AllAchievements {
                 double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
                 long xpPerAdv = 10;
                 if (xpPerAdv > 0 && difficulty > 0) {
-                    server.getPlayerManager().getPlayerList().forEach(p -> {
+                    server.getPlayerList().getPlayers().forEach(p -> {
                         LevelManager.addXp(p, xpPerAdv);
                     });
                 }
@@ -87,7 +86,7 @@ public class Chal_26_AllAchievements {
     private static void generateOrder(MinecraftServer server, ChallengeSavedData data) {
         List<Identifier> survivalAdvancements = getSurvivalAdvancements(server);
         
-        long seed = server.getOverworld().getSeed();
+        long seed = server.overworld().getSeed();
         Collections.shuffle(survivalAdvancements, new Random(seed));
 
         data.setAllAdvancementsOrder(survivalAdvancements);
@@ -97,7 +96,7 @@ public class Chal_26_AllAchievements {
 
     private static List<Identifier> getSurvivalAdvancements(MinecraftServer server) {
         List<Identifier> advancements = new ArrayList<>();
-        server.getAdvancementLoader().getAdvancements().forEach(advancement -> {
+        server.getAdvancements().getAllAdvancements().forEach(advancement -> {
             Identifier id = advancement.id();
             if (!id.getNamespace().equals("minecraft")) return;
             
@@ -116,17 +115,17 @@ public class Chal_26_AllAchievements {
 
     private static AdvancementInfo getInfo(MinecraftServer server, Identifier id) {
         if (id == null) return null;
-        AdvancementEntry entry = server.getAdvancementLoader().get(id);
+        AdvancementHolder entry = server.getAdvancements().get(id);
         if (entry != null && entry.value().display().isPresent()) {
             var display = entry.value().display().get();
-            return new AdvancementInfo(id, display.getTitle(), display.getIcon(), display.getDescription());
+            return new AdvancementInfo(id, display.getTitle(), display.getIcon().create(), display.getDescription());
         }
-        return new AdvancementInfo(id, Text.of(id.toString()), new ItemStack(net.minecraft.item.Items.BARRIER), Text.empty());
+        return new AdvancementInfo(id, Component.nullToEmpty(id.toString()), new ItemStack(net.minecraft.world.item.Items.BARRIER), Component.empty());
     }
 
-    public static void sendListToPlayer(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+    public static void sendListToPlayer(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         List<Identifier> order = data.getAllAdvancementsOrder();
         int index = data.getAllAdvancementsIndex();
         
@@ -138,8 +137,8 @@ public class Chal_26_AllAchievements {
     }
 
     private static void completeChallenge(MinecraftServer server, ChallengeSavedData data) {
-        List<ServerPlayerEntity> eligiblePlayers = server.getPlayerManager().getPlayerList().stream()
-                .filter(p -> !data.isXpAwarded(p.getUuid()))
+        List<ServerPlayer> eligiblePlayers = server.getPlayerList().getPlayers().stream()
+                .filter(p -> !data.isXpAwarded(p.getUUID()))
                 .toList();
 
         if (eligiblePlayers.isEmpty()) return;
@@ -150,8 +149,10 @@ public class Chal_26_AllAchievements {
 
         for (int cid : data.getActive()) {
             eligiblePlayers.forEach(p -> {
-                int pTicks = ChallengeTimeUtil.getDisplayPlayTicks(p);
-                StatsManager.recordCompletion(p.getUuidAsString(), cid, pTicks);
+                // The world's run clock, not this player's play time: a friend invited a minute
+                // before the finish must record the run's real duration, not their own.
+                int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
+                StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
             });
         }
 
@@ -161,28 +162,28 @@ public class Chal_26_AllAchievements {
         if (xpAmount > 0) {
             eligiblePlayers.forEach(p -> {
                 LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
-                data.setXpAwarded(p.getUuid(), true);
+                data.setXpAwarded(p.getUUID(), true);
                 ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, true));
                 
-                p.getWorld().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
+                p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
             });
             
-            Text chatMsg = Text.translatable("challengecraft.reward.xp_earned", xpAmount)
-                    .formatted(Formatting.GOLD, Formatting.BOLD);
-            server.getPlayerManager().broadcast(chatMsg, false);
+            Component chatMsg = Component.translatable("challengecraft.reward.xp_earned", xpAmount)
+                    .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+            server.getPlayerList().broadcastSystemMessage(chatMsg, false);
 
-            Text title = Text.translatable("challengecraft.reward.title").formatted(Formatting.GREEN, Formatting.BOLD);
-            Text subtitle = Text.translatable("challengecraft.reward.xp_earned", xpAmount).formatted(Formatting.GOLD);
+            Component title = Component.translatable("challengecraft.reward.title").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD);
+            Component subtitle = Component.translatable("challengecraft.reward.xp_earned", xpAmount).withStyle(ChatFormatting.GOLD);
 
-            server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-            server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
-            server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+            server.getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+            server.getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+            server.getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
         }
     }
 
     public static void skipAdvancement(MinecraftServer server, int amount) {
         if (!active) return;
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         List<Identifier> order = data.getAllAdvancementsOrder();
         int index = data.getAllAdvancementsIndex();
         int newIndex = Math.min(index + amount, order.size());
@@ -211,7 +212,7 @@ public class Chal_26_AllAchievements {
         
         AllAchievementsSyncPacket syncPacket = new AllAchievementsSyncPacket(current, index, order.size());
         
-        server.getPlayerManager().getPlayerList().forEach(player -> {
+        server.getPlayerList().getPlayers().forEach(player -> {
             ServerPlayNetworking.send(player, syncPacket);
         });
     }
