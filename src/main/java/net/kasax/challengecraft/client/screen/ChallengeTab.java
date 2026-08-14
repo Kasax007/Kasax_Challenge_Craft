@@ -5,13 +5,11 @@ import net.fabricmc.api.Environment;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.ChallengeManager;
 import net.kasax.challengecraft.client.ui.CraftUI;
-import net.minecraft.client.gui.ScreenRect;
-import net.minecraft.client.gui.tab.GridScreenTab;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.tabs.GridLayoutTab;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -19,26 +17,26 @@ import java.util.function.Consumer;
 
 @Environment(EnvType.CLIENT)
 /** Create-world challenge configuration tab shown before the first server boot. */
-public class ChallengeTab extends GridScreenTab {
-    private static final Text TITLE = Text.translatable("challengecraft.challenge_tab.title");
+public class ChallengeTab extends GridLayoutTab {
+    private static final Component TITLE = Component.translatable("challengecraft.challenge_tab.title");
     private static final List<Integer> IDS = new ArrayList<>(List.of(
             1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 46, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
     ));
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final List<ChallengeCardWidget> perkCards = new ArrayList<>();
-    private final SliderWidget maxHealthSlider;
-    private final SliderWidget inventorySlider;
-    private final SliderWidget mobHealthSlider;
-    private final SliderWidget doubleTroubleSlider;
-    private final SliderWidget gameSpeedSlider;
-    private final SliderWidget fibMinutesSlider;
-    private Text difficultyText = Text.empty();
+    private final AbstractSliderButton maxHealthSlider;
+    private final AbstractSliderButton inventorySlider;
+    private final AbstractSliderButton mobHealthSlider;
+    private final AbstractSliderButton doubleTroubleSlider;
+    private final AbstractSliderButton gameSpeedSlider;
+    private final AbstractSliderButton fibMinutesSlider;
+    private Component difficultyText = Component.empty();
     private boolean hasConflict;
     private double currentDifficulty = -1;
 
     private WidgetScrollPanel scrollPanel;
-    private ClickableWidget infoBar;
+    private AbstractWidget infoBar;
 
     // Slider values are normalized for the widget; ticks keep the exact gameplay units.
     private double sliderValue = 1.0;
@@ -78,7 +76,7 @@ public class ChallengeTab extends GridScreenTab {
             perkCards.add(perkCard);
         }
 
-        this.maxHealthSlider = new SliderWidget(
+        this.maxHealthSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getHealthSliderText(0.5 + (sliderValue * 9.5)),
                 sliderValue
@@ -98,7 +96,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.inventorySlider = new SliderWidget(
+        this.inventorySlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getSlotsSliderText(36),
                 inventorySliderValue
@@ -117,7 +115,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.mobHealthSlider = new SliderWidget(
+        this.mobHealthSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getMobHealthSliderText(1),
                 mobHealthSliderValue
@@ -136,7 +134,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.doubleTroubleSlider = new SliderWidget(
+        this.doubleTroubleSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getDoubleTroubleSliderText(2),
                 doubleTroubleSliderValue
@@ -155,7 +153,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.gameSpeedSlider = new SliderWidget(
+        this.gameSpeedSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getGameSpeedSliderText(1),
                 gameSpeedSliderValue
@@ -174,7 +172,7 @@ public class ChallengeTab extends GridScreenTab {
             }
         };
 
-        this.fibMinutesSlider = new SliderWidget(
+        this.fibMinutesSlider = new AbstractSliderButton(
                 0, 0, 210, 20,
                 getFibMinutesSliderText(fibMinutes),
                 fibMinutesSliderValue
@@ -193,33 +191,10 @@ public class ChallengeTab extends GridScreenTab {
         };
 
         // CreateWorldScreen keeps this widget reference, so later refreshes must reuse it.
-        this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Text.empty());
+        this.scrollPanel = new WidgetScrollPanel(0, 0, 1, 1, Component.empty());
 
         // Pinned info bar showing difficulty + projected XP payout at the top of the tab.
-        this.infoBar = new ClickableWidget(0, 0, 1, 20, Text.empty()) {
-            @Override
-            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                CraftUI.panelFloat(context, getX(), getY(), getWidth(), getHeight(), CraftUI.GOLD);
-                var tr = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-                Text line;
-                int color;
-                if (hasConflict) {
-                    line = Text.translatable("challengecraft.warning.conflict");
-                    color = CraftUI.DANGER;
-                } else {
-                    long payout = currentDifficulty <= 0 ? 0 : Math.round(100.0 * currentDifficulty);
-                    line = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", currentDifficulty))
-                            .copy().append(Text.literal("   •   "))
-                            .append(Text.translatable("challengecraft.worldcreate.xp_payout", String.format(Locale.ROOT, "%,d", payout)));
-                    color = CraftUI.WARNING;
-                }
-                context.drawCenteredTextWithShadow(tr, line, getX() + getWidth() / 2, getY() + (getHeight() - tr.fontHeight) / 2 + 1, color);
-            }
-
-            @Override
-            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {
-            }
-        };
+        this.infoBar = new DifficultyBar();
 
         updateDifficultyText();
     }
@@ -236,25 +211,25 @@ public class ChallengeTab extends GridScreenTab {
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.hasConflict = true;
             this.currentDifficulty = -1;
-            this.difficultyText = Text.translatable("challengecraft.warning.conflict");
+            this.difficultyText = Component.translatable("challengecraft.warning.conflict");
         } else {
             this.hasConflict = false;
             int playerCount = 0;
-            if (net.minecraft.client.MinecraftClient.getInstance().world != null) {
-                playerCount = net.minecraft.client.MinecraftClient.getInstance().world.getPlayers().size();
+            if (net.minecraft.client.Minecraft.getInstance().level != null) {
+                playerCount = net.minecraft.client.Minecraft.getInstance().level.players().size();
             }
             double total = ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, inventorysliderTicks, mobHealthMultiplier, gameSpeedMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
             this.currentDifficulty = total;
-            this.difficultyText = Text.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
+            this.difficultyText = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
     }
 
     @Override
-    public void refreshGrid(ScreenRect tabArea) {
+    public void doLayout(ScreenRectangle tabArea) {
         int padding = 6;
 
-        int panelX = tabArea.getLeft() + padding;
-        int panelY = tabArea.getTop() + padding;
+        int panelX = tabArea.left() + padding;
+        int panelY = tabArea.top() + padding;
         int panelW = Math.max(60, tabArea.width() - padding * 2);
         int panelH = Math.max(60, tabArea.height() - padding * 2);
 
@@ -366,14 +341,14 @@ public class ChallengeTab extends GridScreenTab {
         
         if (col == 1) y += cardH + spacing;
         y += 15;
-        Text perkTitle = Text.translatable("challengecraft.challenge_selection.perks_header");
-        scrollPanel.addChild(new ClickableWidget(x0, y, panelW - 16, 20, perkTitle) {
+        Component perkTitle = Component.translatable("challengecraft.challenge_selection.perks_header");
+        scrollPanel.addChild(new AbstractWidget(x0, y, panelW - 16, 20, perkTitle) {
             @Override
-            protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
-                context.drawCenteredTextWithShadow(net.minecraft.client.MinecraftClient.getInstance().textRenderer, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
+            protected void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+                context.centeredText(net.minecraft.client.Minecraft.getInstance().font, getMessage(), getX() + getWidth() / 2, getY() + 5, 0xFFFF55);
             }
             @Override
-            protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+            protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {}
         });
         y += 24;
 
@@ -402,8 +377,45 @@ public class ChallengeTab extends GridScreenTab {
         if (col == 1) y += cardH + spacing;
     }
 
+    /**
+     * The pinned Difficulty Rating / XP payout bar.
+     *
+     * <p>A named class rather than an anonymous one purely so other code can FIND it. Its message is
+     * {@link Component#empty()} — the text is composed at draw time — so any lookup by label misses
+     * it; the tutorial step that explains the rating was pointing at nothing and dropping its card on
+     * top of the bar as a result. A type is stable in a way a rendered English string is not.
+     */
+    public class DifficultyBar extends AbstractWidget {
+        DifficultyBar() {
+            super(0, 0, 1, 20, Component.empty());
+        }
+
+        @Override
+        protected void extractWidgetRenderState(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+            CraftUI.panelFloat(context, getX(), getY(), getWidth(), getHeight(), CraftUI.GOLD);
+            var tr = net.minecraft.client.Minecraft.getInstance().font;
+            Component line;
+            int color;
+            if (hasConflict) {
+                line = Component.translatable("challengecraft.warning.conflict");
+                color = CraftUI.DANGER;
+            } else {
+                long payout = currentDifficulty <= 0 ? 0 : Math.round(100.0 * currentDifficulty);
+                line = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", currentDifficulty))
+                        .copy().append(Component.literal("   •   "))
+                        .append(Component.translatable("challengecraft.worldcreate.xp_payout", String.format(Locale.ROOT, "%,d", payout)));
+                color = CraftUI.WARNING;
+            }
+            context.centeredText(tr, line, getX() + getWidth() / 2, getY() + (getHeight() - tr.lineHeight) / 2 + 1, color);
+        }
+
+        @Override
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput builder) {
+        }
+    }
+
     @Override
-    public void forEachChild(Consumer<ClickableWidget> consumer) {
+    public void visitChildren(Consumer<AbstractWidget> consumer) {
         consumer.accept(this.infoBar);
         consumer.accept(this.scrollPanel);
     }
@@ -466,27 +478,27 @@ public class ChallengeTab extends GridScreenTab {
         return active;
     }
 
-    private static Text getHealthSliderText(double hearts) {
-        return Text.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
+    private static Component getHealthSliderText(double hearts) {
+        return Component.translatable("challengecraft.slider.health", String.format(Locale.ROOT, "%.1f", hearts));
     }
 
-    private static Text getSlotsSliderText(double slots) {
-        return Text.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
+    private static Component getSlotsSliderText(double slots) {
+        return Component.translatable("challengecraft.slider.slots", String.format(Locale.ROOT, "%.0f", slots));
     }
 
-    private static Text getMobHealthSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getMobHealthSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.mob_health", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 
-    private static Text getDoubleTroubleSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getDoubleTroubleSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.double_trouble", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 
-    private static Text getGameSpeedSliderText(double multiplier) {
-        return Text.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
+    private static Component getGameSpeedSliderText(double multiplier) {
+        return Component.translatable("challengecraft.slider.game_speed", String.format(Locale.ROOT, "%.0f", multiplier));
     }
 
-    private static Text getFibMinutesSliderText(int minutes) {
-        return Text.translatable("challengecraft.slider.fib_minutes", minutes);
+    private static Component getFibMinutesSliderText(int minutes) {
+        return Component.translatable("challengecraft.slider.fib_minutes", minutes);
     }
 }

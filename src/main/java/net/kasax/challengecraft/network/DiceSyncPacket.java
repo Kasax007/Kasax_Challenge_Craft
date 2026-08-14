@@ -1,18 +1,18 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /**
  * Per-player movement-budget sync for the Würfel challenge. Sent to one player only — the budget
  * is personal, and the client needs it both for the HUD and for the movement clamp in
  * {@code DiceMovementMixin}.
  */
-public class DiceSyncPacket implements CustomPayload {
-    public static final Id<DiceSyncPacket> ID =
-            new Id<>(Identifier.of("challengecraft", "dice_sync"));
+public class DiceSyncPacket implements CustomPacketPayload {
+    public static final Type<DiceSyncPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "dice_sync"));
 
     /** Remaining horizontal blocks the player may still walk. */
     public final float remaining;
@@ -27,7 +27,7 @@ public class DiceSyncPacket implements CustomPayload {
         this.rolling = rolling;
     }
 
-    public static final PacketCodec<RegistryByteBuf, DiceSyncPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, DiceSyncPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
                 buf.writeFloat(pkt.remaining);
                 buf.writeVarInt(pkt.lastRoll);
@@ -41,7 +41,7 @@ public class DiceSyncPacket implements CustomPayload {
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

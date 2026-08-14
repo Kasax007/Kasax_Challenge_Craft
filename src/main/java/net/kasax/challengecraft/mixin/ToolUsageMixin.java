@@ -1,10 +1,11 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_31_CorrosiveTools;
-import net.minecraft.item.*;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Hand;
+import net.minecraft.world.item.*;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -50,18 +51,18 @@ public abstract class ToolUsageMixin {
             Map.entry(Items.STONE_SWORD, Items.WOODEN_SWORD)
     );
 
-    @Inject(method = "Lnet/minecraft/item/ItemStack;onDurabilityChange(ILnet/minecraft/server/network/ServerPlayerEntity;Ljava/util/function/Consumer;)V", at = @At("HEAD"), cancellable = true)
-    private void onDurabilityChange(int damage, @Nullable ServerPlayerEntity player, Consumer<Item> breakCallback, CallbackInfo ci) {
+    @Inject(method = "Lnet/minecraft/world/item/ItemStack;applyDamage(ILnet/minecraft/server/level/ServerPlayer;Ljava/util/function/Consumer;)V", at = @At("HEAD"), cancellable = true)
+    private void onDurabilityChange(int damage, @Nullable ServerPlayer player, Consumer<Item> breakCallback, CallbackInfo ci) {
         if (Chal_31_CorrosiveTools.isActive() && player != null) {
             ItemStack stack = (ItemStack) (Object) this;
-            if (damage > stack.getDamage()) {
+            if (damage > stack.getDamageValue()) {
                 if (player.getRandom().nextFloat() < 0.05f) {
                     Item currentItem = stack.getItem();
                     Item downgraded = DOWNGRADES.get(currentItem);
                     
                     if (downgraded != null) {
                         // Copy custom data without carrying tier-specific base attributes across materials.
-                        ItemStack newStack = stack.copyComponentsToNewStack(downgraded, stack.getCount());
+                        ItemStack newStack = stack.transmuteCopy(downgraded, stack.getCount());
                         
                         int oldMax = stack.getMaxDamage();
                         int newMax = newStack.getMaxDamage();
@@ -69,29 +70,29 @@ public abstract class ToolUsageMixin {
                         if (oldMax > 0 && newMax > 0) {
                             double damageRatio = (double) damage / oldMax;
                             int newDamage = (int) Math.round(damageRatio * newMax);
-                            newStack.setDamage(Math.min(newDamage, newMax - 1));
+                            newStack.setDamageValue(Math.min(newDamage, newMax - 1));
                         }
                         
                         boolean replaced = false;
-                        for (int i = 0; i < player.getInventory().size(); i++) {
-                            if (player.getInventory().getStack(i) == stack) {
-                                player.getInventory().setStack(i, newStack);
+                        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                            if (player.getInventory().getItem(i) == stack) {
+                                player.getInventory().setItem(i, newStack);
                                 replaced = true;
                             }
                         }
                         
-                        for (net.minecraft.entity.EquipmentSlot slot : net.minecraft.entity.EquipmentSlot.values()) {
-                            if (player.getEquippedStack(slot) == stack) {
-                                player.equipStack(slot, newStack);
+                        for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+                            if (player.getItemBySlot(slot) == stack) {
+                                player.setItemSlot(slot, newStack);
                                 replaced = true;
                             }
                         }
                         
                         // Some call sites hand us an equivalent stack instance rather than the inventory reference.
                         if (!replaced) {
-                            for (int i = 0; i < player.getInventory().size(); i++) {
-                                if (ItemStack.areItemsAndComponentsEqual(player.getInventory().getStack(i), stack)) {
-                                    player.getInventory().setStack(i, newStack);
+                            for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                                if (ItemStack.isSameItemSameComponents(player.getInventory().getItem(i), stack)) {
+                                    player.getInventory().setItem(i, newStack);
                                     replaced = true;
                                     break;
                                 }

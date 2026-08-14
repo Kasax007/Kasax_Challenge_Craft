@@ -1,21 +1,24 @@
 package net.kasax.challengecraft.challenges;
 
-import net.minecraft.block.*;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.chunk.Chunk;
-
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.state.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.piston.MovingPistonBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import java.util.*;
 
 /** Rewrites chunk blocks through a deterministic palette mapping. */
 public class Chal_16_RandomChunkBlocks {
     private static boolean active = false;
     private static List<Block> blockList = null;
-    private static final Map<StructureWorldAccess, Set<BlockPos>> pendingReplacements = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<WorldGenLevel, Set<BlockPos>> pendingReplacements = Collections.synchronizedMap(new WeakHashMap<>());
 
     public static void register() {
     }
@@ -31,32 +34,32 @@ public class Chal_16_RandomChunkBlocks {
     private static void ensureBlockList() {
         if (blockList == null) {
             blockList = new ArrayList<>();
-            for (Block block : Registries.BLOCK) {
-                Identifier id = Registries.BLOCK.getId(block);
+            for (Block block : BuiltInRegistries.BLOCK) {
+                Identifier id = BuiltInRegistries.BLOCK.getKey(block);
                 if (id.getNamespace().equals("challengecraft")) continue;
                 if (isException(block)) continue;
                 if (block == Blocks.TNT) continue;
 
-                if (block instanceof FluidBlock) continue;
+                if (block instanceof LiquidBlock) continue;
                 if (block instanceof FallingBlock) continue;
-                if (block instanceof AbstractFireBlock) continue;
+                if (block instanceof BaseFireBlock) continue;
 
-                if (!block.getDefaultState().blocksMovement()) continue;
+                if (!block.defaultBlockState().blocksMotion()) continue;
 
                 // Replacement targets must remain self-supporting and usable as terrain.
                 if (block instanceof SlabBlock) continue;
-                if (block instanceof StairsBlock) continue;
+                if (block instanceof StairBlock) continue;
                 if (block instanceof FenceBlock) continue;
                 if (block instanceof WallBlock) continue;
-                if (block instanceof PaneBlock) continue;
+                if (block instanceof IronBarsBlock) continue;
                 if (block instanceof LeavesBlock) continue;
                 if (block instanceof ShulkerBoxBlock) continue;
                 if (block instanceof AbstractChestBlock) continue;
                 if (block instanceof AbstractFurnaceBlock) continue;
-                if (block instanceof BambooBlock) continue;
+                if (block instanceof BambooStalkBlock) continue;
                 if (block instanceof CactusBlock) continue;
                 if (block instanceof FenceGateBlock) continue;
-                if (block instanceof TrapdoorBlock) continue;
+                if (block instanceof TrapDoorBlock) continue;
 
                 if (block instanceof BarrierBlock) continue;
                 if (block instanceof StructureVoidBlock) continue;
@@ -68,7 +71,7 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof SpawnerBlock) continue;
                 if (block instanceof TrialSpawnerBlock) continue;
                 if (block instanceof VaultBlock) continue;
-                if (block instanceof PistonExtensionBlock) continue;
+                if (block instanceof MovingPistonBlock) continue;
                 if (block instanceof BubbleColumnBlock) continue;
                 if (block instanceof NetherPortalBlock) continue;
                 if (block instanceof EndPortalBlock) continue;
@@ -87,42 +90,42 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof SculkCatalystBlock) continue;
                 if (block instanceof CalibratedSculkSensorBlock) continue;
                 if (block instanceof CrafterBlock) continue;
-                if (block instanceof ChiseledBookshelfBlock) continue;
+                if (block instanceof ChiseledBookShelfBlock) continue;
                 if (block instanceof DecoratedPotBlock) continue;
                 if (block instanceof CreakingHeartBlock) continue;
 
                 // Many decorative blocks pop off immediately when placed without support.
                 if (block instanceof TorchBlock) continue;
-                if (block instanceof PlantBlock) continue;
+                if (block instanceof VegetationBlock) continue;
                 if (block instanceof CarpetBlock) continue;
                 if (block instanceof ButtonBlock) continue;
                 if (block instanceof LeverBlock) continue;
-                if (block instanceof RedstoneWireBlock) continue;
+                if (block instanceof RedStoneWireBlock) continue;
                 if (block instanceof RedstoneTorchBlock) continue;
-                if (block instanceof AbstractRedstoneGateBlock) continue;
-                if (block instanceof AbstractSignBlock) continue;
+                if (block instanceof DiodeBlock) continue;
+                if (block instanceof SignBlock) continue;
                 if (block instanceof PressurePlateBlock) continue;
                 if (block instanceof WeightedPressurePlateBlock) continue;
 
-                if (block instanceof CoralBlock) continue;
+                if (block instanceof CoralPlantBlock) continue;
                 if (block instanceof CoralFanBlock) continue;
                 if (block instanceof CoralWallFanBlock) continue;
-                if (block instanceof DeadCoralBlock) continue;
-                if (block instanceof DeadCoralFanBlock) continue;
-                if (block instanceof DeadCoralWallFanBlock) continue;
+                if (block instanceof BaseCoralPlantBlock) continue;
+                if (block instanceof BaseCoralFanBlock) continue;
+                if (block instanceof BaseCoralWallFanBlock) continue;
 
                 if (block instanceof RailBlock) continue;
                 if (block instanceof AbstractBannerBlock) continue;
                 if (block instanceof BedBlock) continue;
                 if (block instanceof FlowerPotBlock) continue;
                 if (block instanceof DoorBlock) continue;
-                if (block instanceof SnowBlock) continue;
+                if (block instanceof SnowLayerBlock) continue;
                 if (block instanceof LadderBlock) continue;
                 if (block instanceof VineBlock) continue;
-                if (block instanceof TripwireHookBlock) continue;
-                if (block instanceof TripwireBlock) continue;
+                if (block instanceof TripWireHookBlock) continue;
+                if (block instanceof TripWireBlock) continue;
                 if (block instanceof AbstractCandleBlock) continue;
-                if (block instanceof AbstractPlantPartBlock) continue;
+                if (block instanceof GrowingPlantBlock) continue;
                 if (block instanceof SeaPickleBlock) continue;
                 if (block instanceof TurtleEggBlock) continue;
                 if (block instanceof FrogspawnBlock) continue;
@@ -144,7 +147,7 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof HangingRootsBlock) continue;
                 if (block instanceof SporeBlossomBlock) continue;
                 if (block instanceof SweetBerryBushBlock) continue;
-                if (block instanceof MultifaceGrowthBlock) continue;
+                if (block instanceof MultifaceSpreadeableBlock) continue;
 
                 blockList.add(block);
             }
@@ -156,24 +159,24 @@ public class Chal_16_RandomChunkBlocks {
         if (blockList.isEmpty()) return Blocks.STONE;
 
         // Stable per-chunk mapping keeps reloads and newly created chunks consistent.
-        long seed = worldSeed ^ pos.x ^ (long) pos.z << 32;
+        long seed = worldSeed ^ pos.x() ^ (long) pos.z() << 32;
         Random random = new Random(seed);
         return blockList.get(random.nextInt(blockList.size()));
     }
 
-    public static void replaceChunkBlocks(StructureWorldAccess world, Chunk chunk) {
+    public static void replaceChunkBlocks(WorldGenLevel world, ChunkAccess chunk) {
         Block randomBlock = getRandomBlockForChunk(world.getSeed(), chunk.getPos());
-        BlockState randomState = randomBlock.getDefaultState();
+        BlockState randomState = randomBlock.defaultBlockState();
 
-        int minY = chunk.getBottomY();
+        int minY = chunk.getMinY();
         int maxY = minY + chunk.getHeight();
         ChunkPos chunkPos = chunk.getPos();
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y < maxY; y++) {
-                    mutable.set(chunkPos.getStartX() + x, y, chunkPos.getStartZ() + z);
+                    mutable.set(chunkPos.getMinBlockX() + x, y, chunkPos.getMinBlockZ() + z);
                     BlockState currentState = chunk.getBlockState(mutable);
                     if (!isException(currentState.getBlock())) {
                         chunk.setBlockState(mutable, randomState, 0);
@@ -183,21 +186,21 @@ public class Chal_16_RandomChunkBlocks {
         }
     }
 
-    public static void replaceChunkBlocks(ServerWorld world, ChunkPos chunkPos) {
+    public static void replaceChunkBlocks(ServerLevel world, ChunkPos chunkPos) {
         Block randomBlock = getRandomBlockForChunk(world.getSeed(), chunkPos);
-        BlockState randomState = randomBlock.getDefaultState();
-        Chunk chunk = world.getChunk(chunkPos.x, chunkPos.z);
+        BlockState randomState = randomBlock.defaultBlockState();
+        ChunkAccess chunk = world.getChunk(chunkPos.x(), chunkPos.z());
 
-        int minY = chunk.getBottomY();
+        int minY = chunk.getMinY();
         int maxY = minY + chunk.getHeight();
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y < maxY; y++) {
-                    mutable.set(chunkPos.getStartX() + x, y, chunkPos.getStartZ() + z);
+                    mutable.set(chunkPos.getMinBlockX() + x, y, chunkPos.getMinBlockZ() + z);
                     if (!isException(world.getBlockState(mutable).getBlock())) {
-                        world.setBlockState(mutable, randomState, 3);
+                        world.setBlock(mutable, randomState, 3);
                     }
                 }
             }
@@ -217,18 +220,18 @@ public class Chal_16_RandomChunkBlocks {
                block == Blocks.LAVA;
     }
 
-    public static void recordPendingReplacement(StructureWorldAccess world, BlockPos pos) {
-        pendingReplacements.computeIfAbsent(world, k -> Collections.synchronizedSet(new HashSet<>())).add(pos.toImmutable());
+    public static void recordPendingReplacement(WorldGenLevel world, BlockPos pos) {
+        pendingReplacements.computeIfAbsent(world, k -> Collections.synchronizedSet(new HashSet<>())).add(pos.immutable());
     }
 
-    public static void applyPendingReplacements(StructureWorldAccess world) {
+    public static void applyPendingReplacements(WorldGenLevel world) {
         Set<BlockPos> positions = pendingReplacements.remove(world);
         if (positions != null) {
             long seed = world.getSeed();
             synchronized (positions) {
                 for (BlockPos pos : positions) {
-                    Block randomBlock = getRandomBlockForChunk(seed, new ChunkPos(pos));
-                    world.setBlockState(pos, randomBlock.getDefaultState(), 3);
+                    Block randomBlock = getRandomBlockForChunk(seed, new ChunkPos(pos.getX() >> 4, pos.getZ() >> 4));
+                    world.setBlock(pos, randomBlock.defaultBlockState(), 3);
                 }
             }
         }

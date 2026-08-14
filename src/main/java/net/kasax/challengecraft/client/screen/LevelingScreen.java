@@ -3,19 +3,20 @@ package net.kasax.challengecraft.client.screen;
 import net.kasax.challengecraft.ChallengeCraftClient;
 import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.data.XpManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.ScrollableWidget;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractScrollArea;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -31,7 +32,7 @@ import java.util.function.Consumer;
  * Manual milestone offsets are saved client-side so the artwork can be tuned without touching gameplay data.
  */
 public class LevelingScreen extends Screen {
-    private static final Identifier JOURNEY_TEXTURE = Identifier.of("challengecraft", "textures/gui/level_journey_map.png");
+    private static final Identifier JOURNEY_TEXTURE = Identifier.fromNamespaceAndPath("challengecraft", "textures/gui/level_journey_map.png");
     private static final int JOURNEY_TEXTURE_WIDTH = 576;
     private static final int JOURNEY_TEXTURE_HEIGHT = 3072;
 
@@ -91,8 +92,8 @@ public class LevelingScreen extends Screen {
     private int detailWidth;
     private int detailHeight;
 
-    private ButtonWidget editLayoutButton;
-    private ButtonWidget resetLayoutButton;
+    private Button editLayoutButton;
+    private Button resetLayoutButton;
     private LayoutModeWidget layoutModeButton;
     private boolean draggingRadarThumb;
     private int radarRailY;
@@ -100,7 +101,7 @@ public class LevelingScreen extends Screen {
     private int radarViewportTravel;
 
     public LevelingScreen(Screen parent) {
-        super(Text.translatable("challengecraft.leveling.title"));
+        super(Component.translatable("challengecraft.leveling.title"));
         this.parent = parent;
         this.legacyLayoutMode = ChallengeCraftClient.USE_LEGACY_LEVEL_SCREEN_LAYOUT;
 
@@ -131,17 +132,18 @@ public class LevelingScreen extends Screen {
     }
 
     @Override
-    public void close() {
-        if (this.client != null) {
-            this.client.setScreen(this.parent);
+    public void onClose() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreenAndShow(this.parent);
         }
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
         if (this.layoutEditMode && this.pinnedMilestone != null) {
-            int step = hasShiftDown() ? LAYOUT_STEP * 2 : LAYOUT_STEP;
-            boolean handled = switch (keyCode) {
+            // 26.2 folded key/scancode/modifiers into KeyEvent; the shift check moved onto it too.
+            int step = event.hasShiftDown() ? LAYOUT_STEP * 2 : LAYOUT_STEP;
+            boolean handled = switch (event.key()) {
                 case GLFW.GLFW_KEY_LEFT -> nudgePinnedMilestone(-step, 0);
                 case GLFW.GLFW_KEY_RIGHT -> nudgePinnedMilestone(step, 0);
                 case GLFW.GLFW_KEY_UP -> nudgePinnedMilestone(0, -step);
@@ -156,35 +158,35 @@ public class LevelingScreen extends Screen {
                 return true;
             }
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.legacyLayoutMode && button == 0 && isMouseOverRadarThumb(mouseX, mouseY)) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (!this.legacyLayoutMode && event.button() == 0 && isMouseOverRadarThumb(event.x(), event.y())) {
             this.draggingRadarThumb = true;
-            updateRadarScroll(mouseY);
+            updateRadarScroll(event.y());
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-        if (this.draggingRadarThumb && button == 0) {
-            updateRadarScroll(mouseY);
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        if (this.draggingRadarThumb && event.button() == 0) {
+            updateRadarScroll(event.y());
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(event, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.draggingRadarThumb && button == 0) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        if (this.draggingRadarThumb && event.button() == 0) {
             this.draggingRadarThumb = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     private boolean nudgePinnedMilestone(int dx, int dy) {
@@ -210,7 +212,7 @@ public class LevelingScreen extends Screen {
         int panelX = this.mapX + 10;
         int railX = panelX + 16;
         int scrollRange = Math.max(1, this.journeyPanel.contentHeight - this.journeyPanel.getHeight());
-        int viewportTop = this.radarRailY + Math.round((float) this.journeyPanel.getScrollY() / scrollRange * this.radarViewportTravel);
+        int viewportTop = this.radarRailY + Math.round((float) this.journeyPanel.scrollAmount() / scrollRange * this.radarViewportTravel);
         return mouseX >= railX - 5 && mouseX <= railX + 11 && mouseY >= viewportTop && mouseY <= viewportTop + this.radarViewportHeight;
     }
 
@@ -218,19 +220,19 @@ public class LevelingScreen extends Screen {
         if (this.journeyPanel == null) {
             return;
         }
-        int centerY = MathHelper.clamp((int) Math.round(mouseY) - this.radarViewportHeight / 2, this.radarRailY, this.radarRailY + this.radarViewportTravel);
+        int centerY = Mth.clamp((int) Math.round(mouseY) - this.radarViewportHeight / 2, this.radarRailY, this.radarRailY + this.radarViewportTravel);
         float ratio = this.radarViewportTravel <= 0 ? 0.0f : (centerY - this.radarRailY) / (float) this.radarViewportTravel;
         this.journeyPanel.setScrollRatio(ratio);
     }
 
-    private Text getLayoutButtonText() {
-        return Text.translatable(this.layoutEditMode
+    private Component getLayoutButtonText() {
+        return Component.translatable(this.layoutEditMode
                 ? "challengecraft.leveling.layout_edit.on"
                 : "challengecraft.leveling.layout_edit.off");
     }
 
-    private Text getLayoutModeButtonText() {
-        return Text.translatable(this.legacyLayoutMode
+    private Component getLayoutModeButtonText() {
+        return Component.translatable(this.legacyLayoutMode
                 ? "challengecraft.leveling.layout_mode.legacy"
                 : "challengecraft.leveling.layout_mode.journey");
     }
@@ -248,21 +250,21 @@ public class LevelingScreen extends Screen {
         int buttonWidth = 140;
         int buttonX = this.frameX + this.frameWidth - buttonWidth - 16;
         int buttonY = this.frameY + 12;
-        this.layoutModeButton = addDrawableChild(new LayoutModeWidget(buttonX, buttonY, buttonWidth, 20));
+        this.layoutModeButton = addRenderableWidget(new LayoutModeWidget(buttonX, buttonY, buttonWidth, 20));
     }
 
     private void toggleLayoutMode() {
         ChallengeCraftClient.USE_LEGACY_LEVEL_SCREEN_LAYOUT = !this.legacyLayoutMode;
         this.layoutEditMode = false;
         this.draggedMilestone = null;
-        if (this.client != null) {
-            this.client.setScreen(new LevelingScreen(this.parent));
+        if (this.minecraft != null) {
+            this.minecraft.setScreenAndShow(new LevelingScreen(this.parent));
         }
     }
 
     private void initJourneyLayout() {
         this.legacyScrollPanel = null;
-        this.journeyPanel = addDrawableChild(new JourneyPanel(
+        this.journeyPanel = addRenderableWidget(new JourneyPanel(
                 this.mapX,
                 this.mapY,
                 this.mapWidth,
@@ -286,24 +288,24 @@ public class LevelingScreen extends Screen {
 
         int buttonY = this.height - 26;
         int startX = this.width / 2 - 222;
-        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.ui.back"), button -> close())
-                .dimensions(startX, buttonY, 102, 20)
+        addRenderableWidget(Button.builder(Component.translatable("challengecraft.ui.back"), button -> onClose())
+                .bounds(startX, buttonY, 102, 20)
                 .build());
-        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.leveling.center_current"), button -> {
+        addRenderableWidget(Button.builder(Component.translatable("challengecraft.leveling.center_current"), button -> {
                     if (this.journeyPanel != null) {
                         this.journeyPanel.centerOn(this.currentMilestone != null ? this.currentMilestone : this.pinnedMilestone);
                     }
                 })
-                .dimensions(startX + 108, buttonY, 102, 20)
+                .bounds(startX + 108, buttonY, 102, 20)
                 .build());
-        this.editLayoutButton = addDrawableChild(ButtonWidget.builder(getLayoutButtonText(), button -> {
+        this.editLayoutButton = addRenderableWidget(Button.builder(getLayoutButtonText(), button -> {
                     this.layoutEditMode = !this.layoutEditMode;
                     this.draggedMilestone = null;
                     updateLayoutButtons();
                 })
-                .dimensions(startX + 216, buttonY, 102, 20)
+                .bounds(startX + 216, buttonY, 102, 20)
                 .build());
-        this.resetLayoutButton = addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.leveling.reset_layout"), button -> {
+        this.resetLayoutButton = addRenderableWidget(Button.builder(Component.translatable("challengecraft.leveling.reset_layout"), button -> {
                     this.layoutOffsets.clear();
                     this.layoutOffsets.putAll(LevelJourneyLayoutStore.defaultOffsets());
                     LevelJourneyLayoutStore.clear();
@@ -313,7 +315,7 @@ public class LevelingScreen extends Screen {
                         this.journeyPanel.setPinnedMilestone(this.pinnedMilestone);
                     }
                 })
-                .dimensions(startX + 324, buttonY, 120, 20)
+                .bounds(startX + 324, buttonY, 120, 20)
                 .build());
         updateLayoutButtons();
     }
@@ -326,7 +328,7 @@ public class LevelingScreen extends Screen {
         int panelHeight = Math.max(120, this.mapHeight - 12);
         int panelX = this.frameX + (this.frameWidth - panelWidth) / 2;
         int panelY = this.mapY + 6;
-        this.legacyScrollPanel = addDrawableChild(new WidgetScrollPanel(panelX, panelY, panelWidth, panelHeight, Text.empty()));
+        this.legacyScrollPanel = addRenderableWidget(new WidgetScrollPanel(panelX, panelY, panelWidth, panelHeight, Component.empty()));
 
         int currentY = panelY + 6;
         for (Milestone milestone : this.milestones) {
@@ -335,23 +337,34 @@ public class LevelingScreen extends Screen {
             currentY += entry.getHeight() + 6;
         }
 
-        addDrawableChild(ButtonWidget.builder(Text.translatable("challengecraft.ui.back"), button -> close())
-                .dimensions(this.width / 2 - 50, this.height - 26, 100, 20)
+        addRenderableWidget(Button.builder(Component.translatable("challengecraft.ui.back"), button -> onClose())
+                .bounds(this.width / 2 - 50, this.height - 26, 100, 20)
                 .build());
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        // No explicit background call any more: 26.2's extractRenderStateWithTooltipAndSubtitles
+        // runs extractBackground() in its own stratum right before this method.
         drawFrame(context, this.frameX, this.frameY, this.frameWidth, this.frameHeight, FRAME_BG, FRAME_BORDER, FRAME_ACCENT);
         drawFrame(context, this.frameX + 6, this.frameY + 6, this.frameWidth - 12, this.frameHeight - 12, FRAME_INNER, 0xFF2C3444, 0xFF7FA1D0);
         if (this.legacyLayoutMode && this.legacyScrollPanel != null) {
             drawPanel(context, this.legacyScrollPanel.getX() - 6, this.legacyScrollPanel.getY() - 6, this.legacyScrollPanel.getWidth() + 12, this.legacyScrollPanel.getHeight() + 12, 0xA2141A23, 0xFF364255, 0xFF8BA6D8);
         }
 
-        super.render(context, mouseX, mouseY, delta);
+        // The header MUST be drawn before super.extractRenderState, because
+        // super is what emits the widgets — and the layout-mode toggle sits inside the header band
+        // (button at frameY + 12, header panel from frameY + 10). Drawing the header afterwards
+        // painted its opaque 0xF0151C27 panel straight over the button, which is why the
+        // Journey/Legacy switch was invisible. The header even reserves space for the button
+        // (`reservedRight`), so sitting behind it is the intended arrangement — only the order was
+        // wrong. Every other screen in the mod already draws its chrome before super.
         drawHeader(context);
 
+        super.extractRenderState(context, mouseX, mouseY, delta);
+
+        // These two are side panels, laid out beside the widgets rather than over them, so they
+        // stay after super — they read hover state and must not be covered by the scroll panel.
         if (!this.legacyLayoutMode) {
             drawProgressRadar(context);
             drawDetailCard(context, mouseX, mouseY);
@@ -382,7 +395,7 @@ public class LevelingScreen extends Screen {
         int mapBottom = this.legacyLayoutMode ? this.frameY + this.frameHeight - 18 : this.detailY;
         this.mapHeight = Math.max(70, mapBottom - this.mapY);
 
-        float idealScale = MathHelper.clamp((this.mapWidth - 18.0f) / (float) JOURNEY_TEXTURE_WIDTH, 0.75f, 1.75f);
+        float idealScale = Mth.clamp((this.mapWidth - 18.0f) / (float) JOURNEY_TEXTURE_WIDTH, 0.75f, 1.75f);
         float quantizedScale = Math.max(0.75f, Math.round(idealScale * 4.0f) / 4.0f);
         while (quantizedScale > 0.75f && JOURNEY_TEXTURE_WIDTH * quantizedScale > this.mapWidth - 8) {
             quantizedScale -= 0.25f;
@@ -442,7 +455,7 @@ public class LevelingScreen extends Screen {
             milestone.cardWidth = milestone.isStar ? 118 : 128;
             milestone.cardHeight = milestone.isStar ? 44 : 56;
             int x = center + (int) Math.round(wave * localAmplitude);
-            milestone.baseAnchorX = MathHelper.clamp(x, artMinCenter + milestone.cardWidth / 2, artMaxCenter - milestone.cardWidth / 2);
+            milestone.baseAnchorX = Mth.clamp(x, artMinCenter + milestone.cardWidth / 2, artMaxCenter - milestone.cardWidth / 2);
             int artY = milestone.isStar ? getStarAnchorY(milestone.value) : getLevelAnchorY(milestone.value);
             milestone.baseAnchorY = scaleArtY(compressMilestoneArtY(artY));
             LevelJourneyLayoutStore.LayoutOffset offset = this.layoutOffsets.get(milestone.layoutKey());
@@ -550,9 +563,8 @@ public class LevelingScreen extends Screen {
         for (int perkId : LevelManager.ALL_PERKS) {
             if (LevelManager.getRequiredLevel(perkId) == level) {
                 rewards.add(Reward.perk(
-                        Text.translatable("challengecraft.perk." + perkId),
-                        Text.translatable("challengecraft.perk." + perkId + ".desc"),
-                        ChallengeIconProvider.getIcon(perkId),
+                        Component.translatable("challengecraft.perk." + perkId),
+                        Component.translatable("challengecraft.perk." + perkId + ".desc"),
                         perkId
                 ));
             }
@@ -561,9 +573,8 @@ public class LevelingScreen extends Screen {
         for (int challengeId = 1; challengeId <= 46; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
-                        Text.translatable("challengecraft.worldcreate.challenge" + challengeId),
-                        Text.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc"),
-                        ChallengeIconProvider.getIcon(challengeId),
+                        Component.translatable("challengecraft.worldcreate.challenge" + challengeId),
+                        Component.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc"),
                         challengeId
                 ));
             }
@@ -571,8 +582,8 @@ public class LevelingScreen extends Screen {
 
         if (level == LevelManager.MAX_LEVEL) {
             rewards.add(Reward.special(
-                    Text.translatable("challengecraft.leveling.infinity_road"),
-                    Text.translatable("challengecraft.leveling.infinity_road.desc"),
+                    Component.translatable("challengecraft.leveling.infinity_road"),
+                    Component.translatable("challengecraft.leveling.infinity_road.desc"),
                     0xFFE3B35A
             ));
         }
@@ -589,9 +600,8 @@ public class LevelingScreen extends Screen {
         if (rewardId.startsWith("perk_")) {
             int perkId = LevelManager.PERK_INFINITY_WEAPON;
             rewards.add(Reward.perk(
-                    Text.translatable("challengecraft.perk." + perkId),
-                    Text.translatable("challengecraft.perk." + perkId + ".desc"),
-                    ChallengeIconProvider.getIcon(perkId),
+                    Component.translatable("challengecraft.perk." + perkId),
+                    Component.translatable("challengecraft.perk." + perkId + ".desc"),
                     perkId
             ));
             return rewards;
@@ -606,16 +616,16 @@ public class LevelingScreen extends Screen {
             case "rainbow" -> 0xFF6DE7E1;
             default -> 0xFFFFFFFF;
         };
-        Text label = switch (rewardId) {
-            case "green" -> Text.translatable("challengecraft.leveling.aura.green");
-            case "blue" -> Text.translatable("challengecraft.leveling.aura.blue");
-            case "red" -> Text.translatable("challengecraft.leveling.aura.red");
-            case "purple" -> Text.translatable("challengecraft.leveling.aura.purple");
-            case "gold" -> Text.translatable("challengecraft.leveling.aura.gold");
-            case "rainbow" -> Text.translatable("challengecraft.leveling.aura.rainbow");
-            default -> Text.of(rewardId);
+        Component label = switch (rewardId) {
+            case "green" -> Component.translatable("challengecraft.leveling.aura.green");
+            case "blue" -> Component.translatable("challengecraft.leveling.aura.blue");
+            case "red" -> Component.translatable("challengecraft.leveling.aura.red");
+            case "purple" -> Component.translatable("challengecraft.leveling.aura.purple");
+            case "gold" -> Component.translatable("challengecraft.leveling.aura.gold");
+            case "rainbow" -> Component.translatable("challengecraft.leveling.aura.rainbow");
+            default -> Component.nullToEmpty(rewardId);
         };
-        rewards.add(Reward.color(label, Text.translatable("challengecraft.leveling.aura.desc"), color));
+        rewards.add(Reward.color(label, Component.translatable("challengecraft.leveling.aura.desc"), color));
         return rewards;
     }
 
@@ -651,7 +661,7 @@ public class LevelingScreen extends Screen {
         return tr("challengecraft.leveling.summary.infinity");
     }
 
-    private void drawHeader(DrawContext context) {
+    private void drawHeader(GuiGraphicsExtractor context) {
         int headerX = this.mapX;
         int headerY = this.frameY + 10;
         int headerWidth = this.mapWidth;
@@ -668,10 +678,10 @@ public class LevelingScreen extends Screen {
         }
     }
 
-    private void drawJourneyHeader(DrawContext context, int x, int y, int topWidth, int rowWidth) {
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.header.journey"), x, y, 0xFFF4F8FF, false);
+    private void drawJourneyHeader(GuiGraphicsExtractor context, int x, int y, int topWidth, int rowWidth) {
+        context.text(this.font, Component.translatable("challengecraft.leveling.header.journey"), x, y, 0xFFF4F8FF, false);
         String subtitle = trimToWidth(tr("challengecraft.leveling.header.journey.desc"), topWidth);
-        context.drawText(this.textRenderer, Text.of(subtitle), x, y + 11, 0xFF9FB0CA, false);
+        context.text(this.font, Component.nullToEmpty(subtitle), x, y + 11, 0xFF9FB0CA, false);
 
         float progress;
         String progressText;
@@ -685,7 +695,7 @@ public class LevelingScreen extends Screen {
             long nextLevelXp = LevelManager.getXpForLevel(this.currentLevel + 1);
             long neededXp = Math.max(1L, nextLevelXp - currentLevelXp);
             long progressXp = Math.max(0L, this.totalXp - currentLevelXp);
-            progress = MathHelper.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
+            progress = Mth.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
             progressText = tr("challengecraft.leveling.header.progress", formatXp(progressXp), formatXp(neededXp));
         }
 
@@ -694,8 +704,8 @@ public class LevelingScreen extends Screen {
                 ? tr("challengecraft.leveling.header.next_level", this.currentLevel + 1)
                 : (this.currentStars > 0 ? tr("challengecraft.leveling.header.stars", this.currentStars) : tr("challengecraft.leveling.header.infinity_unlocked"));
         int labelY = y + 24;
-        context.drawText(this.textRenderer, Text.of(left), x, labelY, 0xFFDAE7FF, false);
-        context.drawText(this.textRenderer, Text.of(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
+        context.text(this.font, Component.nullToEmpty(left), x, labelY, 0xFFDAE7FF, false);
+        context.text(this.font, Component.nullToEmpty(right), x + rowWidth - this.font.width(right), labelY, 0xFFE3B35A, false);
 
         int progressPanelY = y + 35;
         int progressPanelWidth = Math.max(200, rowWidth);
@@ -711,14 +721,14 @@ public class LevelingScreen extends Screen {
                 : progressText;
         int footerTop = progressPanelY + 16;
         int footerBottom = y + this.headerHeight - 13;
-        int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.textRenderer.fontHeight) / 2);
-        context.drawText(this.textRenderer, Text.of(trimToWidth(footer, rowWidth)), x, footerY, this.layoutEditMode ? 0xFFF7DF8A : 0xFFB9C5DA, false);
+        int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.font.lineHeight) / 2);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(footer, rowWidth)), x, footerY, this.layoutEditMode ? 0xFFF7DF8A : 0xFFB9C5DA, false);
     }
 
-    private void drawLegacyHeader(DrawContext context, int x, int y, int topWidth, int rowWidth) {
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.mainmenu.leveling_button"), x, y, 0xFFF4F8FF, false);
+    private void drawLegacyHeader(GuiGraphicsExtractor context, int x, int y, int topWidth, int rowWidth) {
+        context.text(this.font, Component.translatable("challengecraft.mainmenu.leveling_button"), x, y, 0xFFF4F8FF, false);
         String subtitle = trimToWidth(tr("challengecraft.leveling.header.legacy.desc"), topWidth);
-        context.drawText(this.textRenderer, Text.of(subtitle), x, y + 11, 0xFF9FB0CA, false);
+        context.text(this.font, Component.nullToEmpty(subtitle), x, y + 11, 0xFF9FB0CA, false);
 
         float progress;
         String progressText;
@@ -732,7 +742,7 @@ public class LevelingScreen extends Screen {
             long nextLevelXp = LevelManager.getXpForLevel(this.currentLevel + 1);
             long neededXp = Math.max(1L, nextLevelXp - currentLevelXp);
             long progressXp = Math.max(0L, this.totalXp - currentLevelXp);
-            progress = MathHelper.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
+            progress = Mth.clamp(progressXp / (float) neededXp, 0.0f, 1.0f);
             progressText = tr("challengecraft.leveling.header.progress", formatXp(progressXp), formatXp(neededXp));
         }
 
@@ -741,8 +751,8 @@ public class LevelingScreen extends Screen {
                 ? tr("challengecraft.leveling.header.next_level", this.currentLevel + 1)
                 : (this.currentStars > 0 ? tr("challengecraft.leveling.header.stars", this.currentStars) : tr("challengecraft.leveling.header.infinity_unlocked"));
         int labelY = y + 24;
-        context.drawText(this.textRenderer, Text.of(left), x, labelY, 0xFFDAE7FF, false);
-        context.drawText(this.textRenderer, Text.of(right), x + rowWidth - this.textRenderer.getWidth(right), labelY, 0xFFE3B35A, false);
+        context.text(this.font, Component.nullToEmpty(left), x, labelY, 0xFFDAE7FF, false);
+        context.text(this.font, Component.nullToEmpty(right), x + rowWidth - this.font.width(right), labelY, 0xFFE3B35A, false);
 
         int progressPanelY = y + 35;
         int progressPanelWidth = Math.max(200, rowWidth);
@@ -754,11 +764,11 @@ public class LevelingScreen extends Screen {
         drawBar(context, barX, barY, barWidth, barHeight, progress);
         int footerTop = progressPanelY + 16;
         int footerBottom = y + this.headerHeight - 13;
-        int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.textRenderer.fontHeight) / 2);
-        context.drawText(this.textRenderer, Text.of(trimToWidth(progressText, rowWidth)), x, footerY, 0xFFB9C5DA, false);
+        int footerY = footerTop + Math.max(0, (footerBottom - footerTop - this.font.lineHeight) / 2);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(progressText, rowWidth)), x, footerY, 0xFFB9C5DA, false);
     }
 
-    private void drawProgressRadar(DrawContext context) {
+    private void drawProgressRadar(GuiGraphicsExtractor context) {
         if (this.journeyPanel == null) {
             return;
         }
@@ -769,9 +779,9 @@ public class LevelingScreen extends Screen {
         int panelHeight = Math.min(this.mapHeight - 32, 220);
         drawPanel(context, panelX, panelY, panelWidth, panelHeight, 0xAA111923, 0xFF364255, 0xFF8BA6D8);
 
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.radar.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
+        context.text(this.font, Component.translatable("challengecraft.leveling.radar.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
         String count = tr("challengecraft.leveling.radar.count", getCompletedMilestoneCount(), this.milestones.size());
-        context.drawText(this.textRenderer, Text.of(count), panelX + 10, panelY + 19, 0xFFB9C5DA, false);
+        context.text(this.font, Component.nullToEmpty(count), panelX + 10, panelY + 19, 0xFFB9C5DA, false);
 
         int railX = panelX + 16;
         int railY = panelY + 34;
@@ -783,14 +793,14 @@ public class LevelingScreen extends Screen {
         int viewportHeight = Math.max(8, Math.round(this.journeyPanel.getHeight() / (float) contentHeight * railHeight));
         int scrollRange = Math.max(1, contentHeight - this.journeyPanel.getHeight());
         int viewportTravel = Math.max(0, railHeight - viewportHeight);
-        int viewportTop = railY + Math.round((float) this.journeyPanel.getScrollY() / scrollRange * viewportTravel);
+        int viewportTop = railY + Math.round((float) this.journeyPanel.scrollAmount() / scrollRange * viewportTravel);
         this.radarRailY = railY;
         this.radarViewportHeight = Math.min(viewportHeight, railHeight);
         this.radarViewportTravel = viewportTravel;
         drawChip(context, railX - 3, viewportTop, 10, Math.min(viewportHeight, railHeight), 0x66232D3A, 0xFFB3D5FF);
 
         for (Milestone milestone : this.milestones) {
-            float ratio = MathHelper.clamp(milestone.centerY() / (float) contentHeight, 0.0f, 1.0f);
+            float ratio = Mth.clamp(milestone.centerY() / (float) contentHeight, 0.0f, 1.0f);
             int dotY = railY + Math.round(ratio * railHeight);
             int color = milestone.unlocked ? 0xFF7BE0A4 : 0xFF75839A;
             if (milestone == this.currentMilestone) {
@@ -805,11 +815,11 @@ public class LevelingScreen extends Screen {
 
         String currentText = this.currentMilestone != null ? this.currentMilestone.title : tr("challengecraft.leveling.none");
         String nextText = this.nextMilestone != null ? this.nextMilestone.title : tr("challengecraft.leveling.done");
-        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.radar.now", currentText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 32, 0xFFE8EEF9, false);
-        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.radar.next", nextText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 19, 0xFFB3D5FF, false);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(tr("challengecraft.leveling.radar.now", currentText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 32, 0xFFE8EEF9, false);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(tr("challengecraft.leveling.radar.next", nextText), panelWidth - 34)), panelX + 24, panelY + panelHeight - 19, 0xFFB3D5FF, false);
     }
 
-    private void drawUpcomingPanel(DrawContext context) {
+    private void drawUpcomingPanel(GuiGraphicsExtractor context) {
         if (this.journeyPanel == null) {
             return;
         }
@@ -820,8 +830,8 @@ public class LevelingScreen extends Screen {
         int panelHeight = Math.min(this.mapHeight - 20, 168);
         drawPanel(context, panelX, panelY, panelWidth, panelHeight, 0xAA111923, 0xFF364255, 0xFFE3B35A);
 
-        context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
-        context.drawText(this.textRenderer, Text.of(trimToWidth(tr("challengecraft.leveling.ledger.pinned", this.pinnedMilestone != null ? this.pinnedMilestone.title : "-"), panelWidth - 18)), panelX + 10, panelY + 20, 0xFFF7DF8A, false);
+        context.text(this.font, Component.translatable("challengecraft.leveling.ledger.title"), panelX + 10, panelY + 8, 0xFFF2F6FF, false);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(tr("challengecraft.leveling.ledger.pinned", this.pinnedMilestone != null ? this.pinnedMilestone.title : "-"), panelWidth - 18)), panelX + 10, panelY + 20, 0xFFF7DF8A, false);
 
         List<Milestone> preview = getPreviewMilestones(4);
         int textY = panelY + 38;
@@ -831,16 +841,16 @@ public class LevelingScreen extends Screen {
                     ? tr("challengecraft.leveling.ledger.now")
                     : (milestone == this.nextMilestone ? tr("challengecraft.leveling.ledger.up") : tr("challengecraft.leveling.ledger.soon"));
             String line = tr("challengecraft.leveling.ledger.line", prefix, milestone.title, formatXp(Math.max(0L, milestone.requiredXp - this.totalXp)));
-            context.drawText(this.textRenderer, Text.of(trimToWidth(line, panelWidth - 18)), panelX + 10, textY, color, false);
+            context.text(this.font, Component.nullToEmpty(trimToWidth(line, panelWidth - 18)), panelX + 10, textY, color, false);
             textY += 12;
         }
 
         if (this.layoutEditMode && this.pinnedMilestone != null) {
             String coords = tr("challengecraft.leveling.ledger.offsets", String.format(Locale.ROOT, "%.1f", this.pinnedMilestone.offsetArtX), String.format(Locale.ROOT, "%.1f", this.pinnedMilestone.offsetArtY));
-            context.drawText(this.textRenderer, Text.of(trimToWidth(coords, panelWidth - 18)), panelX + 10, panelY + panelHeight - 24, 0xFFF7DF8A, false);
-            context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.drag_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
+            context.text(this.font, Component.nullToEmpty(trimToWidth(coords, panelWidth - 18)), panelX + 10, panelY + panelHeight - 24, 0xFFF7DF8A, false);
+            context.text(this.font, Component.translatable("challengecraft.leveling.ledger.drag_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
         } else {
-            context.drawText(this.textRenderer, Text.translatable("challengecraft.leveling.ledger.select_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
+            context.text(this.font, Component.translatable("challengecraft.leveling.ledger.select_hint"), panelX + 10, panelY + panelHeight - 13, 0xFFB9C5DA, false);
         }
     }
 
@@ -878,7 +888,7 @@ public class LevelingScreen extends Screen {
         return getArtLeft() + this.renderedArtWidth;
     }
 
-    private void drawDetailCard(DrawContext context, int mouseX, int mouseY) {
+    private void drawDetailCard(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Milestone focus = this.pinnedMilestone != null ? this.pinnedMilestone : this.currentMilestone;
         if (focus == null) {
             return;
@@ -889,18 +899,18 @@ public class LevelingScreen extends Screen {
         String status = focus.unlocked ? tr("challengecraft.leveling.status.unlocked") : (focus == this.nextMilestone ? tr("challengecraft.leveling.status.up_next") : tr("challengecraft.leveling.status.locked"));
         int statusColor = focus.unlocked ? 0xFF7BE0A4 : (focus == this.nextMilestone ? DETAIL_ACCENT : 0xFF9FAAC1);
 
-        context.drawText(this.textRenderer, Text.of(focus.title), this.detailX + 12, this.detailY + 10, 0xFFF4F8FF, false);
-        int statusWidth = this.textRenderer.getWidth(status);
+        context.text(this.font, Component.nullToEmpty(focus.title), this.detailX + 12, this.detailY + 10, 0xFFF4F8FF, false);
+        int statusWidth = this.font.width(status);
         drawChip(context, this.detailX + this.detailWidth - statusWidth - 20, this.detailY + 8, statusWidth + 10, 12, 0x44222A34, statusColor);
-        context.drawText(this.textRenderer, Text.of(status), this.detailX + this.detailWidth - statusWidth - 15, this.detailY + 10, statusColor, false);
+        context.text(this.font, Component.nullToEmpty(status), this.detailX + this.detailWidth - statusWidth - 15, this.detailY + 10, statusColor, false);
 
         String requirement = focus.isStar
                 ? tr("challengecraft.leveling.requirement.star", formatXp(Math.max(0L, focus.requiredXp - LevelManager.getXpForLevel(LevelManager.MAX_LEVEL))))
                 : tr("challengecraft.leveling.requirement.level", formatXp(focus.requiredXp));
-        context.drawText(this.textRenderer, Text.of(requirement), this.detailX + 12, this.detailY + 24, 0xFFB9C5DA, false);
+        context.text(this.font, Component.nullToEmpty(requirement), this.detailX + 12, this.detailY + 24, 0xFFB9C5DA, false);
 
         String summary = trimToWidth(focus.summary, this.detailWidth - 24);
-        context.drawText(this.textRenderer, Text.of(summary), this.detailX + 12, this.detailY + 37, 0xFFD8DFEC, false);
+        context.text(this.font, Component.nullToEmpty(summary), this.detailX + 12, this.detailY + 37, 0xFFD8DFEC, false);
 
         int chipX = this.detailX + 12;
         int chipY = this.detailY + 48;
@@ -909,8 +919,8 @@ public class LevelingScreen extends Screen {
         Reward hoveredReward = null;
 
         if (focus.rewards.isEmpty()) {
-            drawRewardChip(context, chipX, chipY, 118, Text.translatable("challengecraft.leveling.reward.momentum"), null, 0xFF95A3BC, RewardKind.SPECIAL, false);
-            drawRewardDescription(context, Text.translatable("challengecraft.leveling.reward.checkpoint"), Text.translatable("challengecraft.leveling.reward.checkpoint.desc"), null);
+            drawRewardChip(context, chipX, chipY, 118, Component.translatable("challengecraft.leveling.reward.momentum"), null, 0xFF95A3BC, RewardKind.SPECIAL, false);
+            drawRewardDescription(context, Component.translatable("challengecraft.leveling.reward.checkpoint"), Component.translatable("challengecraft.leveling.reward.checkpoint.desc"), null);
             return;
         }
 
@@ -930,7 +940,7 @@ public class LevelingScreen extends Screen {
             int remaining = focus.rewards.size() - visibleRewards;
             int moreX = chipX + visibleRewards * 96;
             boolean hoveredMore = isInside(mouseX, mouseY, moreX, chipY, 74, 26);
-            drawRewardChip(context, moreX, chipY, 74, Text.translatable("challengecraft.leveling.reward.more", remaining), null, 0xFFAAB4C8, RewardKind.SPECIAL, hoveredMore);
+            drawRewardChip(context, moreX, chipY, 74, Component.translatable("challengecraft.leveling.reward.more", remaining), null, 0xFFAAB4C8, RewardKind.SPECIAL, hoveredMore);
         }
 
         if (hoveredReward != null) {
@@ -939,27 +949,27 @@ public class LevelingScreen extends Screen {
             Reward reward = focus.rewards.get(0);
             drawRewardDescription(context, reward.name, reward.description, reward);
         } else {
-            drawRewardDescription(context, Text.translatable("challengecraft.leveling.reward.inspector"), Text.translatable("challengecraft.leveling.reward.inspector.desc"), null);
+            drawRewardDescription(context, Component.translatable("challengecraft.leveling.reward.inspector"), Component.translatable("challengecraft.leveling.reward.inspector.desc"), null);
         }
     }
 
-    private void drawRewardChip(DrawContext context, int x, int y, int width, Text label, Reward reward, int accent, RewardKind kind, boolean hovered) {
+    private void drawRewardChip(GuiGraphicsExtractor context, int x, int y, int width, Component label, Reward reward, int accent, RewardKind kind, boolean hovered) {
         int fill = hovered ? 0xCC1B2534 : 0xAA101722;
         int border = hovered ? 0xFFE2EDF9 : 0xFF334155;
         int drawAccent = hovered ? 0xFFFFFFFF : accent;
         drawPanel(context, x, y, width, 26, fill, border, drawAccent);
         if (reward != null && reward.shouldDrawItem()) {
-            context.drawItem(reward.icon, x + 4, y + 5);
+            context.item(reward.icon(), x + 4, y + 5);
         } else {
             drawGem(context, x + 11, y + 13, drawAccent);
         }
 
         int textX = x + 24;
         String trimmed = trimToWidth(label.getString(), width - 30);
-        context.drawText(this.textRenderer, Text.of(trimmed), textX, y + 9, kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFDCE7F8, false);
+        context.text(this.font, Component.nullToEmpty(trimmed), textX, y + 9, kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFDCE7F8, false);
     }
 
-    private void drawRewardDescription(DrawContext context, Text title, Text description, Reward reward) {
+    private void drawRewardDescription(GuiGraphicsExtractor context, Component title, Component description, Reward reward) {
         int boxX = this.detailX + 12;
         int boxY = this.detailY + this.detailHeight - 30;
         int boxWidth = this.detailWidth - 24;
@@ -967,11 +977,11 @@ public class LevelingScreen extends Screen {
         int accent = reward != null ? reward.accentColor : 0xFF95A3BC;
 
         drawPanel(context, boxX, boxY, boxWidth, boxHeight, 0xAA101722, 0xFF334155, accent);
-        context.drawText(this.textRenderer, Text.of(trimToWidth(title.getString(), boxWidth - 16)), boxX + 8, boxY + 4, 0xFFF2F6FF, false);
+        context.text(this.font, Component.nullToEmpty(trimToWidth(title.getString(), boxWidth - 16)), boxX + 8, boxY + 4, 0xFFF2F6FF, false);
         drawWrappedLines(context, description, boxX + 8, boxY + 13, boxWidth - 16, 0xFFB9C5DA, 2);
     }
 
-    private void drawBar(DrawContext context, int x, int y, int width, int height, float progress) {
+    private void drawBar(GuiGraphicsExtractor context, int x, int y, int width, int height, float progress) {
         context.fill(x - 2, y - 2, x + width + 2, y + height + 2, 0xFF060A10);
         context.fill(x - 1, y - 1, x + width + 1, y + height + 1, 0xFF000000);
         context.fill(x, y, x + width, y + height, 0xFF162231);
@@ -979,10 +989,10 @@ public class LevelingScreen extends Screen {
         if (fill > 0) {
             context.fill(x + 1, y + 1, x + 1 + fill, y + height - 1, PROGRESS_FILL);
         }
-        context.drawBorder(x - 1, y - 1, width + 2, height + 2, 0xFF6A7991);
+        context.outline(x - 1, y - 1, width + 2, height + 2, 0xFF6A7991);
     }
 
-    private void drawFrame(DrawContext context, int x, int y, int width, int height, int fill, int border, int accent) {
+    private void drawFrame(GuiGraphicsExtractor context, int x, int y, int width, int height, int fill, int border, int accent) {
         context.fill(x + 2, y, x + width - 2, y + height, border);
         context.fill(x, y + 2, x + width, y + height - 2, border);
         context.fill(x + 5, y + 5, x + width - 5, y + height - 5, fill);
@@ -992,7 +1002,7 @@ public class LevelingScreen extends Screen {
         context.fill(x + 8, y + height - 4, x + width - 8, y + height - 2, accent);
     }
 
-    private void drawPanel(DrawContext context, int x, int y, int width, int height, int fill, int border, int accent) {
+    private void drawPanel(GuiGraphicsExtractor context, int x, int y, int width, int height, int fill, int border, int accent) {
         context.fill(x + 1, y, x + width - 1, y + height, border);
         context.fill(x, y + 1, x + width, y + height - 1, border);
         context.fill(x + 3, y + 3, x + width - 3, y + height - 3, fill);
@@ -1001,13 +1011,13 @@ public class LevelingScreen extends Screen {
         context.fill(x + width - 2, y + 5, x + width - 1, y + height - 5, accent);
     }
 
-    private void drawChip(DrawContext context, int x, int y, int width, int height, int fill, int accent) {
+    private void drawChip(GuiGraphicsExtractor context, int x, int y, int width, int height, int fill, int accent) {
         context.fill(x + 1, y, x + width - 1, y + height, accent);
         context.fill(x, y + 1, x + width, y + height - 1, accent);
         context.fill(x + 2, y + 2, x + width - 2, y + height - 2, fill);
     }
 
-    private void drawGem(DrawContext context, int centerX, int centerY, int color) {
+    private void drawGem(GuiGraphicsExtractor context, int centerX, int centerY, int color) {
         int shadow = darken(color, 0.45f);
         context.fill(centerX - 1, centerY - 4, centerX + 1, centerY - 2, shadow);
         context.fill(centerX - 3, centerY - 2, centerX + 3, centerY, color);
@@ -1024,21 +1034,21 @@ public class LevelingScreen extends Screen {
     }
 
     private static String tr(String key, Object... args) {
-        return Text.translatable(key, args).getString();
+        return Component.translatable(key, args).getString();
     }
 
     private String trimToWidth(String text, int width) {
-        if (this.textRenderer.getWidth(text) <= width) {
+        if (this.font.width(text) <= width) {
             return text;
         }
-        return this.textRenderer.trimToWidth(text, Math.max(8, width - this.textRenderer.getWidth("..."))) + "...";
+        return this.font.plainSubstrByWidth(text, Math.max(8, width - this.font.width("..."))) + "...";
     }
 
-    private void drawWrappedLines(DrawContext context, Text text, int x, int y, int width, int color, int maxLines) {
-        List<OrderedText> lines = this.textRenderer.wrapLines(text, width);
+    private void drawWrappedLines(GuiGraphicsExtractor context, Component text, int x, int y, int width, int color, int maxLines) {
+        List<FormattedCharSequence> lines = this.font.split(text, width);
         int lineCount = Math.min(maxLines, lines.size());
         for (int i = 0; i < lineCount; i++) {
-            context.drawText(this.textRenderer, lines.get(i), x, y + i * (this.textRenderer.fontHeight - 1), color, false);
+            context.text(this.font, lines.get(i), x, y + i * (this.font.lineHeight - 1), color, false);
         }
     }
 
@@ -1058,38 +1068,59 @@ public class LevelingScreen extends Screen {
     }
 
     private static final class Reward {
-        private final Text name;
-        private final Text description;
-        private final ItemStack icon;
+        private final Component name;
+        private final Component description;
+        /**
+         * Challenge or perk id whose icon this reward shows, or 0 for none.
+         *
+         * <p>An id, not an {@link ItemStack}, because the stack cannot always be built when the
+         * rewards are assembled. {@code new ItemStack(item)} reads data components off the item's
+         * registry holder and throws "Components not bound yet" until the client has loaded a
+         * datapack — which on a fresh launch has not happened at the title screen. Snapshotting the
+         * result there stored {@link ItemStack#EMPTY} permanently, so the Progress screen showed no
+         * icons at all until the player had opened world creation once (that flow binds the
+         * components) and come back. Resolving through {@link ChallengeIconProvider} at draw time
+         * costs a cached map lookup and fills itself in the moment binding happens.
+         */
+        private final int iconId;
         private final RewardKind kind;
         private final int accentColor;
 
-        private Reward(Text name, Text description, ItemStack icon, RewardKind kind, int accentColor) {
+        private Reward(Component name, Component description, int iconId, RewardKind kind, int accentColor) {
             this.name = name;
             this.description = description;
-            this.icon = icon;
+            this.iconId = iconId;
             this.kind = kind;
             this.accentColor = accentColor;
         }
 
-        private static Reward challenge(Text name, Text description, ItemStack icon, int challengeId) {
-            return new Reward(name, description, icon, RewardKind.CHALLENGE, 0xFF87C7FF + challengeId % 2);
+        private ItemStack icon() {
+            return this.iconId == 0 ? ItemStack.EMPTY : ChallengeIconProvider.getIcon(this.iconId);
         }
 
-        private static Reward perk(Text name, Text description, ItemStack icon, int perkId) {
-            return new Reward(name, description, icon, RewardKind.PERK, 0xFFF1D16A + perkId % 2);
+        private static Reward challenge(Component name, Component description, int challengeId) {
+            return new Reward(name, description, challengeId, RewardKind.CHALLENGE, 0xFF87C7FF + challengeId % 2);
         }
 
-        private static Reward color(Text name, Text description, int color) {
-            return new Reward(name, description, ItemStack.EMPTY, RewardKind.COLOR, color);
+        private static Reward perk(Component name, Component description, int perkId) {
+            return new Reward(name, description, perkId, RewardKind.PERK, 0xFFF1D16A + perkId % 2);
         }
 
-        private static Reward special(Text name, Text description, int accentColor) {
-            return new Reward(name, description, ItemStack.EMPTY, RewardKind.SPECIAL, accentColor);
+        private static Reward color(Component name, Component description, int color) {
+            return new Reward(name, description, 0, RewardKind.COLOR, color);
+        }
+
+        private static Reward special(Component name, Component description, int accentColor) {
+            return new Reward(name, description, 0, RewardKind.SPECIAL, accentColor);
         }
 
         private boolean shouldDrawItem() {
-            return !this.icon.isEmpty() && (this.kind == RewardKind.CHALLENGE || this.kind == RewardKind.PERK);
+            // Asks whether an icon can be drawn RIGHT NOW, so the coloured gem stays as the
+            // fallback while item components are still unbound. Testing only the id drew an empty
+            // stack instead — nothing at all, which is worse than a placeholder.
+            return this.iconId != 0
+                    && (this.kind == RewardKind.CHALLENGE || this.kind == RewardKind.PERK)
+                    && !icon().isEmpty();
         }
     }
 
@@ -1146,13 +1177,13 @@ public class LevelingScreen extends Screen {
         return Math.max(56, 34 + rewardRows * 22);
     }
 
-    private final class LayoutModeWidget extends ClickableWidget {
+    private final class LayoutModeWidget extends AbstractWidget {
         private LayoutModeWidget(int x, int y, int width, int height) {
-            super(x, y, width, height, Text.empty());
+            super(x, y, width, height, Component.empty());
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
             boolean hovering = isHovered();
             int outerFill = hovering ? 0xEE1B2431 : 0xDD131A24;
             drawPanel(context, getX(), getY(), getWidth(), getHeight(), outerFill, 0xFF41516A, 0xFF9CB7E8);
@@ -1162,26 +1193,26 @@ public class LevelingScreen extends Screen {
             int rightX = leftX + segmentWidth;
             boolean journeySelected = !legacyLayoutMode;
 
-            drawModeSegment(context, leftX, getY() + 3, segmentWidth, getHeight() - 6, Text.translatable("challengecraft.leveling.mode.journey"), journeySelected, hovering && mouseX < rightX);
-            drawModeSegment(context, rightX, getY() + 3, segmentWidth, getHeight() - 6, Text.translatable("challengecraft.leveling.mode.legacy"), !journeySelected, hovering && mouseX >= rightX);
+            drawModeSegment(context, leftX, getY() + 3, segmentWidth, getHeight() - 6, Component.translatable("challengecraft.leveling.mode.journey"), journeySelected, hovering && mouseX < rightX);
+            drawModeSegment(context, rightX, getY() + 3, segmentWidth, getHeight() - 6, Component.translatable("challengecraft.leveling.mode.legacy"), !journeySelected, hovering && mouseX >= rightX);
         }
 
-        private void drawModeSegment(DrawContext context, int x, int y, int width, int height, Text label, boolean selected, boolean hovered) {
+        private void drawModeSegment(GuiGraphicsExtractor context, int x, int y, int width, int height, Component label, boolean selected, boolean hovered) {
             int fill = selected ? 0xFF314A38 : (hovered ? 0xCC243345 : 0x99182230);
             int border = selected ? 0xFF74D7A0 : 0xFF506179;
             int accent = selected ? 0xFFBFF3D0 : 0xFF9CB7E8;
             drawPanel(context, x, y, width, height, fill, border, accent);
             int color = selected ? 0xFFF6FFF9 : 0xFFD6E1F4;
-            context.drawCenteredTextWithShadow(textRenderer, label, x + width / 2, y + 4, color);
+            context.centeredText(font, label, x + width / 2, y + 4, color);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            if (!this.active || !this.visible || button != 0 || !isMouseOver(mouseX, mouseY)) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            if (!this.active || !this.visible || event.button() != 0 || !isMouseOver(event.x(), event.y())) {
                 return false;
             }
 
-            boolean clickLegacy = mouseX >= this.getX() + this.getWidth() / 2.0;
+            boolean clickLegacy = event.x() >= this.getX() + this.getWidth() / 2.0;
             if (clickLegacy != legacyLayoutMode) {
                 toggleLayoutMode();
             }
@@ -1189,20 +1220,20 @@ public class LevelingScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(NarrationElementOutput builder) {
         }
     }
 
-    private final class LegacyMilestoneEntryWidget extends ClickableWidget {
+    private final class LegacyMilestoneEntryWidget extends AbstractWidget {
         private final Milestone milestone;
 
         private LegacyMilestoneEntryWidget(int x, int y, int width, Milestone milestone) {
-            super(x, y, width, getLegacyEntryHeight(milestone), Text.empty());
+            super(x, y, width, getLegacyEntryHeight(milestone), Component.empty());
             this.milestone = milestone;
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
             int fill = this.milestone.unlocked ? 0x8E193126 : 0x8E292F39;
             int accent = this.milestone.unlocked ? 0xFF74D7A0 : 0xFF8BA6D8;
             if (this.milestone == nextMilestone) {
@@ -1216,27 +1247,27 @@ public class LevelingScreen extends Screen {
             drawPanel(context, getX(), getY(), getWidth(), getHeight(), fill, 0xFF3C495C, accent);
 
             String label = this.milestone.isStar ? tr("challengecraft.leveling.infinity_star_value", this.milestone.value) : this.milestone.title;
-            context.drawText(textRenderer, Text.of(label), getX() + 10, getY() + 8, 0xFFF4F8FF, false);
+            context.text(font, Component.nullToEmpty(label), getX() + 10, getY() + 8, 0xFFF4F8FF, false);
 
             String state = this.milestone.unlocked ? tr("challengecraft.leveling.state.unlocked") : (this.milestone == nextMilestone ? tr("challengecraft.leveling.state.up_next") : tr("challengecraft.leveling.state.locked"));
             int stateColor = this.milestone.unlocked ? 0xFF7BE0A4 : (this.milestone == nextMilestone ? 0xFFE3B35A : 0xFFB3C0D3);
-            int chipWidth = textRenderer.getWidth(state) + 10;
+            int chipWidth = font.width(state) + 10;
             drawChip(context, getX() + getWidth() - chipWidth - 8, getY() + 6, chipWidth, 12, 0x55222A34, stateColor);
-            context.drawText(textRenderer, Text.of(state), getX() + getWidth() - chipWidth - 3, getY() + 8, stateColor, false);
+            context.text(font, Component.nullToEmpty(state), getX() + getWidth() - chipWidth - 3, getY() + 8, stateColor, false);
 
             String summary = trimToWidth(this.milestone.summary, getWidth() - 20);
-            context.drawText(textRenderer, Text.of(summary), getX() + 10, getY() + 20, 0xFFB9C5DA, false);
+            context.text(font, Component.nullToEmpty(summary), getX() + 10, getY() + 20, 0xFFB9C5DA, false);
 
             int rewardY = getY() + 33;
             if (this.milestone.rewards.isEmpty()) {
-                context.drawText(textRenderer, Text.translatable("challengecraft.leveling.reward.momentum_checkpoint"), getX() + 26, rewardY, 0xFFD8DFEC, false);
+                context.text(font, Component.translatable("challengecraft.leveling.reward.momentum_checkpoint"), getX() + 26, rewardY, 0xFFD8DFEC, false);
                 drawGem(context, getX() + 13, rewardY + 5, 0xFF95A3BC);
             } else {
                 for (Reward reward : this.milestone.rewards) {
                     int iconX = getX() + 10;
                     int iconY = rewardY - 2;
                     if (reward.shouldDrawItem()) {
-                        context.drawItem(reward.icon, iconX, iconY);
+                        context.item(reward.icon(), iconX, iconY);
                     } else {
                         drawGem(context, iconX + 7, rewardY + 5, reward.accentColor);
                     }
@@ -1244,21 +1275,24 @@ public class LevelingScreen extends Screen {
                     int textX = getX() + 30;
                     int maxWidth = getWidth() - 38;
                     String rewardName = trimToWidth(reward.name.getString(), maxWidth);
-                    context.drawText(textRenderer, Text.of(rewardName), textX, rewardY, reward.kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFE8EEF9, false);
+                    context.text(font, Component.nullToEmpty(rewardName), textX, rewardY, reward.kind == RewardKind.PERK ? 0xFFFFEAA6 : 0xFFE8EEF9, false);
 
                     String rewardDesc = trimToWidth(reward.description.getString(), maxWidth);
-                    context.drawText(textRenderer, Text.of(rewardDesc), textX, rewardY + 10, 0xFF9FB0CA, false);
+                    context.text(font, Component.nullToEmpty(rewardDesc), textX, rewardY + 10, 0xFF9FB0CA, false);
                     rewardY += 22;
                 }
             }
         }
 
         @Override
-        protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(NarrationElementOutput builder) {
         }
     }
 
-    private final class JourneyPanel extends ScrollableWidget {
+    private final class JourneyPanel extends AbstractScrollArea {
+        /** Pixels scrolled per wheel notch; also handed to the scrollbar settings below. */
+        private static final int SCROLL_RATE = 24;
+
         private List<Milestone> milestones;
         private final Consumer<Milestone> hoverConsumer;
         private final Consumer<Milestone> selectConsumer;
@@ -1273,7 +1307,9 @@ public class LevelingScreen extends Screen {
 
         private JourneyPanel(int x, int y, int width, int height, List<Milestone> milestones, long playerXp,
                              Consumer<Milestone> hoverConsumer, Consumer<Milestone> selectConsumer) {
-            super(x, y, width, height, Text.empty());
+            // 26.2 made the scrollbar look/rate explicit constructor state; defaultSettings(int)
+            // takes the SCROLL RATE, not the scrollbar width.
+            super(x, y, width, height, Component.empty(), AbstractScrollArea.defaultSettings(SCROLL_RATE));
             this.milestones = milestones;
             this.playerXp = playerXp;
             this.hoverConsumer = hoverConsumer;
@@ -1312,26 +1348,26 @@ public class LevelingScreen extends Screen {
 
         private void centerOnY(int y) {
             double target = y - (double) this.height * 0.38;
-            this.setScrollY(MathHelper.clamp(target, 0.0, Math.max(0.0, this.getMaxScrollY())));
+            this.setScrollAmount(Mth.clamp(target, 0.0, Math.max(0.0, this.maxScrollAmount())));
         }
 
         private void setScrollRatio(float ratio) {
-            this.setScrollY(MathHelper.clamp(this.getMaxScrollY() * MathHelper.clamp(ratio, 0.0f, 1.0f), 0.0, Math.max(0.0, this.getMaxScrollY())));
+            this.setScrollAmount(Mth.clamp(this.maxScrollAmount() * Mth.clamp(ratio, 0.0f, 1.0f), 0.0, Math.max(0.0, this.maxScrollAmount())));
         }
 
         @Override
-        protected int getContentsHeightWithPadding() {
+        protected int contentHeight() {
             return this.contentHeight + 16;
         }
 
         @Override
-        protected double getDeltaYPerScroll() {
-            return 24.0;
+        protected double scrollRate() {
+            return SCROLL_RATE;
         }
 
         @Override
-        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float deltaTicks) {
-            int scrollY = (int) Math.floor(this.getScrollY());
+        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float deltaTicks) {
+            int scrollY = (int) Math.floor(this.scrollAmount());
 
             Milestone hoveredNow = this.isMouseOver(mouseX, mouseY) ? findMilestone(mouseX, mouseY, scrollY) : null;
             if (hoveredNow != this.hovered) {
@@ -1342,8 +1378,9 @@ public class LevelingScreen extends Screen {
             context.enableScissor(this.getX(), this.getY(), this.getRight(), this.getBottom());
             int artX = this.getX() + (this.width - renderedArtWidth) / 2;
             int artY = this.getY() - scrollY;
-            context.drawTexture(
-                    RenderLayer::getGuiTextured,
+            context.blit(
+                    // 26.2 takes a RenderPipeline where 1.21.5 took a RenderType factory.
+                    RenderPipelines.GUI_TEXTURED,
                     JOURNEY_TEXTURE,
                     artX,
                     artY,
@@ -1357,12 +1394,12 @@ public class LevelingScreen extends Screen {
                     JOURNEY_TEXTURE_HEIGHT
             );
 
-            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.spawn"), scaleArtY(SPAWN_RIBBON_Y) - scrollY, 0xFF88D38E, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.cavern"), scaleArtY(CAVERN_RIBBON_Y) - scrollY, 0xFF81A5D9, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.nether"), scaleArtY(NETHER_RIBBON_Y) - scrollY, 0xFFE07A62, true, artX, artX + renderedArtWidth);
-            drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.end"), scaleArtY(END_RIBBON_Y) - scrollY, 0xFFC9A6FF, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Component.translatable("challengecraft.leveling.ribbon.spawn"), scaleArtY(SPAWN_RIBBON_Y) - scrollY, 0xFF88D38E, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Component.translatable("challengecraft.leveling.ribbon.cavern"), scaleArtY(CAVERN_RIBBON_Y) - scrollY, 0xFF81A5D9, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Component.translatable("challengecraft.leveling.ribbon.nether"), scaleArtY(NETHER_RIBBON_Y) - scrollY, 0xFFE07A62, true, artX, artX + renderedArtWidth);
+            drawSectionRibbon(context, Component.translatable("challengecraft.leveling.ribbon.end"), scaleArtY(END_RIBBON_Y) - scrollY, 0xFFC9A6FF, true, artX, artX + renderedArtWidth);
             if (showInfinityTrack) {
-                drawSectionRibbon(context, Text.translatable("challengecraft.leveling.ribbon.infinity"), scaleArtY(INFINITY_RIBBON_Y) - scrollY, 0xFF6DE7E1, true, artX, artX + renderedArtWidth);
+                drawSectionRibbon(context, Component.translatable("challengecraft.leveling.ribbon.infinity"), scaleArtY(INFINITY_RIBBON_Y) - scrollY, 0xFF6DE7E1, true, artX, artX + renderedArtWidth);
             }
 
             for (int i = 0; i < this.milestones.size() - 1; i++) {
@@ -1395,9 +1432,9 @@ public class LevelingScreen extends Screen {
                 Milestone from = this.milestones.get(i);
                 Milestone to = this.milestones.get(i + 1);
                 if (this.playerXp < to.requiredXp) {
-                    float progress = MathHelper.clamp((float) (this.playerXp - from.requiredXp) / (float) (to.requiredXp - from.requiredXp), 0.0f, 1.0f);
-                    int markerX = MathHelper.lerp(progress, from.centerX(), to.centerX());
-                    int markerY = MathHelper.lerp(progress, from.centerY(), to.centerY());
+                    float progress = Mth.clamp((float) (this.playerXp - from.requiredXp) / (float) (to.requiredXp - from.requiredXp), 0.0f, 1.0f);
+                    int markerX = Mth.lerpInt(progress, from.centerX(), to.centerX());
+                    int markerY = Mth.lerpInt(progress, from.centerY(), to.centerY());
                     return new ProgressMarker(markerX, markerY, i, progress);
                 }
             }
@@ -1417,18 +1454,18 @@ public class LevelingScreen extends Screen {
             return null;
         }
 
-        private void drawSectionRibbon(DrawContext context, Text label, int y, int color, boolean rightAligned, int artLeft, int artRight) {
+        private void drawSectionRibbon(GuiGraphicsExtractor context, Component label, int y, int color, boolean rightAligned, int artLeft, int artRight) {
             if (y < -24 || y > this.height + 24) {
                 return;
             }
-            int width = LevelingScreen.this.textRenderer.getWidth(label) + 26;
+            int width = LevelingScreen.this.font.width(label) + 26;
             int x = rightAligned ? artRight - width - 14 : artLeft + 14;
             int border = darken(color, 0.55f);
             drawPanel(context, x, this.getY() + y - 9, width, 18, 0x88202835, border, color);
-            context.drawText(LevelingScreen.this.textRenderer, label, x + 12, this.getY() + y - 4, 0xFFF7FAFF, false);
+            context.text(LevelingScreen.this.font, label, x + 12, this.getY() + y - 4, 0xFFF7FAFF, false);
         }
 
-        private void drawSegment(DrawContext context, Milestone a, Milestone b, int scrollY) {
+        private void drawSegment(GuiGraphicsExtractor context, Milestone a, Milestone b, int scrollY) {
             int ax = this.getX() + a.centerX();
             int ay = this.getY() + a.centerY() - scrollY;
             int bx = this.getX() + b.centerX();
@@ -1459,7 +1496,7 @@ public class LevelingScreen extends Screen {
             drawPixelLine(context, ax, ay, bx, by, 3, FUTURE_PATH);
         }
 
-        private void drawProgressMarker(DrawContext context, int scrollY) {
+        private void drawProgressMarker(GuiGraphicsExtractor context, int scrollY) {
             int centerX = this.getX() + this.progressMarker.x;
             int centerY = this.getY() + this.progressMarker.y - scrollY;
             if (centerY < this.getY() - 18 || centerY > this.getBottom() + 18) {
@@ -1474,7 +1511,7 @@ public class LevelingScreen extends Screen {
             context.fill(centerX - 2, centerY - 2, centerX + 2, centerY + 2, 0xFF2D2511);
         }
 
-        private void drawMilestone(DrawContext context, Milestone milestone, int scrollY) {
+        private void drawMilestone(GuiGraphicsExtractor context, Milestone milestone, int scrollY) {
             int x = this.getX() + milestone.left();
             int y = this.getY() + milestone.top() - scrollY;
             if (y + milestone.cardHeight < this.getY() - 18 || y > this.getBottom() + 18) {
@@ -1508,23 +1545,23 @@ public class LevelingScreen extends Screen {
                 context.fill(x - 5, y - 5, x - 3, y + milestone.cardHeight + 5, 0xFFF7DF8A);
                 context.fill(x + milestone.cardWidth + 3, y - 5, x + milestone.cardWidth + 5, y + milestone.cardHeight + 5, 0xFFF7DF8A);
                 drawChip(context, x + 8, y - 12, 56, 12, 0xCC271B0E, 0xFFF7DF8A);
-                context.drawText(LevelingScreen.this.textRenderer, Text.translatable("challengecraft.leveling.selected"), x + 13, y - 10, 0xFFF9F4D1, false);
+                context.text(LevelingScreen.this.font, Component.translatable("challengecraft.leveling.selected"), x + 13, y - 10, 0xFFF9F4D1, false);
             }
 
             drawPanel(context, x, y, milestone.cardWidth, milestone.cardHeight, fill, border, accent);
 
             String header = milestone.isStar ? tr("challengecraft.leveling.header.star", milestone.value) : tr("challengecraft.leveling.header.level", milestone.value);
-            context.drawText(LevelingScreen.this.textRenderer, Text.of(header), x + 8, y + 7, milestone.isStar ? 0xFFFFE39B : 0xFFE4EEFF, false);
+            context.text(LevelingScreen.this.font, Component.nullToEmpty(header), x + 8, y + 7, milestone.isStar ? 0xFFFFE39B : 0xFFE4EEFF, false);
 
             String state = milestone.unlocked ? tr("challengecraft.leveling.state.cleared") : (isNext ? tr("challengecraft.leveling.state.next") : tr("challengecraft.leveling.state.locked"));
             int stateColor = milestone.unlocked ? 0xFF8FE2B1 : (isNext ? 0xFFB3D5FF : 0xFFA1ADC2);
-            int stateWidth = LevelingScreen.this.textRenderer.getWidth(state);
-            context.drawText(LevelingScreen.this.textRenderer, Text.of(state), x + milestone.cardWidth - stateWidth - 8, y + 7, stateColor, false);
+            int stateWidth = LevelingScreen.this.font.width(state);
+            context.text(LevelingScreen.this.font, Component.nullToEmpty(state), x + milestone.cardWidth - stateWidth - 8, y + 7, stateColor, false);
 
             int rewardY = y + (milestone.isStar && milestone.rewards.isEmpty() ? 18 : 24);
             if (milestone.rewards.isEmpty()) {
                 drawGem(context, x + 12, rewardY, accent);
-                context.drawText(LevelingScreen.this.textRenderer, Text.translatable("challengecraft.leveling.reward.checkpoint"), x + 22, rewardY - 4, 0xFFB8C6DD, false);
+                context.text(LevelingScreen.this.font, Component.translatable("challengecraft.leveling.reward.checkpoint"), x + 22, rewardY - 4, 0xFFB8C6DD, false);
                 return;
             }
 
@@ -1533,7 +1570,7 @@ public class LevelingScreen extends Screen {
             for (int i = 0; i < visibleRewards; i++) {
                 Reward reward = milestone.rewards.get(i);
                 if (reward.shouldDrawItem()) {
-                    context.drawItem(reward.icon, iconX + i * 18, rewardY);
+                    context.item(reward.icon(), iconX + i * 18, rewardY);
                 } else {
                     drawGem(context, iconX + 8 + i * 18, rewardY + 8, reward.accentColor);
                 }
@@ -1543,45 +1580,45 @@ public class LevelingScreen extends Screen {
                     ? milestone.rewards.get(0).name.getString()
                     : tr("challengecraft.leveling.reward.unlocks", milestone.rewards.size());
             rewardLabel = trimToWidth(rewardLabel, milestone.cardWidth - 70);
-            context.drawText(LevelingScreen.this.textRenderer, Text.of(rewardLabel), x + 64, rewardY + 5, 0xFFDCE7F8, false);
+            context.text(LevelingScreen.this.font, Component.nullToEmpty(rewardLabel), x + 64, rewardY + 5, 0xFFDCE7F8, false);
         }
 
-        private void drawPixelLine(DrawContext context, int startX, int startY, int endX, int endY, int size, int color) {
+        private void drawPixelLine(GuiGraphicsExtractor context, int startX, int startY, int endX, int endY, int size, int color) {
             int steps = Math.max(Math.abs(endX - startX), Math.abs(endY - startY)) / 3 + 1;
             for (int i = 0; i <= steps; i++) {
                 float t = steps == 0 ? 0.0f : (float) i / (float) steps;
-                int x = MathHelper.lerp(t, startX, endX);
-                int y = MathHelper.lerp(t, startY, endY);
+                int x = Mth.lerpInt(t, startX, endX);
+                int y = Mth.lerpInt(t, startY, endY);
                 context.fill(x - size / 2, y - size / 2, x + size / 2 + 1, y + size / 2 + 1, color);
             }
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
             if (!this.visible) {
                 return false;
             }
 
-            Milestone clicked = findMilestone(mouseX, mouseY, (int) Math.floor(this.getScrollY()));
+            Milestone clicked = findMilestone(event.x(), event.y(), (int) Math.floor(this.scrollAmount()));
             if (layoutEditMode && clicked != null) {
                 pinnedMilestone = clicked;
                 selectConsumer.accept(clicked);
-                if (button == 1) {
+                if (event.button() == 1) {
                     resetMilestoneOffset(clicked);
                     recomputeGeometry();
                     return true;
                 }
-                if (button == 0) {
+                if (event.button() == 0) {
                     draggedMilestone = clicked;
                     return true;
                 }
             }
 
-            if (this.checkScrollbarDragged(mouseX, mouseY, button)) {
+            if (this.updateScrolling(event)) {
                 return true;
             }
 
-            if (!this.isMouseOver(mouseX, mouseY)) {
+            if (!this.isMouseOver(event.x(), event.y())) {
                 return false;
             }
 
@@ -1594,33 +1631,33 @@ public class LevelingScreen extends Screen {
         }
 
         @Override
-        public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        public boolean mouseReleased(MouseButtonEvent event) {
             if (!this.visible) {
                 return false;
             }
-            if (draggedMilestone != null && button == 0) {
+            if (draggedMilestone != null && event.button() == 0) {
                 saveLayoutOffset(draggedMilestone);
                 draggedMilestone = null;
                 recomputeGeometry();
                 return true;
             }
-            this.onRelease(mouseX, mouseY);
-            return super.mouseReleased(mouseX, mouseY, button);
+            this.onRelease(event);
+            return super.mouseReleased(event);
         }
 
         @Override
-        public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
             if (!this.visible) {
                 return false;
             }
-            if (layoutEditMode && draggedMilestone != null && button == 0) {
+            if (layoutEditMode && draggedMilestone != null && event.button() == 0) {
                 draggedMilestone.offsetArtX += (float) (deltaX / artWidthScale);
                 draggedMilestone.offsetArtY += (float) (deltaY / artScale);
                 applyManualOffset(draggedMilestone);
                 recomputeGeometry();
                 return true;
             }
-            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+            return super.mouseDragged(event, deltaX, deltaY);
         }
 
         @Override
@@ -1632,7 +1669,7 @@ public class LevelingScreen extends Screen {
         }
 
         @Override
-        protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+        protected void updateWidgetNarration(NarrationElementOutput builder) {
         }
     }
 

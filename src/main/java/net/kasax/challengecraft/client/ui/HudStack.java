@@ -2,11 +2,11 @@ package net.kasax.challengecraft.client.ui;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +29,13 @@ public final class HudStack {
     private static final int GAP = 6;
     private static final int TOP = 6;
 
+    /**
+     * Id of the single HUD element the whole stack draws through. 26.2's HUD is element-based
+     * rather than a draw callback, but the stack still needs to see every card in ONE pass (it
+     * centres a whole row against the screen), so it stays one element rather than one per card.
+     */
+    private static final Identifier ELEMENT_ID = Identifier.fromNamespaceAndPath("challengecraft", "hud_stack");
+
     private record Source(Supplier<HudCard> supplier, int row) {
     }
 
@@ -47,15 +54,18 @@ public final class HudStack {
     }
 
     public static void register() {
-        HudRenderCallback.EVENT.register((context, tickCounter) -> onRender(context));
+        // addLast puts the stack after every vanilla element, which is where the old
+        // HudRenderCallback drew — so the cards keep sitting on top of the rest of the HUD.
+        HudElementRegistry.addLast(ELEMENT_ID, (context, tickCounter) -> extract(context));
     }
 
-    private static void onRender(DrawContext context) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.options.hudHidden || client.textRenderer == null) {
+    private static void extract(GuiGraphicsExtractor context) {
+        Minecraft client = Minecraft.getInstance();
+        // hideGui moved off Options and onto the Hud itself in 26.2.
+        if (client.gui.hud.isHidden() || client.font == null) {
             return;
         }
-        TextRenderer tr = client.textRenderer;
+        Font tr = client.font;
 
         // Bucket active cards by row.
         Map<Integer, List<HudCard>> rows = new HashMap<>();
@@ -72,7 +82,7 @@ public final class HudStack {
             return;
         }
 
-        int sw = client.getWindow().getScaledWidth();
+        int sw = client.getWindow().getGuiScaledWidth();
         long now = System.currentTimeMillis();
         // Cards grow with their content but never wider than the screen (minus a small margin).
         int maxCardWidth = sw - 12;
@@ -104,7 +114,7 @@ public final class HudStack {
 
                 int slide = Math.round((1f - appear) * -(HudCard.HEIGHT + 10));
                 int w = widths.get(card);
-                card.render(context, tr, x, rowY + slide, flash, w);
+                card.extractRenderState(context, tr, x, rowY + slide, flash, w);
                 x += w + GAP;
             }
         }

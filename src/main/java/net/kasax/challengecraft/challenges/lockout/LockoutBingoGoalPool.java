@@ -129,7 +129,7 @@ public final class LockoutBingoGoalPool {
             item(LockoutBingoGoalCategory.ITEM, "obtain_glow_ink_sac", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:glow_ink_sac"),
             item(LockoutBingoGoalCategory.ITEM, "obtain_tropical_fish", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:tropical_fish"),
             item(LockoutBingoGoalCategory.ITEM, "obtain_pufferfish", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:pufferfish"),
-            item(LockoutBingoGoalCategory.ITEM, "obtain_turtle_scute", LockoutBingoGoalDifficulty.HARD, "minecraft:scute"),
+            item(LockoutBingoGoalCategory.ITEM, "obtain_turtle_scute", LockoutBingoGoalDifficulty.HARD, "minecraft:turtle_scute"),
             item(LockoutBingoGoalCategory.ITEM, "craft_lava_bucket", LockoutBingoGoalDifficulty.EASY, "minecraft:lava_bucket"),
             item(LockoutBingoGoalCategory.ITEM, "craft_water_bucket", LockoutBingoGoalDifficulty.EASY, "minecraft:water_bucket"),
             item(LockoutBingoGoalCategory.ITEM, "craft_golden_apple", LockoutBingoGoalDifficulty.HARD, "minecraft:golden_apple"),

@@ -1,13 +1,13 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_44_ProgressiveBlockDrops;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,23 +24,23 @@ import java.util.List;
 public class ProgressiveBlockDropsMixin {
 
     @Inject(
-            method = "getDroppedStacks(Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/BlockEntity;)Ljava/util/List;",
+            method = "getDrops(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;)Ljava/util/List;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private static void gateDrops(BlockState state, ServerWorld world, BlockPos pos, BlockEntity blockEntity, CallbackInfoReturnable<List<ItemStack>> cir) {
-        if (Chal_44_ProgressiveBlockDrops.isDropSuppressed(state.getBlock())) {
+    private static void gateDrops(BlockState state, ServerLevel world, BlockPos pos, BlockEntity blockEntity, CallbackInfoReturnable<List<ItemStack>> cir) {
+        if (Chal_44_ProgressiveBlockDrops.isDropSuppressed(state.getBlock(), world)) {
             cir.setReturnValue(List.of());
         }
     }
 
     @Inject(
-            method = "getDroppedStacks(Lnet/minecraft/block/BlockState;Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/BlockEntity;Lnet/minecraft/entity/Entity;Lnet/minecraft/item/ItemStack;)Ljava/util/List;",
+            method = "getDrops(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/BlockEntity;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/item/ItemInstance;)Ljava/util/List;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private static void gateDropsWithTool(BlockState state, ServerWorld world, BlockPos pos, BlockEntity blockEntity, Entity entity, ItemStack stack, CallbackInfoReturnable<List<ItemStack>> cir) {
-        if (Chal_44_ProgressiveBlockDrops.isDropSuppressed(state.getBlock())) {
+    private static void gateDropsWithTool(BlockState state, ServerLevel world, BlockPos pos, BlockEntity blockEntity, Entity entity, net.minecraft.world.item.ItemInstance stack, CallbackInfoReturnable<List<ItemStack>> cir) {
+        if (Chal_44_ProgressiveBlockDrops.isDropSuppressed(state.getBlock(), world)) {
             cir.setReturnValue(List.of());
         }
     }

@@ -1,10 +1,10 @@
 package net.kasax.challengecraft.mixin;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,17 +16,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class NoMobDropsMixin {
     /** Mob loot can be disabled without removing the XP reward for the kill. */
     @Inject(
-            method = "dropExperience(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/entity/Entity;)V",
+            method = "dropExperience(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)V",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void alwaysDropMobXp(ServerWorld world, @Nullable Entity attacker, CallbackInfo ci) {
+    private void alwaysDropMobXp(ServerLevel world, @Nullable Entity attacker, CallbackInfo ci) {
         LivingEntity self = (LivingEntity)(Object)this;
-        int xp = self.getExperienceToDrop(world, attacker);
+        int xp = self.getExperienceReward(world, attacker);
         double x = self.getX();
         double y = self.getY();
         double z = self.getZ();
-        ExperienceOrbEntity.spawn(world, new Vec3d(x, y, z), xp);
+        ExperienceOrb.award(world, new Vec3(x, y, z), xp);
         ci.cancel();
     }
 }

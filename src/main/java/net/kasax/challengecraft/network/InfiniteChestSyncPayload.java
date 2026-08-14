@@ -1,33 +1,32 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.List;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 
 /** Server snapshot of visible infinite chest entries for the open screen. */
-public record InfiniteChestSyncPayload(List<InfiniteChestSyncPayload.Entry> entries) implements CustomPayload {
-    public static final Id<InfiniteChestSyncPayload> ID = new Id<>(Identifier.of("challengecraft", "infinite_chest_sync"));
+public record InfiniteChestSyncPayload(List<InfiniteChestSyncPayload.Entry> entries) implements CustomPacketPayload {
+    public static final Type<InfiniteChestSyncPayload> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "infinite_chest_sync"));
     
     public record Entry(ItemStack stack, long count) {
-        public static final PacketCodec<RegistryByteBuf, Entry> CODEC = PacketCodec.tuple(
-                ItemStack.PACKET_CODEC, Entry::stack,
-                PacketCodecs.VAR_LONG, Entry::count,
+        public static final StreamCodec<RegistryFriendlyByteBuf, Entry> CODEC = StreamCodec.composite(
+                ItemStack.STREAM_CODEC, Entry::stack,
+                ByteBufCodecs.VAR_LONG, Entry::count,
                 Entry::new
         );
     }
 
-    public static final PacketCodec<RegistryByteBuf, InfiniteChestSyncPayload> CODEC = PacketCodec.tuple(
-            Entry.CODEC.collect(PacketCodecs.toList()), InfiniteChestSyncPayload::entries,
+    public static final StreamCodec<RegistryFriendlyByteBuf, InfiniteChestSyncPayload> CODEC = StreamCodec.composite(
+            Entry.CODEC.apply(ByteBufCodecs.list()), InfiniteChestSyncPayload::entries,
             InfiniteChestSyncPayload::new
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

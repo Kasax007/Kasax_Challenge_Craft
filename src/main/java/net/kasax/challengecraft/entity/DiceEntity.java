@@ -2,24 +2,26 @@ package net.kasax.challengecraft.entity;
 
 import net.kasax.challengecraft.challenges.Chal_46_Dice;
 import net.kasax.challengecraft.challenges.dice.DiePhysics;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.MovementType;
-import net.minecraft.entity.PositionInterpolator;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import org.joml.Quaternionf;
+import org.joml.Quaternionfc;
 import org.joml.Vector3f;
 
 import java.util.UUID;
@@ -34,20 +36,20 @@ import java.util.UUID;
  * branch on the orientation</b>; doing so would break that proof.
  *
  * <p><b>Sides:</b> physics runs server-only. The client receives positions from the normal entity
- * tracker and smooths them with a {@link PositionInterpolator} (a plain {@code Entity} returns
+ * tracker and smooths them with a {@link InterpolationHandler} (a plain {@code Entity} returns
  * {@code null} from {@code getInterpolator()} and would hard-snap on every packet), and receives
- * the orientation through tracked data via {@link #onTrackedDataSet}.
+ * the orientation through tracked data via {@link #onSyncedDataUpdated}.
  */
 public class DiceEntity extends Entity {
-    private static final TrackedData<Quaternionf> ORIENTATION =
-            DataTracker.registerData(DiceEntity.class, TrackedDataHandlerRegistry.QUATERNION_F);
+    private static final EntityDataAccessor<Quaternionfc> ORIENTATION =
+            SynchedEntityData.defineId(DiceEntity.class, EntityDataSerializers.QUATERNION);
     /** Stays 0 until the die begins settling, so the result cannot be read early. */
-    private static final TrackedData<Byte> PIPS =
-            DataTracker.registerData(DiceEntity.class, TrackedDataHandlerRegistry.BYTE);
+    private static final EntityDataAccessor<Byte> PIPS =
+            SynchedEntityData.defineId(DiceEntity.class, EntityDataSerializers.BYTE);
 
     private static final int DISPLAY_TICKS_AFTER_REST = 60; // let the player see the result
 
-    private final PositionInterpolator interpolator = new PositionInterpolator(this, 3);
+    private final InterpolationHandler interpolator = new InterpolationHandler(this, 3);
 
     /** Server-authoritative orientation; on the client this mirrors the tracked value. */
     private final Quaternionf orientation = new Quaternionf();
@@ -64,48 +66,48 @@ public class DiceEntity extends Entity {
     private UUID throwerUuid;
     private boolean reported;
 
-    public DiceEntity(EntityType<? extends DiceEntity> type, World world) {
+    public DiceEntity(EntityType<? extends DiceEntity> type, Level world) {
         super(type, world);
     }
 
     @Override
-    public PositionInterpolator getInterpolator() {
+    public InterpolationHandler getInterpolation() {
         return this.interpolator;
     }
 
     // ---- the four abstract members -----------------------------------------------------------
 
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
-        builder.add(ORIENTATION, new Quaternionf());
-        builder.add(PIPS, (byte) 0);
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(ORIENTATION, new Quaternionf());
+        builder.define(PIPS, (byte) 0);
     }
 
     @Override
-    public boolean damage(ServerWorld world, DamageSource source, float amount) {
+    public boolean hurtServer(ServerLevel world, DamageSource source, float amount) {
         return false;
     }
 
     // The type is built with disableSaving(), so these stay empty — but Entity still declares
     // them abstract, so they must exist.
     @Override
-    protected void readCustomDataFromNbt(NbtCompound nbt) {
+    protected void readAdditionalSaveData(ValueInput input) {
     }
 
     @Override
-    protected void writeCustomDataToNbt(NbtCompound nbt) {
+    protected void addAdditionalSaveData(ValueOutput output) {
     }
 
     // ---- client-side orientation intake -------------------------------------------------------
 
     @Override
-    public void onTrackedDataSet(TrackedData<?> data) {
-        super.onTrackedDataSet(data);
+    public void onSyncedDataUpdated(EntityDataAccessor<?> data) {
+        super.onSyncedDataUpdated(data);
         if (ORIENTATION.equals(data)) {
             // lastOrientation is snapshotted at the start of each client tick (see tick()), the
             // same way vanilla keeps lastX/lastY/lastZ — do NOT also roll it here, or a second
             // packet within one tick would collapse the interpolation window.
-            this.orientation.set(getDataTracker().get(ORIENTATION));
+            this.orientation.set(getEntityData().get(ORIENTATION));
         }
     }
 
@@ -120,46 +122,46 @@ public class DiceEntity extends Entity {
     }
 
     public int getPips() {
-        return getDataTracker().get(PIPS);
+        return getEntityData().get(PIPS);
     }
 
     @Override
-    protected double getGravity() {
+    protected double getDefaultGravity() {
         return DiePhysics.GRAVITY;
     }
 
     /** Like ItemEntity: sample the block actually underneath a small entity. */
     @Override
-    public BlockPos getVelocityAffectingPos() {
-        return getPosWithYOffset(0.999999f);
+    public BlockPos getBlockPosBelowThatAffectsMyMovement() {
+        return getOnPos(0.999999f);
     }
 
     // ---- throw ---------------------------------------------------------------------------------
 
     /** Server-side. Launches the die from the player's view with a random tumble. */
-    public void throwFrom(ServerPlayerEntity player) {
-        this.throwerUuid = player.getUuid();
+    public void throwFrom(ServerPlayer player) {
+        this.throwerUuid = player.getUUID();
 
-        Vec3d look = player.getRotationVec(1.0f);
-        setVelocity(look.multiply(0.55).add(0.0, 0.18, 0.0)
-                .add(this.random.nextGaussian() * 0.02, 0.0, this.random.nextGaussian() * 0.02));
+        Vec3 look = player.getViewVector(1.0f);
+        setDeltaMovement(look.scale(0.55).add(0.0, 0.18, 0.0)
+                .add(this.getRandom().nextGaussian() * 0.02, 0.0, this.getRandom().nextGaussian() * 0.02));
 
-        this.omega.set((float) this.random.nextGaussian(),
-                (float) this.random.nextGaussian(),
-                (float) this.random.nextGaussian());
+        this.omega.set((float) this.getRandom().nextGaussian(),
+                (float) this.getRandom().nextGaussian(),
+                (float) this.getRandom().nextGaussian());
         if (this.omega.lengthSquared() < 1.0e-6f) {
             this.omega.set(1f, 0.3f, 0.2f);
         }
-        this.omega.normalize().mul(0.9f + this.random.nextFloat() * 1.2f);
+        this.omega.normalize().mul(0.9f + this.getRandom().nextFloat() * 1.2f);
 
         // The entire fairness mechanism, in one line. See DiePhysics.randomStart.
-        this.orientation.set(DiePhysics.randomStart(this.random));
+        this.orientation.set(DiePhysics.randomStart(this.getRandom()));
         this.lastOrientation.set(this.orientation);
         pushOrientation();
     }
 
     private void pushOrientation() {
-        getDataTracker().set(ORIENTATION, new Quaternionf(this.orientation));
+        getEntityData().set(ORIENTATION, new Quaternionf(this.orientation));
     }
 
     // ---- tick ----------------------------------------------------------------------------------
@@ -168,12 +170,12 @@ public class DiceEntity extends Entity {
     public void tick() {
         super.tick();
 
-        if (!(getWorld() instanceof ServerWorld serverWorld)) {
+        if (!(level() instanceof ServerLevel serverWorld)) {
             // Snapshot the previous orientation ONCE per tick, mirroring vanilla's lastX/lastY/lastZ.
             // Without this, a resting die keeps slerping between two slightly different quaternions
             // as tickDelta cycles 0..1 every frame — which reads as a permanent micro-jitter.
             this.lastOrientation.set(this.orientation);
-            this.interpolator.tick();
+            this.interpolator.interpolate();
             return;
         }
 
@@ -190,20 +192,20 @@ public class DiceEntity extends Entity {
 
         // ItemEntity's buoyancy helpers are private, so rather than half-reimplementing them a die
         // that hits liquid simply resolves where it is.
-        if (isTouchingWater() || isInLava()) {
+        if (isInWater() || isInLava()) {
             beginSettle(serverWorld);
             return;
         }
 
         applyGravity();
 
-        Vec3d before = getVelocity();
-        move(MovementType.SELF, before);
-        Vec3d after = getVelocity();
+        Vec3 before = getDeltaMovement();
+        move(MoverType.SELF, before);
+        Vec3 after = getDeltaMovement();
 
         // Vanilla's stuck-in-a-block remedy.
-        if (!getWorld().isSpaceEmpty(this, getBoundingBox().contract(1.0e-7))) {
-            pushOutOfBlocks(getX(), (getBoundingBox().minY + getBoundingBox().maxY) / 2.0, getZ());
+        if (!level().noCollision(this, getBoundingBox().deflate(1.0e-7))) {
+            moveTowardsClosestSpace(getX(), (getBoundingBox().minY + getBoundingBox().maxY) / 2.0, getZ());
         }
 
         double vx = after.x;
@@ -213,7 +215,7 @@ public class DiceEntity extends Entity {
 
         if (this.verticalCollision) {
             impact = true;
-            if (before.y < 0.0 && this.groundCollision) {
+            if (before.y < 0.0 && this.verticalCollisionBelow) {
                 vy = -before.y * DiePhysics.FLOOR_RESTITUTION;
                 if (vy < DiePhysics.BOUNCE_CUTOFF) vy = 0.0;
             } else {
@@ -230,11 +232,11 @@ public class DiceEntity extends Entity {
             }
         }
 
-        if (this.groundCollision) {
+        if (this.verticalCollisionBelow) {
             vx *= DiePhysics.TANGENT_FRICTION;
             vz *= DiePhysics.TANGENT_FRICTION;
         }
-        setVelocity(vx, vy, vz);
+        setDeltaMovement(vx, vy, vz);
 
         // Angular integration. omega is world-frame because integrate() pre-multiplies.
         this.lastOrientation.set(this.orientation);
@@ -242,16 +244,16 @@ public class DiceEntity extends Entity {
 
         if (impact) {
             this.omega.mul(DiePhysics.SPIN_LOSS_ON_IMPACT);
-            if (this.groundCollision) {
-                playSound(SoundEvents.BLOCK_BONE_BLOCK_HIT, 0.28f, 1.5f + this.random.nextFloat() * 0.3f);
+            if (this.verticalCollisionBelow) {
+                playSound(SoundEvents.BONE_BLOCK_HIT, 0.28f, 1.5f + this.getRandom().nextFloat() * 0.3f);
             }
         }
-        this.omega.mul(this.groundCollision ? DiePhysics.GROUND_ANGULAR_DAMP : DiePhysics.AIR_ANGULAR_DAMP);
+        this.omega.mul(this.verticalCollisionBelow ? DiePhysics.GROUND_ANGULAR_DAMP : DiePhysics.AIR_ANGULAR_DAMP);
 
         pushOrientation();
 
-        boolean atRest = this.groundCollision
-                && getVelocity().lengthSquared() < DiePhysics.LIN_EPS_SQ
+        boolean atRest = this.verticalCollisionBelow
+                && getDeltaMovement().lengthSqr() < DiePhysics.LIN_EPS_SQ
                 && this.omega.lengthSquared() < DiePhysics.ANG_EPS_SQ;
         this.restTicks = atRest ? this.restTicks + 1 : 0;
 
@@ -261,7 +263,7 @@ public class DiceEntity extends Entity {
     }
 
     /** Reads the top face and starts easing onto the matching axis-aligned orientation. */
-    private void beginSettle(ServerWorld world) {
+    private void beginSettle(ServerLevel world) {
         Direction top = DiePhysics.topFace(this.orientation);
         int pips = DiePhysics.pipsForLocalFace(top);
 
@@ -271,10 +273,10 @@ public class DiceEntity extends Entity {
         this.settleTarget = DiePhysics.snapPreservingTop(this.orientation, top);
         this.settleTicks = 0;
         this.omega.set(0f);
-        setVelocity(Vec3d.ZERO);
+        setDeltaMovement(Vec3.ZERO);
 
-        getDataTracker().set(PIPS, (byte) pips);
-        playSound(SoundEvents.BLOCK_BONE_BLOCK_PLACE, 0.5f, 1.1f);
+        getEntityData().set(PIPS, (byte) pips);
+        playSound(SoundEvents.BONE_BLOCK_PLACE, 0.5f, 1.1f);
     }
 
     private void tickSettle() {
@@ -304,19 +306,19 @@ public class DiceEntity extends Entity {
         // movement, that player is permanently frozen. onDiceSettled clears it again; harmless.
         Chal_46_Dice.clearInFlight(this.throwerUuid);
 
-        if (getWorld().getServer() == null) return;
-        ServerPlayerEntity player = getWorld().getServer().getPlayerManager().getPlayer(this.throwerUuid);
+        if (level().getServer() == null) return;
+        ServerPlayer player = level().getServer().getPlayerList().getPlayer(this.throwerUuid);
         if (player != null) {
             Chal_46_Dice.onDiceSettled(player, getPips());
         }
     }
 
     @Override
-    public void onRemoved() {
+    public void onClientRemoval() {
         // A die that is unloaded or killed mid-flight must not leave the thrower stuck forever.
-        if (!getWorld().isClient && this.throwerUuid != null && !this.reported) {
+        if (!level().isClientSide() && this.throwerUuid != null && !this.reported) {
             Chal_46_Dice.clearInFlight(this.throwerUuid);
         }
-        super.onRemoved();
+        super.onClientRemoval();
     }
 }

@@ -1,8 +1,8 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_34_UpsideDownDrops;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,13 +15,13 @@ public abstract class ItemEntityMixin {
     private void onTick(CallbackInfo ci) {
         ItemEntity item = (ItemEntity) (Object) this;
         if (Chal_34_UpsideDownDrops.isActive()) {
-            Vec3d velocity = item.getVelocity();
+            Vec3 velocity = item.getDeltaMovement();
             // Keep the effect readable instead of letting existing momentum decide the rise speed.
-            item.setVelocity(velocity.x, 0.1, velocity.z);
+            item.setDeltaMovement(velocity.x, 0.1, velocity.z);
             item.setNoGravity(true);
             
-            if (!item.getWorld().isClient) {
-                if (item.getY() > item.getWorld().getBottomY() + item.getWorld().getHeight() + 40 || item.getY() > 320) {
+            if (!item.level().isClientSide()) {
+                if (item.getY() > item.level().getMinY() + item.level().getHeight() + 40 || item.getY() > 320) {
                     item.discard();
                 }
             }

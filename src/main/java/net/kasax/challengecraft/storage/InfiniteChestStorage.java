@@ -1,17 +1,16 @@
 package net.kasax.challengecraft.storage;
 
-import net.minecraft.component.ComponentMap;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.util.Identifier;
-
 import java.util.*;
 import java.util.stream.Collectors;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.kasax.challengecraft.ChallengeCraft;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 /** Stores arbitrarily large item counts while keeping item components part of the identity. */
 public class InfiniteChestStorage {
@@ -54,7 +53,7 @@ public class InfiniteChestStorage {
                     .sorted((e1, e2) -> {
                         int cmp = Long.compare(e2.count(), e1.count());
                         if (cmp == 0) {
-                            return Registries.ITEM.getId(e1.key().item()).toString().compareTo(Registries.ITEM.getId(e2.key().item()).toString());
+                            return BuiltInRegistries.ITEM.getKey(e1.key().item()).toString().compareTo(BuiltInRegistries.ITEM.getKey(e2.key().item()).toString());
                         }
                         return cmp;
                     })
@@ -68,11 +67,11 @@ public class InfiniteChestStorage {
         if (search == null || search.isEmpty()) return sorted;
         String lowerSearch = search.toLowerCase(Locale.ROOT);
         return sorted.stream()
-                .filter(e -> e.key().item().getName().getString().toLowerCase(Locale.ROOT).contains(lowerSearch))
+                .filter(e -> new ItemStack(e.key().item()).getItemName().getString().toLowerCase(Locale.ROOT).contains(lowerSearch))
                 .collect(Collectors.toList());
     }
 
-    public void readNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
+    public void readNbt(CompoundTag nbt, HolderLookup.Provider registries) {
         storedItems.clear();
         if (nbt == null) return;
         
@@ -81,7 +80,13 @@ public class InfiniteChestStorage {
                 list.getCompound(i).ifPresent(entry -> {
                     long count = entry.getLong("count").orElse(0L);
                     entry.getCompound("stack").ifPresent(itemNbt -> {
-                        Optional<ItemStack> stack = ItemStack.fromNbt(registries, itemNbt);
+                        // 26.2 removed ItemStack.parse(HolderLookup.Provider, Tag); the Codec is
+                        // now the only entry point. RegistryOps supplies the registry context that
+                        // the old overload took as an argument.
+                        Optional<ItemStack> stack = ItemStack.CODEC
+                                .parse(registries.createSerializationContext(NbtOps.INSTANCE), itemNbt)
+                                .resultOrPartial(error -> ChallengeCraft.LOGGER.warn(
+                                        "[InfiniteChest] Could not read stored stack: {}", error));
                         stack.ifPresent(s -> {
                             if (!s.isEmpty() && count > 0) {
                                 storedItems.put(ItemStackKey.fromStack(s), count);
@@ -94,12 +99,16 @@ public class InfiniteChestStorage {
         cachedSortedList = null;
     }
 
-    public void writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registries) {
-        NbtList list = new NbtList();
+    public void writeNbt(CompoundTag nbt, HolderLookup.Provider registries) {
+        ListTag list = new ListTag();
         for (Map.Entry<ItemStackKey, Long> entry : storedItems.entrySet()) {
-            NbtCompound compound = new NbtCompound();
+            CompoundTag compound = new CompoundTag();
             ItemStack stack = entry.getKey().toStack(1);
-            compound.put("stack", stack.toNbt(registries));
+            // 26.2 removed ItemStack.save(HolderLookup.Provider); encode through the Codec instead.
+            ItemStack.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), stack)
+                    .resultOrPartial(error -> ChallengeCraft.LOGGER.warn(
+                            "[InfiniteChest] Could not write stored stack: {}", error))
+                    .ifPresent(tag -> compound.put("stack", tag));
             compound.putLong("count", entry.getValue());
             list.add(compound);
         }
@@ -119,14 +128,14 @@ public class InfiniteChestStorage {
         return storedItems.isEmpty();
     }
 
-    public record ItemStackKey(Item item, ComponentMap components) {
+    public record ItemStackKey(Item item, DataComponentMap components) {
         public static ItemStackKey fromStack(ItemStack stack) {
             return new ItemStackKey(stack.getItem(), stack.getComponents());
         }
 
         public ItemStack toStack(int count) {
             ItemStack stack = new ItemStack(item, count);
-            stack.applyComponentsFrom(components);
+            stack.applyComponents(components);
             return stack;
         }
 

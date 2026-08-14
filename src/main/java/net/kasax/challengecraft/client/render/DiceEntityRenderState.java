@@ -2,7 +2,7 @@ package net.kasax.challengecraft.client.render;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.render.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import org.joml.Quaternionf;
 
 /**

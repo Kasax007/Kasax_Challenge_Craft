@@ -8,18 +8,17 @@ import net.kasax.challengecraft.entity.DiceEntity;
 import net.kasax.challengecraft.entity.ModEntities;
 import net.kasax.challengecraft.item.ModItems;
 import net.kasax.challengecraft.network.DiceSyncPacket;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.Vec3d;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -48,9 +47,9 @@ public class Chal_46_Dice {
     private static final Map<UUID, Double> SERVER_BUDGET = new HashMap<>();
     private static final Map<UUID, Integer> LAST_ROLL = new HashMap<>();
     private static final Map<UUID, Integer> IN_FLIGHT = new HashMap<>();
-    private static final Map<UUID, Vec3d> LAST_POS = new HashMap<>();
+    private static final Map<UUID, Vec3> LAST_POS = new HashMap<>();
     /** Where an out-of-budget player is held. */
-    private static final Map<UUID, Vec3d> ANCHOR = new HashMap<>();
+    private static final Map<UUID, Vec3> ANCHOR = new HashMap<>();
     private static final Map<UUID, Integer> SNAP_COOLDOWN = new HashMap<>();
 
     /** Mirrors the local player's budget so the mixin can read it client-side. */
@@ -67,15 +66,15 @@ public class Chal_46_Dice {
     public static void register() {
         // Right-click throws the die. Never consumes it.
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (!active) return ActionResult.PASS;
-            if (!player.getStackInHand(hand).isOf(ModItems.DICE)) return ActionResult.PASS;
-            if (world.isClient()) return ActionResult.SUCCESS;
+            if (!active) return InteractionResult.PASS;
+            if (!player.getItemInHand(hand).is(ModItems.DICE)) return InteractionResult.PASS;
+            if (world.isClientSide()) return InteractionResult.SUCCESS;
 
-            if (player instanceof ServerPlayerEntity serverPlayer) {
+            if (player instanceof ServerPlayer serverPlayer) {
                 throwDie(serverPlayer);
-                return ActionResult.SUCCESS_SERVER;
+                return InteractionResult.SUCCESS_SERVER;
             }
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -83,7 +82,7 @@ public class Chal_46_Dice {
             tickCounter++;
             // Scanning every inventory every tick would be wasteful; once a second is plenty.
             boolean handOutDice = tickCounter % 20 == 0;
-            for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 if (handOutDice && !player.isSpectator()) {
                     ensureDice(player);
                 }
@@ -98,19 +97,19 @@ public class Chal_46_Dice {
      * joiner) would leave that player permanently frozen. Also strips duplicates, so it can't be
      * farmed into a stack.
      */
-    private static void ensureDice(ServerPlayerEntity player) {
+    private static void ensureDice(ServerPlayer player) {
         var inventory = player.getInventory();
         int firstSlot = -1;
-        for (int i = 0; i < inventory.size(); i++) {
-            if (!inventory.getStack(i).isOf(ModItems.DICE)) continue;
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (!inventory.getItem(i).is(ModItems.DICE)) continue;
             if (firstSlot == -1) {
                 firstSlot = i;
             } else {
-                inventory.setStack(i, ItemStack.EMPTY);
+                inventory.setItem(i, ItemStack.EMPTY);
             }
         }
         if (firstSlot == -1) {
-            inventory.insertStack(new ItemStack(ModItems.DICE));
+            inventory.add(new ItemStack(ModItems.DICE));
         }
     }
 
@@ -146,13 +145,13 @@ public class Chal_46_Dice {
     }
 
     /** Side-aware read used by {@code DiceMovementMixin}, which runs on both logical sides. */
-    public static double getBudgetFor(PlayerEntity player) {
-        if (player.getWorld().isClient) {
+    public static double getBudgetFor(Player player) {
+        if (player.level().isClientSide()) {
             // travel() only runs for the main player on a client, but be explicit: never clamp
             // another player's puppet from local state.
-            return player.isMainPlayer() ? clientRemaining : Double.MAX_VALUE;
+            return player.isLocalPlayer() ? clientRemaining : Double.MAX_VALUE;
         }
-        return getBudget(player.getUuid());
+        return getBudget(player.getUUID());
     }
 
     public static void setClientRemaining(double value) {
@@ -169,25 +168,25 @@ public class Chal_46_Dice {
 
     // ---- throwing ------------------------------------------------------------------------------
 
-    private static void throwDie(ServerPlayerEntity player) {
-        if (hasDieInFlight(player.getUuid())) {
+    private static void throwDie(ServerPlayer player) {
+        if (hasDieInFlight(player.getUUID())) {
             // The only restriction on throw rate: the previous die must have finished.
-            player.sendMessage(Text.translatable("challengecraft.dice.already_rolling")
-                    .formatted(Formatting.RED), true);
+            player.sendOverlayMessage(Component.translatable("challengecraft.dice.already_rolling")
+                    .withStyle(ChatFormatting.RED));
             return;
         }
-        if (!(player.getWorld() instanceof ServerWorld world)) return;
+        if (!(player.level() instanceof ServerLevel world)) return;
 
         DiceEntity die = new DiceEntity(ModEntities.DICE, world);
-        Vec3d eye = player.getEyePos();
-        Vec3d look = player.getRotationVec(1.0f);
-        die.setPosition(eye.x + look.x * 0.4, eye.y - 0.15, eye.z + look.z * 0.4);
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getViewVector(1.0f);
+        die.setPos(eye.x + look.x * 0.4, eye.y - 0.15, eye.z + look.z * 0.4);
         die.throwFrom(player);
-        world.spawnEntity(die);
+        world.addFreshEntity(die);
 
-        IN_FLIGHT.put(player.getUuid(), die.getId());
-        player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
-                SoundEvents.ENTITY_ITEM_PICKUP, net.minecraft.sound.SoundCategory.PLAYERS,
+        IN_FLIGHT.put(player.getUUID(), die.getId());
+        player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
+                SoundEvents.ITEM_PICKUP, net.minecraft.sounds.SoundSource.PLAYERS,
                 0.4f, 1.6f);
         sync(player);
     }
@@ -196,42 +195,42 @@ public class Chal_46_Dice {
      * Called by {@link DiceEntity} once the die has physically come to rest and its top face has
      * been read. REPLACES the budget — see the class javadoc for why.
      */
-    public static void onDiceSettled(ServerPlayerEntity player, int pips) {
+    public static void onDiceSettled(ServerPlayer player, int pips) {
         if (!active || player == null) return;
-        UUID uuid = player.getUuid();
+        UUID uuid = player.getUUID();
         setBudget(uuid, pips);
         LAST_ROLL.put(uuid, pips);
         clearInFlight(uuid);
-        ANCHOR.put(uuid, player.getPos());
+        ANCHOR.put(uuid, player.position());
         SNAP_COOLDOWN.remove(uuid);
         // Drop the freeze immediately rather than letting it tick out — the player should be able
         // to walk the instant the die stops. (Heavy Pockets re-applies its own Slowness next tick
         // if that challenge is also running, so clearing here is safe.)
-        StatusEffectInstance slowness = player.getStatusEffect(StatusEffects.SLOWNESS);
+        MobEffectInstance slowness = player.getEffect(MobEffects.SLOWNESS);
         if (slowness != null && slowness.getAmplifier() >= 6) {
-            player.removeStatusEffect(StatusEffects.SLOWNESS);
+            player.removeEffect(MobEffects.SLOWNESS);
         }
 
-        player.sendMessage(Text.translatable("challengecraft.dice.rolled", pips)
-                .formatted(Formatting.GOLD), true);
-        player.playSound(SoundEvents.BLOCK_NOTE_BLOCK_BELL.value(), 0.5f, 1.4f);
+        player.sendOverlayMessage(Component.translatable("challengecraft.dice.rolled", pips)
+                .withStyle(ChatFormatting.GOLD));
+        player.playSound(SoundEvents.NOTE_BLOCK_BELL.value(), 0.5f, 1.4f);
         sync(player);
     }
 
     // ---- per-tick accounting --------------------------------------------------------------------
 
-    private static void tickPlayer(ServerPlayerEntity player) {
-        UUID uuid = player.getUuid();
+    private static void tickPlayer(ServerPlayer player) {
+        UUID uuid = player.getUUID();
         if (player.isCreative() || player.isSpectator()) {
-            LAST_POS.put(uuid, player.getPos());
+            LAST_POS.put(uuid, player.position());
             return;
         }
 
-        Vec3d now = player.getPos();
-        Vec3d last = LAST_POS.get(uuid);
+        Vec3 now = player.position();
+        Vec3 last = LAST_POS.get(uuid);
         LAST_POS.put(uuid, now);
 
-        if (last == null || last.squaredDistanceTo(now) > TELEPORT_THRESHOLD_SQ) {
+        if (last == null || last.distanceToSqr(now) > TELEPORT_THRESHOLD_SQ) {
             // Portal, /tp, respawn or dimension change — never bill the player for it.
             ANCHOR.put(uuid, now);
             return;
@@ -256,25 +255,25 @@ public class Chal_46_Dice {
             enforce(player, uuid, now);
         }
 
-        if (changed || player.age % 10 == 0) {
+        if (changed || player.tickCount % 10 == 0) {
             sync(player);
         }
     }
 
     /** Server-side backstop for a player with no budget left. */
-    private static void enforce(ServerPlayerEntity player, UUID uuid, Vec3d now) {
+    private static void enforce(ServerPlayer player, UUID uuid, Vec3 now) {
         // Elytra: travelGliding derives velocity from the look vector, so zeroing the movement
         // input does nothing at all while gliding — the flight has to be ended outright.
-        if (player.isGliding()) {
-            player.stopGliding();
+        if (player.isFallFlying()) {
+            player.stopFallFlying();
         }
         // Belt-and-braces on top of the mixin (kills residual momentum / ice sliding): amplifier 6
         // is -1.05 speed, i.e. clamped to 0. Duration is deliberately only 3 ticks and refreshed
         // every tick — a longer one keeps ticking after the budget is restored and the player
         // stays frozen for the remainder, which feels awful right after a roll lands.
-        player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 3, 6, false, false, false));
+        player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 3, 6, false, false, false));
 
-        Vec3d anchor = ANCHOR.get(uuid);
+        Vec3 anchor = ANCHOR.get(uuid);
         if (anchor == null) {
             ANCHOR.put(uuid, now);
             return;
@@ -296,13 +295,13 @@ public class Chal_46_Dice {
             return;
         }
         SNAP_COOLDOWN.put(uuid, SNAP_COOLDOWN_TICKS);
-        player.requestTeleport(anchor.x, now.y, anchor.z);
+        player.teleportTo(anchor.x, now.y, anchor.z);
     }
 
     // ---- sync ------------------------------------------------------------------------------------
 
-    public static void sync(ServerPlayerEntity player) {
-        UUID uuid = player.getUuid();
+    public static void sync(ServerPlayer player) {
+        UUID uuid = player.getUUID();
         ServerPlayNetworking.send(player, new DiceSyncPacket(
                 (float) getBudget(uuid),
                 LAST_ROLL.getOrDefault(uuid, 0),

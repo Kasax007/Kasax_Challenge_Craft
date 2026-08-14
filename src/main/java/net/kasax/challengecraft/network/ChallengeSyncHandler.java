@@ -73,7 +73,14 @@ public class ChallengeSyncHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(AllItemsListPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                context.client().setScreen(new AllItemsScreen(payload.items, payload.currentIndex));
+                context.client().setScreenAndShow(new AllItemsScreen(payload.items, payload.currentIndex));
+            });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(ProgressiveBlocksListPacket.ID, (payload, context) -> {
+            context.client().execute(() -> {
+                context.client().setScreenAndShow(
+                        new net.kasax.challengecraft.client.screen.ProgressiveBlocksScreen(payload.blockIds, payload.currentIndex));
             });
         });
 
@@ -91,16 +98,16 @@ public class ChallengeSyncHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(ForceItemResultsPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                if (context.client().currentScreen instanceof ForceItemResultsScreen screen) {
+                if (context.client().gui.screen() instanceof ForceItemResultsScreen screen) {
                     screen.updateFromPacket(payload);
                 } else {
-                    context.client().setScreen(new ForceItemResultsScreen(payload));
+                    context.client().setScreenAndShow(new ForceItemResultsScreen(payload));
                 }
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(ForceItemOpenScreenPacket.ID, (payload, context) -> {
-            context.client().execute(() -> context.client().setScreen(new ForceItemTeamScreen()));
+            context.client().execute(() -> context.client().setScreenAndShow(new ForceItemTeamScreen()));
         });
 
         ClientPlayNetworking.registerGlobalReceiver(ProgressiveBlocksSyncPacket.ID, (payload, context) -> {
@@ -117,7 +124,7 @@ public class ChallengeSyncHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(AllEntitiesListPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                context.client().setScreen(new AllEntitiesScreen(payload.entities, payload.currentIndex));
+                context.client().setScreenAndShow(new AllEntitiesScreen(payload.entities, payload.currentIndex));
             });
         });
 
@@ -129,13 +136,13 @@ public class ChallengeSyncHandler {
 
         ClientPlayNetworking.registerGlobalReceiver(AllAchievementsListPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                context.client().setScreen(new AllAchievementsScreen(payload.advancements, payload.currentIndex));
+                context.client().setScreenAndShow(new AllAchievementsScreen(payload.advancements, payload.currentIndex));
             });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(TriviaQuestionPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
-                context.client().setScreen(new net.kasax.challengecraft.client.screen.TriviaScreen(payload.question(), payload.answers(), payload.correctIndex()));
+                context.client().setScreenAndShow(new net.kasax.challengecraft.client.screen.TriviaScreen(payload.question(), payload.answers(), payload.correctIndex()));
             });
         });
 
@@ -146,9 +153,9 @@ public class ChallengeSyncHandler {
         ClientPlayNetworking.registerGlobalReceiver(LockoutBingoOpenScreenPacket.ID, (payload, context) -> {
             context.client().execute(() -> {
                 if (payload.boardScreen()) {
-                    context.client().setScreen(new LockoutBingoBoardScreen());
+                    context.client().setScreenAndShow(new LockoutBingoBoardScreen());
                 } else {
-                    context.client().setScreen(new LockoutBingoTeamScreen());
+                    context.client().setScreenAndShow(new LockoutBingoTeamScreen());
                 }
             });
         });

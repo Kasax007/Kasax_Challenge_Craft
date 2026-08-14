@@ -1,6 +1,7 @@
 package net.kasax.challengecraft;
 
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -8,11 +9,11 @@ import net.kasax.challengecraft.challenges.*;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengeSyncPacket;
 import net.minecraft.nbt.*;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,18 +26,33 @@ import java.util.List;
 public class ChallengeManager {
     public static final Logger LOGGER = LoggerFactory.getLogger(ChallengeCraft.MOD_ID);
     private static List<Integer> PRE_LOADED_PERKS = new ArrayList<>();
+    /** Countdown to the follow-up sync after a join; 0 = idle. */
+    private static int resyncDelayTicks = 0;
 
     public static void register() {
-        ServerWorldEvents.LOAD.register((server, world) -> {
+        ServerLevelEvents.LOAD.register((server, world) -> {
             applyTo(world);
         });
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             server.execute(() -> syncToAll(server));
+            // …and once more shortly after. The immediate sync lands during the join itself, which
+            // is the least settled moment there is: a progress order generated lazily on the first
+            // server tick may not exist yet, so the joiner can be told "0 of 0" and then hear
+            // nothing until some gameplay action happens to trigger the next sync. A single cheap
+            // repeat closes that window without anyone having to reason about join ordering.
+            resyncDelayTicks = 40;
+        });
+
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (resyncDelayTicks <= 0) return;
+            if (--resyncDelayTicks == 0 && !server.getPlayerList().getPlayers().isEmpty()) {
+                syncToAll(server);
+            }
         });
 
         PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, blockEntity) -> {
-            if (player instanceof ServerPlayerEntity serverPlayer) {
+            if (player instanceof ServerPlayer serverPlayer) {
                 Chal_19_MinePotionEffect.applyEffect(serverPlayer, state.getBlock());
             }
         });
@@ -45,14 +61,14 @@ public class ChallengeManager {
     /** Rebuilds challenge state after reloads and in-game configuration changes. */
     public static void applyAll(net.minecraft.server.MinecraftServer server) {
         LOGGER.info("ChallengeManager.applyAll: re-applying to all worlds");
-        for (ServerWorld world : server.getWorlds()) {
+        for (ServerLevel world : server.getAllLevels()) {
             applyTo(world);
         }
         syncToAll(server);
     }
 
     public static void syncToAll(net.minecraft.server.MinecraftServer server) {
-        ChallengeSavedData data = ChallengeSavedData.get(server.getOverworld());
+        ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
         List<Integer> active = data.getActive();
         List<Integer> perks = data.getActivePerks();
         ChallengeSyncPacket pkt = new ChallengeSyncPacket(
@@ -65,7 +81,7 @@ public class ChallengeManager {
                 data.getGameSpeedMultiplier(),
                 data.getForceItemBattleMinutes()
         );
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, pkt);
         }
         if (active.contains(22)) {
@@ -210,17 +226,72 @@ public class ChallengeManager {
         return false;
     }
 
-    private static void applyTo(ServerWorld world) {
+    /**
+     * Test hook: {@code CHALLENGECRAFT_TEST_CHALLENGES=3} (or {@code 3,7,12}) forces exactly those
+     * challenges active on world load, so a dedicated server can be booted per challenge without a
+     * client to pick them. Same spirit as {@code CHALLENGECRAFT_SURVEY_AUTOSTART} — unset in normal
+     * play, so it costs nothing.
+     */
+    private static final String TEST_CHALLENGES_ENV = System.getenv("CHALLENGECRAFT_TEST_CHALLENGES");
+
+    /** Parsed form of {@link #TEST_CHALLENGES_ENV}, empty when the variable is unset. */
+    public static List<Integer> getTestChallengeOverride() {
+        List<Integer> forced = new ArrayList<>();
+        if (TEST_CHALLENGES_ENV == null || TEST_CHALLENGES_ENV.isBlank()) return forced;
+        for (String part : TEST_CHALLENGES_ENV.split(",")) {
+            try {
+                forced.add(Integer.parseInt(part.trim()));
+            } catch (NumberFormatException ignored) {
+                LOGGER.warn("[TEST] Ignoring non-numeric challenge id '{}'", part);
+            }
+        }
+        return forced;
+    }
+
+    /**
+     * Applies the test override to the static challenge flags BEFORE the world is built.
+     *
+     * <p>Needed because some challenges change how the world itself is generated — Skyblock swaps
+     * the chunk generator in {@code ChallengeWorldRestarter.initializeGenerators}, which runs before
+     * {@code createLevels}. Setting the flags only in {@code applyTo} (on world LOAD) is too late:
+     * the test world would come out as an ordinary world and the challenge would be tested in name
+     * only. This was caught by the boot sweep, where Skyblock reported "no island surface found".
+     */
+    /**
+     * True once this boot's {@code CHALLENGECRAFT_TEST_CHALLENGES} selection has been written into
+     * the world. The override seeds a test world at load; it must NOT keep re-asserting itself
+     * afterwards, or nothing in the harness can ever change a challenge again — the deselect test
+     * set the list to empty and watched {@code applyAll} put it straight back on the next line.
+     */
+    private static boolean testOverrideSeeded = false;
+
+    public static void applyTestOverrideEarly() {
+        testOverrideSeeded = false;   // a new world load gets one fresh chance to seed
+        List<Integer> forced = getTestChallengeOverride();
+        if (forced.isEmpty()) return;
+        LOGGER.info("[TEST] Pre-seeding challenges {} before world generation", forced);
+        applyActiveChallenges(forced, null, null);
+    }
+
+    private static void applyTo(ServerLevel world) {
         // The overworld owns the canonical saved state even when another dimension loads first.
-        ServerWorld overworld = world.getServer().getOverworld();
+        ServerLevel overworld = world.getServer().overworld();
         ChallengeSavedData data = ChallengeSavedData.get(overworld);
+
+        List<Integer> forcedForTest = getTestChallengeOverride();
+        if (!testOverrideSeeded && !forcedForTest.isEmpty() && !forcedForTest.equals(data.getActive())) {
+            LOGGER.info("[TEST] Forcing challenges {} via CHALLENGECRAFT_TEST_CHALLENGES", forcedForTest);
+            data.setActive(forcedForTest);
+            testOverrideSeeded = true;
+        }
+
         List<Integer> saved = data.getActive();
 
         boolean wasExpBorderActive = Chal_9_ExpWorldBorder.isActive();
         boolean wasDamageBorderActive = Chal_25_DamageWorldBorder.isActive();
         boolean wasChunkHuntActive = Chal_38_ChunkHunt.isActive();
 
-        if (world.getRegistryKey() == World.OVERWORLD) {
+        if (world.dimension() == Level.OVERWORLD) {
             if (saved.contains(7)) {
                 int savedTicks = data.getMaxHeartsTicks();
                 float hearts   = savedTicks * 0.5f;
@@ -254,7 +325,7 @@ public class ChallengeManager {
             }
 
             if (!data.isDifficultySet()) {
-                boolean serverSide = world.getServer().isDedicated();
+                boolean serverSide = world.getServer().isDedicatedServer();
                 
                 if (serverSide) {
                     // Dedicated restarts restore static challenge flags before world state is available.
@@ -275,34 +346,50 @@ public class ChallengeManager {
                     }
 
                     if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36 || data.getGameSpeedMultiplier() != 1) {
-                        int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
+                        int playerCount = world.getServer().getPlayerList().getPlayers().size();
                         double initialDiff = calculateTotalDifficulty(data.getActive(), data.getMaxHeartsTicks(), data.getLimitedInventorySlots(), data.getMobHealthMultiplier(), data.getGameSpeedMultiplier(), data.getDoubleTroubleMultiplier(), playerCount, data.getActivePerks());
                         data.setInitialDifficulty(initialDiff);
                         data.setDifficultySet(true);
                         LOGGER.info("ChallengeManager: seeded difficulty from existing data. Initial Difficulty: {}", initialDiff);
                     }
                 } else {
-                    int clientTicks = MathHelper.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
+                    int clientTicks = Mth.clamp(ChallengeCraftClient.SELECTED_MAX_HEARTS, 1, 20);
                     int clientSlots = ChallengeCraftClient.SELECTED_LIMITED_INVENTORY;
                     int clientMult  = ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER;
                     int clientDoubleMult = ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER;
                     int clientGameSpeedMult = ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER;
 
+                    // Prefer the flags just restored from disk over the client's world-creation
+                    // selection. Both reach here, but they are not equally trustworthy: LAST_CHOSEN
+                    // is a static that outlives the world it was picked for, whereas after a restart
+                    // the challenge flags were loaded from the outgoing world's saved data moments
+                    // ago and are exactly what the player last confirmed. At world creation the two
+                    // agree anyway — MinecraftServerMixin seeds the flags from LAST_CHOSEN when
+                    // there is no file to load — so preferring the flags is never worse and stops a
+                    // stale client field from resurrecting a challenge that was switched off.
+                    List<Integer> seedActive = getCurrentlyActiveIds();
+                    if (seedActive.isEmpty()) seedActive = List.copyOf(ChallengeCraftClient.LAST_CHOSEN);
+                    List<Integer> seedPerks = !PRE_LOADED_PERKS.isEmpty()
+                            ? List.copyOf(PRE_LOADED_PERKS)
+                            : List.copyOf(ChallengeCraftClient.SELECTED_PERKS);
+
                     data.setMaxHeartsTicks(clientTicks);
-                    data.setActive(List.copyOf(ChallengeCraftClient.LAST_CHOSEN));
-                    data.setActivePerks(List.copyOf(ChallengeCraftClient.SELECTED_PERKS));
+                    data.setActive(seedActive);
+                    data.setActivePerks(seedPerks);
                     data.setLimitedInventorySlots(clientSlots);
                     data.setMobHealthMultiplier(clientMult);
                     data.setDoubleTroubleMultiplier(clientDoubleMult);
                     data.setGameSpeedMultiplier(clientGameSpeedMult);
                     data.setForceItemBattleMinutes(ChallengeCraftClient.SELECTED_FIB_MINUTES);
                     
-                    int playerCount = world.getServer().getPlayerManager().getPlayerList().size();
-                    double initialDiff = calculateTotalDifficulty(ChallengeCraftClient.LAST_CHOSEN, clientTicks, clientSlots, clientMult, clientGameSpeedMult, clientDoubleMult, playerCount, ChallengeCraftClient.SELECTED_PERKS);
+                    int playerCount = world.getServer().getPlayerList().getPlayers().size();
+                    // Score what was actually stored, not the client fields — after a restart those
+                    // two differ, and the initial difficulty is what the XP payout is priced from.
+                    double initialDiff = calculateTotalDifficulty(data.getActive(), clientTicks, clientSlots, clientMult, clientGameSpeedMult, clientDoubleMult, playerCount, data.getActivePerks());
                     data.setInitialDifficulty(initialDiff);
                     data.setDifficultySet(true);
 
-                    LOGGER.info("ChallengeManager: seeded from client LAST_CHOSEN {}. Initial Difficulty: {}", ChallengeCraftClient.LAST_CHOSEN, initialDiff);
+                    LOGGER.info("ChallengeManager: seeded client-side world with {}. Initial Difficulty: {}", data.getActive(), initialDiff);
                     
                     // These selections belong to one world-creation flow and must not leak into the next world.
                     ChallengeCraftClient.LAST_CHOSEN = new ArrayList<>();
@@ -323,7 +410,7 @@ public class ChallengeManager {
                 Chal_37_GameSpeed.setMultiplier(data.getGameSpeedMultiplier());
 
                 if (data.getActivePerks().contains(LevelManager.PERK_INFINITY_WEAPON)) {
-                    for (var p : world.getServer().getPlayerManager().getPlayerList()) {
+                    for (var p : world.getServer().getPlayerList().getPlayers()) {
                         net.kasax.challengecraft.LevelXpListener.grantInfinityWeapon(p);
                     }
                 }
@@ -331,22 +418,29 @@ public class ChallengeManager {
                 boolean isBorderOrSky = data.getActive().contains(9) || data.getActive().contains(11) || data.getActive().contains(25);
                 
                 if (isBorderOrSky) {
-                    int x = 0;
-                    int z = 0;
-                    int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, x, z);
-                    
-                    // Skyblock starts on a fixed island. Border worlds keep the first spawn inside the opening border.
-                    if (y <= 0 || data.getActive().contains(11)) y = 64;
-                    
-                    world.setSpawnPos(new net.minecraft.util.math.BlockPos(x, y, z), 0.0f);
-                    world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
-                    LOGGER.info("Forced world spawn to {}, {}, {} and spawnRadius to 0 due to active challenge (Border/Skyblock)", x, y, z);
-                } else {
-                    net.minecraft.util.math.BlockPos currentSpawn = world.getSpawnPos();
-                    if (currentSpawn.getY() <= 0) {
-                        int y = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING, currentSpawn.getX(), currentSpawn.getZ());
+                    net.minecraft.core.BlockPos spawnPos;
+
+                    if (data.getActive().contains(11)) {
+                        // Skyblock: stand on the island's own surface, turned to bedrock, instead of
+                        // the old hardcoded (0, 64, 0) — that was a breakable block beside the
+                        // island, and losing it meant respawning over the void forever.
+                        spawnPos = Chal_11_SkyblockWorld.anchorSpawnOnIsland(world);
+                    } else {
+                        // Border worlds keep the first spawn inside the opening border.
+                        int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, 0, 0);
                         if (y <= 0) y = 64;
-                        world.setSpawnPos(new net.minecraft.util.math.BlockPos(currentSpawn.getX(), y, currentSpawn.getZ()), 0.0f);
+                        spawnPos = new net.minecraft.core.BlockPos(0, y, 0);
+                    }
+
+                    world.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(world.dimension(), spawnPos, 0.0f, 0.0f));
+                    world.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, world.getServer());
+                    LOGGER.info("Forced world spawn to {} and spawnRadius to 0 due to active challenge (Border/Skyblock)", spawnPos);
+                } else {
+                    net.minecraft.core.BlockPos currentSpawn = world.getRespawnData().pos();
+                    if (currentSpawn.getY() <= 0) {
+                        int y = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, currentSpawn.getX(), currentSpawn.getZ());
+                        if (y <= 0) y = 64;
+                        world.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(world.dimension(), new net.minecraft.core.BlockPos(currentSpawn.getX(), y, currentSpawn.getZ()), 0.0f, 0.0f));
                         LOGGER.info("Adjusted normal world spawn Y to safe location: {}", y);
                     }
                 }
@@ -370,41 +464,65 @@ public class ChallengeManager {
         if (Chal_9_ExpWorldBorder.isActive() || Chal_25_DamageWorldBorder.isActive()) {
             world.getWorldBorder().setCenter(0.5, 0.5);
             // A nonzero radius can place players outside the tiny opening border.
-            world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0, world.getServer());
+            world.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, world.getServer());
         }
 
-        var rules         = world.getGameRules();
-        var tileDropsRule = rules.get(GameRules.DO_TILE_DROPS);
-        var mobLootRule   = rules.get(GameRules.DO_MOB_LOOT);
-
-        tileDropsRule.set(!Chal_2_NoBlockDrops.isActive(), world.getServer());
-        mobLootRule .set(!Chal_3_NoMobDrops    .isActive(), world.getServer());
+        var rules = world.getGameRules();
+        rules.set(GameRules.BLOCK_DROPS, !Chal_2_NoBlockDrops.isActive(), world.getServer());
+        rules.set(GameRules.MOB_DROPS,   !Chal_3_NoMobDrops  .isActive(), world.getServer());
     }
 
-    private static void resetWorldBorder(ServerWorld world) {
+    private static void resetWorldBorder(ServerLevel world) {
         world.getWorldBorder().setSize(6.0E7);
-        world.getGameRules().get(GameRules.SPAWN_RADIUS).set(10, world.getServer());
+        world.getGameRules().set(GameRules.RESPAWN_RADIUS, 10, world.getServer());
+    }
+
+    /**
+     * Where {@link ChallengeSavedData} actually lives on disk, or null if no copy exists.
+     *
+     * <p>This is read by hand, before the world is open, so it has to know the save layout — and
+     * 26.2 changed that layout twice over: saved data is now namespaced under its
+     * {@code Identifier}, and per-dimension storage moved under {@code dimensions/}. The old
+     * {@code data/challengecraft_challenges.dat} path therefore never matched anything, and since a
+     * miss is silent, every restart fell through to the "nothing on disk" branch. On a dedicated
+     * server that quietly dropped the challenge settings; in singleplayer it was worse, because the
+     * client JVM keeps the static challenge flags from the previous world — so Skyblock stayed on
+     * and generated another Skyblock world after being switched off.
+     *
+     * <p>The legacy path is still checked last so a world created before the port still loads.
+     */
+    private static Path findSavedDataFile(Path worldDir) {
+        Path[] candidates = {
+                worldDir.resolve("dimensions/minecraft/overworld/data/challengecraft/challengecraft_challenges.dat"),
+                worldDir.resolve("data/challengecraft/challengecraft_challenges.dat"),
+                worldDir.resolve("data/challengecraft_challenges.dat"),
+        };
+        for (Path candidate : candidates) {
+            if (Files.exists(candidate)) return candidate;
+        }
+        return null;
     }
 
     public static boolean loadInitialActiveChallenges(Path worldDir) {
-        Path dataFile = worldDir.resolve("data/challengecraft_challenges.dat");
-        if (Files.exists(dataFile)) {
+        Path dataFile = findSavedDataFile(worldDir);
+        if (dataFile != null) {
+            LOGGER.info("Pre-loading challenge state from {}", worldDir.relativize(dataFile));
             try {
-                NbtCompound nbt = NbtIo.readCompressed(dataFile, NbtSizeTracker.ofUnlimitedBytes());
-                NbtElement dataElement = nbt.get("data");
-                if (dataElement instanceof NbtCompound data) {
-                    NbtElement activeElement = data.get("active");
-                    if (activeElement instanceof NbtList list) {
+                CompoundTag nbt = NbtIo.readCompressed(dataFile, NbtAccounter.unlimitedHeap());
+                Tag dataElement = nbt.get("data");
+                if (dataElement instanceof CompoundTag data) {
+                    Tag activeElement = data.get("active");
+                    if (activeElement instanceof ListTag list) {
                         List<Integer> active = new ArrayList<>();
                         for (int i = 0; i < list.size(); i++) {
-                            NbtElement e = list.get(i);
-                            if (e instanceof NbtInt nbtInt) {
+                            Tag e = list.get(i);
+                            if (e instanceof IntTag nbtInt) {
                                 active.add(nbtInt.intValue());
-                            } else if (e instanceof NbtByte nbtByte) {
+                            } else if (e instanceof ByteTag nbtByte) {
                                 active.add((int) nbtByte.byteValue());
-                            } else if (e instanceof NbtShort nbtShort) {
+                            } else if (e instanceof ShortTag nbtShort) {
                                 active.add((int) nbtShort.shortValue());
-                            } else if (e instanceof NbtLong nbtLong) {
+                            } else if (e instanceof LongTag nbtLong) {
                                 active.add((int) nbtLong.longValue());
                             }
                         }
@@ -430,11 +548,13 @@ public class ChallengeManager {
             } catch (Exception e) {
                 LOGGER.error("Failed to pre-load active challenges!", e);
             }
+        } else {
+            LOGGER.info("No saved challenge state under {} — treating this as a fresh world", worldDir);
         }
         return false;
     }
 
-    public static void applyActiveChallenges(List<Integer> activeIds, ServerWorld world, ChallengeSavedData data) {
+    public static void applyActiveChallenges(List<Integer> activeIds, ServerLevel world, ChallengeSavedData data) {
         LOGGER.info("ChallengeManager: turning all challenges OFF");
         setAllActive(false);
 
@@ -544,7 +664,7 @@ public class ChallengeManager {
         net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(active);
     }
 
-    public static void applyActiveFlag(int id, ServerWorld world, ChallengeSavedData data) {
+    public static void applyActiveFlag(int id, ServerLevel world, ChallengeSavedData data) {
         switch (id) {
             case 1  -> { Chal_1_LevelItem        .setActive(true); LOGGER.info("Challenge 1 ON"); }
             case 2  -> { Chal_2_NoBlockDrops     .setActive(true); LOGGER.info("Challenge 2 ON"); }

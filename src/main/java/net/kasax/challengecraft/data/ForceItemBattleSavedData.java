@@ -2,25 +2,27 @@ package net.kasax.challengecraft.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.datafixer.DataFixTypes;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.PersistentState;
-import net.minecraft.world.PersistentStateManager;
-import net.minecraft.world.PersistentStateType;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.storage.SavedDataStorage;
 
 /**
  * Persistent state for one Force Item Battle: per-player target item, score, and jokers, plus
  * team assignments and the battle timer. World-scoped (overworld-owned) like the other saved
  * data; lifetime XP prizes go through the usual XpManager path instead.
  */
-public class ForceItemBattleSavedData extends PersistentState {
-    private static final String KEY = "challengecraft_force_item_battle";
+public class ForceItemBattleSavedData extends SavedData {
+    // 26.2: SavedDataType takes an Identifier, not a bare String (file resolves to
+    // <world>/data/<namespace>/<path>.dat).
+    private static final net.minecraft.resources.Identifier KEY = net.minecraft.resources.Identifier
+            .fromNamespaceAndPath(net.kasax.challengecraft.ChallengeCraft.MOD_ID, "challengecraft_force_item_battle");
 
     public static final int STATE_IDLE = 0;
     public static final int STATE_RUNNING = 1;
@@ -80,8 +82,8 @@ public class ForceItemBattleSavedData extends PersistentState {
             Codec.BOOL.optionalFieldOf("debugRun", false).forGetter(ForceItemBattleSavedData::isDebugRun)
     ).apply(instance, ForceItemBattleSavedData::new));
 
-    public static final PersistentStateType<ForceItemBattleSavedData> TYPE =
-            new PersistentStateType<>(KEY, ForceItemBattleSavedData::new, CODEC, DataFixTypes.LEVEL);
+    public static final SavedDataType<ForceItemBattleSavedData> TYPE =
+            new SavedDataType<>(KEY, ForceItemBattleSavedData::new, CODEC, DataFixTypes.LEVEL);
 
     private int state = STATE_IDLE;
     private long endGameTime = -1L;
@@ -114,9 +116,9 @@ public class ForceItemBattleSavedData extends PersistentState {
         this.debugRun = debugRun;
     }
 
-    public static ForceItemBattleSavedData get(ServerWorld world) {
-        PersistentStateManager manager = world.getPersistentStateManager();
-        return manager.getOrCreate(TYPE);
+    public static ForceItemBattleSavedData get(ServerLevel world) {
+        SavedDataStorage manager = world.getDataStorage();
+        return manager.computeIfAbsent(TYPE);
     }
 
     public int getState() {
@@ -125,7 +127,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setState(int state) {
         this.state = state;
-        markDirty();
+        setDirty();
     }
 
     public long getEndGameTime() {
@@ -134,7 +136,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setEndGameTime(long endGameTime) {
         this.endGameTime = endGameTime;
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, String> getCurrentItems() {
@@ -147,7 +149,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setCurrentItem(UUID uuid, String itemId) {
         currentItems.put(uuid, itemId);
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, Integer> getScores() {
@@ -160,7 +162,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void addScore(UUID uuid) {
         scores.merge(uuid, 1, Integer::sum);
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, Integer> getJokers() {
@@ -173,7 +175,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setJokersLeft(UUID uuid, int amount) {
         jokers.put(uuid, amount);
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, Integer> getTeamAssignments() {
@@ -187,12 +189,12 @@ public class ForceItemBattleSavedData extends PersistentState {
     public void setTeam(UUID uuid, String playerName, int teamOrdinal) {
         teamAssignments.put(uuid, teamOrdinal);
         playerNames.put(uuid, playerName);
-        markDirty();
+        setDirty();
     }
 
     public void removeTeam(UUID uuid) {
         teamAssignments.remove(uuid);
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, String> getPlayerNames() {
@@ -202,7 +204,7 @@ public class ForceItemBattleSavedData extends PersistentState {
     public void updatePlayerName(UUID uuid, String name) {
         if (!name.equals(playerNames.get(uuid))) {
             playerNames.put(uuid, name);
-            markDirty();
+            setDirty();
         }
     }
 
@@ -212,7 +214,7 @@ public class ForceItemBattleSavedData extends PersistentState {
         jokers.putIfAbsent(uuid, DEFAULT_JOKERS);
         scores.putIfAbsent(uuid, 0);
         updatePlayerName(uuid, name);
-        markDirty();
+        setDirty();
     }
 
     public boolean isResultsAwarded() {
@@ -221,7 +223,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setResultsAwarded(boolean awarded) {
         this.resultsAwarded = awarded;
-        markDirty();
+        setDirty();
     }
 
     public Map<UUID, List<String>> getCollectedItems() {
@@ -237,7 +239,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void addCollectedItem(UUID uuid, String itemId) {
         collectedItems.computeIfAbsent(uuid, ignored -> new ArrayList<>()).add(itemId);
-        markDirty();
+        setDirty();
     }
 
     public boolean isDebugRun() {
@@ -246,7 +248,7 @@ public class ForceItemBattleSavedData extends PersistentState {
 
     public void setDebugRun(boolean debug) {
         this.debugRun = debug;
-        markDirty();
+        setDirty();
     }
 
     public void resetForNewBattle() {
@@ -258,6 +260,6 @@ public class ForceItemBattleSavedData extends PersistentState {
         collectedItems.clear();
         resultsAwarded = false;
         debugRun = false;
-        markDirty();
+        setDirty();
     }
 }

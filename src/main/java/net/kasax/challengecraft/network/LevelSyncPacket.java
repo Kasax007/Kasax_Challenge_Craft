@@ -1,34 +1,33 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
-
 import java.util.UUID;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import java.util.Optional;
 
 /** Server-to-client XP update for one player UUID. */
-public class LevelSyncPacket implements CustomPayload {
-    public static final Id<LevelSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "level_sync"));
+public class LevelSyncPacket implements CustomPacketPayload {
+    public static final Type<LevelSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "level_sync"));
     
     public final long xp;
     public final UUID uuid;
 
-    public static final PacketCodec<PacketByteBuf, LevelSyncPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<PacketByteBuf, LevelSyncPacket>() {
+    public static final StreamCodec<FriendlyByteBuf, LevelSyncPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<FriendlyByteBuf, LevelSyncPacket>() {
                 @Override
-                public void encode(LevelSyncPacket pkt, PacketByteBuf buf) {
+                public void encode(LevelSyncPacket pkt, FriendlyByteBuf buf) {
                     buf.writeLong(pkt.xp);
-                    buf.writeUuid(pkt.uuid);
+                    buf.writeUUID(pkt.uuid);
                 }
             },
-            new PacketDecoder<PacketByteBuf, LevelSyncPacket>() {
+            new StreamDecoder<FriendlyByteBuf, LevelSyncPacket>() {
                 @Override
-                public LevelSyncPacket decode(PacketByteBuf buf) {
-                    return new LevelSyncPacket(buf.readLong(), buf.readUuid());
+                public LevelSyncPacket decode(FriendlyByteBuf buf) {
+                    return new LevelSyncPacket(buf.readLong(), buf.readUUID());
                 }
             }
     );
@@ -39,7 +38,7 @@ public class LevelSyncPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

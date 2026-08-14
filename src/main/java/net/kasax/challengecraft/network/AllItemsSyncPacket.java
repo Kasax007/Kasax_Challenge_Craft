@@ -1,14 +1,14 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
 
 /** Incremental HUD sync for the current item target. */
-public class AllItemsSyncPacket implements CustomPayload {
-    public static final Id<AllItemsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_items_sync"));
+public class AllItemsSyncPacket implements CustomPacketPayload {
+    public static final Type<AllItemsSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "all_items_sync"));
 
     public final ItemStack currentItem;
     public final int currentIndex;
@@ -20,21 +20,21 @@ public class AllItemsSyncPacket implements CustomPayload {
         this.totalItems = totalItems;
     }
 
-    public static final PacketCodec<RegistryByteBuf, AllItemsSyncPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, AllItemsSyncPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
-                ItemStack.OPTIONAL_PACKET_CODEC.encode(buf, pkt.currentItem);
+                ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, pkt.currentItem);
                 buf.writeVarInt(pkt.currentIndex);
                 buf.writeVarInt(pkt.totalItems);
             },
             buf -> new AllItemsSyncPacket(
-                    ItemStack.OPTIONAL_PACKET_CODEC.decode(buf),
+                    ItemStack.OPTIONAL_STREAM_CODEC.decode(buf),
                     buf.readVarInt(),
                     buf.readVarInt()
             )
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

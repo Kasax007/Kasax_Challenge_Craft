@@ -4,18 +4,24 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.util.ChallengeTimeUtil;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
-/** Periodically syncs display playtime so HUD clocks remain stable under TPS changes. */
+/** Advances the world's run clock and syncs it to every player, so all HUDs show the same time. */
 public class PlayTimePacketHandler {
     private static long lastSyncMillis = 0L;
 
     public static void registerServer() {
-        // Keep the HUD clock tied to wall time instead of current server TPS.
         ServerTickEvents.END_SERVER_TICK.register(server -> {
+            // One tick of the world is one tick of the run — counted here rather than read from any
+            // player's statistics, so it keeps going while nobody is online and is identical for
+            // everyone who is. END_SERVER_TICK fires exactly once per server tick.
+            ChallengeSavedData.get(server.overworld()).tickRun();
+
+            // Broadcast on wall time, not tick count, so the HUD clock stays honest if TPS drops.
             long now = System.currentTimeMillis();
             if (lastSyncMillis == 0L) {
                 lastSyncMillis = now;
@@ -23,21 +29,18 @@ public class PlayTimePacketHandler {
 
             if (now - lastSyncMillis >= 1000L) {
                 lastSyncMillis = now;
-                for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-                    int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
-                    ServerPlayNetworking.send(player, new PlayTimeSyncPacket(playTicks));
+                int runTicks = ChallengeTimeUtil.getDisplayRunTicks(server);
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    ServerPlayNetworking.send(player, new PlayTimeSyncPacket(runTicks));
                 }
             }
         });
 
         ServerPlayConnectionEvents.JOIN.register(
-                (ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server) -> {
-                    server.execute(() -> {
-                        ServerPlayerEntity player = handler.player;
-                        int playTicks = ChallengeTimeUtil.getDisplayPlayTicks(player);
-
-                        sender.sendPacket(new PlayTimeSyncPacket(playTicks));
-                    });
+                (ServerGamePacketListenerImpl handler, PacketSender sender, MinecraftServer server) -> {
+                    // A joining player adopts the run already in progress instead of starting at zero.
+                    server.execute(() -> sender.sendPacket(
+                            new PlayTimeSyncPacket(ChallengeTimeUtil.getDisplayRunTicks(server))));
                 }
         );
     }

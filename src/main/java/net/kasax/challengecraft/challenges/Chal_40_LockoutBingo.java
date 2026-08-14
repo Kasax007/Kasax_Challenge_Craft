@@ -22,63 +22,62 @@ import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoOpenScreenPacket;
 import net.kasax.challengecraft.network.LockoutBingoSyncPacket;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.CampfireBlock;
-import net.minecraft.block.PressurePlateBlock;
-import net.minecraft.block.WeightedPressurePlateBlock;
-import net.minecraft.advancement.AdvancementEntry;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ChargedProjectilesComponent;
-import net.minecraft.component.type.PotionContentsComponent;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.damage.DamageTypes;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.mob.SkeletonEntity;
-import net.minecraft.entity.passive.CowEntity;
-import net.minecraft.entity.passive.HorseEntity;
-import net.minecraft.entity.passive.PigEntity;
-import net.minecraft.entity.passive.SheepEntity;
-import net.minecraft.entity.passive.StriderEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.entity.mob.PiglinEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.SubtitleS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleFadeS2CPacket;
-import net.minecraft.network.packet.s2c.play.TitleS2CPacket;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.tag.TagKey;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.screen.BrewingStandScreenHandler;
-import net.minecraft.screen.MerchantScreenHandler;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.screen.slot.TradeOutputSlot;
+import net.minecraft.ChatFormatting;
+import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.stat.Stats;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.village.Merchant;
-import net.minecraft.village.VillagerProfession;
-import net.minecraft.world.gen.structure.Structure;
-import net.minecraft.structure.StructureStart;
-
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stats;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.animal.pig.Pig;
+import net.minecraft.world.entity.animal.equine.Horse;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.entity.monster.skeleton.Skeleton;
+import net.minecraft.world.entity.monster.Strider;
+import net.minecraft.world.entity.monster.piglin.Piglin;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.inventory.MerchantResultSlot;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.component.ChargedProjectiles;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CampfireBlock;
+import net.minecraft.world.level.block.PressurePlateBlock;
+import net.minecraft.world.level.block.WeightedPressurePlateBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -108,13 +107,13 @@ public final class Chal_40_LockoutBingo {
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (!active || server.getTicks() % 20 != 0) {
+            if (!active || server.getTickCount() % 20 != 0) {
                 return;
             }
 
             LockoutBingoSavedData data = getData(server);
             ensureCurrentRun(server, data);
-            ensureMaps(server, server.getTicks());
+            ensureMaps(server, server.getTickCount());
 
             if (!data.isStarted()) {
                 maybeStartGame(server, data);
@@ -128,46 +127,46 @@ public final class Chal_40_LockoutBingo {
 
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (!active) {
-                return ActionResult.PASS;
+                return InteractionResult.PASS;
             }
 
-            ItemStack heldStack = player.getStackInHand(hand);
-            if (!heldStack.isOf(ModItems.LOCKOUT_BINGO_MAP)) {
-                return ActionResult.PASS;
+            ItemStack heldStack = player.getItemInHand(hand);
+            if (!heldStack.is(ModItems.LOCKOUT_BINGO_MAP)) {
+                return InteractionResult.PASS;
             }
 
-            if (world.isClient()) {
-                return ActionResult.SUCCESS;
+            if (world.isClientSide()) {
+                return InteractionResult.SUCCESS;
             }
 
-            if (player instanceof ServerPlayerEntity serverPlayer) {
+            if (player instanceof ServerPlayer serverPlayer) {
                 openAppropriateScreen(serverPlayer);
-                return ActionResult.SUCCESS_SERVER;
+                return InteractionResult.SUCCESS_SERVER;
             }
 
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
 
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
-            if (!active || world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
-                return ActionResult.PASS;
+            if (!active || world.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) {
+                return InteractionResult.PASS;
             }
 
-            handleBlockInteraction(serverPlayer, player.getStackInHand(hand), world.getBlockState(hit.getBlockPos()));
-            return ActionResult.PASS;
+            handleBlockInteraction(serverPlayer, player.getItemInHand(hand), world.getBlockState(hit.getBlockPos()));
+            return InteractionResult.PASS;
         });
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
-            if (!active || world.isClient() || !(player instanceof ServerPlayerEntity serverPlayer)) {
-                return ActionResult.PASS;
+            if (!active || world.isClientSide() || !(player instanceof ServerPlayer serverPlayer)) {
+                return InteractionResult.PASS;
             }
 
-            handleEntityInteraction(serverPlayer, player.getStackInHand(hand), entity);
-            return ActionResult.PASS;
+            handleEntityInteraction(serverPlayer, player.getItemInHand(hand), entity);
+            return InteractionResult.PASS;
         });
 
         ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, damageSource, baseDamageTaken, damageTaken, blocked) -> {
-            if (!active || !(entity instanceof ServerPlayerEntity player) || damageTaken <= 0.0f || player.isDead()) {
+            if (!active || !(entity instanceof ServerPlayer player) || damageTaken <= 0.0f || player.isDeadOrDying()) {
                 return;
             }
 
@@ -183,8 +182,8 @@ public final class Chal_40_LockoutBingo {
 
             LockoutBingoSavedData data = getData(server);
             ensureCurrentRun(server, data);
-            data.updatePlayerName(handler.player.getUuid(), handler.player.getGameProfile().getName());
-            ensureMap(handler.player, server.getTicks());
+            data.updatePlayerName(handler.player.getUUID(), handler.player.getGameProfile().name());
+            ensureMap(handler.player, server.getTickCount());
             syncToPlayer(handler.player);
         }));
 
@@ -196,25 +195,25 @@ public final class Chal_40_LockoutBingo {
             LockoutBingoSavedData data = getData(server);
             ensureCurrentRun(server, data);
             if (!data.isStarted()) {
-                data.setReady(handler.player.getUuid(), false);
+                data.setReady(handler.player.getUUID(), false);
                 syncToAll(server);
             }
         }));
     }
 
-    public static void handleAction(ServerPlayerEntity player, LockoutBingoActionPacket packet) {
+    public static void handleAction(ServerPlayer player, LockoutBingoActionPacket packet) {
         if (!active) {
             return;
         }
 
-        MinecraftServer server = player.getServer();
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
 
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        data.updatePlayerName(player.getUuid(), player.getGameProfile().getName());
+        data.updatePlayerName(player.getUUID(), player.getGameProfile().name());
 
         switch (packet.action()) {
             case REQUEST_SYNC -> {
@@ -223,7 +222,7 @@ public final class Chal_40_LockoutBingo {
             }
             case JOIN_TEAM -> {
                 if (data.isStarted()) {
-                    player.sendMessage(Text.translatable("challengecraft.lockout.error.started").formatted(Formatting.RED), true);
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.started").withStyle(ChatFormatting.RED));
                     syncToPlayer(player);
                     return;
                 }
@@ -234,36 +233,36 @@ public final class Chal_40_LockoutBingo {
                     return;
                 }
 
-                data.setTeam(player.getUuid(), player.getGameProfile().getName(), team);
-                data.setReady(player.getUuid(), false);
+                data.setTeam(player.getUUID(), player.getGameProfile().name(), team);
+                data.setReady(player.getUUID(), false);
             }
             case LEAVE_TEAM -> {
                 if (data.isStarted()) {
-                    player.sendMessage(Text.translatable("challengecraft.lockout.error.started").formatted(Formatting.RED), true);
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.started").withStyle(ChatFormatting.RED));
                     syncToPlayer(player);
                     return;
                 }
 
-                data.removeTeam(player.getUuid());
+                data.removeTeam(player.getUUID());
             }
             case READY -> {
                 if (data.isStarted()) {
-                    player.sendMessage(Text.translatable("challengecraft.lockout.error.started").formatted(Formatting.RED), true);
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.started").withStyle(ChatFormatting.RED));
                     syncToPlayer(player);
                     return;
                 }
 
-                if (data.getTeam(player.getUuid()) == null) {
-                    player.sendMessage(Text.translatable("challengecraft.lockout.error.join_team_first").formatted(Formatting.RED), true);
+                if (data.getTeam(player.getUUID()) == null) {
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.join_team_first").withStyle(ChatFormatting.RED));
                     syncToPlayer(player);
                     return;
                 }
 
-                data.setReady(player.getUuid(), true);
+                data.setReady(player.getUUID(), true);
             }
             case UNREADY -> {
                 if (!data.isStarted()) {
-                    data.setReady(player.getUuid(), false);
+                    data.setReady(player.getUUID(), false);
                 }
             }
         }
@@ -274,40 +273,40 @@ public final class Chal_40_LockoutBingo {
         }
     }
 
-    public static void handleScreenSlotClick(PlayerEntity player, ScreenHandler handler, int slotIndex) {
-        if (!active || !(player instanceof ServerPlayerEntity serverPlayer) || slotIndex < 0 || slotIndex >= handler.slots.size()) {
+    public static void handleScreenSlotClick(Player player, AbstractContainerMenu handler, int slotIndex) {
+        if (!active || !(player instanceof ServerPlayer serverPlayer) || slotIndex < 0 || slotIndex >= handler.slots.size()) {
             return;
         }
 
-        MinecraftServer server = serverPlayer.getServer();
+        MinecraftServer server = serverPlayer.level().getServer();
         if (server == null) {
             return;
         }
 
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        if (!data.isStarted() || data.isEnded() || data.getTeam(serverPlayer.getUuid()) == null) {
+        if (!data.isStarted() || data.isEnded() || data.getTeam(serverPlayer.getUUID()) == null) {
             return;
         }
 
         Slot slot = handler.slots.get(slotIndex);
-        ItemStack stack = slot.getStack();
+        ItemStack stack = slot.getItem();
         if (stack.isEmpty()) {
             return;
         }
 
-        if (handler instanceof BrewingStandScreenHandler && slot.getIndex() >= 0 && slot.getIndex() <= 2 && isPotionStack(stack)) {
+        if (handler instanceof BrewingStandMenu && slot.getContainerSlot() >= 0 && slot.getContainerSlot() <= 2 && isPotionStack(stack)) {
             claimFirstMatchingGoal(server, data, serverPlayer, goal -> matchesBrewGoal(goal, stack));
             return;
         }
 
-        if (handler instanceof MerchantScreenHandler merchantHandler && slot instanceof TradeOutputSlot) {
+        if (handler instanceof MerchantMenu merchantHandler && slot instanceof MerchantResultSlot) {
             Merchant merchant = ((MerchantScreenHandlerAccessor) merchantHandler).challengecraft$getMerchant();
             claimFirstMatchingGoal(server, data, serverPlayer, goal -> matchesTradeGoal(goal, stack, merchant));
         }
     }
 
-    public static void onActivated(ServerWorld world) {
+    public static void onActivated(ServerLevel world) {
         if (world == null) {
             return;
         }
@@ -315,7 +314,7 @@ public final class Chal_40_LockoutBingo {
         MinecraftServer server = world.getServer();
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        ensureMaps(server, server.getTicks());
+        ensureMaps(server, server.getTickCount());
         syncToAll(server);
     }
 
@@ -323,13 +322,13 @@ public final class Chal_40_LockoutBingo {
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
         LockoutBingoSyncPacket packet = buildSyncPacket(server, data);
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, packet);
         }
     }
 
-    public static void syncToPlayer(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
+    public static void syncToPlayer(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
@@ -350,8 +349,8 @@ public final class Chal_40_LockoutBingo {
         return active;
     }
 
-    public static void startSoloDebugRun(ServerPlayerEntity player) {
-        MinecraftServer server = player.getServer();
+    public static void startSoloDebugRun(ServerPlayer player) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
@@ -360,28 +359,28 @@ public final class Chal_40_LockoutBingo {
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
         data.resetForRun(data.getRunId());
-        data.setTeam(player.getUuid(), player.getGameProfile().getName(), LockoutBingoTeam.RED);
-        data.retainPlayers(Set.of(player.getUuid()));
+        data.setTeam(player.getUUID(), player.getGameProfile().name(), LockoutBingoTeam.RED);
+        data.retainPlayers(Set.of(player.getUUID()));
 
-        long boardSeed = server.getOverworld().getSeed()
-                ^ server.getOverworld().getTime()
-                ^ player.getUuid().getMostSignificantBits()
-                ^ player.getUuid().getLeastSignificantBits();
+        long boardSeed = server.overworld().getSeed()
+                ^ server.overworld().getGameTime()
+                ^ player.getUUID().getMostSignificantBits()
+                ^ player.getUUID().getLeastSignificantBits();
         List<LockoutBingoGoal> goals = LockoutBingoGoalPool.pickBoard(boardSeed);
-        data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.getOverworld().getTime());
+        data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.overworld().getGameTime());
         captureGoalStatBaselines(data, List.of(player), goals);
         data.setStarted(true);
         data.setEnded(false);
         data.setWinnerTeam(null);
         data.clearReady();
 
-        ensureMap(player, server.getTicks());
+        ensureMap(player, server.getTickCount());
         syncToAll(server);
         ServerPlayNetworking.send(player, new LockoutBingoOpenScreenPacket(true));
     }
 
-    public static int debugClaimTiles(ServerPlayerEntity player, int amount) {
-        MinecraftServer server = player.getServer();
+    public static int debugClaimTiles(ServerPlayer player, int amount) {
+        MinecraftServer server = player.level().getServer();
         if (server == null || !active) {
             return 0;
         }
@@ -392,10 +391,10 @@ public final class Chal_40_LockoutBingo {
             return 0;
         }
 
-        LockoutBingoTeam team = data.getTeam(player.getUuid());
+        LockoutBingoTeam team = data.getTeam(player.getUUID());
         if (team == null) {
             team = LockoutBingoTeam.RED;
-            data.setTeam(player.getUuid(), player.getGameProfile().getName(), team);
+            data.setTeam(player.getUUID(), player.getGameProfile().name(), team);
         }
 
         int claimed = 0;
@@ -441,73 +440,73 @@ public final class Chal_40_LockoutBingo {
         return maxOtherScore + getRemainingTiles(data) + 1;
     }
 
-    private static void openAppropriateScreen(ServerPlayerEntity player) {
+    private static void openAppropriateScreen(ServerPlayer player) {
         syncToPlayer(player);
-        LockoutBingoSavedData data = getData(player.getServer());
+        LockoutBingoSavedData data = getData(player.level().getServer());
         ServerPlayNetworking.send(player, new LockoutBingoOpenScreenPacket(data.isStarted()));
     }
 
-    private static void handleBlockInteraction(ServerPlayerEntity player, ItemStack heldStack, BlockState state) {
-        MinecraftServer server = player.getServer();
+    private static void handleBlockInteraction(ServerPlayer player, ItemStack heldStack, BlockState state) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
 
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUuid()) == null) {
+        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUUID()) == null) {
             return;
         }
 
         claimFirstMatchingGoal(server, data, player, goal -> matchesBlockInteraction(goal, player, heldStack, state));
     }
 
-    private static void handleEntityInteraction(ServerPlayerEntity player, ItemStack heldStack, Entity entity) {
-        MinecraftServer server = player.getServer();
+    private static void handleEntityInteraction(ServerPlayer player, ItemStack heldStack, Entity entity) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
 
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUuid()) == null) {
+        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUUID()) == null) {
             return;
         }
 
         claimFirstMatchingGoal(server, data, player, goal -> matchesEntityInteraction(goal, heldStack, entity));
     }
 
-    private static void handlePlayerDamage(ServerPlayerEntity player, DamageSource damageSource, float damageTaken) {
-        MinecraftServer server = player.getServer();
+    private static void handlePlayerDamage(ServerPlayer player, DamageSource damageSource, float damageTaken) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
 
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
-        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUuid()) == null) {
+        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUUID()) == null) {
             return;
         }
 
         claimFirstMatchingGoal(server, data, player, goal -> matchesDamageGoal(goal, player, damageSource, damageTaken));
     }
 
-    private static boolean matchesBlockInteraction(LockoutBingoGoal goal, ServerPlayerEntity player, ItemStack heldStack, BlockState state) {
+    private static boolean matchesBlockInteraction(LockoutBingoGoal goal, ServerPlayer player, ItemStack heldStack, BlockState state) {
         if (goal.type() != LockoutBingoGoalType.INTERACT && goal.type() != LockoutBingoGoalType.CONSUME) {
             return false;
         }
 
         return switch (goal.id()) {
             case "eat_cake_slice" -> goal.type() == LockoutBingoGoalType.CONSUME
-                    && state.isOf(Blocks.CAKE)
-                    && !heldStack.isIn(ItemTags.CANDLES)
-                    && player.canConsume(false)
+                    && state.is(Blocks.CAKE)
+                    && !heldStack.is(ItemTags.CANDLES)
+                    && player.canEat(false)
                     && !Chal_39_NoFood.isActive();
             case "use_lectern", "use_grindstone", "use_stonecutter", "use_cartography_table", "use_smithing_table", "use_loom", "ring_bell" ->
-                    Registries.BLOCK.getId(state.getBlock()).toString().equals(goal.primaryTarget());
+                    BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(goal.primaryTarget());
             case "light_campfire" -> state.getBlock() instanceof CampfireBlock
-                    && !state.get(CampfireBlock.LIT)
-                    && (heldStack.isOf(Items.FLINT_AND_STEEL) || heldStack.isOf(Items.FIRE_CHARGE));
+                    && !state.getValue(CampfireBlock.LIT)
+                    && (heldStack.is(Items.FLINT_AND_STEEL) || heldStack.is(Items.FIRE_CHARGE));
             default -> false;
         };
     }
@@ -518,25 +517,25 @@ public final class Chal_40_LockoutBingo {
         }
 
         return switch (goal.id()) {
-            case "milk_cow" -> entity instanceof CowEntity && heldStack.isOf(Items.BUCKET);
-            case "shear_sheep" -> entity instanceof SheepEntity sheep && heldStack.isOf(Items.SHEARS) && !sheep.isSheared();
-            case "barter_with_piglin" -> entity instanceof PiglinEntity piglin && !piglin.isBaby() && heldStack.isOf(Items.GOLD_INGOT);
+            case "milk_cow" -> entity instanceof Cow && heldStack.is(Items.BUCKET);
+            case "shear_sheep" -> entity instanceof Sheep sheep && heldStack.is(Items.SHEARS) && !sheep.isSheared();
+            case "barter_with_piglin" -> entity instanceof Piglin piglin && !piglin.isBaby() && heldStack.is(Items.GOLD_INGOT);
             default -> false;
         };
     }
 
-    private static boolean matchesDamageGoal(LockoutBingoGoal goal, ServerPlayerEntity player, DamageSource damageSource, float damageTaken) {
+    private static boolean matchesDamageGoal(LockoutBingoGoal goal, ServerPlayer player, DamageSource damageSource, float damageTaken) {
         if (goal.type() != LockoutBingoGoalType.DAMAGE_EVENT) {
             return false;
         }
 
         return switch (goal.id()) {
-            case "survive_explosion" -> damageSource.isOf(DamageTypes.EXPLOSION) || damageSource.isOf(DamageTypes.PLAYER_EXPLOSION);
-            case "take_fall_damage" -> damageSource.isOf(DamageTypes.FALL);
-            case "fall_20_blocks_and_survive" -> damageSource.isOf(DamageTypes.FALL) && player.fallDistance >= 20.0f;
-            case "burn_and_survive" -> damageSource.isOf(DamageTypes.IN_FIRE) || damageSource.isOf(DamageTypes.ON_FIRE) || damageSource.isOf(DamageTypes.CAMPFIRE);
-            case "freeze_in_powder_snow" -> damageSource.isOf(DamageTypes.FREEZE);
-            case "get_shot_by_skeleton" -> damageSource.isOf(DamageTypes.ARROW) && damageSource.getAttacker() instanceof SkeletonEntity;
+            case "survive_explosion" -> damageSource.is(DamageTypes.EXPLOSION) || damageSource.is(DamageTypes.PLAYER_EXPLOSION);
+            case "take_fall_damage" -> damageSource.is(DamageTypes.FALL);
+            case "fall_20_blocks_and_survive" -> damageSource.is(DamageTypes.FALL) && player.fallDistance >= 20.0f;
+            case "burn_and_survive" -> damageSource.is(DamageTypes.IN_FIRE) || damageSource.is(DamageTypes.ON_FIRE) || damageSource.is(DamageTypes.CAMPFIRE);
+            case "freeze_in_powder_snow" -> damageSource.is(DamageTypes.FREEZE);
+            case "get_shot_by_skeleton" -> damageSource.is(DamageTypes.ARROW) && damageSource.getEntity() instanceof Skeleton;
             default -> false;
         };
     }
@@ -544,10 +543,10 @@ public final class Chal_40_LockoutBingo {
     private static void claimFirstMatchingGoal(
             MinecraftServer server,
             LockoutBingoSavedData data,
-            ServerPlayerEntity player,
+            ServerPlayer player,
             Predicate<LockoutBingoGoal> matcher
     ) {
-        LockoutBingoTeam team = data.getTeam(player.getUuid());
+        LockoutBingoTeam team = data.getTeam(player.getUUID());
         if (team == null) {
             return;
         }
@@ -566,12 +565,12 @@ public final class Chal_40_LockoutBingo {
         }
     }
 
-    private static void handleEntityDeath(LivingEntity entity, net.minecraft.entity.damage.DamageSource damageSource) {
-        if (!active || !(damageSource.getAttacker() instanceof ServerPlayerEntity player)) {
+    private static void handleEntityDeath(LivingEntity entity, net.minecraft.world.damagesource.DamageSource damageSource) {
+        if (!active || !(damageSource.getEntity() instanceof ServerPlayer player)) {
             return;
         }
 
-        MinecraftServer server = player.getServer();
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
         }
@@ -582,12 +581,12 @@ public final class Chal_40_LockoutBingo {
             return;
         }
 
-        LockoutBingoTeam team = data.getTeam(player.getUuid());
+        LockoutBingoTeam team = data.getTeam(player.getUUID());
         if (team == null) {
             return;
         }
 
-        String entityId = Registries.ENTITY_TYPE.getId(entity.getType()).toString();
+        String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
         List<String> board = data.getBoardGoalIds();
         for (int i = 0; i < board.size(); i++) {
             if (data.getClaimedTeam(i) != null) {
@@ -603,54 +602,54 @@ public final class Chal_40_LockoutBingo {
     }
 
     private static void ensureCurrentRun(MinecraftServer server, LockoutBingoSavedData data) {
-        int currentRunId = ChallengeSavedData.get(server.getOverworld()).getRunIndex();
+        int currentRunId = ChallengeSavedData.get(server.overworld()).getRunIndex();
         if (data.getRunId() != currentRunId) {
             data.resetForRun(currentRunId);
         }
     }
 
     private static LockoutBingoSavedData getData(MinecraftServer server) {
-        return LockoutBingoSavedData.get(server.getOverworld());
+        return LockoutBingoSavedData.get(server.overworld());
     }
 
     private static void ensureMaps(MinecraftServer server, long currentTick) {
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ensureMap(player, currentTick);
         }
     }
 
-    private static void ensureMap(ServerPlayerEntity player, long currentTick) {
-        PlayerInventory inventory = player.getInventory();
+    private static void ensureMap(ServerPlayer player, long currentTick) {
+        Inventory inventory = player.getInventory();
         int firstSlot = -1;
 
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack stack = inventory.getStack(i);
-            if (!stack.isOf(ModItems.LOCKOUT_BINGO_MAP)) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            ItemStack stack = inventory.getItem(i);
+            if (!stack.is(ModItems.LOCKOUT_BINGO_MAP)) {
                 continue;
             }
 
             if (firstSlot == -1) {
                 firstSlot = i;
             } else {
-                inventory.setStack(i, ItemStack.EMPTY);
+                inventory.setItem(i, ItemStack.EMPTY);
             }
         }
 
         if (firstSlot != -1) {
-            LAST_MAP_DROP_TICK.remove(player.getUuid());
+            LAST_MAP_DROP_TICK.remove(player.getUUID());
             return;
         }
 
         ItemStack mapStack = new ItemStack(ModItems.LOCKOUT_BINGO_MAP);
-        if (inventory.insertStack(mapStack)) {
-            LAST_MAP_DROP_TICK.remove(player.getUuid());
+        if (inventory.add(mapStack)) {
+            LAST_MAP_DROP_TICK.remove(player.getUUID());
             return;
         }
 
-        long lastDropTick = LAST_MAP_DROP_TICK.getOrDefault(player.getUuid(), Long.MIN_VALUE);
+        long lastDropTick = LAST_MAP_DROP_TICK.getOrDefault(player.getUUID(), Long.MIN_VALUE);
         if (currentTick - lastDropTick >= MAP_DROP_RETRY_TICKS) {
-            player.dropItem(new ItemStack(ModItems.LOCKOUT_BINGO_MAP), false);
-            LAST_MAP_DROP_TICK.put(player.getUuid(), currentTick);
+            player.drop(new ItemStack(ModItems.LOCKOUT_BINGO_MAP), false);
+            LAST_MAP_DROP_TICK.put(player.getUUID(), currentTick);
         }
     }
 
@@ -659,13 +658,13 @@ public final class Chal_40_LockoutBingo {
             return;
         }
 
-        List<ServerPlayerEntity> participants = getOnlineParticipants(server, data);
+        List<ServerPlayer> participants = getOnlineParticipants(server, data);
         if (participants.size() < 2) {
             return;
         }
 
         long distinctTeams = participants.stream()
-                .map(player -> data.getTeam(player.getUuid()))
+                .map(player -> data.getTeam(player.getUUID()))
                 .filter(team -> team != null)
                 .distinct()
                 .count();
@@ -673,44 +672,44 @@ public final class Chal_40_LockoutBingo {
             return;
         }
 
-        boolean everyoneReady = participants.stream().allMatch(player -> data.isReady(player.getUuid()));
+        boolean everyoneReady = participants.stream().allMatch(player -> data.isReady(player.getUUID()));
         if (!everyoneReady) {
             return;
         }
 
-        data.retainPlayers(participants.stream().map(ServerPlayerEntity::getUuid).collect(java.util.stream.Collectors.toSet()));
-        long boardSeed = server.getOverworld().getSeed() ^ server.getOverworld().getTime() ^ participants.size();
+        data.retainPlayers(participants.stream().map(ServerPlayer::getUUID).collect(java.util.stream.Collectors.toSet()));
+        long boardSeed = server.overworld().getSeed() ^ server.overworld().getGameTime() ^ participants.size();
         List<LockoutBingoGoal> goals = LockoutBingoGoalPool.pickBoard(boardSeed);
-        data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.getOverworld().getTime());
+        data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.overworld().getGameTime());
         captureGoalStatBaselines(data, participants, goals);
         data.setStarted(true);
         data.setEnded(false);
         data.setWinnerTeam(null);
         data.clearReady();
 
-        server.getPlayerManager().broadcast(Text.translatable("challengecraft.lockout.start.broadcast").formatted(Formatting.GOLD), false);
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.BLOCK_NOTE_BLOCK_PLING, SoundCategory.MASTER, 1.0f, 1.2f);
+        server.getPlayerList().broadcastSystemMessage(Component.translatable("challengecraft.lockout.start.broadcast").withStyle(ChatFormatting.GOLD), false);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.NOTE_BLOCK_PLING, SoundSource.MASTER, 1.0f, 1.2f);
         }
 
         scanPassiveGoals(server, data);
         syncToAll(server);
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, new LockoutBingoOpenScreenPacket(true));
         }
     }
 
     private static void captureGoalStatBaselines(
             LockoutBingoSavedData data,
-            List<ServerPlayerEntity> participants,
+            List<ServerPlayer> participants,
             List<LockoutBingoGoal> goals
     ) {
-        for (ServerPlayerEntity player : participants) {
+        for (ServerPlayer player : participants) {
             for (LockoutBingoGoal goal : goals) {
                 if (!usesStatBaseline(goal)) {
                     continue;
                 }
-                data.setGoalStatBaseline(player.getUuid(), goal.id(), readProgressStat(player, goal));
+                data.setGoalStatBaseline(player.getUUID(), goal.id(), readProgressStat(player, goal));
             }
         }
     }
@@ -724,9 +723,9 @@ public final class Chal_40_LockoutBingo {
         };
     }
 
-    private static List<ServerPlayerEntity> getOnlineParticipants(MinecraftServer server, LockoutBingoSavedData data) {
-        return server.getPlayerManager().getPlayerList().stream()
-                .filter(player -> data.getTeam(player.getUuid()) != null)
+    private static List<ServerPlayer> getOnlineParticipants(MinecraftServer server, LockoutBingoSavedData data) {
+        return server.getPlayerList().getPlayers().stream()
+                .filter(player -> data.getTeam(player.getUUID()) != null)
                 .toList();
     }
 
@@ -735,7 +734,7 @@ public final class Chal_40_LockoutBingo {
             return;
         }
 
-        List<ServerPlayerEntity> participants = getOnlineParticipants(server, data);
+        List<ServerPlayer> participants = getOnlineParticipants(server, data);
         if (participants.isEmpty()) {
             return;
         }
@@ -751,8 +750,8 @@ public final class Chal_40_LockoutBingo {
                 continue;
             }
 
-            for (ServerPlayerEntity player : participants) {
-                LockoutBingoTeam team = data.getTeam(player.getUuid());
+            for (ServerPlayer player : participants) {
+                LockoutBingoTeam team = data.getTeam(player.getUUID());
                 if (team == null) {
                     continue;
                 }
@@ -768,16 +767,16 @@ public final class Chal_40_LockoutBingo {
         }
     }
 
-    private static boolean matchesPassiveGoal(LockoutBingoSavedData data, ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesPassiveGoal(LockoutBingoSavedData data, ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.type()) {
             case ITEM, ITEM_TAG -> inventoryHasGoal(player, goal);
             case ITEM_AMOUNT -> countMatchingItems(player, goal) >= goal.amount();
             case CRAFT, TRADE -> hasAdvancedStat(data, player, goal);
             case CONSUME -> "eat_cake_slice".equals(goal.id()) ? false : hasAdvancedStat(data, player, goal);
-            case DIMENSION -> player.getWorld().getRegistryKey().getValue().toString().equals(goal.primaryTarget());
-            case BIOME -> player.getWorld().getBiome(player.getBlockPos())
-                    .getKey()
-                    .map(key -> key.getValue().toString())
+            case DIMENSION -> player.level().dimension().identifier().toString().equals(goal.primaryTarget());
+            case BIOME -> player.level().getBiome(player.blockPosition())
+                    .unwrapKey()
+                    .map(key -> key.identifier().toString())
                     .filter(goal.primaryTarget()::equals)
                     .isPresent();
             case EQUIP -> matchesEquipGoal(player, goal);
@@ -793,19 +792,19 @@ public final class Chal_40_LockoutBingo {
         };
     }
 
-    private static boolean inventoryHasGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            if (goal.matchesItem(player.getInventory().getStack(i))) {
+    private static boolean inventoryHasGoal(ServerPlayer player, LockoutBingoGoal goal) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            if (goal.matchesItem(player.getInventory().getItem(i))) {
                 return true;
             }
         }
         return false;
     }
 
-    private static int countMatchingItems(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static int countMatchingItems(ServerPlayer player, LockoutBingoGoal goal) {
         int count = 0;
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
             if (goal.matchesItem(stack)) {
                 count += stack.getCount();
             }
@@ -813,35 +812,35 @@ public final class Chal_40_LockoutBingo {
         return count;
     }
 
-    private static boolean hasAdvancedStat(LockoutBingoSavedData data, ServerPlayerEntity player, LockoutBingoGoal goal) {
-        return readProgressStat(player, goal) > data.getGoalStatBaseline(player.getUuid(), goal.id());
+    private static boolean hasAdvancedStat(LockoutBingoSavedData data, ServerPlayer player, LockoutBingoGoal goal) {
+        return readProgressStat(player, goal) > data.getGoalStatBaseline(player.getUUID(), goal.id());
     }
 
-    private static int readProgressStat(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static int readProgressStat(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.type()) {
             case CRAFT -> sumItemStats(player, goal.targets(), StatKind.CRAFTED);
             case CONSUME -> sumItemStats(player, goal.targets(), StatKind.USED);
             case TRADE -> "trade_with_villager".equals(goal.id())
-                    ? player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.TRADED_WITH_VILLAGER))
+                    ? player.getStats().getValue(Stats.CUSTOM.get(Stats.TRADED_WITH_VILLAGER))
                     : 0;
             case INTERACT -> readInteractStat(player, goal);
-            case FISHING -> player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.FISH_CAUGHT));
+            case FISHING -> player.getStats().getValue(Stats.CUSTOM.get(Stats.FISH_CAUGHT));
             case ENCHANT -> "enchant_item".equals(goal.id())
-                    ? player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.ENCHANT_ITEM))
+                    ? player.getStats().getValue(Stats.CUSTOM.get(Stats.ENCHANT_ITEM))
                     : countEnchantedTargetItems(player, goal);
             case ACTION -> readActionStat(player, goal);
             default -> 0;
         };
     }
 
-    private static int readActionStat(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static int readActionStat(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
-            case "block_damage_with_shield" -> player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.DAMAGE_BLOCKED_BY_SHIELD));
+            case "block_damage_with_shield" -> player.getStats().getValue(Stats.CUSTOM.get(Stats.DAMAGE_BLOCKED_BY_SHIELD));
             case "place_tnt" -> sumItemStats(player, List.of("minecraft:tnt"), StatKind.USED);
             case "ignite_tnt" -> sumItemStats(player, List.of("minecraft:flint_and_steel", "minecraft:fire_charge"), StatKind.USED);
             case "shoot_crossbow" -> sumItemStats(player, List.of("minecraft:crossbow"), StatKind.USED);
             case "obtain_firework_crossbow" -> countFireworkCrossbows(player);
-            case "hit_target_block" -> player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.TARGET_HIT));
+            case "hit_target_block" -> player.getStats().getValue(Stats.CUSTOM.get(Stats.TARGET_HIT));
             case "throw_ender_pearl" -> sumItemStats(player, List.of("minecraft:ender_pearl"), StatKind.USED);
             case "throw_trident" -> sumItemStats(player, List.of("minecraft:trident"), StatKind.USED);
             case "use_totem" -> sumItemStats(player, List.of("minecraft:totem_of_undying"), StatKind.USED);
@@ -850,9 +849,9 @@ public final class Chal_40_LockoutBingo {
         };
     }
 
-    private static int readInteractStat(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static int readInteractStat(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
-            case "breed_animals" -> player.getStatHandler().getStat(Stats.CUSTOM.getOrCreateStat(Stats.ANIMALS_BRED));
+            case "breed_animals" -> player.getStats().getValue(Stats.CUSTOM.get(Stats.ANIMALS_BRED));
             case "breed_cows" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:cow") ? 1 : 0;
             case "breed_sheep" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:sheep") ? 1 : 0;
             case "breed_pigs" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:pig") ? 1 : 0;
@@ -861,22 +860,22 @@ public final class Chal_40_LockoutBingo {
         };
     }
 
-    private static int sumItemStats(ServerPlayerEntity player, List<String> itemIds, StatKind kind) {
+    private static int sumItemStats(ServerPlayer player, List<String> itemIds, StatKind kind) {
         int total = 0;
         for (String itemId : itemIds) {
-            Item item = Registries.ITEM.get(net.minecraft.util.Identifier.of(itemId));
+            Item item = BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.parse(itemId));
             total += switch (kind) {
-                case CRAFTED -> player.getStatHandler().getStat(Stats.CRAFTED.getOrCreateStat(item));
-                case USED -> player.getStatHandler().getStat(Stats.USED.getOrCreateStat(item));
+                case CRAFTED -> player.getStats().getValue(Stats.ITEM_CRAFTED.get(item));
+                case USED -> player.getStats().getValue(Stats.ITEM_USED.get(item));
             };
         }
         return total;
     }
 
-    private static int countEnchantedTargetItems(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static int countEnchantedTargetItems(ServerPlayer player, LockoutBingoGoal goal) {
         int count = 0;
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
             if (matchesEnchantedItemGoal(stack, goal)) {
                 count++;
             }
@@ -885,26 +884,26 @@ public final class Chal_40_LockoutBingo {
     }
 
     private static boolean matchesEnchantedItemGoal(ItemStack stack, LockoutBingoGoal goal) {
-        if (!stack.hasEnchantments()) {
+        if (!stack.isEnchanted()) {
             return false;
         }
 
         return switch (goal.id()) {
-            case "enchant_sword" -> stack.isIn(ItemTags.SWORDS);
-            case "enchant_pickaxe" -> stack.isIn(ItemTags.PICKAXES);
+            case "enchant_sword" -> stack.is(ItemTags.SWORDS);
+            case "enchant_pickaxe" -> stack.is(ItemTags.PICKAXES);
             default -> goal.matchesItem(stack);
         };
     }
 
-    private static int countFireworkCrossbows(ServerPlayerEntity player) {
+    private static int countFireworkCrossbows(ServerPlayer player) {
         int count = 0;
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
-            if (!stack.isOf(Items.CROSSBOW)) {
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.is(Items.CROSSBOW)) {
                 continue;
             }
 
-            ChargedProjectilesComponent charged = stack.get(DataComponentTypes.CHARGED_PROJECTILES);
+            ChargedProjectiles charged = stack.get(DataComponents.CHARGED_PROJECTILES);
             if (charged != null && charged.contains(Items.FIREWORK_ROCKET)) {
                 count++;
             }
@@ -912,14 +911,14 @@ public final class Chal_40_LockoutBingo {
         return count;
     }
 
-    private static boolean matchesEquipGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
-        if (!goal.contextTarget().isBlank() && !player.getWorld().getRegistryKey().getValue().toString().equals(goal.contextTarget())) {
+    private static boolean matchesEquipGoal(ServerPlayer player, LockoutBingoGoal goal) {
+        if (!goal.contextTarget().isBlank() && !player.level().dimension().identifier().toString().equals(goal.contextTarget())) {
             return false;
         }
 
         int matched = 0;
         for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
-            ItemStack stack = player.getEquippedStack(slot);
+            ItemStack stack = player.getItemBySlot(slot);
             if (goal.matchesItem(stack)) {
                 matched++;
             }
@@ -927,15 +926,15 @@ public final class Chal_40_LockoutBingo {
         return matched >= goal.amount();
     }
 
-    private static boolean matchesInventorySetGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesInventorySetGoal(ServerPlayer player, LockoutBingoGoal goal) {
         Set<String> matchedTargets = new HashSet<>();
-        for (int i = 0; i < player.getInventory().size(); i++) {
-            ItemStack stack = player.getInventory().getStack(i);
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
             if (stack.isEmpty()) {
                 continue;
             }
 
-            String itemId = Registries.ITEM.getId(stack.getItem()).toString();
+            String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
             if (matchesInventorySetTarget(stack, goal.targets())) {
                 matchedTargets.add(itemId);
             }
@@ -946,33 +945,33 @@ public final class Chal_40_LockoutBingo {
     private static boolean matchesInventorySetTarget(ItemStack stack, List<String> targets) {
         for (String target : targets) {
             if (target.startsWith("#")) {
-                if (stack.isIn(TagKey.of(RegistryKeys.ITEM, Identifier.of(target.substring(1))))) {
+                if (stack.is(TagKey.create(Registries.ITEM, Identifier.parse(target.substring(1))))) {
                     return true;
                 }
                 continue;
             }
 
-            if (Registries.ITEM.getId(stack.getItem()).toString().equals(target)) {
+            if (BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(target)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean matchesPassiveInteractGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesPassiveInteractGoal(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
             case "sleep_in_bed" -> player.isSleeping();
-            case "breed_animals", "breed_cows", "breed_sheep", "breed_pigs", "breed_chickens" -> hasAdvancedStat(getData(player.getServer()), player, goal);
-            case "ride_horse" -> player.getVehicle() instanceof HorseEntity;
-            case "ride_pig" -> player.getVehicle() instanceof PigEntity;
-            case "ride_strider" -> player.getVehicle() instanceof StriderEntity;
+            case "breed_animals", "breed_cows", "breed_sheep", "breed_pigs", "breed_chickens" -> hasAdvancedStat(getData(player.level().getServer()), player, goal);
+            case "ride_horse" -> player.getVehicle() instanceof Horse;
+            case "ride_pig" -> player.getVehicle() instanceof Pig;
+            case "ride_strider" -> player.getVehicle() instanceof Strider;
             case "activate_pressure_plate" -> hasPoweredPressurePlateNear(player);
             default -> false;
         };
     }
 
     private static boolean isPotionStack(ItemStack stack) {
-        return stack.isOf(Items.POTION) || stack.isOf(Items.SPLASH_POTION) || stack.isOf(Items.LINGERING_POTION);
+        return stack.is(Items.POTION) || stack.is(Items.SPLASH_POTION) || stack.is(Items.LINGERING_POTION);
     }
 
     private static boolean matchesBrewGoal(LockoutBingoGoal goal, ItemStack stack) {
@@ -980,13 +979,13 @@ public final class Chal_40_LockoutBingo {
             return false;
         }
 
-        PotionContentsComponent contents = stack.get(DataComponentTypes.POTION_CONTENTS);
+        PotionContents contents = stack.get(DataComponents.POTION_CONTENTS);
         if (contents == null || contents.potion().isEmpty()) {
             return false;
         }
 
         String potionId = contents.potion()
-                .flatMap(entry -> entry.getKey().map(key -> key.getValue().toString()))
+                .flatMap(entry -> entry.unwrapKey().map(key -> key.identifier().toString()))
                 .orElse("");
         if ("brew_any_potion".equals(goal.id())) {
             return contents.hasEffects()
@@ -1004,7 +1003,7 @@ public final class Chal_40_LockoutBingo {
             return true;
         }
 
-        String targetPath = Identifier.of(targetId).getPath();
+        String targetPath = Identifier.parse(targetId).getPath();
         return potionId.endsWith(":long_" + targetPath) || potionId.endsWith(":strong_" + targetPath);
     }
 
@@ -1017,17 +1016,17 @@ public final class Chal_40_LockoutBingo {
             case "trade_with_villager" -> true;
             case "obtain_emerald_by_trade", "buy_bread", "buy_arrows", "buy_lapis" -> itemStackMatchesTarget(stack, goal.primaryTarget());
             case "trade_with_librarian", "trade_with_armorer", "trade_with_farmer", "trade_with_cleric", "trade_with_toolsmith", "trade_with_fletcher" ->
-                    merchant instanceof VillagerEntity villager && villagerMatchesProfession(villager, goal.primaryTarget());
+                    merchant instanceof Villager villager && villagerMatchesProfession(villager, goal.primaryTarget());
             default -> false;
         };
     }
 
     private static boolean itemStackMatchesTarget(ItemStack stack, String targetId) {
-        return stack.isOf(Registries.ITEM.get(Identifier.of(targetId)));
+        return stack.is(BuiltInRegistries.ITEM.getValue(Identifier.parse(targetId)));
     }
 
-    private static boolean villagerMatchesProfession(VillagerEntity villager, String professionId) {
-        return villager.getVillagerData().profession().matchesKey(switch (professionId) {
+    private static boolean villagerMatchesProfession(Villager villager, String professionId) {
+        return villager.getVillagerData().profession().is(switch (professionId) {
             case "minecraft:librarian" -> VillagerProfession.LIBRARIAN;
             case "minecraft:armorer" -> VillagerProfession.ARMORER;
             case "minecraft:farmer" -> VillagerProfession.FARMER;
@@ -1038,28 +1037,28 @@ public final class Chal_40_LockoutBingo {
         });
     }
 
-    private static boolean hasAdvancement(ServerPlayerEntity player, String advancementId) {
-        MinecraftServer server = player.getServer();
+    private static boolean hasAdvancement(ServerPlayer player, String advancementId) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return false;
         }
 
-        AdvancementEntry advancement = server.getAdvancementLoader().get(Identifier.of(advancementId));
-        return advancement != null && player.getAdvancementTracker().getProgress(advancement).isDone();
+        AdvancementHolder advancement = server.getAdvancements().get(Identifier.parse(advancementId));
+        return advancement != null && player.getAdvancements().getOrStartProgress(advancement).isDone();
     }
 
-    private static boolean hasAdvancementCriterion(ServerPlayerEntity player, String advancementId, String criterionId) {
-        MinecraftServer server = player.getServer();
+    private static boolean hasAdvancementCriterion(ServerPlayer player, String advancementId, String criterionId) {
+        MinecraftServer server = player.level().getServer();
         if (server == null) {
             return false;
         }
 
-        AdvancementEntry advancement = server.getAdvancementLoader().get(Identifier.of(advancementId));
+        AdvancementHolder advancement = server.getAdvancements().get(Identifier.parse(advancementId));
         if (advancement == null) {
             return false;
         }
 
-        for (String obtainedCriterion : player.getAdvancementTracker().getProgress(advancement).getObtainedCriteria()) {
+        for (String obtainedCriterion : player.getAdvancements().getOrStartProgress(advancement).getCompletedCriteria()) {
             if (criterionId.equals(obtainedCriterion)) {
                 return true;
             }
@@ -1067,59 +1066,59 @@ public final class Chal_40_LockoutBingo {
         return false;
     }
 
-    private static boolean matchesStatusGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesStatusGoal(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
-            case "get_poisoned" -> player.hasStatusEffect(StatusEffects.POISON);
-            case "get_withered" -> player.hasStatusEffect(StatusEffects.WITHER);
-            case "get_levitation" -> player.hasStatusEffect(StatusEffects.LEVITATION);
+            case "get_poisoned" -> player.hasEffect(MobEffects.POISON);
+            case "get_withered" -> player.hasEffect(MobEffects.WITHER);
+            case "get_levitation" -> player.hasEffect(MobEffects.LEVITATION);
             default -> false;
         };
     }
 
-    private static boolean matchesLocationGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesLocationGoal(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
             case "reach_y_minus_50" -> player.getBlockY() <= -50;
-            case "reach_build_limit" -> player.getBlockY() >= player.getWorld().getDimension().minY() + player.getWorld().getDimension().height() - 5;
-            case "enter_end_gateway" -> isBlockNear(player, state -> state.isOf(Blocks.END_GATEWAY), 3, 3);
+            case "reach_build_limit" -> player.getBlockY() >= player.level().dimensionType().minY() + player.level().dimensionType().height() - 5;
+            case "enter_end_gateway" -> isBlockNear(player, state -> state.is(Blocks.END_GATEWAY), 3, 3);
             case "stand_on_bedrock" -> {
-                BlockPos below = player.getBlockPos().down();
-                yield player.getWorld().getBlockState(below).isOf(Blocks.BEDROCK);
+                BlockPos below = player.blockPosition().below();
+                yield player.level().getBlockState(below).is(Blocks.BEDROCK);
             }
             default -> false;
         };
     }
 
-    private static boolean matchesStructureGoal(ServerPlayerEntity player, LockoutBingoGoal goal) {
+    private static boolean matchesStructureGoal(ServerPlayer player, LockoutBingoGoal goal) {
         Identifier structureId = normalizeStructureId(goal.primaryTarget());
-        if (!(player.getWorld() instanceof ServerWorld world)) {
+        if (!(player.level() instanceof ServerLevel world)) {
             return false;
         }
-        BlockPos pos = player.getBlockPos();
+        BlockPos pos = player.blockPosition();
         StructureStart start;
 
         if (isStructureTag(structureId)) {
-            start = world.getStructureAccessor().getStructureContaining(pos, TagKey.of(RegistryKeys.STRUCTURE, structureId));
+            start = world.structureManager().getStructureWithPieceAt(pos, TagKey.create(Registries.STRUCTURE, structureId));
         } else {
-            RegistryKey<Structure> key = RegistryKey.of(RegistryKeys.STRUCTURE, structureId);
-            Structure structure = world.getRegistryManager().getOrThrow(RegistryKeys.STRUCTURE)
-                    .getOptional(key)
+            ResourceKey<Structure> key = ResourceKey.create(Registries.STRUCTURE, structureId);
+            Structure structure = world.registryAccess().lookupOrThrow(Registries.STRUCTURE)
+                    .get(key)
                     .map(entry -> entry.value())
                     .orElse(null);
             if (structure == null) {
                 return false;
             }
-            start = world.getStructureAccessor().getStructureContaining(pos, structure);
+            start = world.structureManager().getStructureWithPieceAt(pos, structure);
         }
 
-        return start != null && start != StructureStart.DEFAULT && start.hasChildren();
+        return start != null && start != StructureStart.INVALID_START && start.isValid();
     }
 
     private static Identifier normalizeStructureId(String targetId) {
         return switch (targetId) {
-            case "minecraft:jungle_temple" -> Identifier.of("minecraft:jungle_pyramid");
-            case "minecraft:ocean_monument" -> Identifier.of("minecraft:monument");
-            case "minecraft:woodland_mansion" -> Identifier.of("minecraft:mansion");
-            default -> Identifier.of(targetId);
+            case "minecraft:jungle_temple" -> Identifier.parse("minecraft:jungle_pyramid");
+            case "minecraft:ocean_monument" -> Identifier.parse("minecraft:monument");
+            case "minecraft:woodland_mansion" -> Identifier.parse("minecraft:mansion");
+            default -> Identifier.parse(targetId);
         };
     }
 
@@ -1130,21 +1129,21 @@ public final class Chal_40_LockoutBingo {
         };
     }
 
-    private static boolean hasPoweredPressurePlateNear(ServerPlayerEntity player) {
+    private static boolean hasPoweredPressurePlateNear(ServerPlayer player) {
         return isBlockNear(player, state -> {
-            if (state.contains(PressurePlateBlock.POWERED) && state.get(PressurePlateBlock.POWERED)) {
+            if (state.hasProperty(PressurePlateBlock.POWERED) && state.getValue(PressurePlateBlock.POWERED)) {
                 return true;
             }
-            return state.contains(WeightedPressurePlateBlock.POWER) && state.get(WeightedPressurePlateBlock.POWER) > 0;
+            return state.hasProperty(WeightedPressurePlateBlock.POWER) && state.getValue(WeightedPressurePlateBlock.POWER) > 0;
         }, 1, 1);
     }
 
-    private static boolean isBlockNear(ServerPlayerEntity player, Predicate<BlockState> predicate, int horizontalRadius, int verticalRadius) {
-        BlockPos center = player.getBlockPos();
+    private static boolean isBlockNear(ServerPlayer player, Predicate<BlockState> predicate, int horizontalRadius, int verticalRadius) {
+        BlockPos center = player.blockPosition();
         for (int x = -horizontalRadius; x <= horizontalRadius; x++) {
             for (int y = -verticalRadius; y <= verticalRadius; y++) {
                 for (int z = -horizontalRadius; z <= horizontalRadius; z++) {
-                    if (predicate.test(player.getWorld().getBlockState(center.add(x, y, z)))) {
+                    if (predicate.test(player.level().getBlockState(center.offset(x, y, z)))) {
                         return true;
                     }
                 }
@@ -1158,21 +1157,21 @@ public final class Chal_40_LockoutBingo {
             LockoutBingoSavedData data,
             int index,
             LockoutBingoGoal goal,
-            ServerPlayerEntity player,
+            ServerPlayer player,
             LockoutBingoTeam team
     ) {
         if (!data.isStarted() || data.isEnded() || data.getClaimedTeam(index) != null) {
             return;
         }
 
-        data.claimTile(index, team, player.getUuid(), player.getGameProfile().getName());
+        data.claimTile(index, team, player.getUUID(), player.getGameProfile().name());
 
-        server.getPlayerManager().broadcast(
-                Text.translatable("challengecraft.lockout.claim.broadcast", team.displayName(), goal.title()),
+        server.getPlayerList().broadcastSystemMessage(
+                Component.translatable("challengecraft.lockout.claim.broadcast", team.displayName(), goal.title()),
                 false
         );
-        for (ServerPlayerEntity onlinePlayer : server.getPlayerManager().getPlayerList()) {
-            onlinePlayer.getWorld().playSound(null, onlinePlayer.getX(), onlinePlayer.getY(), onlinePlayer.getZ(), SoundEvents.BLOCK_NOTE_BLOCK_CHIME, SoundCategory.MASTER, 1.0f, 1.1f);
+        for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
+            onlinePlayer.level().playSound(null, onlinePlayer.getX(), onlinePlayer.getY(), onlinePlayer.getZ(), SoundEvents.NOTE_BLOCK_CHIME, SoundSource.MASTER, 1.0f, 1.1f);
         }
 
         LockoutBingoTeam winner = getWinner(data);
@@ -1230,7 +1229,7 @@ public final class Chal_40_LockoutBingo {
         data.setEnded(true);
         data.setWinnerTeam(winner);
 
-        long elapsedTicks = Math.max(0L, server.getOverworld().getTime() - Math.max(0L, data.getStartedAtWorldTicks()));
+        long elapsedTicks = Math.max(0L, server.overworld().getGameTime() - Math.max(0L, data.getStartedAtWorldTicks()));
         int elapsedTicksInt = (int) Math.min(Integer.MAX_VALUE, elapsedTicks);
 
         for (Map.Entry<UUID, Integer> entry : data.getTeamAssignments().entrySet()) {
@@ -1245,7 +1244,7 @@ public final class Chal_40_LockoutBingo {
             }
 
             long xpAmount = team == winner ? 100L : 50L;
-            ServerPlayerEntity onlinePlayer = server.getPlayerManager().getPlayer(uuid);
+            ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(uuid);
             if (onlinePlayer != null) {
                 LevelManager.XpResult result = LevelManager.addXp(onlinePlayer, xpAmount);
                 ServerPlayNetworking.send(onlinePlayer, new ChallengeRewardPacket(result.oldXp, result.newXp, result.actualAmount, false));
@@ -1257,23 +1256,23 @@ public final class Chal_40_LockoutBingo {
             data.setRewarded(uuid);
         }
 
-        Text chatMessage = winner != null
-                ? Text.translatable("challengecraft.lockout.win.broadcast", winner.displayName()).formatted(Formatting.GOLD, Formatting.BOLD)
-                : Text.translatable("challengecraft.lockout.draw.broadcast").formatted(Formatting.GOLD, Formatting.BOLD);
-        server.getPlayerManager().broadcast(chatMessage, false);
+        Component chatMessage = winner != null
+                ? Component.translatable("challengecraft.lockout.win.broadcast", winner.displayName()).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
+                : Component.translatable("challengecraft.lockout.draw.broadcast").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+        server.getPlayerList().broadcastSystemMessage(chatMessage, false);
 
-        Text title = winner != null
-                ? Text.translatable("challengecraft.lockout.win.title", winner.displayName())
-                : Text.translatable("challengecraft.lockout.draw.title");
-        Text subtitle = winner != null
-                ? Text.translatable("challengecraft.lockout.win.subtitle")
-                : Text.translatable("challengecraft.lockout.draw.subtitle");
-        server.getPlayerManager().sendToAll(new TitleFadeS2CPacket(10, 70, 20));
-        server.getPlayerManager().sendToAll(new TitleS2CPacket(title));
-        server.getPlayerManager().sendToAll(new SubtitleS2CPacket(subtitle));
+        Component title = winner != null
+                ? Component.translatable("challengecraft.lockout.win.title", winner.displayName())
+                : Component.translatable("challengecraft.lockout.draw.title");
+        Component subtitle = winner != null
+                ? Component.translatable("challengecraft.lockout.win.subtitle")
+                : Component.translatable("challengecraft.lockout.draw.subtitle");
+        server.getPlayerList().broadcastAll(new ClientboundSetTitlesAnimationPacket(10, 70, 20));
+        server.getPlayerList().broadcastAll(new ClientboundSetTitleTextPacket(title));
+        server.getPlayerList().broadcastAll(new ClientboundSetSubtitleTextPacket(subtitle));
 
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
-            player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0f, 1.0f);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
         }
 
         syncToAll(server);
@@ -1283,8 +1282,8 @@ public final class Chal_40_LockoutBingo {
         List<LockoutBingoSyncPacket.PlayerState> players = new ArrayList<>();
         for (Map.Entry<UUID, Integer> entry : data.getTeamAssignments().entrySet()) {
             UUID uuid = entry.getKey();
-            ServerPlayerEntity onlinePlayer = server.getPlayerManager().getPlayer(uuid);
-            String name = data.getPlayerNames().getOrDefault(uuid, onlinePlayer != null ? onlinePlayer.getGameProfile().getName() : uuid.toString());
+            ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(uuid);
+            String name = data.getPlayerNames().getOrDefault(uuid, onlinePlayer != null ? onlinePlayer.getGameProfile().name() : uuid.toString());
             players.add(new LockoutBingoSyncPacket.PlayerState(
                     uuid,
                     name,
@@ -1297,7 +1296,7 @@ public final class Chal_40_LockoutBingo {
 
         long elapsedTicks = 0L;
         if (data.isStarted() && data.getStartedAtWorldTicks() >= 0L) {
-            elapsedTicks = Math.max(0L, server.getOverworld().getTime() - data.getStartedAtWorldTicks());
+            elapsedTicks = Math.max(0L, server.overworld().getGameTime() - data.getStartedAtWorldTicks());
         }
 
         return new LockoutBingoSyncPacket(

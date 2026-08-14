@@ -1,10 +1,10 @@
 package net.kasax.challengecraft.mixin;
 
-import net.minecraft.block.Block;
-import net.minecraft.entity.ExperienceOrbEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,12 +20,12 @@ public class NoBlockDropsMixin {
 
     /** Block drops can be disabled without suppressing the XP vanilla would have awarded. */
     @Inject(
-            method = "dropExperience(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/util/math/BlockPos;I)V",
+            method = "popExperience(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/core/BlockPos;I)V",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void alwaysDropBlockXp(ServerWorld world, BlockPos pos, int size, CallbackInfo ci) {
-        ExperienceOrbEntity.spawn(world, Vec3d.ofCenter(pos), size);
+    private void alwaysDropBlockXp(ServerLevel world, BlockPos pos, int size, CallbackInfo ci) {
+        ExperienceOrb.award(world, Vec3.atCenterOf(pos), size);
         ci.cancel();
     }
 }

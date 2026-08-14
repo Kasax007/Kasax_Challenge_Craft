@@ -5,25 +5,27 @@ import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.client.ui.Anim;
 import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.data.StatsManager;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ComponentPath;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.ItemStack;
 import java.util.function.Consumer;
 
 /** Toggle card shared by the create-world tab and the in-world challenge editor. */
-public class ChallengeCardWidget extends ClickableWidget {
+public class ChallengeCardWidget extends AbstractWidget {
     private final int challengeId;
     private final ItemStack icon;
-    private final Text title;
-    private final Text description;
+    private final Component title;
+    private final Component description;
     private boolean active;
     private final Consumer<Boolean> onToggle;
     private final Integer pbTicks;
@@ -32,22 +34,22 @@ public class ChallengeCardWidget extends ClickableWidget {
     private final Anim.Tween hover = new Anim.Tween(0f);
 
     public ChallengeCardWidget(int x, int y, int width, int height, int challengeId, boolean active, Consumer<Boolean> onToggle) {
-        super(x, y, width, height, Text.empty());
+        super(x, y, width, height, Component.empty());
         this.challengeId = challengeId;
         this.icon = ChallengeIconProvider.getIcon(challengeId);
         if (challengeId > 100) {
-            this.title = Text.translatable("challengecraft.perk." + challengeId);
-            this.description = Text.translatable("challengecraft.perk." + challengeId + ".desc");
+            this.title = Component.translatable("challengecraft.perk." + challengeId);
+            this.description = Component.translatable("challengecraft.perk." + challengeId + ".desc");
         } else {
-            this.title = Text.translatable("challengecraft.worldcreate.challenge" + challengeId);
-            this.description = Text.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc");
+            this.title = Component.translatable("challengecraft.worldcreate.challenge" + challengeId);
+            this.description = Component.translatable("challengecraft.worldcreate.challenge" + challengeId + ".desc");
         }
         this.active = active;
         this.onToggle = onToggle;
 
         String uuid = "global";
-        if (MinecraftClient.getInstance().getSession() != null && MinecraftClient.getInstance().getSession().getUuidOrNull() != null) {
-            uuid = MinecraftClient.getInstance().getSession().getUuidOrNull().toString();
+        if (Minecraft.getInstance().getUser() != null && Minecraft.getInstance().getUser().getProfileId() != null) {
+            uuid = Minecraft.getInstance().getUser().getProfileId().toString();
         }
         this.pbTicks = StatsManager.getBestTimes(uuid).get(challengeId);
 
@@ -62,23 +64,23 @@ public class ChallengeCardWidget extends ClickableWidget {
         }
 
         if (locked) {
-            Text requirement = challengeId == LevelManager.PERK_INFINITY_WEAPON
-                    ? Text.translatable("challengecraft.requirement.infinity_stars", 20)
-                    : Text.translatable("challengecraft.requirement.level", requiredLevel);
-            setTooltip(Tooltip.of(Text.translatable("challengecraft.challenge_card.locked", requirement).formatted(Formatting.RED).append(Text.of("\n")).append(description)));
+            Component requirement = challengeId == LevelManager.PERK_INFINITY_WEAPON
+                    ? Component.translatable("challengecraft.requirement.infinity_stars", 20)
+                    : Component.translatable("challengecraft.requirement.level", requiredLevel);
+            setTooltip(Tooltip.create(Component.translatable("challengecraft.challenge_card.locked", requirement).withStyle(ChatFormatting.RED).append(Component.nullToEmpty("\n")).append(description)));
         } else {
-            setTooltip(Tooltip.of(description));
+            setTooltip(Tooltip.create(description));
         }
     }
 
     @Override
-    public void playDownSound(net.minecraft.client.sound.SoundManager soundManager) {
+    public void playDownSound(net.minecraft.client.sounds.SoundManager soundManager) {
         // Parent screens own click feedback so one interaction does not play twice.
     }
 
     @Override
-    protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-        TextRenderer tr = MinecraftClient.getInstance().textRenderer;
+    protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        Font tr = Minecraft.getInstance().font;
         CraftUI.CardState state = locked ? CraftUI.CardState.LOCKED
                 : (active ? CraftUI.CardState.ACTIVE : CraftUI.CardState.IDLE);
 
@@ -99,9 +101,9 @@ public class ChallengeCardWidget extends ClickableWidget {
 
         int textX;
         if (locked) {
-            Text label = challengeId == LevelManager.PERK_INFINITY_WEAPON
-                    ? Text.translatable("challengecraft.challenge_card.locked_stars_short", 20)
-                    : Text.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel);
+            Component label = challengeId == LevelManager.PERK_INFINITY_WEAPON
+                    ? Component.translatable("challengecraft.challenge_card.locked_stars_short", 20)
+                    : Component.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel);
             int chipW = CraftUI.labelChip(context, tr, label, x + 4, y + (h - 12) / 2, CraftUI.DANGER);
             textX = x + 4 + chipW + 4;
         } else {
@@ -114,11 +116,11 @@ public class ChallengeCardWidget extends ClickableWidget {
         String titleStr = CraftUI.trimToWidth(tr, title.getString(), maxTextWidth);
 
         if (pbTicks != null && !locked) {
-            context.drawText(tr, Text.of(titleStr), textX, y + (h / 2) - 9, textColor, false);
-            MutableText pbText = Text.translatable("challengecraft.challenge_card.completed_time", formatTicks(pbTicks));
-            context.drawText(tr, CraftUI.trimToWidth(tr, pbText.getString(), maxTextWidth), textX, y + (h / 2) + 1, CraftUI.SUCCESS, false);
+            context.text(tr, Component.nullToEmpty(titleStr), textX, y + (h / 2) - 9, textColor, false);
+            MutableComponent pbText = Component.translatable("challengecraft.challenge_card.completed_time", formatTicks(pbTicks));
+            context.text(tr, CraftUI.trimToWidth(tr, pbText.getString(), maxTextWidth), textX, y + (h / 2) + 1, CraftUI.SUCCESS, false);
         } else {
-            context.drawText(tr, Text.of(titleStr), textX, y + (h - tr.fontHeight) / 2, textColor, false);
+            context.text(tr, Component.nullToEmpty(titleStr), textX, y + (h - tr.lineHeight) / 2, textColor, false);
         }
     }
 
@@ -135,7 +137,7 @@ public class ChallengeCardWidget extends ClickableWidget {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
         if (locked) return;
         active = !active;
         if (onToggle != null) {
@@ -143,11 +145,53 @@ public class ChallengeCardWidget extends ClickableWidget {
         }
     }
 
+    // ---- vanilla interaction guards --------------------------------------------------------
+    // This widget publishes isActive() as "is the challenge toggled on" — that is what both
+    // selection screens read it for. 26.2 changed AbstractWidget to route clicking, hover testing
+    // and focus navigation through isActive() instead of the raw active/visible fields (1.21.5
+    // read the fields directly), so vanilla would now read every un-toggled card as a *disabled*
+    // widget and make it impossible to switch a challenge ON. The three overrides below are
+    // vanilla's own logic re-based on the widget's enabled state, super.isActive() == visible &&
+    // active. Note handleCursor() needs no such treatment: AbstractWidget never calls it, only
+    // AbstractButton does.
+
     @Override
-    protected void appendClickableNarrations(NarrationMessageBuilder builder) {
-        appendDefaultNarrations(builder);
+    public boolean isMouseOver(double mouseX, double mouseY) {
+        return super.isActive()
+                && mouseX >= getX() && mouseY >= getY()
+                && mouseX < getRight() && mouseY < getBottom();
     }
 
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (!super.isActive()
+                || !isValidClickButton(event.buttonInfo())
+                || !isMouseOver(event.x(), event.y())) {
+            return false;
+        }
+        playDownSound(Minecraft.getInstance().getSoundManager());
+        onClick(event, doubleClick);
+        return true;
+    }
+
+    @Override
+    public ComponentPath nextFocusPath(FocusNavigationEvent event) {
+        if (!super.isActive()) {
+            return null;
+        }
+        return isFocused() ? null : ComponentPath.leaf(this);
+    }
+
+    @Override
+    protected void updateWidgetNarration(NarrationElementOutput builder) {
+        defaultButtonNarrationText(builder);
+    }
+
+    /**
+     * The challenge's toggle state — <em>not</em> the widget's enabled state. This deliberately
+     * shadows {@link AbstractWidget#isActive()}; see the interaction guards above for why that
+     * needs compensating on 26.2.
+     */
     public boolean isActive() {
         return active;
     }

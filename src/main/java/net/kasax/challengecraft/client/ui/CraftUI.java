@@ -1,13 +1,12 @@
 package net.kasax.challengecraft.client.ui;
 
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
-
 import java.util.List;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * Shared house-style component kit for every Challenge Craft screen and HUD.
@@ -80,7 +79,7 @@ public final class CraftUI {
     // ---- Frames & panels -----------------------------------------------------------------
 
     /** Heavy outer frame for a whole screen (double border with corner accents). */
-    public static void frame(DrawContext context, int x, int y, int width, int height,
+    public static void frame(GuiGraphicsExtractor context, int x, int y, int width, int height,
                              int fill, int border, int accent) {
         context.fill(x + 2, y, x + width - 2, y + height, border);
         context.fill(x, y + 2, x + width, y + height - 2, border);
@@ -91,12 +90,12 @@ public final class CraftUI {
         context.fill(x + 8, y + height - 4, x + width - 8, y + height - 2, accent);
     }
 
-    public static void frame(DrawContext context, int x, int y, int width, int height) {
+    public static void frame(GuiGraphicsExtractor context, int x, int y, int width, int height) {
         frame(context, x, y, width, height, SURFACE_BG, BORDER, ACCENT_HAIRLINE);
     }
 
     /** Standard panel: fill, border, and a top + side accent hairline. */
-    public static void panel(DrawContext context, int x, int y, int width, int height,
+    public static void panel(GuiGraphicsExtractor context, int x, int y, int width, int height,
                              int fill, int border, int accent) {
         context.fill(x + 1, y, x + width - 1, y + height, border);
         context.fill(x, y + 1, x + width, y + height - 1, border);
@@ -106,16 +105,16 @@ public final class CraftUI {
         context.fill(x + width - 2, y + 5, x + width - 1, y + height - 5, accent);
     }
 
-    public static void panel(DrawContext context, int x, int y, int width, int height) {
+    public static void panel(GuiGraphicsExtractor context, int x, int y, int width, int height) {
         panel(context, x, y, width, height, SURFACE_RAISED, BORDER, ACCENT_HAIRLINE);
     }
 
-    public static void panelFloat(DrawContext context, int x, int y, int width, int height, int accent) {
+    public static void panelFloat(GuiGraphicsExtractor context, int x, int y, int width, int height, int accent) {
         panel(context, x, y, width, height, SURFACE_FLOAT, BORDER, accent);
     }
 
     /** A small pill used for status badges. */
-    public static void chip(DrawContext context, int x, int y, int width, int height, int fill, int accent) {
+    public static void chip(GuiGraphicsExtractor context, int x, int y, int width, int height, int fill, int accent) {
         context.fill(x + 1, y, x + width - 1, y + height, accent);
         context.fill(x, y + 1, x + width, y + height - 1, accent);
         context.fill(x + 2, y + 2, x + width - 2, y + height - 2, fill);
@@ -125,21 +124,21 @@ public final class CraftUI {
      * Draws a labelled status chip sized to its text and returns its total width.
      * The fill is a dark translucent wash so every badge reads as the same family.
      */
-    public static int labelChip(DrawContext context, TextRenderer tr, Text label, int x, int y, int accent) {
+    public static int labelChip(GuiGraphicsExtractor context, Font tr, Component label, int x, int y, int accent) {
         String text = label.getString();
-        int w = tr.getWidth(text) + 10;
+        int w = tr.width(text) + 10;
         chip(context, x, y, w, 12, 0x66151C27, accent);
-        context.drawText(tr, label, x + 5, y + 2, accent, false);
+        context.text(tr, label, x + 5, y + 2, accent, false);
         return w;
     }
 
     // ---- Section header ------------------------------------------------------------------
 
     /** A left-aligned section title with a coloured underline hairline spanning the width. */
-    public static void sectionHeader(DrawContext context, TextRenderer tr, Text label,
+    public static void sectionHeader(GuiGraphicsExtractor context, Font tr, Component label,
                                      int x, int y, int width, int accent) {
-        context.drawText(tr, label, x, y, TEXT_PRIMARY, false);
-        int underlineY = y + tr.fontHeight + 2;
+        context.text(tr, label, x, y, TEXT_PRIMARY, false);
+        int underlineY = y + tr.lineHeight + 2;
         context.fill(x, underlineY, x + width, underlineY + 1, applyAlpha(accent, 0.85f));
         context.fill(x, underlineY, x + Math.min(width, 28), underlineY + 1, accent);
     }
@@ -147,42 +146,42 @@ public final class CraftUI {
     // ---- Icon tile -----------------------------------------------------------------------
 
     /** A recessed slot-style tile. Draw an item into it with {@link #iconTileItem}. */
-    public static void iconTile(DrawContext context, int x, int y, int size, int accent) {
+    public static void iconTile(GuiGraphicsExtractor context, int x, int y, int size, int accent) {
         context.fill(x, y, x + size, y + size, 0xFF10151F);
-        context.drawBorder(x, y, size, size, applyAlpha(accent, 0.55f));
+        context.outline(x, y, size, size, applyAlpha(accent, 0.55f));
     }
 
-    public static void iconTileItem(DrawContext context, ItemStack stack, int x, int y, int size, int accent) {
+    public static void iconTileItem(GuiGraphicsExtractor context, ItemStack stack, int x, int y, int size, int accent) {
         iconTile(context, x, y, size, accent);
         if (stack != null && !stack.isEmpty()) {
             int inset = (size - 16) / 2;
-            context.drawItem(stack, x + inset, y + inset);
+            context.item(stack, x + inset, y + inset);
         }
     }
 
     // ---- Progress bar --------------------------------------------------------------------
 
     /** Bevelled progress bar with a dark trough and a bright fill. */
-    public static void progressBar(DrawContext context, int x, int y, int width, int height,
+    public static void progressBar(GuiGraphicsExtractor context, int x, int y, int width, int height,
                                    float progress, int fillColor) {
         context.fill(x - 1, y - 1, x + width + 1, y + height + 1, 0xFF000000);
         context.fill(x, y, x + width, y + height, 0xFF162231);
-        int fill = Math.max(0, (int) ((width - 2) * MathHelper.clamp(progress, 0f, 1f)));
+        int fill = Math.max(0, (int) ((width - 2) * Mth.clamp(progress, 0f, 1f)));
         if (fill > 0) {
             context.fill(x + 1, y + 1, x + 1 + fill, y + height - 1, fillColor);
             // subtle top gloss on the filled region
             context.fill(x + 1, y + 1, x + 1 + fill, y + 2, applyAlpha(0xFFFFFFFF, 0.18f));
         }
-        context.drawBorder(x - 1, y - 1, width + 2, height + 2, 0xFF6A7991);
+        context.outline(x - 1, y - 1, width + 2, height + 2, 0xFF6A7991);
     }
 
-    public static void progressBar(DrawContext context, int x, int y, int width, int height, float progress) {
+    public static void progressBar(GuiGraphicsExtractor context, int x, int y, int width, int height, float progress) {
         progressBar(context, x, y, width, height, progress, SUCCESS);
     }
 
     // ---- Gem (fallback reward marker) ----------------------------------------------------
 
-    public static void gem(DrawContext context, int centerX, int centerY, int color) {
+    public static void gem(GuiGraphicsExtractor context, int centerX, int centerY, int color) {
         int shadow = darken(color, 0.45f);
         context.fill(centerX - 1, centerY - 4, centerX + 1, centerY - 2, shadow);
         context.fill(centerX - 3, centerY - 2, centerX + 3, centerY, color);
@@ -202,13 +201,13 @@ public final class CraftUI {
 
     /** Multiplies the alpha channel of an ARGB colour by {@code alpha} (0..1). */
     public static int applyAlpha(int color, float alpha) {
-        int a = (int) (((color >>> 24) & 0xFF) * MathHelper.clamp(alpha, 0f, 1f));
+        int a = (int) (((color >>> 24) & 0xFF) * Mth.clamp(alpha, 0f, 1f));
         return (a << 24) | (color & 0x00FFFFFF);
     }
 
     /** Linear blend between two ARGB colours. */
     public static int mix(int a, int b, float t) {
-        t = MathHelper.clamp(t, 0f, 1f);
+        t = Mth.clamp(t, 0f, 1f);
         int aa = (a >>> 24) & 0xFF, ar = (a >>> 16) & 0xFF, ag = (a >>> 8) & 0xFF, ab = a & 0xFF;
         int ba = (b >>> 24) & 0xFF, br = (b >>> 16) & 0xFF, bg = (b >>> 8) & 0xFF, bb = b & 0xFF;
         int ra = (int) (aa + (ba - aa) * t);
@@ -220,30 +219,31 @@ public final class CraftUI {
 
     // ---- Text helpers --------------------------------------------------------------------
 
-    public static String trimToWidth(TextRenderer tr, String text, int width) {
-        if (tr.getWidth(text) <= width) {
+    public static String trimToWidth(Font tr, String text, int width) {
+        if (tr.width(text) <= width) {
             return text;
         }
-        return tr.trimToWidth(text, Math.max(8, width - tr.getWidth("..."))) + "...";
+        return tr.plainSubstrByWidth(text, Math.max(8, width - tr.width("..."))) + "...";
     }
 
-    public static void drawWrapped(DrawContext context, TextRenderer tr, Text text,
+    public static void drawWrapped(GuiGraphicsExtractor context, Font tr, Component text,
                                    int x, int y, int width, int color, int maxLines) {
-        List<OrderedText> lines = tr.wrapLines(text, width);
+        List<FormattedCharSequence> lines = tr.split(text, width);
         int lineCount = Math.min(maxLines, lines.size());
         for (int i = 0; i < lineCount; i++) {
-            context.drawText(tr, lines.get(i), x, y + i * tr.fontHeight, color, false);
+            context.text(tr, lines.get(i), x, y + i * tr.lineHeight, color, false);
         }
     }
 
     /** Draws text centred on ({@code cx}, {@code cy}) at an arbitrary scale. */
-    public static void drawCenteredScaled(DrawContext context, TextRenderer tr, Text text,
+    public static void drawCenteredScaled(GuiGraphicsExtractor context, Font tr, Component text,
                                           int cx, int cy, float scale, int color) {
-        context.getMatrices().push();
-        context.getMatrices().translate(cx, cy, 0);
-        context.getMatrices().scale(scale, scale, 1f);
-        int w = tr.getWidth(text);
-        context.drawText(tr, text, -w / 2, -tr.fontHeight / 2, color, false);
-        context.getMatrices().pop();
+        // pose() is a 2D affine Matrix3x2fStack in 26.2 — scale/translate take two floats, not three.
+        context.pose().pushMatrix();
+        context.pose().translate(cx, cy);
+        context.pose().scale(scale, scale);
+        int w = tr.width(text);
+        context.text(tr, text, -w / 2, -tr.lineHeight / 2, color, false);
+        context.pose().popMatrix();
     }
 }

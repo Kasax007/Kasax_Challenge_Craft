@@ -9,16 +9,15 @@ import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.CraftButton;
 import net.kasax.challengecraft.network.ForceItemActionPacket;
 import net.kasax.challengecraft.network.ForceItemResultsPacket;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 @Environment(EnvType.CLIENT)
@@ -39,7 +38,7 @@ public class ForceItemResultsScreen extends Screen {
     private CraftButton continueButton;
 
     public ForceItemResultsScreen(ForceItemResultsPacket packet) {
-        super(Text.translatable("challengecraft.fib.results.title"));
+        super(Component.translatable("challengecraft.fib.results.title"));
         this.standings = packet.entries();
         this.stage = Math.max(1, packet.stage());
         this.stageStartMillis = System.currentTimeMillis();
@@ -56,7 +55,7 @@ public class ForceItemResultsScreen extends Screen {
     }
 
     @Override
-    public boolean shouldPause() {
+    public boolean isPauseScreen() {
         return false;
     }
 
@@ -84,33 +83,33 @@ public class ForceItemResultsScreen extends Screen {
     protected void init() {
         super.init();
         this.continueButton = new CraftButton(width / 2 - 60, height - 30, 120, 20,
-                Text.translatable("challengecraft.fib.results.continue"), CraftButton.Style.PRIMARY,
+                Component.translatable("challengecraft.fib.results.continue"), CraftButton.Style.PRIMARY,
                 btn -> {
                     if (stage >= standings.size()) {
-                        close();
+                        onClose();
                     } else {
                         ClientPlayNetworking.send(new ForceItemActionPacket(ForceItemActionPacket.Action.NEXT_RESULT, -1));
                     }
                 });
-        addDrawableChild(continueButton);
+        addRenderableWidget(continueButton);
     }
 
     @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         boolean done = currentEntryFullyRevealed();
         continueButton.active = done;
         continueButton.setMessage(stage >= standings.size()
-                ? Text.translatable("gui.done")
-                : Text.translatable("challengecraft.fib.results.continue"));
+                ? Component.translatable("gui.done")
+                : Component.translatable("challengecraft.fib.results.continue"));
 
-        super.render(ctx, mouseX, mouseY, delta);
+        super.extractRenderState(ctx, mouseX, mouseY, delta);
 
         int panelW = 320;
         int panelX = width / 2 - panelW / 2;
         int panelY = 20;
         int panelH = height - 60;
         CraftUI.frame(ctx, panelX - 4, panelY - 4, panelW + 8, panelH + 8);
-        ctx.drawCenteredTextWithShadow(textRenderer, title, width / 2, panelY + 8, CraftUI.TEXT_PRIMARY);
+        ctx.centeredText(font, title, width / 2, panelY + 8, CraftUI.TEXT_PRIMARY);
 
         // Already fully revealed placements, compact, worst at the bottom of the block.
         int y = panelY + 26;
@@ -120,7 +119,7 @@ public class ForceItemResultsScreen extends Screen {
             LockoutBingoTeam team = LockoutBingoTeam.fromOrdinal(entry.teamId());
             int color = team != null ? team.color() : CraftUI.TEXT_SECONDARY;
             String line = "#" + place + "  " + entry.name() + "  ·  " + entry.score() + " ✦";
-            ctx.drawText(textRenderer, Text.of(line), panelX + 10, y, color, false);
+            ctx.text(font, Component.nullToEmpty(line), panelX + 10, y, color, false);
             y += 11;
         }
 
@@ -131,17 +130,17 @@ public class ForceItemResultsScreen extends Screen {
             int itemsRevealed = currentItemsRevealed();
             if (itemsRevealed > lastSoundedItems) {
                 lastSoundedItems = itemsRevealed;
-                MinecraftClient.getInstance().getSoundManager()
-                        .play(PositionedSoundInstance.master(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
+                Minecraft.getInstance().getSoundManager()
+                        .play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP,
                                 0.9f + 0.02f * (itemsRevealed % 12)));
             }
 
             int perRow = (panelW - 20) / 18;
             for (int i = 0; i < itemsRevealed; i++) {
-                var item = Registries.ITEM.get(Identifier.of(entry.itemIds().get(i)));
+                var item = BuiltInRegistries.ITEM.getValue(Identifier.parse(entry.itemIds().get(i)));
                 int gx = panelX + 10 + (i % perRow) * 18;
                 int gy = y + (i / perRow) * 18;
-                ctx.drawItem(new ItemStack(item), gx, gy);
+                ctx.item(new ItemStack(item), gx, gy);
             }
             int rows = Math.max(1, (itemsRevealed + perRow - 1) / perRow);
             y += rows * 18 + 8;
@@ -151,21 +150,21 @@ public class ForceItemResultsScreen extends Screen {
                 boolean isWinner = place == 1;
                 LockoutBingoTeam team = LockoutBingoTeam.fromOrdinal(entry.teamId());
                 int nameColor = team != null ? team.color() : CraftUI.TEXT_PRIMARY;
-                Text reveal = Text.translatable("challengecraft.fib.results.reveal", place, entry.name(), entry.score());
+                Component reveal = Component.translatable("challengecraft.fib.results.reveal", place, entry.name(), entry.score());
                 int placeColor = isWinner
                         ? CraftUI.mix(CraftUI.GOLD, 0xFFFFFFFF, Anim.pulse(900) * 0.5f)
                         : nameColor;
-                ctx.drawCenteredTextWithShadow(textRenderer, reveal, width / 2, y, placeColor);
+                ctx.centeredText(font, reveal, width / 2, y, placeColor);
                 y += 14;
 
                 if (isWinner) {
-                    Text banner = Text.translatable("challengecraft.fib.results.winner", entry.name());
+                    Component banner = Component.translatable("challengecraft.fib.results.winner", entry.name());
                     int bannerColor = CraftUI.mix(CraftUI.GOLD, 0xFFFFFFFF, Anim.pulse(1200) * 0.6f);
-                    ctx.drawCenteredTextWithShadow(textRenderer, banner, width / 2, y, bannerColor);
+                    ctx.centeredText(font, banner, width / 2, y, bannerColor);
                 }
             } else {
-                ctx.drawCenteredTextWithShadow(textRenderer,
-                        Text.translatable("challengecraft.fib.results.revealing"),
+                ctx.centeredText(font,
+                        Component.translatable("challengecraft.fib.results.revealing"),
                         width / 2, y, CraftUI.TEXT_MUTED);
             }
         }

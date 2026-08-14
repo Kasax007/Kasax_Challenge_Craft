@@ -3,7 +3,7 @@ package net.kasax.challengecraft.challenges;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.Mth;
 
 /** Applies the configured server tick-rate multiplier and restores vanilla speed on disable. */
 public class Chal_37_GameSpeed {
@@ -16,15 +16,15 @@ public class Chal_37_GameSpeed {
     public static void register() {
         ServerTickEvents.START_SERVER_TICK.register(server -> {
             float desiredTickRate = getDesiredTickRate();
-            var tickManager = server.getTickManager();
+            var tickManager = server.tickRateManager();
 
             if (active) {
-                if (tickManager.getTickRate() != desiredTickRate || lastAppliedTickRate != desiredTickRate) {
+                if (tickManager.tickrate() != desiredTickRate || lastAppliedTickRate != desiredTickRate) {
                     tickManager.setTickRate(desiredTickRate);
                     lastAppliedTickRate = desiredTickRate;
                 }
             } else if (lastAppliedTickRate != BASE_TICK_RATE) {
-                if (tickManager.getTickRate() != BASE_TICK_RATE) {
+                if (tickManager.tickrate() != BASE_TICK_RATE) {
                     tickManager.setTickRate(BASE_TICK_RATE);
                 }
                 lastAppliedTickRate = BASE_TICK_RATE;
@@ -34,7 +34,7 @@ public class Chal_37_GameSpeed {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
                 server.execute(() -> {
                     if (active) {
-                        server.getTickManager().sendPackets(handler.player);
+                        server.tickRateManager().updateJoiningPlayer(handler.player);
                     }
                 })
         );
@@ -56,7 +56,7 @@ public class Chal_37_GameSpeed {
     }
 
     public static void setMultiplier(int mult) {
-        multiplier = MathHelper.clamp(mult, 1, 10);
+        multiplier = Mth.clamp(mult, 1, 10);
     }
 
     private static float getDesiredTickRate() {

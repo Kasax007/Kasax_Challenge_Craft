@@ -1,15 +1,15 @@
 package net.kasax.challengecraft.network;
 
 import net.kasax.challengecraft.ChallengeCraft;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.codec.PacketDecoder;
-import net.minecraft.network.codec.ValueFirstEncoder;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.StreamDecoder;
+import net.minecraft.network.codec.StreamMemberEncoder;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Client action from the Force Item Battle UI (team join/leave, sync request, joker). */
-public class ForceItemActionPacket implements CustomPayload {
+public class ForceItemActionPacket implements CustomPacketPayload {
     public enum Action {
         JOIN_TEAM,
         LEAVE_TEAM,
@@ -20,20 +20,20 @@ public class ForceItemActionPacket implements CustomPayload {
         NEXT_RESULT
     }
 
-    public static final Id<ForceItemActionPacket> ID =
-            new Id<>(Identifier.of(ChallengeCraft.MOD_ID, "force_item_action"));
+    public static final Type<ForceItemActionPacket> ID =
+            new Type<>(Identifier.fromNamespaceAndPath(ChallengeCraft.MOD_ID, "force_item_action"));
 
-    public static final PacketCodec<PacketByteBuf, ForceItemActionPacket> CODEC = CustomPayload.codecOf(
-            new ValueFirstEncoder<>() {
+    public static final StreamCodec<FriendlyByteBuf, ForceItemActionPacket> CODEC = CustomPacketPayload.codec(
+            new StreamMemberEncoder<>() {
                 @Override
-                public void encode(ForceItemActionPacket packet, PacketByteBuf buf) {
+                public void encode(ForceItemActionPacket packet, FriendlyByteBuf buf) {
                     buf.writeVarInt(packet.action.ordinal());
                     buf.writeVarInt(packet.teamId);
                 }
             },
-            new PacketDecoder<>() {
+            new StreamDecoder<>() {
                 @Override
-                public ForceItemActionPacket decode(PacketByteBuf buf) {
+                public ForceItemActionPacket decode(FriendlyByteBuf buf) {
                     Action action = Action.values()[buf.readVarInt()];
                     int teamId = buf.readVarInt();
                     return new ForceItemActionPacket(action, teamId);
@@ -58,7 +58,7 @@ public class ForceItemActionPacket implements CustomPayload {
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

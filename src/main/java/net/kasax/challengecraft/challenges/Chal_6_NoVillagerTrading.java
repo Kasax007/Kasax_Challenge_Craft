@@ -2,10 +2,8 @@ package net.kasax.challengecraft.challenges;
 
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.MerchantScreenHandler;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.npc.villager.Villager;
 
 /** Prevents players from opening villager trades while the challenge is active. */
 public class Chal_6_NoVillagerTrading {
@@ -18,10 +16,10 @@ public class Chal_6_NoVillagerTrading {
 
     public static void register() {
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
-            if (isActive() && entity instanceof VillagerEntity) {
-                return ActionResult.FAIL;
+            if (isActive() && entity instanceof Villager) {
+                return InteractionResult.FAIL;
             }
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 

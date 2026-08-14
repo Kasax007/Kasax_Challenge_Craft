@@ -1,9 +1,9 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_41_NoJumping;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -21,21 +21,21 @@ public abstract class NoJumpingMixin {
      * flag is synced to clients via ChallengeSyncPacket, so isActive() is correct here on
      * either side.
      */
-    @Inject(method = "jump", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "jumpFromGround", at = @At("HEAD"), cancellable = true)
     private void onJump(CallbackInfo ci) {
         if (!Chal_41_NoJumping.isActive()) {
             return;
         }
 
         LivingEntity self = (LivingEntity) (Object) this;
-        if (!(self instanceof PlayerEntity player) || player.isCreative() || player.isSpectator()) {
+        if (!(self instanceof Player player) || player.isCreative() || player.isSpectator()) {
             return;
         }
 
         ci.cancel();
         // Only the server copy messages, so singleplayer doesn't show it twice.
-        if (player instanceof ServerPlayerEntity serverPlayer) {
-            serverPlayer.sendMessage(Chal_41_NoJumping.BLOCKED_MESSAGE, true);
+        if (player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.sendOverlayMessage(Chal_41_NoJumping.BLOCKED_MESSAGE);
         }
     }
 }

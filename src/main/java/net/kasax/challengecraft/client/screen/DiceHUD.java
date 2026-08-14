@@ -6,15 +6,15 @@ import net.kasax.challengecraft.challenges.Chal_46_Dice;
 import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.ui.HudCard;
 import net.kasax.challengecraft.item.ModItems;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 
 @Environment(EnvType.CLIENT)
 /** HUD card showing how many blocks of movement the local player has left. */
 public class DiceHUD {
     public static HudCard buildCard() {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (!Chal_46_Dice.isActive() || client.player == null) {
             return null;
         }
@@ -23,12 +23,12 @@ public class DiceHUD {
         int lastRoll = DiceClientState.getLastRoll();
         boolean rolling = DiceClientState.isRolling();
 
-        Text title = rolling
-                ? Text.translatable("challengecraft.dice.hud_rolling")
-                : Text.translatable("challengecraft.dice.hud_title");
+        Component title = rolling
+                ? Component.translatable("challengecraft.dice.hud_rolling")
+                : Component.translatable("challengecraft.dice.hud_title");
 
         // One decimal: the budget drains continuously, so a bare integer would look frozen.
-        Text value = rolling ? Text.of("...") : Text.of(String.format("%.1f", remaining));
+        Component value = rolling ? Component.nullToEmpty("...") : Component.nullToEmpty(String.format("%.1f", remaining));
 
         int accent = remaining <= 0f && !rolling ? CraftUI.DANGER : CraftUI.GOLD;
         float progress = lastRoll > 0 ? Math.min(1f, remaining / lastRoll) : 0f;

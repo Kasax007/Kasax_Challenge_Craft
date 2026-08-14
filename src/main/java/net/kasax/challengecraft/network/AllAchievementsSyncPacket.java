@@ -1,13 +1,13 @@
 package net.kasax.challengecraft.network;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 /** Incremental HUD sync for the current advancement target. */
-public class AllAchievementsSyncPacket implements CustomPayload {
-    public static final Id<AllAchievementsSyncPacket> ID = new Id<>(Identifier.of("challengecraft", "all_achievements_sync"));
+public class AllAchievementsSyncPacket implements CustomPacketPayload {
+    public static final Type<AllAchievementsSyncPacket> ID = new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "all_achievements_sync"));
 
     public final AdvancementInfo currentAdvancement;
     public final int currentIndex;
@@ -19,7 +19,7 @@ public class AllAchievementsSyncPacket implements CustomPayload {
         this.total = total;
     }
 
-    public static final PacketCodec<RegistryByteBuf, AllAchievementsSyncPacket> CODEC = PacketCodec.of(
+    public static final StreamCodec<RegistryFriendlyByteBuf, AllAchievementsSyncPacket> CODEC = StreamCodec.ofMember(
             (pkt, buf) -> {
                 buf.writeBoolean(pkt.currentAdvancement != null);
                 if (pkt.currentAdvancement != null) {
@@ -39,7 +39,7 @@ public class AllAchievementsSyncPacket implements CustomPayload {
     );
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }
