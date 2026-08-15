@@ -95,6 +95,17 @@ public class LevelingScreen extends Screen {
     private Button editLayoutButton;
     private Button resetLayoutButton;
     private LayoutModeWidget layoutModeButton;
+
+    /**
+     * The Journey/Legacy toggle, for code that needs to point at it.
+     *
+     * <p>Exposed because the widget's message is {@link Component#empty()} — "Journey" and "Legacy"
+     * are painted inside its draw method — so nothing can find it by label. The tutorial step that
+     * explains the toggle was looking for that text, found nothing, and highlighted nothing.
+     */
+    public net.minecraft.client.gui.components.AbstractWidget getLayoutModeButton() {
+        return this.layoutModeButton;
+    }
     private boolean draggingRadarThumb;
     private int radarRailY;
     private int radarViewportHeight;

@@ -162,8 +162,10 @@ public final class TutorialManager {
                 "challengecraft.tutorial.progress.title",
                 List.of("challengecraft.tutorial.progress.body1", "challengecraft.tutorial.progress.body2")));
 
+        // Asked for by the screen, not by label: the toggle draws its own "Journey"/"Legacy" text
+        // and carries an empty message, so no label search can ever match it.
         s.add(TutorialStep.explain("layout_toggle", ON_LEVELING,
-                byLabel("journey", "legacy"),
+                screen -> screen instanceof LevelingScreen ls ? ls.getLayoutModeButton() : null,
                 "challengecraft.tutorial.toggle.title",
                 List.of("challengecraft.tutorial.toggle.body")));
 
@@ -267,8 +269,26 @@ public final class TutorialManager {
         TutorialState.setStep(TutorialState.getStep() + 1);
     }
 
+    /** Steps already reported as unresolvable, so the warning below fires once each, not per frame. */
+    private static final java.util.Set<String> WARNED_MISSING_TARGET = new java.util.HashSet<>();
+
     public static AbstractWidget resolveTarget(TutorialStep step, Screen screen) {
-        return step.target() == null ? null : step.target().apply(screen);
+        if (step.target() == null) return null;   // deliberately targetless step
+
+        AbstractWidget found = step.target().apply(screen);
+        if (found == null && WARNED_MISSING_TARGET.add(step.id())) {
+            // A step that wants to point at something and cannot is invisible to the player: the
+            // card still appears, just with no highlight, which reads as "the tutorial is broken"
+            // rather than "a locator stopped matching". It has happened twice — both times a widget
+            // that paints its own text and carries an empty message, so a by-label search could
+            // never match it — and both times it took a bug report to notice. Now it says so.
+            ChallengeCraft.LOGGER.warn(
+                    "[Tutorial] Step '{}' could not find the widget it points at on {}. "
+                    + "The card will show without a highlight. If the target draws its own text, "
+                    + "locate it by type or via an accessor rather than by label.",
+                    step.id(), screen.getClass().getSimpleName());
+        }
+        return found;
     }
 
     /**

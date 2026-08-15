@@ -46,3 +46,6 @@ replay_*.log
 
 # Fabric Loom remapped-sources output
 /remappedSrc/
+/graphify-out/
+/DESCRIPTION_MOD.md
+/DESCRIPTION_MODPACK.md
