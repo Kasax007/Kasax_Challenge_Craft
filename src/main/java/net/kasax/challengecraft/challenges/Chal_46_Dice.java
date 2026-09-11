@@ -47,6 +47,19 @@ public class Chal_46_Dice {
     private static final Map<UUID, Double> SERVER_BUDGET = new HashMap<>();
     private static final Map<UUID, Integer> LAST_ROLL = new HashMap<>();
     private static final Map<UUID, Integer> IN_FLIGHT = new HashMap<>();
+    /** Server tick at which a throw stops counting as in flight. See {@link #pruneStaleThrow}. */
+    private static final Map<UUID, Long> IN_FLIGHT_DEADLINE = new HashMap<>();
+
+    /**
+     * How long a die may be airborne before the throw is written off.
+     *
+     * <p>A settling die takes a couple of seconds; ten is far past any legitimate roll and well
+     * short of being noticeable as a wait. The cap exists because {@code IN_FLIGHT} is only cleared
+     * by the die itself — if the entity disappears another way (chunk unloaded, {@code /kill @e},
+     * dropped into the void, removed by another mod) the entry would survive forever and the player
+     * could never roll again. That is a soft-lock with no way out, and it happened.
+     */
+    private static final long THROW_TIMEOUT_TICKS = 200L;
     private static final Map<UUID, Vec3> LAST_POS = new HashMap<>();
     /** Where an out-of-budget player is held. */
     private static final Map<UUID, Vec3> ANCHOR = new HashMap<>();
@@ -121,6 +134,7 @@ public class Chal_46_Dice {
             SERVER_BUDGET.clear();
             LAST_ROLL.clear();
             IN_FLIGHT.clear();
+            IN_FLIGHT_DEADLINE.clear();
             LAST_POS.clear();
             ANCHOR.clear();
             SNAP_COOLDOWN.clear();
@@ -164,6 +178,32 @@ public class Chal_46_Dice {
 
     public static void clearInFlight(UUID player) {
         IN_FLIGHT.remove(player);
+        IN_FLIGHT_DEADLINE.remove(player);
+    }
+
+    /**
+     * Drops a throw that can no longer finish, silently.
+     *
+     * <p>Two ways out: the deadline passes, or the die entity is simply gone from the world. Either
+     * way the player just gets to roll again — deliberately with no message, because from their side
+     * nothing happened that they did or could have avoided, and "your roll was voided" reads as a
+     * punishment for a bug.
+     */
+    private static void pruneStaleThrow(ServerPlayer player, UUID uuid) {
+        Integer dieId = IN_FLIGHT.get(uuid);
+        if (dieId == null) return;
+
+        long deadline = IN_FLIGHT_DEADLINE.getOrDefault(uuid, 0L);
+        boolean expired = player.level().getGameTime() > deadline;
+        boolean gone = !(player.level() instanceof ServerLevel world)
+                || world.getEntity(dieId) == null;
+
+        if (expired || gone) {
+            clearInFlight(uuid);
+            ChallengeCraft.LOGGER.info("[Dice] Wurf von {} verworfen ({}), erneutes Würfeln möglich",
+                    player.getName().getString(), expired ? "Zeitüberschreitung" : "Würfel verschwunden");
+            sync(player);
+        }
     }
 
     // ---- throwing ------------------------------------------------------------------------------
@@ -185,6 +225,7 @@ public class Chal_46_Dice {
         world.addFreshEntity(die);
 
         IN_FLIGHT.put(player.getUUID(), die.getId());
+        IN_FLIGHT_DEADLINE.put(player.getUUID(), world.getGameTime() + THROW_TIMEOUT_TICKS);
         player.level().playSound(null, player.getX(), player.getY(), player.getZ(),
                 SoundEvents.ITEM_PICKUP, net.minecraft.sounds.SoundSource.PLAYERS,
                 0.4f, 1.6f);
@@ -203,9 +244,10 @@ public class Chal_46_Dice {
         clearInFlight(uuid);
         ANCHOR.put(uuid, player.position());
         SNAP_COOLDOWN.remove(uuid);
-        // Drop the freeze immediately rather than letting it tick out — the player should be able
-        // to walk the instant the die stops. (Heavy Pockets re-applies its own Slowness next tick
-        // if that challenge is also running, so clearing here is safe.)
+        // The freeze no longer uses a status effect, but a world saved by an older build can still
+        // carry the old amplifier-6 Slowness, and it would keep ticking forever because nothing
+        // refreshes or clears it any more. Amplifier 6 was only ever ours — Heavy Pockets tops out
+        // at 5 — so clearing it here migrates those worlds and touches nothing else.
         MobEffectInstance slowness = player.getEffect(MobEffects.SLOWNESS);
         if (slowness != null && slowness.getAmplifier() >= 6) {
             player.removeEffect(MobEffects.SLOWNESS);
@@ -225,6 +267,8 @@ public class Chal_46_Dice {
             LAST_POS.put(uuid, player.position());
             return;
         }
+
+        pruneStaleThrow(player, uuid);
 
         Vec3 now = player.position();
         Vec3 last = LAST_POS.get(uuid);
@@ -267,11 +311,22 @@ public class Chal_46_Dice {
         if (player.isFallFlying()) {
             player.stopFallFlying();
         }
-        // Belt-and-braces on top of the mixin (kills residual momentum / ice sliding): amplifier 6
-        // is -1.05 speed, i.e. clamped to 0. Duration is deliberately only 3 ticks and refreshed
-        // every tick — a longer one keeps ticking after the budget is restored and the player
-        // stays frozen for the remainder, which feels awful right after a roll lands.
-        player.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 3, 6, false, false, false));
+        // Kills residual momentum and ice sliding directly instead of through a status effect.
+        //
+        // This used to be Slowness at amplifier 6. It worked, but Minecraft derives the field of
+        // view from movement speed — `modifier *= (speed / walkingSpeed + 1) / 2` — so a speed of
+        // zero halved the FOV and the view snapped inward every time the budget ran out, which is
+        // most of this challenge. Zeroing the velocity has exactly the same effect on movement and
+        // none at all on the camera. It also leaves the potion HUD alone, so nothing looks like a
+        // debuff the player could cure.
+        //
+        // Vertical velocity is deliberately preserved: falling still has to work, and the challenge
+        // only ever counted horizontal distance anyway.
+        Vec3 velocity = player.getDeltaMovement();
+        if (velocity.x != 0.0 || velocity.z != 0.0) {
+            player.setDeltaMovement(0.0, velocity.y, 0.0);
+            player.hurtMarked = true;   // forces the change down to the client, which owns its own position
+        }
 
         Vec3 anchor = ANCHOR.get(uuid);
         if (anchor == null) {

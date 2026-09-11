@@ -22,6 +22,16 @@ public class ChallengeCraftClient implements ClientModInitializer {
     public static int SELECTED_MOB_HEALTH_MULTIPLIER = 1;
     public static int SELECTED_DOUBLE_TROUBLE_MULTIPLIER = 2;
     public static int SELECTED_GAME_SPEED_MULTIPLIER = 1;
+    /**
+     * Rotation index when the world being created is today's daily, else -1.
+     *
+     * <p>Travels with the other SELECTED_* values because world creation has <b>no server
+     * connection yet</b> — {@code CreateWorldScreenMixin} only sends its packet when one exists, so
+     * at creation time these statics are the only channel. Sending the index by packet alone was
+     * why the finished daily never showed up as one on the summary card.
+     */
+    public static int SELECTED_DAILY_INDEX = -1;
+
     public static int SELECTED_FIB_MINUTES = 60;
     /** World-creation selections are cached until the integrated server starts. */
     public static List<Integer> LAST_CHOSEN = Collections.emptyList();
@@ -82,11 +92,16 @@ public class ChallengeCraftClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+
+
         TimerOverlay.register();
       		ChallengeSyncHandler.register();
       		LevelSyncHandler.register();
       		StatsSyncHandler.register();
         net.kasax.challengecraft.network.EnderDragonDefeatHandler.register();
+        net.kasax.challengecraft.network.RunSummaryHandler.register();
+        // Registers our render pipeline with Iris before anything draws on it.
+        net.kasax.challengecraft.client.ShaderCompat.registerPipelines();
         ChallengeRewardOverlay.register();
 
         // Objective HUDs share one auto-laid-out stack (row 0), the target HUD sits below (row 1).
@@ -101,6 +116,10 @@ public class ChallengeCraftClient implements ClientModInitializer {
                 net.kasax.challengecraft.client.render.DiceEntityRenderer::new);
 
         registerTutorial();
+
+        // Sodium ersetzt den Video-Screen; der Mixin allein erreicht ihn nicht.
+
+        net.kasax.challengecraft.client.TimerSettingsEntry.register();
 
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllItemsHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllEntitiesHUD::buildCard, 0);
@@ -150,6 +169,9 @@ public class ChallengeCraftClient implements ClientModInitializer {
             PLAYER_XP_MAP.clear();
             LOCAL_PLAYER_XP = 0;
             LockoutBingoClientState.clear();
+            // A card from the previous world must not pop up in the next one — client statics
+            // survive the world change, the run they describe does not.
+            net.kasax.challengecraft.network.RunSummaryHandler.reset();
             // Ordered-progress HUDs keep their counters in statics. Leaving a world must drop them,
             // or a save-and-restart shows the previous world's progress until the new world's first
             // progress packet lands — which reads exactly like the restart failed to reset anything.

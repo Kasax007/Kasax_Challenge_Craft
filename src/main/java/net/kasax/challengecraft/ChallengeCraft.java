@@ -90,6 +90,9 @@ public class ChallengeCraft implements ModInitializer {
 		// Registering an entity type obliges the client to register a renderer for it —
 		// see ChallengeCraftClient, or a dev client crashes on resource reload.
 		net.kasax.challengecraft.entity.ModEntities.initialize();
+		// The daily rotation is hand-maintained, so a bad edit is a typo, not a code path. Checking
+		// it at boot turns "one day in three weeks silently does nothing" into a line in the log.
+		net.kasax.challengecraft.daily.DailyChallenges.validateAndLog();
 		ChallengeManager.register();
 		Chal_1_LevelItem.register();
 		Chal_5_NoRegen.register();
@@ -119,6 +122,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_45_ForceItemBattle.register();
 		net.kasax.challengecraft.challenges.Chal_46_Dice.register();
 		net.kasax.challengecraft.data.BlockSurvey.register();
+		net.kasax.challengecraft.daily.SeedProbe.register();
 		net.kasax.challengecraft.data.RegistryIdAudit.register();
 		LevelXpListener.register();
 		net.kasax.challengecraft.block.InfiniteChestRegistry.initialize();
@@ -491,6 +495,10 @@ public class ChallengeCraft implements ModInitializer {
 		PayloadTypeRegistry.clientboundPlay().register(
 				ChallengeRewardPacket.ID,
 				ChallengeRewardPacket.CODEC
+		);
+		PayloadTypeRegistry.clientboundPlay().register(
+				net.kasax.challengecraft.network.RunSummaryPacket.ID,
+				net.kasax.challengecraft.network.RunSummaryPacket.CODEC
 		);
 		PayloadTypeRegistry.clientboundPlay().register(
 				net.kasax.challengecraft.network.AllEntitiesListPacket.ID,

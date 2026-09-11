@@ -33,6 +33,16 @@ public abstract class TitleScreenMixin extends Screen {
         this.addRenderableWidget(new AnimatedLevelButton(x, y, 200, 20, Component.translatable("challengecraft.mainmenu.leveling_button"), button -> {
             this.minecraft.setScreenAndShow(new LevelingScreen(this));
         }));
+
+        // Today's daily, to the right of the button column. This is the only place a player ever
+        // finds out dailies exist — behind a menu or a command nobody would.
+        var card = new net.kasax.challengecraft.client.widget.DailyCardWidget(
+                x + 200 + 12, y);
+        // Only when it actually fits: on a narrow window it would sit over the buttons or run off
+        // the edge, and a menu that breaks at 4x GUI scale is worse than one without a card.
+        if (card.getX() + net.kasax.challengecraft.client.widget.DailyCardWidget.WIDTH <= this.width - 4) {
+            this.addRenderableWidget(card);
+        }
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)

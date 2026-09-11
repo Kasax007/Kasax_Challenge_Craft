@@ -147,13 +147,26 @@ public class Chal_26_AllAchievements {
         if (data.getActive().contains(22) && data.getAllItemsIndex() < data.getAllItemsOrder().size()) return;
         if (data.getActive().contains(23) && data.getAllEntitiesIndex() < data.getAllEntitiesOrder().size()) return;
 
-        for (int cid : data.getActive()) {
-            eligiblePlayers.forEach(p -> {
-                // The world's run clock, not this player's play time: a friend invited a minute
-                // before the finish must record the run's real duration, not their own.
-                int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
-                StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
-            });
+        // Asked BEFORE the record loop below: afterwards the stored best is this very run, so the
+        // comparison would be against itself and always answer "no".
+        final int summaryTicks = ChallengeTimeUtil.getDisplayRunTicks(server);
+        final java.util.Map<java.util.UUID, Boolean> summaryNewBest = new java.util.HashMap<>();
+        eligiblePlayers.forEach(p -> summaryNewBest.put(p.getUUID(),
+                net.kasax.challengecraft.network.RunSummary.isNewBest(p, data.getActive(), summaryTicks)));
+
+        // A daily records only its own time, never a per-challenge record. Its ruleset is handed to
+        // you, often with challenges you have never chosen and may not even have unlocked — banking
+        // a "personal best" for those would poison the real leaderboard with times you never set
+        // under your own terms.
+        if (!data.isDailyRun()) {
+            for (int cid : data.getActive()) {
+                eligiblePlayers.forEach(p -> {
+                    // The world's run clock, not this player's play time: a friend invited a minute
+                    // before the finish must record the run's real duration, not their own.
+                    int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
+                    StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
+                });
+            }
         }
 
         double difficulty = data.isTainted() ? 0 : data.getInitialDifficulty();
@@ -164,6 +177,10 @@ public class Chal_26_AllAchievements {
                 LevelManager.XpResult res = LevelManager.addXp(p, xpAmount);
                 data.setXpAwarded(p.getUUID(), true);
                 ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, true));
+                net.kasax.challengecraft.network.RunSummary.sendTimed(p,
+                        net.kasax.challengecraft.network.RunSummaryPacket.Kind.ALL_ADVANCEMENTS,
+                        data, res.actualAmount, res.oldXp, res.newXp,
+                        summaryNewBest.getOrDefault(p.getUUID(), false));
                 
                 p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
             });

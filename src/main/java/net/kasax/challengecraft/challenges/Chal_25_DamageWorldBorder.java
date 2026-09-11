@@ -10,6 +10,9 @@ public class Chal_25_DamageWorldBorder {
     private static boolean active = false;
     private static double currentDiameter = 2.0;
 
+    /** Vanilla's own ceiling ({@code WorldBorder.MAX_SIZE}); anything past it is nonsense anyway. */
+    private static final double MAX_DIAMETER = net.minecraft.world.level.border.WorldBorder.MAX_SIZE;
+
     public static void register() {
         ServerTickEvents.END_LEVEL_TICK.register((world) -> {
             if (!active) return;
@@ -46,8 +49,24 @@ public class Chal_25_DamageWorldBorder {
         return currentDiameter;
     }
 
+    /**
+     * Keeps a diameter inside what a world border can actually be.
+     *
+     * <p>{@code /kill} and the void deal {@code Float.MAX_VALUE}, and that used to be added to the
+     * diameter unfiltered — 3.4e38, an overflowing lerp duration, and a border that turned green and
+     * never moved again. The damage side is capped where it happens; this is the second net, and it
+     * also <b>repairs saves that were already poisoned</b>, because every load path runs through
+     * here.
+     */
+    public static double clampDiameter(double diameter) {
+        if (!Double.isFinite(diameter)) {
+            return 2.0;
+        }
+        return Math.max(2.0, Math.min(diameter, MAX_DIAMETER));
+    }
+
     public static void setDiameter(double diameter) {
-        currentDiameter = Math.max(2.0, diameter);
+        currentDiameter = clampDiameter(diameter);
     }
 
     public static void updateWorldBorder(ServerLevel world) {

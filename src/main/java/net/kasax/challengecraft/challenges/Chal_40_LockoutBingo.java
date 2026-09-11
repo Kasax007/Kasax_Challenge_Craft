@@ -1248,6 +1248,15 @@ public final class Chal_40_LockoutBingo {
             if (onlinePlayer != null) {
                 LevelManager.XpResult result = LevelManager.addXp(onlinePlayer, xpAmount);
                 ServerPlayNetworking.send(onlinePlayer, new ChallengeRewardPacket(result.oldXp, result.newXp, result.actualAmount, false));
+                // Everyone who took part gets a card with their own result, not just the winners:
+                // a second place is worth sharing, and a card only for the winner reads as a snub.
+                net.kasax.challengecraft.network.RunSummary.sendCompetitive(onlinePlayer,
+                        net.kasax.challengecraft.network.RunSummaryPacket.Kind.LOCKOUT_BINGO,
+                        net.kasax.challengecraft.data.ChallengeSavedData.get(server.overworld()),
+                        result.actualAmount, result.oldXp, result.newXp,
+                        winner == null ? "" : winner.displayName().getString(),
+                        team == winner ? 1 : 2,
+                        (int) data.getTeamAssignments().values().stream().distinct().count());
             } else {
                 XpManager.addXp(uuid, xpAmount);
             }

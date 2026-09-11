@@ -196,7 +196,39 @@ public class ChallengeTab extends GridLayoutTab {
         // Pinned info bar showing difficulty + projected XP payout at the top of the tab.
         this.infoBar = new DifficultyBar();
 
+        applyDailyLockIfArmed();
         updateDifficultyText();
+    }
+
+    /**
+     * Pre-fills and freezes the tab when the player came here through the daily card.
+     *
+     * <p>Every card stays visible and readable — the daily's are switched on, the rest are switched
+     * off, and none of them respond to a click. Hiding the others would make the tab look broken;
+     * showing them locked makes it obvious that today's ruleset is fixed and what it consists of.
+     * The sliders go with them, because a daily whose mob health you can dial down is not the same
+     * run for everyone.
+     */
+    private void applyDailyLockIfArmed() {
+        var entry = net.kasax.challengecraft.client.DailyClientState.entry();
+        if (entry == null) return;
+
+        for (int i = 0; i < IDS.size(); i++) {
+            ChallengeCardWidget card = cards.get(i);
+            card.setActive(entry.challengeIds().contains(IDS.get(i)));
+            card.setRuleLocked(true);
+        }
+        // Perks are off for a daily: they differ per player and would make times incomparable.
+        for (ChallengeCardWidget perkCard : perkCards) {
+            perkCard.setActive(false);
+            perkCard.setRuleLocked(true);
+        }
+        if (maxHealthSlider != null) maxHealthSlider.active = false;
+        if (inventorySlider != null) inventorySlider.active = false;
+        if (mobHealthSlider != null) mobHealthSlider.active = false;
+        if (doubleTroubleSlider != null) doubleTroubleSlider.active = false;
+        if (gameSpeedSlider != null) gameSpeedSlider.active = false;
+        if (fibMinutesSlider != null) fibMinutesSlider.active = false;
     }
 
     private void updateDifficultyText() {
@@ -255,6 +287,21 @@ public class ChallengeTab extends GridLayoutTab {
         int x1 = x0 + cardW + spacing;
         int col = 0;
         int y = listY + 4;
+
+        // When the player came here through the daily card, the tab has to SAY so. Everything below
+        // is pre-ticked and frozen, and at low levels the untaken cards additionally render as
+        // level-locked — without this header the screen reads as "nothing is selected and most of
+        // it is unavailable", which is the opposite of what happened.
+        if (net.kasax.challengecraft.client.DailyClientState.isArmed()) {
+            var header = new net.kasax.challengecraft.client.widget.DailyCardWidget(
+                            x0, y, panelW - 16, () -> { })
+                    .withSelected(() -> true);
+            // Read-only here. The choice was made on the title screen; this only reports it, and
+            // the icons still answer "which challenges am I actually getting" on hover.
+            header.active = false;
+            scrollPanel.addChild(header);
+            y += net.kasax.challengecraft.client.widget.DailyCardWidget.HEIGHT + spacing + 4;
+        }
 
         for (int i = 0; i < IDS.size(); i++) {
             int id = IDS.get(i);

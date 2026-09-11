@@ -561,8 +561,48 @@ public class Chal_45_ForceItemBattle {
             data.setResultsAwarded(true);
         }
 
+        sendRunSummaries(server, data, standings);
+
         ceremonyStage = 1;
         broadcastResults(server, standings);
+    }
+
+    /**
+     * Hands every participant a summary card carrying their own placement.
+     *
+     * <p>Force Item Battle is one of the six ways a run can finish, and the only completion signal
+     * it has is this ceremony — there is no dragon and no collection goal, so without this hook a
+     * finished battle would produce no card at all.
+     */
+    private static void sendRunSummaries(MinecraftServer server, ForceItemBattleSavedData data,
+                                         List<ForceItemResultsPacket.Entry> standings) {
+        if (standings.isEmpty()) return;
+        boolean eligible = !data.isDebugRun() && data.getScores().size() >= 2;
+        int best = standings.get(0).score();
+        net.kasax.challengecraft.data.ChallengeSavedData shared =
+                net.kasax.challengecraft.data.ChallengeSavedData.get(server.overworld());
+
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            int placement = 0;
+            for (int i = 0; i < standings.size(); i++) {
+                ForceItemResultsPacket.Entry e = standings.get(i);
+                boolean mine = e.teamId() >= 0
+                        ? e.teamId() == orDefault(data.getTeamOrdinal(player.getUUID()))
+                        : e.name().equals(player.getName().getString());
+                if (mine) {
+                    placement = i + 1;
+                    break;
+                }
+            }
+            if (placement == 0) continue;   // spectator or never joined the battle
+
+            long prize = (eligible && standings.get(placement - 1).score() == best) ? 100L : 0L;
+            long total = net.kasax.challengecraft.data.XpManager.getXp(player.getUUID());
+            net.kasax.challengecraft.network.RunSummary.sendCompetitive(player,
+                    net.kasax.challengecraft.network.RunSummaryPacket.Kind.FORCE_ITEM_BATTLE,
+                    shared, prize, total - prize, total,
+                    standings.get(0).name(), placement, standings.size());
+        }
     }
 
     /** Continue button (any player): advance the synced ceremony to the next placement. */

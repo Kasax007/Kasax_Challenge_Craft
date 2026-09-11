@@ -151,7 +151,21 @@ public abstract class MovementAndDamageMixin {
             }
             if (Chal_25_DamageWorldBorder.isActive()) {
                 double current = Chal_25_DamageWorldBorder.getDiameter();
-                double next = current + amount;
+                // `/kill` and the void deal Float.MAX_VALUE. Added raw, that pushed the diameter to
+                // 3.4e38, made the lerp duration overflow to effectively forever, and persisted the
+                // ruined value — the border turned green and never moved again, which is exactly
+                // what the challenge looked like after one `/kill`.
+                //
+                // What counts is damage that could actually have been dealt to this player, so a
+                // single event contributes at most their maximum health. That also keeps the Max
+                // Health Modifier meaningful instead of hard-coding twenty.
+                float counted = amount;
+                if (!Float.isFinite(counted) || counted < 0f) {
+                    counted = 0f;
+                }
+                counted = Math.min(counted, player.getMaxHealth());
+
+                double next = Chal_25_DamageWorldBorder.clampDiameter(current + counted);
                 Chal_25_DamageWorldBorder.setDiameter(next);
 
                 player.level().getServer().getAllLevels().forEach(w -> {
@@ -163,7 +177,10 @@ public abstract class MovementAndDamageMixin {
                         // MovingBorderExtent no longer references System.currentTimeMillis at all,
                         // and vanilla seeds it from levelData.getGameTime(). Keeping the old *1000
                         // would have stretched one second of growth into fifty.
-                        w.getWorldBorder().lerpSizeBetween(currentSize, next, (long)((next - currentSize) * 20), w.getGameTime());
+                        // Duration is capped as well: without it a single large jump produced a
+                        // multi-minute crawl that reads as a frozen border rather than growth.
+                        long ticks = (long) Math.min(200.0, Math.max(1.0, (next - currentSize) * 20.0));
+                        w.getWorldBorder().lerpSizeBetween(currentSize, next, ticks, w.getGameTime());
                     } else {
                         w.getWorldBorder().setSize(next);
                     }

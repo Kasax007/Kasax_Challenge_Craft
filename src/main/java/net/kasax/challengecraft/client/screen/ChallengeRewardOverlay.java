@@ -32,6 +32,16 @@ public class ChallengeRewardOverlay {
         HudElementRegistry.addLast(HUD_ELEMENT_ID, (context, tickCounter) -> render(context, 0.0f));
     }
 
+    /**
+     * Whether the reward animation is still on screen, including its lead-in delay.
+     *
+     * <p>The run-summary card waits for this: opening a full screen over a running XP animation
+     * would hide the very thing it is celebrating.
+     */
+    public static boolean isPlaying() {
+        return startTime != -1 && System.currentTimeMillis() < startTime + DURATION_MS;
+    }
+
     public static void start(long oldXpVal, long newXpVal, long gain, boolean gameComp) {
         startTime = System.currentTimeMillis() + DELAY_MS;
         xpGained = gain;

@@ -95,6 +95,13 @@ public final class DiceReachRenderer {
             }
             if (EDGES.isEmpty()) return;
 
+            // Iris looks its render programs up by pipeline and has none for debug pipelines, so
+            // this used to make it log "Missing program minecraft:pipeline/debug_quads in override
+            // list". ShaderCompat registers DEBUG_QUADS as IrisProgram.BASIC at startup, which is
+            // Iris's own answer to exactly this. Only if that registration did not take does the
+            // ring step aside, and only while a pack is running.
+            if (!net.kasax.challengecraft.client.ShaderCompat.canDrawDebugPipeline()) return;
+
             // 26.2: the camera lives on the render state, and geometry is SUBMITTED rather than
             // written straight into a buffer. ShapeRenderer is gone with no replacement, so the
             // quads are emitted by hand — each edge is a single upward-facing quad, exactly what

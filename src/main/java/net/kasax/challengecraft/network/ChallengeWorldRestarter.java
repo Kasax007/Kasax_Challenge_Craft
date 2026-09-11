@@ -93,6 +93,12 @@ public class ChallengeWorldRestarter {
             Path worldDir = server.getWorldPath(LevelResource.ROOT);
             Files.writeString(worldDir.resolve("challengecraft_restart_pending"), "true");
             LOGGER.info("Created restart flag file in {}", worldDir);
+            // A dedicated server restarts its process, so the in-memory forced seed would be lost.
+            // It travels on disk next to the flag that triggers the restart in the first place.
+            if (forcedSeed != null) {
+                Files.writeString(worldDir.resolve(FORCED_SEED_FILE), Long.toString(forcedSeed));
+                LOGGER.info("Parked forced seed {} for the next process", forcedSeed);
+            }
         } catch (IOException e) {
             LOGGER.error("Failed to create restart flag file!", e);
         }
@@ -180,6 +186,49 @@ public class ChallengeWorldRestarter {
         }
     }
 
+    /**
+     * A seed the next restart must use instead of a random one, or null for the normal behaviour.
+     *
+     * <p>Set by the daily challenge so every player worldwide gets the same terrain and their times
+     * are actually comparable. Consumed on use: a forced seed applies to exactly one restart, so a
+     * daily can never leak into the next ordinary run.
+     */
+    private static Long forcedSeed = null;
+
+    /** File the forced seed is parked in so it survives a process restart. */
+    private static final String FORCED_SEED_FILE = "challengecraft_forced_seed";
+
+    /** Makes the next world regeneration use this exact seed. Consumed by {@link #randomizeSeed}. */
+    public static void forceNextSeed(long seed) {
+        forcedSeed = seed;
+        LOGGER.info("[SeedReset] Nächster Neustart benutzt den vorgegebenen Seed {}", seed);
+    }
+
+    /**
+     * Reads a forced seed left behind by the previous process, if any.
+     *
+     * <p>The static alone is enough in singleplayer, where the JVM outlives the world swap. A
+     * dedicated server actually restarts its process, so the value has to travel on disk — the same
+     * way the restart flag itself does. Deleted on read: a forced seed applies to one restart.
+     */
+    private static Long readForcedSeedFile(MinecraftServer server) {
+        try {
+            Path file = server.getWorldPath(LevelResource.ROOT).resolve(FORCED_SEED_FILE);
+            if (!Files.exists(file)) return null;
+            long seed = Long.parseLong(Files.readString(file).trim());
+            Files.deleteIfExists(file);
+            LOGGER.info("[SeedReset] Vorgegebener Seed aus Datei übernommen: {}", seed);
+            return seed;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("[SeedReset] Seed-Datei nicht lesbar: {}", e.toString());
+            return null;
+        }
+    }
+
+    public static void clearForcedSeed() {
+        forcedSeed = null;
+    }
+
     public static void randomizeSeed(MinecraftServer server) {
         if (!rotationPending) return;
         
@@ -189,8 +238,17 @@ public class ChallengeWorldRestarter {
                 LOGGER.warn("SaveProperties is null during randomization!");
                 return;
             }
-            long newSeed = new java.util.Random().nextLong();
-            LOGGER.info("Randomizing seed in memory for fresh world. New seed: {}", newSeed);
+            // A forced seed wins, and is consumed here so it can only ever affect this one restart.
+            long newSeed;
+            Long pending = forcedSeed != null ? forcedSeed : readForcedSeedFile(server);
+            if (pending != null) {
+                newSeed = pending;
+                forcedSeed = null;
+                LOGGER.info("Using forced seed for fresh world: {}", newSeed);
+            } else {
+                newSeed = new java.util.Random().nextLong();
+                LOGGER.info("Randomizing seed in memory for fresh world. New seed: {}", newSeed);
+            }
 
             // Reset the clock instead of randomising every long on the level data.
             //

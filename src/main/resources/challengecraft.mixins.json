@@ -37,9 +37,10 @@
   },
   "client": [
     "CreateWorldScreenMixin",
-    "TitleScreenMixin",
-    "InGameHudMixin",
     "GameMenuScreenMixin",
-    "MinecraftClientMixin"
+    "InGameHudMixin",
+    "MinecraftClientMixin",
+    "TitleScreenMixin",
+    "VideoSettingsScreenMixin"
   ]
 }

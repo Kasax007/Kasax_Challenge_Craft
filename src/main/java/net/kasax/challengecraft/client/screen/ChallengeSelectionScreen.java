@@ -66,6 +66,15 @@ public class ChallengeSelectionScreen extends Screen {
 
     private WidgetScrollPanel scrollPanel;
     private CraftButton saveButton;
+    /**
+     * Whether the daily card at the top is the current choice.
+     *
+     * <p>Mutually exclusive with the challenge cards below by design: a daily IS a fixed ruleset, so
+     * "the daily plus three of my own" is not a thing that can exist. Picking one side visibly
+     * disables the other rather than silently ignoring it.
+     */
+    private boolean dailyChosen = false;
+    private net.kasax.challengecraft.client.widget.DailyCardWidget dailyCard;
     private CraftButton saveAndRestartButton;
 
     private final boolean[] categoryExpanded = {true, true, true, true};
@@ -98,8 +107,13 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     private void updateDifficultyText() {
-        List<Integer> activeIds = getActiveIds();
-        List<Integer> activePerks = getActivePerks();
+        // With the daily picked, every card below is cleared on purpose — so reading the cards
+        // would report 0.00 and a payout of nothing for a run that is usually one of the hardest
+        // on offer. The numbers have to come from the rotation entry itself.
+        var daily = dailyChosen ? net.kasax.challengecraft.daily.DailyChallenges
+                .get(net.kasax.challengecraft.daily.DailyManager.todayIndex()) : null;
+        List<Integer> activeIds = daily != null ? daily.challengeIds() : getActiveIds();
+        List<Integer> activePerks = daily != null ? List.of() : getActivePerks();
 
         if (net.kasax.challengecraft.ChallengeManager.hasConflict(activeIds, activePerks)) {
             this.currentDifficulty = -1;
@@ -109,7 +123,17 @@ public class ChallengeSelectionScreen extends Screen {
             if (this.minecraft != null && this.minecraft.level != null) {
                 playerCount = this.minecraft.level.players().size();
             }
-            double total = net.kasax.challengecraft.ChallengeManager.calculateTotalDifficulty(activeIds, sliderTicks, slotsSliderTicks, mobHealthMultiplier, gameSpeedMultiplier, doubleTroubleMultiplier, playerCount, activePerks);
+            int UNSET = net.kasax.challengecraft.daily.DailyEntry.UNSET;
+            int hearts = daily == null || daily.maxHearts() == UNSET ? sliderTicks : daily.maxHearts();
+            int slots = daily == null || daily.inventorySlots() == UNSET
+                    ? slotsSliderTicks : daily.inventorySlots();
+            int mobHp = daily == null || daily.mobHealthMultiplier() == UNSET
+                    ? mobHealthMultiplier : daily.mobHealthMultiplier();
+            int speed = daily == null || daily.gameSpeedMultiplier() == UNSET
+                    ? gameSpeedMultiplier : daily.gameSpeedMultiplier();
+            int twice = daily == null || daily.doubleTroubleMultiplier() == UNSET
+                    ? doubleTroubleMultiplier : daily.doubleTroubleMultiplier();
+            double total = net.kasax.challengecraft.ChallengeManager.calculateTotalDifficulty(activeIds, hearts, slots, mobHp, speed, twice, playerCount, activePerks);
             this.currentDifficulty = total;
             this.difficultyText = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", total));
         }
@@ -194,6 +218,7 @@ public class ChallengeSelectionScreen extends Screen {
         this.scrollPanel = new WidgetScrollPanel(panelX, panelTop, panelWidth, panelHeight, Component.empty());
         addRenderableWidget(this.scrollPanel);
 
+
         buildSliders();
 
         for (int id : IDS) {
@@ -223,12 +248,20 @@ public class ChallengeSelectionScreen extends Screen {
         this.saveButton = new CraftButton(width / 2 - 125, saveY, 120, 20,
                 Component.translatable("challengecraft.challenge_selection.save"), CraftButton.Style.PRIMARY,
                 btn -> {
+                    // A daily needs a fresh world, so plain "Save" cannot serve it — it would apply
+                    // the ruleset to the world you are standing in, with the wrong seed and a
+                    // history. Only Save and Restart can honour it.
+                    if (dailyChosen) {
+                        client.setScreenAndShow(new ConfirmRestartScreen(this, this::sendDailyRestart));
+                        return;
+                    }
                     sendChallengePacket(false);
                     client.setScreenAndShow(null);
                 });
         this.saveAndRestartButton = new CraftButton(width / 2 + 5, saveY, 120, 20,
                 Component.translatable("challengecraft.challenge_selection.save_restart"), CraftButton.Style.NEUTRAL,
-                btn -> client.setScreenAndShow(new ConfirmRestartScreen(this, () -> sendChallengePacket(true))));
+                btn -> client.setScreenAndShow(new ConfirmRestartScreen(this,
+                        dailyChosen ? this::sendDailyRestart : () -> sendChallengePacket(true))));
         addRenderableWidget(this.saveButton);
         addRenderableWidget(this.saveAndRestartButton);
 
@@ -298,6 +331,68 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     /** Rebuilds the scroll-panel contents from the current expanded/collapsed state. */
+    /**
+     * Sends the daily's ruleset with a restart.
+     *
+     * <p>Separate from {@link #sendChallengePacket} because the values come from the rotation, not
+     * from the cards on screen — reusing that method would send whatever the player happened to have
+     * ticked. The seed is applied server-side from the same rotation entry, so nothing about the
+     * daily depends on the client agreeing.
+     */
+    private void sendDailyRestart() {
+        net.kasax.challengecraft.client.DailyClientState.arm();
+        var entry = net.kasax.challengecraft.client.DailyClientState.entry();
+        if (entry != null) {
+            sendDailyPacket(entry);
+        }
+    }
+
+    private void sendDailyPacket(net.kasax.challengecraft.daily.DailyEntry entry) {
+        int index = net.kasax.challengecraft.client.DailyClientState.index();
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                new net.kasax.challengecraft.network.ChallengePacket(
+                        entry.challengeIds(),
+                        entry.maxHearts() == net.kasax.challengecraft.daily.DailyEntry.UNSET ? 20 : entry.maxHearts(),
+                        entry.inventorySlots() == net.kasax.challengecraft.daily.DailyEntry.UNSET ? 36 : entry.inventorySlots(),
+                        entry.mobHealthMultiplier() == net.kasax.challengecraft.daily.DailyEntry.UNSET ? 1 : entry.mobHealthMultiplier(),
+                        entry.doubleTroubleMultiplier() == net.kasax.challengecraft.daily.DailyEntry.UNSET ? 2 : entry.doubleTroubleMultiplier(),
+                        entry.gameSpeedMultiplier() == net.kasax.challengecraft.daily.DailyEntry.UNSET ? 1 : entry.gameSpeedMultiplier(),
+                        ChallengeCraftClient.SELECTED_FIB_MINUTES,
+                        java.util.List.of(),
+                        true,
+                        index));
+        net.kasax.challengecraft.client.DailyClientState.clear();
+    }
+
+    /**
+     * Picking the daily clears every hand-picked challenge; they cannot both be true.
+     *
+     * <p>The card stays clickable at all times. Greying it out while challenges were ticked looked
+     * like the right way to say "either/or" and was a dead end in practice: opened in a running
+     * world the challenges are already on, so the card was born disabled and the daily could never
+     * be reached. Enforcing the rule through the click — take the daily, lose the selection — says
+     * the same thing and always has a way out.
+     */
+    private void toggleDaily() {
+        dailyChosen = !dailyChosen;
+        // The lock has to be (un)set here, not only in layout(): toggling does not re-lay-out, so
+        // without this the cards below stayed clickable after the daily was picked.
+        for (ChallengeCardWidget card : cards) {
+            if (dailyChosen) {
+                card.setActive(false);
+            }
+            card.setRuleLocked(dailyChosen);
+        }
+        for (ChallengeCardWidget perkCard : perkCards) {
+            if (dailyChosen) {
+                perkCard.setActive(false);
+            }
+            perkCard.setRuleLocked(dailyChosen);
+        }
+        updateDifficultyText();
+        updateSaveButton();
+    }
+
     private void layout() {
         this.scrollPanel.clearChildren();
 
@@ -307,6 +402,14 @@ public class ChallengeSelectionScreen extends Screen {
         int x0 = panelX + 8;
         int x1 = x0 + cardW + spacing;
         int y = panelTop + 6;
+
+        // Rebuilt each layout pass so it always sits at the top and always carries the current
+        // width; the widget itself is cheap and reads today's rotation in its constructor.
+        this.dailyCard = new net.kasax.challengecraft.client.widget.DailyCardWidget(
+                        x0, y, headerW, this::toggleDaily)
+                .withSelected(() -> dailyChosen);
+        scrollPanel.addChild(this.dailyCard);
+        y += net.kasax.challengecraft.client.widget.DailyCardWidget.HEIGHT + spacing + 4;
 
         for (Category category : Category.values()) {
             boolean expanded = categoryExpanded[category.ordinal()];
@@ -329,6 +432,7 @@ public class ChallengeSelectionScreen extends Screen {
                 card.setY(y);
                 card.setWidth(cardW);
                 card.setHeight(26);
+                card.setRuleLocked(dailyChosen);
                 scrollPanel.addChild(card);
 
                 if (col == 1) {
@@ -369,6 +473,7 @@ public class ChallengeSelectionScreen extends Screen {
                 perkCard.setY(y);
                 perkCard.setWidth(cardW);
                 perkCard.setHeight(26);
+                perkCard.setRuleLocked(dailyChosen);
                 scrollPanel.addChild(perkCard);
                 if (col == 1) {
                     y += 26 + spacing;

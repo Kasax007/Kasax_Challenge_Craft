@@ -381,6 +381,12 @@ public class ChallengeManager {
                     data.setDoubleTroubleMultiplier(clientDoubleMult);
                     data.setGameSpeedMultiplier(clientGameSpeedMult);
                     data.setForceItemBattleMinutes(ChallengeCraftClient.SELECTED_FIB_MINUTES);
+                    if (ChallengeCraftClient.SELECTED_DAILY_INDEX >= 0) {
+                        data.setDaily(ChallengeCraftClient.SELECTED_DAILY_INDEX,
+                                net.kasax.challengecraft.daily.DailyManager.epochDayUtc());
+                        LOGGER.info("ChallengeManager: world marked as daily #{}",
+                                ChallengeCraftClient.SELECTED_DAILY_INDEX);
+                    }
                     
                     int playerCount = world.getServer().getPlayerList().getPlayers().size();
                     // Score what was actually stored, not the client fields — after a restart those
@@ -394,6 +400,7 @@ public class ChallengeManager {
                     // These selections belong to one world-creation flow and must not leak into the next world.
                     ChallengeCraftClient.LAST_CHOSEN = new ArrayList<>();
                     ChallengeCraftClient.SELECTED_PERKS = new ArrayList<>();
+                    ChallengeCraftClient.SELECTED_DAILY_INDEX = -1;
                     ChallengeCraftClient.SELECTED_MAX_HEARTS = 20;
                     ChallengeCraftClient.SELECTED_LIMITED_INVENTORY = 36;
                     ChallengeCraftClient.SELECTED_MOB_HEALTH_MULTIPLIER = 1;

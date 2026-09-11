@@ -56,9 +56,9 @@ public class ChallengeSavedData extends SavedData {
             // NOTE: this group is now at RecordCodecBuilder's 16-field maximum. The next new
             // field must go into a nested record (see ChallengeProgress) instead.
             Codec.INT.optionalFieldOf("forceItemBattleMinutes", 60).forGetter(ChallengeSavedData::getForceItemBattleMinutes),
-            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex, data.progressiveBlocksOrder, data.progressiveBlocksIndex, data.runTicks))
+            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex, data.progressiveBlocksOrder, data.progressiveBlocksIndex, data.runTicks, data.dailyIndex, data.dailyEpochDay))
     ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress) ->
-            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress.allAdvancementsOrder, progress.allAdvancementsIndex, progress.progressiveBlocksOrder, progress.progressiveBlocksIndex, progress.runTicks)
+            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress.allAdvancementsOrder, progress.allAdvancementsIndex, progress.progressiveBlocksOrder, progress.progressiveBlocksIndex, progress.runTicks, progress.dailyIndex, progress.dailyEpochDay)
     ));
 
     public static final SavedDataType<ChallengeSavedData> TYPE =
@@ -91,6 +91,9 @@ public class ChallengeSavedData extends SavedData {
 
     private int mobHealthMultiplier = 1;
     private double damageWorldBorderSize = 2.0;
+    /** -1 when this world is an ordinary run; otherwise the daily rotation index it was created for. */
+    private int dailyIndex = -1;
+    private long dailyEpochDay = 0L;
 
     private final List<Integer> activePerks = new ArrayList<>();
 
@@ -121,7 +124,7 @@ public class ChallengeSavedData extends SavedData {
 
     private ChallengeSavedData() {}
 
-    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, int gameSpeedMultiplier, int forceItemBattleMinutes, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks) {
+    public ChallengeSavedData(List<Integer> active, int maxHeartsTicks, int limitedInventorySlots, double initialDifficulty, boolean tainted, Map<String, Boolean> playerXpAwarded, boolean difficultySet, List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, int mobHealthMultiplier, double damageWorldBorderSize, Map<String, Long> playerXp, List<Integer> activePerks, int runIndex, int doubleTroubleMultiplier, int gameSpeedMultiplier, int forceItemBattleMinutes, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks, int dailyIndex, long dailyEpochDay) {
         this.active.clear();
         this.active.addAll(active);
         this.maxHeartsTicks = maxHeartsTicks;
@@ -154,6 +157,8 @@ public class ChallengeSavedData extends SavedData {
         this.progressiveBlocksOrder.addAll(progressiveBlocksOrder);
         this.progressiveBlocksIndex = progressiveBlocksIndex;
         this.runTicks = runTicks;
+        this.dailyIndex = dailyIndex;
+        this.dailyEpochDay = dailyEpochDay;
     }
 
     public long getRunTicks() {
@@ -425,7 +430,26 @@ public class ChallengeSavedData extends SavedData {
         setDirty();
     }
 
-    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks) {
+    /** -1 when this is an ordinary run. */
+    public int getDailyIndex() {
+        return dailyIndex;
+    }
+
+    public long getDailyEpochDay() {
+        return dailyEpochDay;
+    }
+
+    public boolean isDailyRun() {
+        return dailyIndex >= 0;
+    }
+
+    public void setDaily(int index, long epochDay) {
+        this.dailyIndex = index;
+        this.dailyEpochDay = epochDay;
+        setDirty();
+    }
+
+    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks, int dailyIndex, long dailyEpochDay) {
         public static final MapCodec<ChallengeProgress> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeProgress::allItemsOrder),
                 Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeProgress::allItemsIndex),
@@ -437,7 +461,12 @@ public class ChallengeSavedData extends SavedData {
                 Codec.INT.optionalFieldOf("progressiveBlocksIndex", 0).forGetter(ChallengeProgress::progressiveBlocksIndex),
                 // The run timer belongs to the WORLD, not to a player's play-time statistic — see
                 // ChallengeSavedData.getRunTicks.
-                Codec.LONG.optionalFieldOf("runTicks", 0L).forGetter(ChallengeProgress::runTicks)
+                Codec.LONG.optionalFieldOf("runTicks", 0L).forGetter(ChallengeProgress::runTicks),
+                // Which daily this world is, if any. Lives here rather than at the top level
+                // because that codec group is at its hard 16-field maximum, and it is world state:
+                // several players share one daily world.
+                Codec.INT.optionalFieldOf("dailyIndex", -1).forGetter(ChallengeProgress::dailyIndex),
+                Codec.LONG.optionalFieldOf("dailyEpochDay", 0L).forGetter(ChallengeProgress::dailyEpochDay)
         ).apply(instance, ChallengeProgress::new));
     }
 }

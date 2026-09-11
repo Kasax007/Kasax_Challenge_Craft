@@ -56,13 +56,22 @@ public class PlayerAdvancementTrackerMixin {
                             .toList();
 
                     if (!eligiblePlayers.isEmpty()) {
-                        for (int cid : data.getActive()) {
-                            eligiblePlayers.forEach(p -> {
-                                // The world's run clock, not this player's play time: a friend invited a minute
-                                // before the finish must record the run's real duration, not their own.
-                                int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
-                                StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
-                            });
+                        // Asked BEFORE the record loop below: afterwards the stored best is this very
+                        // run, so the comparison would be against itself and always answer "no".
+                        int runTicks = ChallengeTimeUtil.getDisplayRunTicks(player.level().getServer());
+                        java.util.Map<java.util.UUID, Boolean> newBest = new java.util.HashMap<>();
+                        eligiblePlayers.forEach(p -> newBest.put(p.getUUID(),
+                                net.kasax.challengecraft.network.RunSummary.isNewBest(p, data.getActive(), runTicks)));
+
+                        // A daily records only its own time, never a per-challenge record — its
+                        // ruleset is handed to you, often with challenges you never chose.
+                        if (!data.isDailyRun()) {
+                            for (int cid : data.getActive()) {
+                                eligiblePlayers.forEach(p -> {
+                                    int pTicks = ChallengeTimeUtil.getDisplayRunTicks(p.level().getServer());
+                                    StatsManager.recordCompletion(p.getStringUUID(), cid, pTicks);
+                                });
+                            }
                         }
                         
                         eligiblePlayers.forEach(LevelManager::sync);
@@ -77,7 +86,11 @@ public class PlayerAdvancementTrackerMixin {
                                 data.setXpAwarded(p.getUUID(), true);
                                 // Dragon completion is a reward trigger, not a full run-completion screen.
                                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(p, new ChallengeRewardPacket(res.oldXp, res.newXp, res.actualAmount, false));
-                                
+                                net.kasax.challengecraft.network.RunSummary.sendTimed(p,
+                                        net.kasax.challengecraft.network.RunSummaryPacket.Kind.DRAGON,
+                                        data, res.actualAmount, res.oldXp, res.newXp,
+                                        newBest.getOrDefault(p.getUUID(), false));
+
                                 p.level().playSound(null, p.getX(), p.getY(), p.getZ(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0f, 1.0f);
                             });
                             
@@ -94,6 +107,12 @@ public class PlayerAdvancementTrackerMixin {
                             
                             LOGGER.info("[Advancement] Awarded {} XP to eligible players (triggered by {})", xpAmount, player.getName().getString());
                         } else {
+                            // A tainted or zero-difficulty run pays nothing, but it was still
+                            // finished — the player beat the dragon and deserves the card. The
+                            // summary says the payout was zero rather than silently not appearing.
+                            eligiblePlayers.forEach(p -> net.kasax.challengecraft.network.RunSummary.sendTimed(p,
+                                    net.kasax.challengecraft.network.RunSummaryPacket.Kind.DRAGON,
+                                    data, 0L, 0L, 0L, newBest.getOrDefault(p.getUUID(), false)));
                             if (data.isTainted()) {
                                 player.sendSystemMessage(Component.translatable("challengecraft.reward.no_xp")
                                         .withStyle(ChatFormatting.RED));

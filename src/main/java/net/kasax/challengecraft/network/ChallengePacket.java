@@ -20,6 +20,14 @@ public class ChallengePacket implements CustomPacketPayload {
     public final int          forceItemBattleMinutes;
     public final List<Integer> perks;
     public final boolean       restart;
+    /**
+     * -1 for an ordinary selection; otherwise the daily rotation index this world was created for.
+     *
+     * <p>The server does not take the challenge list on trust when this is set — it compares it
+     * against its own copy of the rotation. That is what lets a daily hand out challenges above the
+     * player's level without opening a hole through which any client could request any challenge.
+     */
+    public final int           dailyIndex;
 
     public static final Type<ChallengePacket> ID =
             new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "update_challenges"));
@@ -40,6 +48,11 @@ public class ChallengePacket implements CustomPacketPayload {
                             buf.writeVarInt(pkt.perks.size());
                             for (int id : pkt.perks) buf.writeVarInt(id);
                             buf.writeBoolean(pkt.restart);
+                            // Shifted by one so -1 stays a valid VarInt. Leaving this out is what
+                            // made every send a DecoderException and threw the player out of the
+                            // world: the decoder below reads it unconditionally, so the two halves
+                            // have to be edited together. Always.
+                            buf.writeVarInt(pkt.dailyIndex + 1);
                         }
                     },
                     new StreamDecoder<FriendlyByteBuf, ChallengePacket>() {
@@ -62,12 +75,18 @@ public class ChallengePacket implements CustomPacketPayload {
                                 perks.add(buf.readVarInt());
                             }
                             boolean restart = buf.readBoolean();
-                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, fibMinutes, perks, restart);
+                            int dailyIndex = buf.readVarInt() - 1;
+                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, fibMinutes, perks, restart, dailyIndex);
                         }
                     }
             );
 
     public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks, boolean restart) {
+        this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, forceItemBattleMinutes, perks, restart, -1);
+    }
+
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks, boolean restart, int dailyIndex) {
+        this.dailyIndex = dailyIndex;
         this.active    = active;
         this.maxHearts = maxHearts;
         this.limitedInventorySlots = slots;
@@ -81,20 +100,6 @@ public class ChallengePacket implements CustomPacketPayload {
 
     public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks) {
         this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, forceItemBattleMinutes, perks, false);
-    }
-
-    public void write(FriendlyByteBuf buf) {
-        buf.writeVarInt(active.size());
-        for (int id : active) buf.writeVarInt(id);
-        buf.writeVarInt(maxHearts);
-        buf.writeVarInt(limitedInventorySlots);
-        buf.writeVarInt(mobHealthMultiplier);
-        buf.writeVarInt(doubleTroubleMultiplier);
-        buf.writeVarInt(gameSpeedMultiplier);
-        buf.writeVarInt(forceItemBattleMinutes);
-        buf.writeVarInt(perks.size());
-        for (int id : perks) buf.writeVarInt(id);
-        buf.writeBoolean(restart);
     }
 
     @Override

@@ -1,39 +1,42 @@
 {
-	"schemaVersion": 1,
-	"id": "challengecraft",
-	"version": "${version}",
-	"name": "Challenge Craft",
-	"description": "Adds exciting Challenges to Minecraft",
-	"authors": [
-		"Kasax"
-	],
-	"contact": {
-		"homepage": "https://www.curseforge.com/minecraft/mc-mods/challenge",
-		"sources": "https://github.com/Kasax007/Kasax_Challenge_Craft",
-		"issues": "https://github.com/Kasax007/Kasax_Challenge_Craft/issues"
-	},
-	"license": "MIT",
-	"icon": "assets/challengecraft/icon.png",
-	"environment": "*",
-	"entrypoints": {
-		"main": [
-			"net.kasax.challengecraft.ChallengeCraft"
-		],
-		"fabric-datagen": [
-			"net.kasax.challengecraft.ChallengeCraftDataGenerator"
-		],
-		"client": [
-			"net.kasax.challengecraft.ChallengeCraftClient",
-			"net.kasax.challengecraft.client.ClientCommands"
-		]
-	},
-	"mixins": [
-		"challengecraft.mixins.json"
-	],
-	"depends": {
-		"fabricloader": ">=0.19.3",
-		"minecraft": "~26.2",
-		"java": ">=25",
-		"fabric-api": ">=0.156.0"
-	}
+  "schemaVersion": 1,
+  "id": "challengecraft",
+  "version": "${version}",
+  "name": "Challenge Craft",
+  "description": "Adds exciting Challenges to Minecraft",
+  "authors": [
+    "Kasax"
+  ],
+  "contact": {
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/challenge",
+    "sources": "https://github.com/Kasax007/Kasax_Challenge_Craft",
+    "issues": "https://github.com/Kasax007/Kasax_Challenge_Craft/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/challengecraft/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.kasax.challengecraft.ChallengeCraft"
+    ],
+    "fabric-datagen": [
+      "net.kasax.challengecraft.ChallengeCraftDataGenerator"
+    ],
+    "client": [
+      "net.kasax.challengecraft.ChallengeCraftClient",
+      "net.kasax.challengecraft.client.ClientCommands"
+    ],
+    "preLaunch": [
+      "net.kasax.challengecraft.client.AwtClipboardFix"
+    ]
+  },
+  "mixins": [
+    "challengecraft.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": ">=0.156.0"
+  }
 }

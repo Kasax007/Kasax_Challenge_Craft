@@ -32,8 +32,26 @@ public class PacketHandler {
 
                         int playerLevel = net.kasax.challengecraft.LevelManager.getLevelForXp(net.kasax.challengecraft.data.XpManager.getXp(player.getUUID()));
                         long playerXp = net.kasax.challengecraft.data.XpManager.getXp(player.getUUID());
-                        
-                        for (int cid : packet.active) {
+
+                        // A daily is exempt from the level gate — handing you challenges you have
+                        // not unlocked is the point of it. It is not exempt from checking, though:
+                        // the ruleset must match this server's own copy of the rotation exactly, so
+                        // the exemption cannot be used to request an arbitrary challenge set.
+                        boolean isDaily = packet.dailyIndex >= 0;
+                        if (isDaily) {
+                            var entry = net.kasax.challengecraft.daily.DailyChallenges.get(packet.dailyIndex);
+                            var expected = new java.util.HashSet<>(entry.challengeIds());
+                            var got = new java.util.HashSet<>(packet.active);
+                            if (!expected.equals(got) || !packet.perks.isEmpty()) {
+                                ChallengeCraft.LOGGER.warn("[Server] Denied daily {} from {}: ruleset {} does not match rotation {}",
+                                        packet.dailyIndex, player.getName().getString(), got, expected);
+                                player.sendSystemMessage(Component.translatable("challengecraft.daily.mismatch")
+                                        .withStyle(ChatFormatting.RED));
+                                return;
+                            }
+                        }
+
+                        for (int cid : isDaily ? java.util.List.<Integer>of() : packet.active) {
                             if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(cid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (challenge {} locked for level {})", player.getName().getString(), cid, playerLevel);
                                 player.sendSystemMessage(Component.translatable("challengecraft.requirement.challenge_level", cid).withStyle(ChatFormatting.RED));
@@ -74,6 +92,11 @@ public class PacketHandler {
                         data.setDoubleTroubleMultiplier(packet.doubleTroubleMultiplier);
                         data.setGameSpeedMultiplier(packet.gameSpeedMultiplier);
                         data.setForceItemBattleMinutes(packet.forceItemBattleMinutes);
+                        if (isDaily) {
+                            data.setDaily(packet.dailyIndex,
+                                    net.kasax.challengecraft.daily.DailyManager.epochDayUtc());
+                            ChallengeCraft.LOGGER.info("[Server] Welt als Tages-Challenge #{} markiert", packet.dailyIndex);
+                        }
 
                         boolean hadBefore = prevPerks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
                         boolean hasAfter  = packet.perks.contains(net.kasax.challengecraft.LevelManager.PERK_INFINITY_WEAPON);
@@ -125,6 +148,15 @@ public class PacketHandler {
                         ChallengeCraft.LOGGER.info("Packet Handler applyAll " + packet );
 
                         if (packet.restart) {
+                            // A daily restarted from inside a world still has to land on the
+                            // rotation's seed, or two players' times are not comparable. Taken from
+                            // the server's own rotation entry, never from the client.
+                            if (isDaily) {
+                                var e = net.kasax.challengecraft.daily.DailyChallenges.get(packet.dailyIndex);
+                                if (e.hasFixedSeed()) {
+                                    ChallengeWorldRestarter.forceNextSeed(e.seed());
+                                }
+                            }
                             ChallengeWorldRestarter.initiateRestart(server);
                         }
                     });

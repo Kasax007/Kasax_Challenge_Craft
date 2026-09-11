@@ -27,6 +27,15 @@ public class ChallengeCardWidget extends AbstractWidget {
     private final Component title;
     private final Component description;
     private boolean active;
+    /**
+     * A card the player may look at but not change.
+     *
+     * <p>Used by the daily challenge, whose ruleset is fixed. Deliberately separate both from
+     * {@code active} (the card must still render as switched ON, it just must not respond to a
+     * click) and from {@code locked}, which already means "you have not reached the level for this".
+     * The two are different statements and a daily can show both at once.
+     */
+    private boolean ruleLocked = false;
     private final Consumer<Boolean> onToggle;
     private final Integer pbTicks;
     private final boolean locked;
@@ -164,6 +173,7 @@ public class ChallengeCardWidget extends AbstractWidget {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        if (ruleLocked) return false;
         if (!super.isActive()
                 || !isValidClickButton(event.buttonInfo())
                 || !isMouseOver(event.x(), event.y())) {
@@ -192,6 +202,14 @@ public class ChallengeCardWidget extends AbstractWidget {
      * shadows {@link AbstractWidget#isActive()}; see the interaction guards above for why that
      * needs compensating on 26.2.
      */
+    public void setRuleLocked(boolean ruleLocked) {
+        this.ruleLocked = ruleLocked;
+    }
+
+    public boolean isRuleLocked() {
+        return ruleLocked;
+    }
+
     public boolean isActive() {
         return active;
     }
