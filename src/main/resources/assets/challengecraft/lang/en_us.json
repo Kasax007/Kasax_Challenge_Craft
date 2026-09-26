@@ -647,8 +647,8 @@
   "challengecraft.summary.saved": "Saved as %s",
   "challengecraft.summary.save_failed": "Could not save the image - see the log",
   "challengecraft.summary.privacy": "Nothing is uploaded. Save the image, then attach it yourself.",
-  "challengecraft.summary.share.daily": "Beat the Challenge Craft daily of %s in %s. Think you can go faster? Try it: %s",
-  "challengecraft.summary.share.timed": "Finished a Challenge Craft run in %s with %s challenges stacked. Think you can beat that? Try it: %s",
+  "challengecraft.summary.share.daily": "Beat the Challenge Craft daily “%s” (%s) in %s. Think you can go faster? Try it: %s",
+  "challengecraft.summary.share.timed": "%s in %s with %s in Challenge Craft. Think you can beat that? Try it: %s",
   "challengecraft.summary.share.competitive": "Placed %s of %s in Challenge Craft. Think you'd do better? Try it: %s",
   "challengecraft.summary.none": "No run summary yet - finish a run first.",
   "challengecraft.shaderfix.done": "Shader pipeline rebuilt - item textures should be back.",
@@ -750,5 +750,6 @@
   "challengecraft.timer.format.always_hours": "Always hours",
   "challengecraft.timer.format.tenths": "With tenths",
   "challengecraft.timer.sample_hint": "Vanilla draws the held item's name here",
-  "challengecraft.timer.recenter": "Auto-place above item name"
+  "challengecraft.timer.recenter": "Auto-place above item name",
+  "challengecraft.summary.share.no_challenges": "no extra challenges"
 }

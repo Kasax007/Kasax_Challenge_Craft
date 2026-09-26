@@ -30,7 +30,10 @@
     "MobEntityAccessor",
     "NoJumpingMixin",
     "ProgressiveBlockDropsMixin",
-    "DiceMovementMixin"
+    "DiceMovementMixin",
+    "ServerLevelBorderSpawnsMixin",
+    "SpawnPlacementBorderMixin",
+    "SpawnPlacementGroundBorderMixin"
   ],
   "injectors": {
     "defaultRequire": 1

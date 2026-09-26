@@ -344,6 +344,7 @@ public class ChallengeManager {
                             LOGGER.info("ChallengeManager: seeded NEW dedicated server world from pre-loaded challenges: {}", currentActive);
                         }
                     }
+                    markPendingDaily(world, data);
 
                     if (!data.getActive().isEmpty() || data.getMaxHeartsTicks() != 20 || data.getLimitedInventorySlots() != 36 || data.getGameSpeedMultiplier() != 1) {
                         int playerCount = world.getServer().getPlayerList().getPlayers().size();
@@ -387,6 +388,7 @@ public class ChallengeManager {
                         LOGGER.info("ChallengeManager: world marked as daily #{}",
                                 ChallengeCraftClient.SELECTED_DAILY_INDEX);
                     }
+                    markPendingDaily(world, data);
                     
                     int playerCount = world.getServer().getPlayerList().getPlayers().size();
                     // Score what was actually stored, not the client fields — after a restart those
@@ -508,6 +510,23 @@ public class ChallengeManager {
             if (Files.exists(candidate)) return candidate;
         }
         return null;
+    }
+
+    /**
+     * Marks a fresh world as the daily a restart was started for.
+     *
+     * <p>World creation hands the index over through {@code SELECTED_DAILY_INDEX}; a restart from
+     * inside a world cannot, so it parks it in {@code ChallengeWorldRestarter} instead. Reading it
+     * here, in both seeding branches, is what makes the two entrances end in the same kind of
+     * world.
+     */
+    private static void markPendingDaily(ServerLevel world, ChallengeSavedData data) {
+        int pending = net.kasax.challengecraft.network.ChallengeWorldRestarter
+                .consumeForcedDaily(world.getServer());
+        if (pending >= 0 && !data.isDailyRun()) {
+            data.setDaily(pending, net.kasax.challengecraft.daily.DailyManager.epochDayUtc());
+            LOGGER.info("ChallengeManager: restarted world marked as daily #{}", pending);
+        }
     }
 
     public static boolean loadInitialActiveChallenges(Path worldDir) {

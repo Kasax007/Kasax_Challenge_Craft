@@ -647,8 +647,8 @@
   "challengecraft.summary.saved": "Gespeichert als %s",
   "challengecraft.summary.save_failed": "Bild konnte nicht gespeichert werden - siehe Log",
   "challengecraft.summary.privacy": "Es wird nichts hochgeladen. Bild speichern und selbst anhängen.",
-  "challengecraft.summary.share.daily": "Tages-Challenge vom %s in %s geschafft. Schaffst du eine bessere Zeit? Probier's aus: %s",
-  "challengecraft.summary.share.timed": "Challenge-Craft-Run in %s mit %s gestapelten Challenges geschafft. Schaffst du das schneller? Probier's aus: %s",
+  "challengecraft.summary.share.daily": "Challenge-Craft-Tages-Challenge „%s“ (%s) in %s geschafft. Schaffst du eine bessere Zeit? Probier’s aus: %s",
+  "challengecraft.summary.share.timed": "%s in %s mit %s bei Challenge Craft. Schaffst du das schneller? Probier’s aus: %s",
   "challengecraft.summary.share.competitive": "Platz %s von %s bei Challenge Craft. Machst du es besser? Probier's aus: %s",
   "challengecraft.summary.none": "Noch keine Zusammenfassung - beende zuerst einen Run.",
   "challengecraft.shaderfix.done": "Shader-Pipeline neu aufgebaut - die Item-Texturen sollten wieder da sein.",
@@ -750,5 +750,6 @@
   "challengecraft.timer.format.always_hours": "Immer Stunden",
   "challengecraft.timer.format.tenths": "Mit Zehnteln",
   "challengecraft.timer.sample_hint": "Hier schreibt Minecraft den Namen des gehaltenen Items",
-  "challengecraft.timer.recenter": "Automatisch über Item-Name"
+  "challengecraft.timer.recenter": "Automatisch über Item-Name",
+  "challengecraft.summary.share.no_challenges": "ohne Zusatz-Challenges"
 }

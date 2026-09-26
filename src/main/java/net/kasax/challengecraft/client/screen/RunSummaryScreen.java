@@ -195,16 +195,41 @@ public class RunSummaryScreen extends Screen {
     private String shareText() {
         Component text;
         if (summary.daily) {
+            // The daily by name, so the reader knows which one to go and beat.
+            String name = Component.translatable(
+                    net.kasax.challengecraft.daily.DailyChallenges.get(summary.dailyIndex).nameKey())
+                    .getString();
             text = Component.translatable("challengecraft.summary.share.daily",
-                    dailyDateText(), formatTime(summary.runTicks), MODPACK_URL);
+                    name, dailyDateText(), formatTime(summary.runTicks), MODPACK_URL);
         } else if (summary.kind.isTimed()) {
+            // "3 challenges stacked" told nobody anything. The names are the brag.
             text = Component.translatable("challengecraft.summary.share.timed",
-                    formatTime(summary.runTicks), String.valueOf(summary.activeIds.size()), MODPACK_URL);
+                    Component.translatable(summary.kind.titleKey()).getString(),
+                    formatTime(summary.runTicks), challengeNames(), MODPACK_URL);
         } else {
             text = Component.translatable("challengecraft.summary.share.competitive",
                     String.valueOf(summary.placement), String.valueOf(summary.participants), MODPACK_URL);
         }
         return text.getString() + " " + HASHTAGS;
+    }
+
+    /**
+     * The active challenges by name, capped so a heavily stacked run does not blow past a post
+     * length limit: three names, then "+N".
+     */
+    private String challengeNames() {
+        if (summary.activeIds.isEmpty()) {
+            return Component.translatable("challengecraft.summary.share.no_challenges").getString();
+        }
+        java.util.List<String> names = new java.util.ArrayList<>();
+        int shown = Math.min(3, summary.activeIds.size());
+        for (int i = 0; i < shown; i++) {
+            names.add(Component.translatable(
+                    "challengecraft.worldcreate.challenge" + summary.activeIds.get(i)).getString());
+        }
+        String joined = String.join(", ", names);
+        int more = summary.activeIds.size() - shown;
+        return more > 0 ? joined + " +" + more : joined;
     }
 
     /**

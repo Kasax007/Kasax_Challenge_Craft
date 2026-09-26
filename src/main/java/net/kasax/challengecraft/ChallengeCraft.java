@@ -65,11 +65,12 @@ public class ChallengeCraft implements ModInitializer {
 					// could open in the middle of the night.
 					// The generator class is the only honest answer to "is this actually a Skyblock
 					// world?" — the challenge flag says what we intended, this says what the world IS.
-					LOGGER.info("[TEST-WORLDINFO] seed={} spawn={} gameTime={} dayTime={} runTicks={} generator={}",
+					LOGGER.info("[TEST-WORLDINFO] seed={} spawn={} gameTime={} dayTime={} runTicks={} generator={} dailyIndex={}",
 							overworld.getSeed(), overworld.getRespawnData().pos(),
 							overworld.getGameTime(), overworld.getOverworldClockTime(),
 							ChallengeSavedData.get(overworld).getRunTicks(),
-							overworld.getChunkSource().getGenerator().getClass().getSimpleName());
+							overworld.getChunkSource().getGenerator().getClass().getSimpleName(),
+							ChallengeSavedData.get(overworld).getDailyIndex());
 					if (shouldRestart) {
 						LOGGER.info("[TEST-RESTART] triggering restart via CHALLENGECRAFT_TEST_RESTART");
 						net.kasax.challengecraft.network.ChallengeWorldRestarter.initiateRestart(server);
@@ -410,7 +411,28 @@ public class ChallengeCraft implements ModInitializer {
 					.executes(context -> {
 						ChallengeWorldRestarter.initiateRestart(context.getSource().getServer());
 						return 1;
-					}));
+					})
+					// The console twin of picking the daily card in /challenges and pressing
+					// Save & Restart: the same steps PacketHandler takes on that packet, so a
+					// headless harness can prove the daily survives the world swap.
+					.then(Commands.literal("daily")
+							.then(Commands.argument("index", com.mojang.brigadier.arguments.IntegerArgumentType.integer(0))
+									.executes(context -> {
+										var server = context.getSource().getServer();
+										int index = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "index");
+										var entry = net.kasax.challengecraft.daily.DailyChallenges.get(index);
+										ChallengeSavedData data = ChallengeSavedData.get(server.overworld());
+										data.setActive(entry.challengeIds());
+										data.setActivePerks(java.util.List.of());
+										data.setDaily(index, net.kasax.challengecraft.daily.DailyManager.epochDayUtc());
+										ChallengeManager.applyAll(server);
+										if (entry.hasFixedSeed()) {
+											ChallengeWorldRestarter.forceNextSeed(entry.seed());
+										}
+										ChallengeWorldRestarter.forceNextDaily(index);
+										ChallengeWorldRestarter.initiateRestart(server);
+										return 1;
+									}))));
 
 			dispatcher.register(Commands.literal("challengecraft_lockout_debug_solo")
 					.requires(source -> ModPermissions.isOp(source))

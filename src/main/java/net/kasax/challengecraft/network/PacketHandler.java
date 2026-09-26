@@ -156,6 +156,9 @@ public class PacketHandler {
                                 if (e.hasFixedSeed()) {
                                     ChallengeWorldRestarter.forceNextSeed(e.seed());
                                 }
+                                // The setDaily above marked the world we are about to archive.
+                                // The one that matters is the fresh one.
+                                ChallengeWorldRestarter.forceNextDaily(packet.dailyIndex);
                             }
                             ChallengeWorldRestarter.initiateRestart(server);
                         }

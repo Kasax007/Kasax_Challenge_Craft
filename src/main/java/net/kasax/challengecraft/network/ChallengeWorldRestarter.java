@@ -99,6 +99,10 @@ public class ChallengeWorldRestarter {
                 Files.writeString(worldDir.resolve(FORCED_SEED_FILE), Long.toString(forcedSeed));
                 LOGGER.info("Parked forced seed {} for the next process", forcedSeed);
             }
+            if (forcedDaily >= 0) {
+                Files.writeString(worldDir.resolve(FORCED_DAILY_FILE), Integer.toString(forcedDaily));
+                LOGGER.info("Parked daily #{} for the next process", forcedDaily);
+            }
         } catch (IOException e) {
             LOGGER.error("Failed to create restart flag file!", e);
         }
@@ -227,6 +231,51 @@ public class ChallengeWorldRestarter {
 
     public static void clearForcedSeed() {
         forcedSeed = null;
+        forcedDaily = -1;
+    }
+
+    /**
+     * The daily rotation index the next fresh world belongs to, or -1.
+     *
+     * <p>Travels the same two ways the forced seed does - a static for singleplayer, a file for a
+     * dedicated server whose process restarts - and for the same reason. Restarting into a daily
+     * from inside a world used to mark the OUTGOING world as the daily and then throw that world
+     * away: the restore of the challenge file below has been reading the pre-26.2 path since the
+     * port and finds nothing, so the fresh world was seeded from the client statics alone, and
+     * {@code SELECTED_DAILY_INDEX} is only ever set by world creation. The run then finished as an
+     * ordinary run - no daily banner on the card, no daily wording in the share text, and the
+     * time went into the per-challenge personal bests it was supposed to stay out of.
+     */
+    private static int forcedDaily = -1;
+
+    private static final String FORCED_DAILY_FILE = "challengecraft_forced_daily";
+
+    public static void forceNextDaily(int index) {
+        forcedDaily = index;
+        LOGGER.info("[Daily] Naechster Neustart wird als Tages-Challenge #{} markiert", index);
+    }
+
+    /**
+     * Hands over the pending daily index exactly once, or -1. Static first, file second; the file
+     * is deleted on read so a daily can never leak into the run after it.
+     */
+    public static int consumeForcedDaily(MinecraftServer server) {
+        if (forcedDaily >= 0) {
+            int index = forcedDaily;
+            forcedDaily = -1;
+            return index;
+        }
+        try {
+            Path file = server.getWorldPath(LevelResource.ROOT).resolve(FORCED_DAILY_FILE);
+            if (!Files.exists(file)) return -1;
+            int index = Integer.parseInt(Files.readString(file).trim());
+            Files.deleteIfExists(file);
+            LOGGER.info("[Daily] Tages-Challenge #{} aus Datei uebernommen", index);
+            return index;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("[Daily] Daily-Datei nicht lesbar: {}", e.toString());
+            return -1;
+        }
     }
 
     public static void randomizeSeed(MinecraftServer server) {
@@ -570,7 +619,15 @@ public class ChallengeWorldRestarter {
         // A deny-list survives the next layout change; an allow-list silently stops working.
         Set<String> keep = Set.of(
                 "old worlds",     // the archive we are writing into
-                "session.lock"    // held open by the running server; moving it breaks the session
+                "session.lock",   // held open by the running server; moving it breaks the session
+                // The two carriers a restart leaves for the NEXT world. They are written into this
+                // directory by initiateRestart and read after this rotation by randomizeSeed and
+                // applyTo, so archiving them here sent every dedicated-server daily into a random
+                // seed and an ordinary run (the daily-restart harness caught it: boot 2 logged
+                // "Archived 'challengecraft_forced_seed'" three lines before "Randomizing seed").
+                // Both delete themselves on read, so nothing accumulates.
+                FORCED_SEED_FILE,
+                FORCED_DAILY_FILE
         );
 
         int moved = 0, skipped = 0;
