@@ -56,9 +56,12 @@ public class ChallengeSavedData extends SavedData {
             // NOTE: this group is now at RecordCodecBuilder's 16-field maximum. The next new
             // field must go into a nested record (see ChallengeProgress) instead.
             Codec.INT.optionalFieldOf("forceItemBattleMinutes", 60).forGetter(ChallengeSavedData::getForceItemBattleMinutes),
-            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex, data.progressiveBlocksOrder, data.progressiveBlocksIndex, data.runTicks, data.dailyIndex, data.dailyEpochDay))
-    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress) ->
-            new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress.allAdvancementsOrder, progress.allAdvancementsIndex, progress.progressiveBlocksOrder, progress.progressiveBlocksIndex, progress.runTicks, progress.dailyIndex, progress.dailyEpochDay)
+            ChallengeProgress.CODEC.forGetter(data -> new ChallengeProgress(data.allItemsOrder, data.allItemsIndex, data.allEntitiesOrder, data.allEntitiesIndex, data.allAdvancementsOrder, data.allAdvancementsIndex, data.progressiveBlocksOrder, data.progressiveBlocksIndex, data.runTicks, data.dailyIndex, data.dailyEpochDay, List.copyOf(data.allBiomesVisited)))
+    ).apply(instance, (active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress) -> {
+            ChallengeSavedData loaded = new ChallengeSavedData(active, maxHeartsTicks, limitedInventorySlots, initialDifficulty, tainted, playerXpAwarded, difficultySet, progress.allItemsOrder, progress.allItemsIndex, progress.allEntitiesOrder, progress.allEntitiesIndex, mobHealthMultiplier, damageWorldBorderSize, playerXp, activePerks, runIndex, doubleTroubleMultiplier, gameSpeedMultiplier, forceItemBattleMinutes, progress.allAdvancementsOrder, progress.allAdvancementsIndex, progress.progressiveBlocksOrder, progress.progressiveBlocksIndex, progress.runTicks, progress.dailyIndex, progress.dailyEpochDay);
+            loaded.allBiomesVisited.addAll(progress.allBiomesVisited);
+            return loaded;
+        }
     ));
 
     public static final SavedDataType<ChallengeSavedData> TYPE =
@@ -121,6 +124,12 @@ public class ChallengeSavedData extends SavedData {
      * on the world fixes all three at once.
      */
     private long runTicks = 0;
+
+    /**
+     * Biome ids visited in this world for All Biomes (49), in the order they were found. A set in
+     * meaning, a list on disk so the order the run went in survives for the summary.
+     */
+    private final List<String> allBiomesVisited = new ArrayList<>();
 
     private ChallengeSavedData() {}
 
@@ -443,13 +452,27 @@ public class ChallengeSavedData extends SavedData {
         return dailyIndex >= 0;
     }
 
+    public List<String> getAllBiomesVisited() {
+        return java.util.Collections.unmodifiableList(allBiomesVisited);
+    }
+
+    /** Records a visit; true only the first time this biome is seen in this world. */
+    public boolean addVisitedBiome(String biomeId) {
+        if (allBiomesVisited.contains(biomeId)) {
+            return false;
+        }
+        allBiomesVisited.add(biomeId);
+        setDirty();
+        return true;
+    }
+
     public void setDaily(int index, long epochDay) {
         this.dailyIndex = index;
         this.dailyEpochDay = epochDay;
         setDirty();
     }
 
-    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks, int dailyIndex, long dailyEpochDay) {
+    private record ChallengeProgress(List<ItemStack> allItemsOrder, int allItemsIndex, List<EntityType<?>> allEntitiesOrder, int allEntitiesIndex, List<Identifier> allAdvancementsOrder, int allAdvancementsIndex, List<String> progressiveBlocksOrder, int progressiveBlocksIndex, long runTicks, int dailyIndex, long dailyEpochDay, List<String> allBiomesVisited) {
         public static final MapCodec<ChallengeProgress> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 Codec.list(ItemStack.CODEC).fieldOf("allItemsOrder").forGetter(ChallengeProgress::allItemsOrder),
                 Codec.INT.fieldOf("allItemsIndex").forGetter(ChallengeProgress::allItemsIndex),
@@ -466,7 +489,9 @@ public class ChallengeSavedData extends SavedData {
                 // because that codec group is at its hard 16-field maximum, and it is world state:
                 // several players share one daily world.
                 Codec.INT.optionalFieldOf("dailyIndex", -1).forGetter(ChallengeProgress::dailyIndex),
-                Codec.LONG.optionalFieldOf("dailyEpochDay", 0L).forGetter(ChallengeProgress::dailyEpochDay)
+                Codec.LONG.optionalFieldOf("dailyEpochDay", 0L).forGetter(ChallengeProgress::dailyEpochDay),
+                // All Biomes (49). Optional with an empty default, like every field added after release.
+                Codec.list(Codec.STRING).optionalFieldOf("allBiomesVisited", List.of()).forGetter(ChallengeProgress::allBiomesVisited)
         ).apply(instance, ChallengeProgress::new));
     }
 }

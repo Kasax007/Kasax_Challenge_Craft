@@ -316,7 +316,11 @@ public class Chal_45_ForceItemBattle {
             "minecraft:egg", "minecraft:ender_chest",
             "minecraft:beacon", "minecraft:conduit",
             "minecraft:bell", "minecraft:lantern",
-            "minecraft:soul_lantern", "minecraft:chain"
+            "minecraft:soul_lantern", "minecraft:chain",
+            // --- 26.3 Wilderness Bound ---
+            "minecraft:poplar_log", "minecraft:poplar_planks", "minecraft:poplar_sapling", "minecraft:poplar_shelf",
+            "minecraft:red_shrub", "minecraft:shelf_mushroom", "minecraft:straw_bed", "minecraft:white_cushion",
+            "minecraft:white_wool_stairs", "minecraft:white_wool_slab", "minecraft:gray_concrete_stairs"
     );
 
     private static void buildPoolIfNeeded() {

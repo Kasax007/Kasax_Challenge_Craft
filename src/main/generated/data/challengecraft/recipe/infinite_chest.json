@@ -1,6 +1,5 @@
 {
   "type": "minecraft:crafting_shaped",
-  "category": "misc",
   "key": {
     "C": "minecraft:chest",
     "D": "minecraft:diamond_block"
@@ -11,7 +10,6 @@
     "DDD"
   ],
   "result": {
-    "count": 1,
     "id": "challengecraft:infinite_chest"
   }
 }

@@ -225,7 +225,7 @@ public class DailyCardWidget extends AbstractWidget {
         return true;
     }
 
-    private static void open() {
+    public static void open() {
         Minecraft mc = Minecraft.getInstance();
         DailyClientState.arm();
         // Ordinary world creation from here on. The daily only pre-fills and locks the Challenges

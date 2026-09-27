@@ -70,6 +70,23 @@ public final class TimerSettings {
     public float backgroundOpacity = 0.55f;
     public Format format = Format.AUTO;
 
+    // ---- challenge cards (HudStack) ------------------------------------------------------
+    // Stored in the same file as the timer: one "HUD settings" screen, one file.
+
+    public boolean cardsVisible = true;
+    /** Like {@link #customPosition}: false = centred at the top, as the cards always were. */
+    public boolean cardsCustom = false;
+    /** Top-centre of the card stack as a fraction of the screen. Only read when cardsCustom. */
+    public float cardsX = 0.5f;
+    public float cardsY = 0.02f;
+    public float cardsScale = 1.0f;
+
+    /**
+     * Hidden with the "toggle HUD" key. Deliberately not saved: a HUD that is still gone after a
+     * restart reads as a bug, not as a setting somebody chose weeks ago.
+     */
+    public static boolean hiddenByKey = false;
+
     private static TimerSettings instance;
 
     public static TimerSettings get() {
@@ -95,6 +112,11 @@ public final class TimerSettings {
         background = d.background;
         backgroundOpacity = d.backgroundOpacity;
         format = d.format;
+        cardsVisible = d.cardsVisible;
+        cardsCustom = d.cardsCustom;
+        cardsX = d.cardsX;
+        cardsY = d.cardsY;
+        cardsScale = d.cardsScale;
     }
 
     private static TimerSettings load() {
@@ -121,6 +143,11 @@ public final class TimerSettings {
             s.background = bool(root, "background", s.background);
             s.backgroundOpacity = clamp(flt(root, "backgroundOpacity", s.backgroundOpacity), 0f, 1f);
             s.format = enumOf(Format.class, str(root, "format", s.format.name()), s.format);
+            s.cardsVisible = bool(root, "cardsVisible", s.cardsVisible);
+            s.cardsCustom = bool(root, "cardsCustom", s.cardsCustom);
+            s.cardsX = clamp(flt(root, "cardsX", s.cardsX), 0f, 1f);
+            s.cardsY = clamp(flt(root, "cardsY", s.cardsY), 0f, 1f);
+            s.cardsScale = clamp(flt(root, "cardsScale", s.cardsScale), 0.5f, 2.0f);
         } catch (Exception e) {
             ChallengeCraft.LOGGER.warn("Timer-Einstellungen nicht lesbar ({}), nutze Standardwerte",
                     FILE, e);
@@ -165,6 +192,11 @@ public final class TimerSettings {
         root.addProperty("background", background);
         root.addProperty("backgroundOpacity", backgroundOpacity);
         root.addProperty("format", format.name());
+        root.addProperty("cardsVisible", cardsVisible);
+        root.addProperty("cardsCustom", cardsCustom);
+        root.addProperty("cardsX", cardsX);
+        root.addProperty("cardsY", cardsY);
+        root.addProperty("cardsScale", cardsScale);
         try {
             Files.createDirectories(FILE.getParent());
             Files.writeString(FILE, GSON.toJson(root), StandardCharsets.UTF_8);

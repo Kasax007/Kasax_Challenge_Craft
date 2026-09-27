@@ -33,7 +33,7 @@ public class Chal_27_NoArmor {
             ItemStack current = inv.getItem(slot);
             if (current.getItem() != Items.BARRIER) {
                 if (!current.isEmpty()) {
-                    player.drop(current, false);
+                    net.kasax.challengecraft.util.ServerDrops.dropQuietly(player, current);
                 }
                 inv.setItem(slot, BlockedBarrierItem.create());
             }

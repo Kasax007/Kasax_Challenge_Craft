@@ -28,6 +28,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.SwingAnimation;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -231,7 +232,8 @@ public class Chal_42_RandomMobSpawn {
             if (attackCooldown > 0) attackCooldown--;
             if (attackCooldown <= 0 && mob.distanceToSqr(target) < 4.0 && mob.level() instanceof ServerLevel serverWorld) {
                 target.hurtServer(serverWorld, serverWorld.damageSources().mobAttack(mob), 2.0f);
-                mob.swing(InteractionHand.MAIN_HAND);
+                // 26.3: Mob.swing(InteractionHand) removed; two-arg overload takes a SwingAnimation.
+                mob.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT);
                 attackCooldown = 20;
             }
         }

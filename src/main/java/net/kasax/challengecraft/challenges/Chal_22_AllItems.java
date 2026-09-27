@@ -228,6 +228,9 @@ public class Chal_22_AllItems {
             if (data.getActive().contains(23) && data.getAllEntitiesIndex() < data.getAllEntitiesOrder().size()) {
                 isGameComp = false;
             }
+            if (data.getActive().contains(49) && !Chal_49_AllBiomes.isComplete(server, data)) {
+                isGameComp = false;
+            }
 
             final boolean finalIsGameComp = isGameComp;
             eligiblePlayers.forEach(p -> {

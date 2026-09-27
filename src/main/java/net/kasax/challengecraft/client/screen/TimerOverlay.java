@@ -87,7 +87,7 @@ public class TimerOverlay {
     private static void onHudRender(GuiGraphicsExtractor ctx, DeltaTracker tickDelta) {
         Minecraft client = Minecraft.getInstance();
         TimerSettings s = TimerSettings.get();
-        if (client.player == null || basePlayTicks < 0 || !s.visible) {
+        if (client.player == null || basePlayTicks < 0 || !s.visible || TimerSettings.hiddenByKey) {
             return;
         }
         String timeString = formatted(s, basePlayTicks + extraTicks);

@@ -42,7 +42,7 @@ public class Chal_1_LevelItem {
                     Item pick = ALL_ITEMS.get(world.getRandom().nextInt(ALL_ITEMS.size()));
                     ItemStack reward = new ItemStack(pick, lv);
                     if (!player.getInventory().add(reward)) {
-                        player.drop(reward, false);
+                        net.kasax.challengecraft.util.ServerDrops.dropQuietly(player, reward);
                     }
                     player.giveExperienceLevels(-lv);
                 }

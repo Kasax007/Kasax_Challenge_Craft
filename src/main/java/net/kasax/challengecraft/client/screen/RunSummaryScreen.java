@@ -168,7 +168,10 @@ public class RunSummaryScreen extends Screen {
 
     private void openFolder() {
         java.nio.file.Path dir = savedFile != null ? savedFile.getParent() : RunSummaryImage.folder();
-        net.minecraft.util.Util.getPlatform().openPath(dir);
+        // 26.3: GLFW->SDL swap took Util.OS.openPath/openUri/openFile with it (OS is now a bare
+        // telemetry-name enum). The "open a path in the OS file browser" call lives on
+        // com.mojang.blaze3d.Blaze3D now (SDL_OpenURL under the hood) — same fire-and-forget contract.
+        com.mojang.blaze3d.Blaze3D.openPath(dir);
     }
 
     /** Always through the vanilla confirmation dialog — the mod never opens a browser unasked. */
@@ -210,7 +213,26 @@ public class RunSummaryScreen extends Screen {
             text = Component.translatable("challengecraft.summary.share.competitive",
                     String.valueOf(summary.placement), String.valueOf(summary.participants), MODPACK_URL);
         }
-        return text.getString() + " " + HASHTAGS;
+        return text.getString() + " "
+                + Component.translatable("challengecraft.summary.share.code", shareCode()).getString()
+                + " " + HASHTAGS;
+    }
+
+    private String shareCode;
+
+    /**
+     * The run as a challenge code: a daily's own, otherwise this world's challenges, sliders and
+     * seed as the server last synced them. Built once — the card is drawn every frame.
+     */
+    private String shareCode() {
+        if (shareCode == null) {
+            var code = summary.daily && summary.dailyIndex >= 0
+                    ? net.kasax.challengecraft.client.ChallengeCodeClient.ofDaily(
+                            net.kasax.challengecraft.daily.DailyChallenges.get(summary.dailyIndex))
+                    : net.kasax.challengecraft.client.ChallengeCodeClient.ofSyncedWorld(summary.activeIds);
+            shareCode = code.encode();
+        }
+        return shareCode;
     }
 
     /**
@@ -281,8 +303,8 @@ public class RunSummaryScreen extends Screen {
         y = drawHeadline(context, y);
         y = drawBigNumber(context, y);
         y = drawChallengeIcons(context, y);
-        drawChips(context, y);
-        drawFooter(context);
+        y = drawChips(context, y);
+        drawFooter(context, y);
     }
 
     /**
@@ -434,7 +456,7 @@ public class RunSummaryScreen extends Screen {
         return y + CraftUI.S.XS;
     }
 
-    private void drawChips(GuiGraphicsExtractor context, int y) {
+    private int drawChips(GuiGraphicsExtractor context, int y) {
         String diff = String.format(Locale.ROOT, "%.1f", summary.difficulty);
         Component left = Component.translatable("challengecraft.summary.difficulty", diff);
         Component right = Component.translatable("challengecraft.summary.xp",
@@ -452,13 +474,34 @@ public class RunSummaryScreen extends Screen {
                 summary.xpGained > 0 ? CraftUI.GOLD : CraftUI.BORDER);
         context.text(this.font, right.getString(), x + 6, y + 3,
                 summary.xpGained > 0 ? CraftUI.GOLD : CraftUI.TEXT_MUTED, false);
+        return y + 14;
     }
 
-    /** Date and mod name, so a screenshot passed around still says where it came from. */
-    private void drawFooter(GuiGraphicsExtractor context) {
+    /**
+     * Date and mod name, so a screenshot passed around still says where it came from — and the
+     * run's challenge code, so whoever sees the picture can play the very same run.
+     *
+     * <p>The code gets its own line above the footer when the card has room (it runs to ~40
+     * characters with a random seed); on a full card it shrinks into the gap between date and name.
+     */
+    private void drawFooter(GuiGraphicsExtractor context, int contentBottom) {
         String date = summary.daily ? dailyDateText()
                 : LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         int y = CARD_H - PAD - this.font.lineHeight + 2;
+        Component code = Component.literal(shareCode());
+        int codeLineY = y - this.font.lineHeight - 3;
+        if (codeLineY >= contentBottom + 2) {
+            float scale = Math.min(1f, (CARD_W - 2f * PAD) / this.font.width(code));
+            CraftUI.drawCenteredScaled(context, this.font, code, CARD_W / 2,
+                    codeLineY + this.font.lineHeight / 2, scale, CraftUI.GOLD);
+        } else {
+            int gap = CARD_W - 2 * PAD - this.font.width(date) - this.font.width("Challenge Craft") - 16;
+            float scale = Math.min(1f, gap / (float) this.font.width(code));
+            if (scale >= 0.5f) {
+                CraftUI.drawCenteredScaled(context, this.font, code, CARD_W / 2,
+                        y + this.font.lineHeight / 2 - 1, scale, CraftUI.GOLD);
+            }
+        }
         context.text(this.font, date, PAD, y, CraftUI.TEXT_MUTED, false);
         String brand = "Challenge Craft";
         context.text(this.font, brand, CARD_W - PAD - this.font.width(brand), y,

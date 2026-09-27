@@ -15,11 +15,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /** Redirects selected death drops for active inventory-based challenges. */
 public abstract class MixinPlayerEntityDrop {
     @Inject(
-            method = "drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;",
+            // 26.3: drop(ItemStack, boolean randomly, boolean thrownFromHand) became
+            // drop(ItemStack, boolean thrownFromHand, Prediction); ServerPlayer's override still
+            // ends in super.drop, so this one injection keeps covering every player drop.
+            method = "drop(Lnet/minecraft/world/item/ItemStack;ZLnet/minecraft/util/Prediction;)Lnet/minecraft/world/entity/item/ItemEntity;",
             at = @At("HEAD"),
             cancellable = true
     )
-    private void onAnyDrop(ItemStack stack, boolean dropAtSelf, boolean retainOwnership, CallbackInfoReturnable<ItemEntity> cir) {
+    private void onAnyDrop(ItemStack stack, boolean thrownFromHand, net.minecraft.util.Prediction prediction, CallbackInfoReturnable<ItemEntity> cir) {
         if (!Chal_12_LimitedInventory.isActive()) return;
 
         LivingEntity self = (LivingEntity)(Object)this;

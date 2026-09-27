@@ -28,6 +28,12 @@ public class ChallengePacket implements CustomPacketPayload {
      * player's level without opening a hole through which any client could request any challenge.
      */
     public final int           dailyIndex;
+    /**
+     * The challenge code this selection was loaded from, or "" for none. Like {@link #dailyIndex} it
+     * is checked, not trusted: the server decodes it and requires its challenges to be exactly the
+     * ones in {@link #active} before it waives the level lock or uses the code's seed.
+     */
+    public final String        code;
 
     public static final Type<ChallengePacket> ID =
             new Type<>(Identifier.fromNamespaceAndPath("challengecraft", "update_challenges"));
@@ -53,6 +59,10 @@ public class ChallengePacket implements CustomPacketPayload {
                             // world: the decoder below reads it unconditionally, so the two halves
                             // have to be edited together. Always.
                             buf.writeVarInt(pkt.dailyIndex + 1);
+                            // 512, not 128: a code with most challenges on and a random 64-bit
+                            // seed runs past 140 characters, and an over-long writeUtf throws on
+                            // the sending client, which drops the player out of the world.
+                            buf.writeUtf(pkt.code, 512);
                         }
                     },
                     new StreamDecoder<FriendlyByteBuf, ChallengePacket>() {
@@ -76,7 +86,8 @@ public class ChallengePacket implements CustomPacketPayload {
                             }
                             boolean restart = buf.readBoolean();
                             int dailyIndex = buf.readVarInt() - 1;
-                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, fibMinutes, perks, restart, dailyIndex);
+                            String code = buf.readUtf(512);
+                            return new ChallengePacket(list, hearts, slots, mobHealth, doubleTrouble, gameSpeed, fibMinutes, perks, restart, dailyIndex, code);
                         }
                     }
             );
@@ -86,6 +97,11 @@ public class ChallengePacket implements CustomPacketPayload {
     }
 
     public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks, boolean restart, int dailyIndex) {
+        this(active, maxHearts, slots, mobHealth, doubleTrouble, gameSpeed, forceItemBattleMinutes, perks, restart, dailyIndex, "");
+    }
+
+    public ChallengePacket(List<Integer> active, int maxHearts, int slots, int mobHealth, int doubleTrouble, int gameSpeed, int forceItemBattleMinutes, List<Integer> perks, boolean restart, int dailyIndex, String code) {
+        this.code = code == null ? "" : code;
         this.dailyIndex = dailyIndex;
         this.active    = active;
         this.maxHearts = maxHearts;

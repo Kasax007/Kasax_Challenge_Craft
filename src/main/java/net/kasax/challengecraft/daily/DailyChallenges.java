@@ -35,7 +35,7 @@ public final class DailyChallenges {
 
     /** Ids that must never appear in a daily, with the reason, used by {@link #validate()}. */
     private static final List<int[]> FORBIDDEN = List.of(
-            new int[]{22}, new int[]{23}, new int[]{26},   // open-ended collections
+            new int[]{22}, new int[]{23}, new int[]{26}, new int[]{49},   // open-ended collections
             new int[]{40}, new int[]{45}                    // lobby minigames
     );
 
@@ -45,6 +45,10 @@ public final class DailyChallenges {
      * the web claims. Those lists are almost all written for older versions and copied forward, and
      * worldgen changes between versions, so their claims do not transfer. A daily seed reaches every
      * player and cannot be corrected afterwards.
+     *
+     * <p>Re-measured on 26.3 (2026-09-26): spawn biome, height range, water share and every structure
+     * distance quoted below are unchanged from 26.2. Five seeds now also see a dappled forest in
+     * their sample, so a biome count went up by one where one is quoted.
      *
      * <p>The seed is chosen to argue with the ruleset rather than to be pretty: a village you may
      * not trade with, a mountain when you may only go down, a desert when you have no crafting
@@ -76,7 +80,8 @@ public final class DailyChallenges {
             DailyEntry.of("challengecraft.daily.chaos_night", 35, 33, 42)
                     .withDoubleTrouble(5)
                     .withSeed(987654321L),
-            // Dark forest with 30 distinct biomes around spawn — the most of everything measured.
+            // Dark forest with 31 distinct biomes around spawn (30 in 26.2; 26.3 added the dappled
+            // forest to the sample) — the most of everything measured.
             // A quiz run should send you past as many different blocks as possible.
             DailyEntry.of("challengecraft.daily.quiz_run", 36, 5, 27)
                     .withSeed(12345L),

@@ -4,6 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.kasax.challengecraft.client.config.TimerSettings;
 import net.kasax.challengecraft.client.ui.CraftUI;
+import net.kasax.challengecraft.client.ui.HudStack;
 import net.kasax.challengecraft.client.widget.CraftButton;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -48,6 +49,8 @@ public class TimerSettingsScreen extends Screen {
 
     /** Set while the player is dragging the preview, with the grab offset inside the box. */
     private boolean dragging;
+    /** The same, for the challenge-card preview. */
+    private boolean draggingCards;
     private int grabDx;
     private int grabDy;
 
@@ -144,6 +147,74 @@ public class TimerSettingsScreen extends Screen {
                 () -> Component.translatable("challengecraft.timer.format." + s.format.name().toLowerCase()),
                 () -> s.format = TimerSettings.Format.values()[
                         (s.format.ordinal() + 1) % TimerSettings.Format.values().length]));
+
+        // The challenge cards (All Items, Dice, Red Light, ...): one stack, moved and sized as a whole.
+        row(y, header("challengecraft.hud.section.cards"));
+        row(y, toggle("challengecraft.hud.cards_visible", x, w, () -> s.cardsVisible, v -> s.cardsVisible = v));
+        int[] box = HudStack.bounds(this.font, previewRows(), this.width, this.height, s);
+        float cardsX = (box[0] + box[2] / 2f) / this.width;
+        float cardsY = box[1] / (float) this.height;
+        row(y, positionSlider("challengecraft.hud.cards_x", x, w, cardsX, this.width, v -> {
+            takeOverCards();
+            s.cardsX = v;
+        }));
+        row(y, positionSlider("challengecraft.hud.cards_y", x, w, cardsY, this.height, v -> {
+            takeOverCards();
+            s.cardsY = v;
+        }));
+        row(y, new AbstractSliderButton(x, 0, w, 20, Component.empty(), (s.cardsScale - 0.5f) / 1.5f) {
+            {
+                updateMessage();
+            }
+
+            @Override
+            protected void updateMessage() {
+                setMessage(Component.translatable("challengecraft.hud.cards_scale").append(": ")
+                        .append(String.format("%.2f×", 0.5 + this.value * 1.5)));
+            }
+
+            @Override
+            protected void applyValue() {
+                s.cardsScale = Math.round((0.5f + (float) this.value * 1.5f) * 20f) / 20f;
+                s.markDirty();
+            }
+        });
+        row(y, new CraftButton(x, 0, w, 20, Component.translatable("challengecraft.hud.cards_recenter"),
+                CraftButton.Style.NEUTRAL, b -> {
+            s.cardsCustom = false;
+            s.save();
+            rebuild();
+        }));
+    }
+
+    /**
+     * Before the first move the cards sit at their automatic spot (top centre); the stored fraction
+     * takes over from exactly there, so the other axis does not jump.
+     */
+    private void takeOverCards() {
+        if (!s.cardsCustom) {
+            int[] box = HudStack.bounds(this.font, previewRows(), this.width, this.height, s);
+            s.cardsX = (box[0] + box[2] / 2f) / this.width;
+            s.cardsY = box[1] / (float) this.height;
+            s.cardsCustom = true;
+        }
+    }
+
+    /**
+     * Two sample cards for the preview. Icons come from ChallengeIconProvider, which binds item
+     * components itself: this screen is reachable from the title screen, where a plain
+     * {@code new ItemStack(...)} would throw "Components not bound yet".
+     */
+    private java.util.Map<Integer, java.util.List<net.kasax.challengecraft.client.ui.HudCard>> previewRows() {
+        var rows = new java.util.TreeMap<Integer, java.util.List<net.kasax.challengecraft.client.ui.HudCard>>();
+        rows.put(0, java.util.List.of(
+                new net.kasax.challengecraft.client.ui.HudCard("preview_items", ChallengeIconProvider.getIcon(22),
+                        Component.translatable("challengecraft.worldcreate.challenge22"), Component.literal("412 / 1250"),
+                        0.33f, CraftUI.GOLD, 0),
+                new net.kasax.challengecraft.client.ui.HudCard("preview_light", ChallengeIconProvider.getIcon(48),
+                        Component.translatable("challengecraft.red_light.hud.red"),
+                        Component.translatable("challengecraft.red_light.hud.freeze"), 0f, CraftUI.DANGER, 0)));
+        return rows;
     }
 
     private void row(int[] y, AbstractWidget widget) {
@@ -237,10 +308,11 @@ public class TimerSettingsScreen extends Screen {
 
             @Override
             public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-                int step = event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT
-                        || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN ? -1
-                        : event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT
-                        || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_UP ? 1 : 0;
+                // 26.3: GLFW replaced by SDL; GLFW_KEY_* moved onto com.mojang.blaze3d.platform.InputConstants.
+                int step = event.key() == com.mojang.blaze3d.platform.InputConstants.KEY_LEFT
+                        || event.key() == com.mojang.blaze3d.platform.InputConstants.KEY_DOWN ? -1
+                        : event.key() == com.mojang.blaze3d.platform.InputConstants.KEY_RIGHT
+                        || event.key() == com.mojang.blaze3d.platform.InputConstants.KEY_UP ? 1 : 0;
                 if (step == 0 || span <= 0) {
                     return super.keyPressed(event);
                 }
@@ -344,6 +416,19 @@ public class TimerSettingsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        boolean overControls = event.x() >= panelX && event.x() < panelX + panelW
+                && event.y() >= panelY && event.y() < panelY + panelH;
+        if (s.cardsVisible && !overControls) {
+            int[] cards = HudStack.bounds(this.font, previewRows(), this.width, this.height, s);
+            if (event.x() >= cards[0] && event.x() < cards[0] + cards[2]
+                    && event.y() >= cards[1] && event.y() < cards[1] + cards[3]) {
+                takeOverCards();
+                draggingCards = true;
+                grabDx = (int) event.x() - cards[0];
+                grabDy = (int) event.y() - cards[1];
+                return true;
+            }
+        }
         int[] box = TimerOverlay.bounds(this.font, SAMPLE, s, this.width, this.height);
         boolean onTimer = event.x() >= box[0] && event.x() < box[0] + box[2]
                 && event.y() >= box[1] && event.y() < box[1] + box[3];
@@ -362,6 +447,15 @@ public class TimerSettingsScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        if (draggingCards) {
+            int[] cards = HudStack.bounds(this.font, previewRows(), this.width, this.height, s);
+            int left = (int) event.x() - grabDx;
+            int top = (int) event.y() - grabDy;
+            s.cardsX = Math.max(0f, Math.min(1f, (left + cards[2] / 2f) / this.width));
+            s.cardsY = Math.max(0f, Math.min(1f, top / (float) this.height));
+            s.markDirty();
+            return true;
+        }
         if (dragging) {
             int[] box = TimerOverlay.bounds(this.font, SAMPLE, s, this.width, this.height);
             int left = (int) event.x() - grabDx;
@@ -383,6 +477,12 @@ public class TimerSettingsScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
+        if (draggingCards) {
+            draggingCards = false;
+            s.flush();
+            rebuild();
+            return true;
+        }
         if (dragging) {
             dragging = false;
             s.flush();
@@ -429,6 +529,9 @@ public class TimerSettingsScreen extends Screen {
         if (s.visible) {
             TimerOverlay.draw(ctx, this.font, SAMPLE, s, this.width, this.height,
                     dragging ? 0.75f : 1.0f);
+        }
+        if (s.cardsVisible) {
+            HudStack.draw(ctx, this.font, previewRows(), this.width, this.height, s, false);
         }
 
         super.extractRenderState(ctx, mouseX, mouseY, delta);

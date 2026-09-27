@@ -168,15 +168,15 @@ public class LevelManager {
             case 8, 13, 43 -> 4;
             case 11, 12, 27 -> 5;
             case 20, 26, 44 -> 6;
-            case 21, 38, 41 -> 7;
+            case 21, 38, 41, 48 -> 7;
             case 24, 28, 30 -> 8;
             case 25, 31, 46 -> 9;
-            case 9, 32 -> 10;
+            case 9, 32, 47 -> 10;
             case 29 -> 11;
             case 2, 33 -> 12;
             case 3, 39 -> 13;
             case 34 -> 14;
-            case 23 -> 15;
+            case 23, 49 -> 15;
             case 14 -> 16;
             case 15 -> 17;
             case 36 -> 17;

@@ -325,7 +325,7 @@ public class Chal_46_Dice {
         Vec3 velocity = player.getDeltaMovement();
         if (velocity.x != 0.0 || velocity.z != 0.0) {
             player.setDeltaMovement(0.0, velocity.y, 0.0);
-            player.hurtMarked = true;   // forces the change down to the client, which owns its own position
+            player.syncVelocity = true;   // 26.3: Entity.hurtMarked renamed to syncVelocity; ServerEntity still reads this to force a ClientboundSetEntityMotionPacket down to the client, which owns its own position
         }
 
         Vec3 anchor = ANCHOR.get(uuid);

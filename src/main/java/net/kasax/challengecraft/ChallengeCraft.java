@@ -122,6 +122,9 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_44_ProgressiveBlockDrops.register();
 		Chal_45_ForceItemBattle.register();
 		net.kasax.challengecraft.challenges.Chal_46_Dice.register();
+		net.kasax.challengecraft.challenges.Chal_47_CushionOnly.register();
+		net.kasax.challengecraft.challenges.Chal_48_RedLight.register();
+		net.kasax.challengecraft.challenges.Chal_49_AllBiomes.register();
 		net.kasax.challengecraft.data.BlockSurvey.register();
 		net.kasax.challengecraft.daily.SeedProbe.register();
 		net.kasax.challengecraft.data.RegistryIdAudit.register();
@@ -146,6 +149,15 @@ public class ChallengeCraft implements ModInitializer {
 								return 1;
 							}))
 			);
+
+			dispatcher.register(Commands.literal("challengecraft_skip_biome")
+					.requires(source -> ModPermissions.isOp(source))
+					.executes(context -> {
+						boolean done = net.kasax.challengecraft.challenges.Chal_49_AllBiomes.skipBiome(context.getSource().getServer());
+						context.getSource().sendSuccess(() -> Component.translatable(done
+								? "challengecraft.command.skip_biome.done" : "challengecraft.command.all_biomes.inactive"), true);
+						return 1;
+					}));
 
 			dispatcher.register(Commands.literal("challengecraft_all_items_list")
 					.executes(context -> {
@@ -491,6 +503,14 @@ public class ChallengeCraft implements ModInitializer {
 				net.kasax.challengecraft.network.DiceSyncPacket.CODEC
 		);
 		PayloadTypeRegistry.clientboundPlay().register(
+				net.kasax.challengecraft.network.RedLightSyncPacket.ID,
+				net.kasax.challengecraft.network.RedLightSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.clientboundPlay().register(
+				net.kasax.challengecraft.network.AllBiomesSyncPacket.ID,
+				net.kasax.challengecraft.network.AllBiomesSyncPacket.CODEC
+		);
+		PayloadTypeRegistry.clientboundPlay().register(
 				StatsSyncPacket.ID,
 				StatsSyncPacket.CODEC
 		);
@@ -608,6 +628,10 @@ public class ChallengeCraft implements ModInitializer {
 		}
 		if (data.getActive().contains(44)) {
 			player.sendSystemMessage(Component.translatable("challengecraft.command.progressive_blocks.reminder")
+					.withStyle(ChatFormatting.GOLD));
+		}
+		if (data.getActive().contains(49)) {
+			player.sendSystemMessage(Component.translatable("challengecraft.command.all_biomes.reminder")
 					.withStyle(ChatFormatting.GOLD));
 		}
 	}

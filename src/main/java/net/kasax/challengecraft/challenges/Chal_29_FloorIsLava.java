@@ -40,8 +40,35 @@ public class Chal_29_FloorIsLava {
     public static boolean isNaturalGround(BlockState state) {
         if (state.isAir()) return false;
 
-        return state.is(BlockTags.OVERWORLD_CARVER_REPLACEABLES)   // stone family, dirt/grass, sand, gravel, terracotta, snow…
-                || state.is(BlockTags.NETHER_CARVER_REPLACEABLES)  // netherrack, basalt, blackstone, nylium, soul sand/soil
+        // 26.3: BlockTags.OVERWORLD_CARVER_REPLACEABLES / NETHER_CARVER_REPLACEABLES were removed.
+        // The replacement, BlockTags.UNCARVABLE, inverted the semantics (it's now just a bedrock
+        // blacklist, not a terrain whitelist) so it can't stand in here without making nearly every
+        // block "natural ground". Inlined the same block set the two old tags actually expanded to
+        // (per 26.2's VanillaBlockTagsProvider) via their still-present constituent tags/blocks.
+        return state.is(BlockTags.BASE_STONE_OVERWORLD)    // stone, granite, diorite, andesite, tuff, deepslate
+                || state.is(BlockTags.SUBSTRATE_OVERWORLD) // dirt/grass, mud, moss
+                || state.is(BlockTags.SAND)
+                || state.is(BlockTags.TERRACOTTA)
+                || state.is(BlockTags.IRON_ORES)
+                || state.is(BlockTags.COPPER_ORES)
+                || state.is(BlockTags.SNOW)
+                || state.is(Blocks.WATER)
+                || state.is(Blocks.GRAVEL)
+                || state.is(Blocks.SUSPICIOUS_GRAVEL)
+                || state.is(Blocks.SANDSTONE)
+                || state.is(Blocks.RED_SANDSTONE)
+                || state.is(Blocks.CALCITE)
+                || state.is(Blocks.PACKED_ICE)
+                || state.is(Blocks.RAW_IRON_BLOCK)
+                || state.is(Blocks.RAW_COPPER_BLOCK)
+                || state.is(Blocks.CINNABAR)
+                || state.is(Blocks.SULFUR)
+                || state.is(Blocks.POTENT_SULFUR)
+                || state.is(BlockTags.BASE_STONE_NETHER)   // netherrack, basalt, blackstone
+                || state.is(BlockTags.NYLIUM)
+                || state.is(BlockTags.WART_BLOCKS)
+                || state.is(Blocks.SOUL_SAND)
+                || state.is(Blocks.SOUL_SOIL)
                 || state.is(BlockTags.ICE)
                 || state.is(BlockTags.CORAL_BLOCKS)
                 || state.is(Blocks.END_STONE)

@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BuiltinStructures;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -84,6 +85,8 @@ public final class SeedProbe {
         WANTED.put("trial_chambers", BuiltinStructures.TRIAL_CHAMBERS);
         WANTED.put("trail_ruins", BuiltinStructures.TRAIL_RUINS);
         WANTED.put("stronghold", BuiltinStructures.STRONGHOLD);
+        // 26.3: one structure per biome variant; the dappled-forest one is the new biome's own.
+        WANTED.put("abandoned_camp_dappled_forest", BuiltinStructures.ABANDONED_CAMP_DAPPLED_FOREST);
     }
 
     private SeedProbe() {
@@ -124,13 +127,17 @@ public final class SeedProbe {
         BlockPos spawn = level.getRespawnData().pos();
         var chunks = level.getChunkSource();
         var generator = chunks.getGenerator();
-        var sampler = chunks.randomState().sampler();
+        // 26.3: RandomState.sampler() removed; a Climate.Sampler is no longer precomputed and
+        // stashed on RandomState. Build a BiomeResolver once instead (same one-time cost as the
+        // old field read) and query it directly — BiomeResolver.getNoiseBiome no longer takes a
+        // sampler argument, since the resolver already closes over one.
+        BiomeResolver biomeResolver = generator.getBiomeSource().createUncachedResolver(chunks.randomState());
 
         StringBuilder sb = new StringBuilder(512);
         sb.append("{\"seed\":").append(level.getSeed());
         sb.append(",\"spawn\":[").append(spawn.getX()).append(',').append(spawn.getZ()).append(']');
         sb.append(",\"spawn_biome\":\"")
-                .append(biomeAt(generator, sampler, spawn.getX(), spawn.getY(), spawn.getZ()))
+                .append(biomeAt(biomeResolver, spawn.getX(), spawn.getY(), spawn.getZ()))
                 .append('"');
 
         // Terrain shape around spawn. Surface height alone separates "flat plains" from "you spawn
@@ -152,7 +159,7 @@ public final class SeedProbe {
                     water++;
                 }
                 samples++;
-                biomes.add(biomeAt(generator, sampler, x, h, z));
+                biomes.add(biomeAt(biomeResolver, x, h, z));
             }
         }
         sb.append(",\"surface_min\":").append(min).append(",\"surface_max\":").append(max);
@@ -186,14 +193,11 @@ public final class SeedProbe {
         return sb.toString();
     }
 
-    private static String biomeAt(net.minecraft.world.level.chunk.ChunkGenerator generator,
-                                  net.minecraft.world.level.biome.Climate.Sampler sampler,
-                                  int x, int y, int z) {
+    private static String biomeAt(BiomeResolver biomeResolver, int x, int y, int z) {
         // Quart coordinates: the biome grid is one cell per 4 blocks. Going through the biome source
         // rather than level.getBiome keeps this from generating chunks, which is the whole trick
         // that makes a sweep affordable.
-        Holder<Biome> biome = generator.getBiomeSource()
-                .getNoiseBiome(x >> 2, y >> 2, z >> 2, sampler);
+        Holder<Biome> biome = biomeResolver.getNoiseBiome(x >> 2, y >> 2, z >> 2);
         return biome.unwrapKey().<String>map(k -> k.identifier().getPath()).orElse("?");
     }
 }

@@ -127,6 +127,11 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ProgressiveBlocksHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.ForceItemHUD::buildCard, 0);
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.DiceHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.RedLightHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.AllBiomesHUD::buildCard, 0);
+        net.kasax.challengecraft.client.ChallengeKeys.register();
+        net.kasax.challengecraft.client.SoundCues.register();
+        net.kasax.challengecraft.client.RunHistory.register();
         net.kasax.challengecraft.client.screen.DiceReachRenderer.register();
         net.kasax.challengecraft.client.screen.ForceItemHeadIconRenderer.register();
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
@@ -172,6 +177,9 @@ public class ChallengeCraftClient implements ClientModInitializer {
             // A card from the previous world must not pop up in the next one — client statics
             // survive the world change, the run they describe does not.
             net.kasax.challengecraft.network.RunSummaryHandler.reset();
+            net.kasax.challengecraft.client.ChallengeCodeClient.setSyncedWorldSeed(null);
+            net.kasax.challengecraft.client.screen.RedLightHUD.reset();
+            net.kasax.challengecraft.client.screen.AllBiomesHUD.reset();
             // Ordered-progress HUDs keep their counters in statics. Leaving a world must drop them,
             // or a save-and-restart shows the previous world's progress until the new world's first
             // progress packet lands — which reads exactly like the restart failed to reset anything.

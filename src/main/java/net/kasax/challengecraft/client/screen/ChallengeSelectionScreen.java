@@ -7,6 +7,7 @@ import net.kasax.challengecraft.LevelManager;
 import net.kasax.challengecraft.client.ui.Anim;
 import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.CraftButton;
+import net.kasax.challengecraft.client.widget.SettableSlider;
 import net.kasax.challengecraft.data.ChallengeSavedData;
 import net.kasax.challengecraft.network.ChallengePacket;
 import net.minecraft.client.Minecraft;
@@ -27,42 +28,20 @@ import java.util.Map;
 /** In-world challenge editor used after a save already exists. */
 public class ChallengeSelectionScreen extends Screen {
     private static final List<Integer> IDS = new ArrayList<>(List.of(
-            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 30, 24, 28, 31, 25, 46, 32, 9, 29, 33, 2, 3, 39, 34, 23, 14, 36, 15, 35, 19, 22
+            1, 10, 16, 17, 18, 40, 45, 4, 5, 42, 6, 7, 37, 8, 13, 43, 11, 27, 12, 20, 26, 44, 21, 38, 41, 48, 30, 24, 28, 31, 25, 46, 32, 9, 47, 29, 33, 2, 3, 39, 34, 23, 49, 14, 36, 15, 35, 19, 22
     ));
-
-    private enum Category {
-        DROPS("challengecraft.category.drops"),
-        WORLD("challengecraft.category.world"),
-        COMBAT("challengecraft.category.combat"),
-        CHAOS("challengecraft.category.chaos");
-
-        final String key;
-
-        Category(String key) {
-            this.key = key;
-        }
-    }
-
-    private static Category categoryOf(int id) {
-        return switch (id) {
-            case 2, 3, 4, 14, 15, 34, 44 -> Category.DROPS;
-            case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39, 41, 42, 43, 46 -> Category.COMBAT;
-            case 10, 13, 16, 17, 18, 19, 20, 33, 36, 37 -> Category.CHAOS;
-            default -> Category.WORLD;
-        };
-    }
 
     private final List<ChallengeCardWidget> cards = new ArrayList<>();
     private final List<ChallengeCardWidget> perkCards = new ArrayList<>();
     private final Map<Integer, ChallengeCardWidget> cardById = new HashMap<>();
     private final Map<Integer, AbstractSliderButton> sliderById = new HashMap<>();
 
-    private AbstractSliderButton maxHealthSlider;
-    private AbstractSliderButton slotsSlider;
-    private AbstractSliderButton mobHealthSlider;
-    private AbstractSliderButton doubleTroubleSlider;
-    private AbstractSliderButton gameSpeedSlider;
-    private AbstractSliderButton fibMinutesSlider;
+    private SettableSlider maxHealthSlider;
+    private SettableSlider slotsSlider;
+    private SettableSlider mobHealthSlider;
+    private SettableSlider doubleTroubleSlider;
+    private SettableSlider gameSpeedSlider;
+    private SettableSlider fibMinutesSlider;
 
     private WidgetScrollPanel scrollPanel;
     private CraftButton saveButton;
@@ -77,9 +56,9 @@ public class ChallengeSelectionScreen extends Screen {
     private net.kasax.challengecraft.client.widget.DailyCardWidget dailyCard;
     private CraftButton saveAndRestartButton;
 
-    private final boolean[] categoryExpanded = {true, true, true, true};
-    private boolean perksExpanded = true;
     private boolean needsRelayout;
+    /** Search, filters and sections; survives the init() a resize or the code dialog triggers. */
+    private final ChallengeBrowser browser = new ChallengeBrowser(() -> needsRelayout = true);
 
     private int panelX;
     private int panelTop;
@@ -102,8 +81,65 @@ public class ChallengeSelectionScreen extends Screen {
     private Component difficultyText = Component.empty();
     private double currentDifficulty = -1;
 
+    /** Unsaved screen state carried across the init() that returning from the code dialog runs. */
+    private record Restore(net.kasax.challengecraft.code.ChallengeCode setup, List<Integer> perks, boolean daily) {
+    }
+
+    private Restore restore;
+    /**
+     * The code last loaded here. Sent along while the ticked challenges and perks still match it, so
+     * Save and Restart can use its seed. It never lifts a level lock.
+     */
+    private net.kasax.challengecraft.code.ChallengeCode importedCode;
+
     public ChallengeSelectionScreen() {
         super(Component.translatable("challengecraft.challenge_selection.title"));
+    }
+
+    /** What is on screen, as a code: the cards and sliders, and this world's seed. */
+    private net.kasax.challengecraft.code.ChallengeCode currentCode() {
+        if (dailyChosen) {
+            return net.kasax.challengecraft.client.ChallengeCodeClient.ofDaily(
+                    net.kasax.challengecraft.daily.DailyChallenges.get(
+                            net.kasax.challengecraft.daily.DailyManager.todayIndex()));
+        }
+        Long seed = importedCode != null && matchesImported(getActiveIds()) && importedCode.hasSeed()
+                ? importedCode.seed()
+                : net.kasax.challengecraft.client.ChallengeCodeClient.currentWorldSeed();
+        return net.kasax.challengecraft.code.ChallengeCode.of(getActiveIds(), getActivePerks(), sliderTicks,
+                slotsSliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, gameSpeedMultiplier, fibMinutes, seed);
+    }
+
+    private boolean matchesImported(List<Integer> ids) {
+        return importedCode != null
+                && new java.util.HashSet<>(ids).equals(new java.util.HashSet<>(importedCode.challengeIds()))
+                && new java.util.HashSet<>(getActivePerks()).equals(new java.util.HashSet<>(importedCode.perkIds()));
+    }
+
+    private void openCodeScreen() {
+        net.kasax.challengecraft.code.ChallengeCode now = currentCode();
+        // Snapshot the cards themselves (a daily's code is not what the cards show).
+        this.restore = new Restore(net.kasax.challengecraft.code.ChallengeCode.of(getActiveIds(), getActivePerks(),
+                sliderTicks, slotsSliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, gameSpeedMultiplier,
+                fibMinutes, null), getActivePerks(), dailyChosen);
+        this.minecraft.setScreenAndShow(new ChallengeCodeScreen(this, now,
+                Component.translatable("challengecraft.code.hint.in_world"), this::loadSetup));
+    }
+
+    private void openPresetScreen() {
+        net.kasax.challengecraft.code.ChallengeCode now = currentCode();
+        this.restore = new Restore(net.kasax.challengecraft.code.ChallengeCode.of(getActiveIds(), getActivePerks(),
+                sliderTicks, slotsSliderTicks, mobHealthMultiplier, doubleTroubleMultiplier, gameSpeedMultiplier,
+                fibMinutes, null), getActivePerks(), dailyChosen);
+        this.minecraft.setScreenAndShow(new PresetScreen(this, now,
+                Component.translatable("challengecraft.code.hint.in_world"), this::loadSetup));
+    }
+
+    /** A code or preset was chosen: put it on the cards and come back here. */
+    private void loadSetup(net.kasax.challengecraft.code.ChallengeCode code) {
+        this.importedCode = code;
+        this.restore = new Restore(code, code.perkIds(), false);
+        this.minecraft.setScreenAndShow(this);
     }
 
     private void updateDifficultyText() {
@@ -196,6 +232,21 @@ public class ChallengeSelectionScreen extends Screen {
         if (savedGameSpeedMult <= 0) savedGameSpeedMult = 1;
         if (savedFibMinutes <= 0) savedFibMinutes = 60;
 
+        // Back from the code dialog: init() runs again and would reset every card to the saved
+        // world state, throwing away what was ticked (or just loaded from a code) but not saved yet.
+        if (restore != null) {
+            active = restore.setup().challengeIds();
+            activePerks = restore.perks();
+            savedMaxHeartsTicks = restore.setup().maxHearts();
+            savedSlots = restore.setup().inventorySlots();
+            savedMobHealthMult = restore.setup().mobHealth();
+            savedDoubleTroubleMult = restore.setup().doubleTrouble();
+            savedGameSpeedMult = restore.setup().gameSpeed();
+            savedFibMinutes = restore.setup().fibMinutes();
+            dailyChosen = restore.daily();
+            restore = null;
+        }
+
         sliderTicks = savedMaxHeartsTicks;
         sliderValue = (sliderTicks - 1) / 19.0;
         slotsSliderTicks = savedSlots;
@@ -211,7 +262,13 @@ public class ChallengeSelectionScreen extends Screen {
 
         this.panelWidth = 300;
         this.panelX = width / 2 - panelWidth / 2;
-        this.panelTop = 40;
+        // Search | Category | Show, between the difficulty line and the list.
+        int searchY = 36;
+        int buttonW = 70;
+        addRenderableWidget(browser.searchBox(this.font, panelX, searchY, panelWidth - 2 * buttonW - 8, 16));
+        addRenderableWidget(browser.categoryButton(panelX + panelWidth - 2 * buttonW - 4, searchY - 1, buttonW, 18));
+        addRenderableWidget(browser.showButton(panelX + panelWidth - buttonW, searchY - 1, buttonW, 18));
+        this.panelTop = searchY + 22;
         int panelBottomReserved = 48;
         int panelHeight = Math.max(60, height - panelTop - panelBottomReserved);
 
@@ -226,6 +283,7 @@ public class ChallengeSelectionScreen extends Screen {
             ChallengeCardWidget card = new ChallengeCardWidget(0, 0, 139, 26, id, isOn, val -> {
                 updateSaveButton();
                 updateDifficultyText();
+                refreshConflicts();
             });
             cards.add(card);
             cardById.put(id, card);
@@ -240,12 +298,22 @@ public class ChallengeSelectionScreen extends Screen {
             ChallengeCardWidget perkCard = new ChallengeCardWidget(0, 0, 139, 26, perkId, isOn, val -> {
                 updateSaveButton();
                 updateDifficultyText();
+                refreshConflicts();
             });
             perkCards.add(perkCard);
         }
 
         int saveY = panelTop + panelHeight + 12;
-        this.saveButton = new CraftButton(width / 2 - 125, saveY, 120, 20,
+        // Code | Presets | Save | Save and Restart. 386 wide, so the row still fits a 480-wide screen
+        // (1080p at GUI scale 4).
+        int rowX = width / 2 - 193;
+        addRenderableWidget(new CraftButton(rowX, saveY, 64, 20,
+                Component.translatable("challengecraft.code.button"), CraftButton.Style.NEUTRAL,
+                btn -> openCodeScreen()));
+        addRenderableWidget(new CraftButton(rowX + 70, saveY, 64, 20,
+                Component.translatable("challengecraft.preset.button"), CraftButton.Style.NEUTRAL,
+                btn -> openPresetScreen()));
+        this.saveButton = new CraftButton(rowX + 140, saveY, 120, 20,
                 Component.translatable("challengecraft.challenge_selection.save"), CraftButton.Style.PRIMARY,
                 btn -> {
                     // A daily needs a fresh world, so plain "Save" cannot serve it — it would apply
@@ -258,7 +326,7 @@ public class ChallengeSelectionScreen extends Screen {
                     sendChallengePacket(false);
                     client.setScreenAndShow(null);
                 });
-        this.saveAndRestartButton = new CraftButton(width / 2 + 5, saveY, 120, 20,
+        this.saveAndRestartButton = new CraftButton(rowX + 266, saveY, 120, 20,
                 Component.translatable("challengecraft.challenge_selection.save_restart"), CraftButton.Style.NEUTRAL,
                 btn -> client.setScreenAndShow(new ConfirmRestartScreen(this,
                         dailyChosen ? this::sendDailyRestart : () -> sendChallengePacket(true))));
@@ -268,10 +336,17 @@ public class ChallengeSelectionScreen extends Screen {
         layout();
         updateSaveButton();
         updateDifficultyText();
+        refreshConflicts();
+    }
+
+    private void refreshConflicts() {
+        List<ChallengeCardWidget> all = new ArrayList<>(cards);
+        all.addAll(perkCards);
+        ChallengeBrowser.refreshConflicts(all, getActiveIds(), getActivePerks());
     }
 
     private void buildSliders() {
-        this.maxHealthSlider = new AbstractSliderButton(0, 0, 139, 20, getHealthSliderText(0.5 + (sliderValue * 9.5)), sliderValue) {
+        this.maxHealthSlider = new SettableSlider(0, 0, 139, 20, getHealthSliderText(0.5 + (sliderValue * 9.5)), sliderValue) {
             @Override protected void updateMessage() { setMessage(getHealthSliderText(0.5 + (this.value * 9.5))); }
             @Override protected void applyValue() {
                 sliderTicks = (int) (Math.round(this.value * 19) + 1);
@@ -279,7 +354,7 @@ public class ChallengeSelectionScreen extends Screen {
                 updateDifficultyText();
             }
         };
-        this.slotsSlider = new AbstractSliderButton(0, 0, 139, 20, getSlotsSliderText(slotsSliderTicks), slotsSliderValue) {
+        this.slotsSlider = new SettableSlider(0, 0, 139, 20, getSlotsSliderText(slotsSliderTicks), slotsSliderValue) {
             @Override protected void updateMessage() { setMessage(getSlotsSliderText((int) (1 + (this.value * 35)))); }
             @Override protected void applyValue() {
                 slotsSliderTicks = (int) (Math.round(this.value * 35) + 1);
@@ -287,7 +362,7 @@ public class ChallengeSelectionScreen extends Screen {
                 updateDifficultyText();
             }
         };
-        this.mobHealthSlider = new AbstractSliderButton(0, 0, 139, 20, getMobHealthSliderText(mobHealthMultiplier), mobHealthSliderValue) {
+        this.mobHealthSlider = new SettableSlider(0, 0, 139, 20, getMobHealthSliderText(mobHealthMultiplier), mobHealthSliderValue) {
             @Override protected void updateMessage() { setMessage(getMobHealthSliderText(1 + (this.value * 99))); }
             @Override protected void applyValue() {
                 mobHealthMultiplier = (int) (Math.round(this.value * 99) + 1);
@@ -295,7 +370,7 @@ public class ChallengeSelectionScreen extends Screen {
                 updateDifficultyText();
             }
         };
-        this.doubleTroubleSlider = new AbstractSliderButton(0, 0, 139, 20, getDoubleTroubleSliderText(doubleTroubleMultiplier), doubleTroubleSliderValue) {
+        this.doubleTroubleSlider = new SettableSlider(0, 0, 139, 20, getDoubleTroubleSliderText(doubleTroubleMultiplier), doubleTroubleSliderValue) {
             @Override protected void updateMessage() { setMessage(getDoubleTroubleSliderText(2 + (this.value * 8))); }
             @Override protected void applyValue() {
                 doubleTroubleMultiplier = (int) (Math.round(this.value * 8) + 2);
@@ -303,7 +378,7 @@ public class ChallengeSelectionScreen extends Screen {
                 updateDifficultyText();
             }
         };
-        this.gameSpeedSlider = new AbstractSliderButton(0, 0, 139, 20, getGameSpeedSliderText(gameSpeedMultiplier), gameSpeedSliderValue) {
+        this.gameSpeedSlider = new SettableSlider(0, 0, 139, 20, getGameSpeedSliderText(gameSpeedMultiplier), gameSpeedSliderValue) {
             @Override protected void updateMessage() { setMessage(getGameSpeedSliderText(1 + (this.value * 9))); }
             @Override protected void applyValue() {
                 gameSpeedMultiplier = (int) (Math.round(this.value * 9) + 1);
@@ -313,7 +388,7 @@ public class ChallengeSelectionScreen extends Screen {
         };
 
         // 15–180 minutes in 5-minute steps (33 steps over a 165-minute range).
-        this.fibMinutesSlider = new AbstractSliderButton(0, 0, 139, 20, getFibMinutesSliderText(fibMinutes), fibMinutesSliderValue) {
+        this.fibMinutesSlider = new SettableSlider(0, 0, 139, 20, getFibMinutesSliderText(fibMinutes), fibMinutesSliderValue) {
             @Override protected void updateMessage() { setMessage(getFibMinutesSliderText(15 + (int) Math.round(this.value * 33) * 5)); }
             @Override protected void applyValue() {
                 fibMinutes = 15 + (int) Math.round(this.value * 33) * 5;
@@ -394,95 +469,33 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     private void layout() {
+        double keep = scrollPanel.scrollAmount();
         this.scrollPanel.clearChildren();
 
         int spacing = 6;
         int headerW = panelWidth - 16;
-        int cardW = (headerW - spacing) / 2;
         int x0 = panelX + 8;
-        int x1 = x0 + cardW + spacing;
         int y = panelTop + 6;
 
         // Rebuilt each layout pass so it always sits at the top and always carries the current
-        // width; the widget itself is cheap and reads today's rotation in its constructor.
-        this.dailyCard = new net.kasax.challengecraft.client.widget.DailyCardWidget(
-                        x0, y, headerW, this::toggleDaily)
-                .withSelected(() -> dailyChosen);
-        scrollPanel.addChild(this.dailyCard);
-        y += net.kasax.challengecraft.client.widget.DailyCardWidget.HEIGHT + spacing + 4;
-
-        for (Category category : Category.values()) {
-            boolean expanded = categoryExpanded[category.ordinal()];
-            scrollPanel.addChild(new SectionHeaderWidget(x0, y, headerW, category.ordinal(),
-                    Component.translatable(category.key), expanded));
-            y += 20;
-
-            if (!expanded) {
-                y += 4;
-                continue;
-            }
-
-            int col = 0;
-            for (int id : IDS) {
-                if (categoryOf(id) != category) {
-                    continue;
-                }
-                ChallengeCardWidget card = cardById.get(id);
-                card.setX(col == 0 ? x0 : x1);
-                card.setY(y);
-                card.setWidth(cardW);
-                card.setHeight(26);
-                card.setRuleLocked(dailyChosen);
-                scrollPanel.addChild(card);
-
-                if (col == 1) {
-                    y += 26 + spacing;
-                    col = 0;
-                } else {
-                    col = 1;
-                }
-
-                AbstractSliderButton slider = sliderById.get(id);
-                if (slider != null) {
-                    if (col == 1) {
-                        y += 26 + spacing;
-                        col = 0;
-                    }
-                    slider.setX(x0);
-                    slider.setY(y);
-                    slider.setWidth(headerW);
-                    slider.setHeight(20);
-                    scrollPanel.addChild(slider);
-                    y += 20 + spacing;
-                }
-            }
-            if (col == 1) {
-                y += 26 + spacing;
-            }
-            y += 8;
+        // width; the widget itself is cheap and reads today's rotation in its constructor. Hidden
+        // while searching: it is not a challenge and matches nothing typed.
+        if (!browser.isFiltering()) {
+            this.dailyCard = new net.kasax.challengecraft.client.widget.DailyCardWidget(
+                            x0, y, headerW, this::toggleDaily)
+                    .withSelected(() -> dailyChosen);
+            scrollPanel.addChild(this.dailyCard);
+            y += net.kasax.challengecraft.client.widget.DailyCardWidget.HEIGHT + spacing + 4;
         }
 
-        // Perks section.
-        scrollPanel.addChild(new SectionHeaderWidget(x0, y, headerW, 4,
-                Component.translatable("challengecraft.challenge_selection.perks_header"), perksExpanded));
-        y += 20;
-        if (perksExpanded) {
-            int col = 0;
-            for (ChallengeCardWidget perkCard : perkCards) {
-                perkCard.setX(col == 0 ? x0 : x1);
-                perkCard.setY(y);
-                perkCard.setWidth(cardW);
-                perkCard.setHeight(26);
-                perkCard.setRuleLocked(dailyChosen);
-                scrollPanel.addChild(perkCard);
-                if (col == 1) {
-                    y += 26 + spacing;
-                    col = 0;
-                } else {
-                    col = 1;
-                }
-            }
+        for (ChallengeCardWidget card : cards) {
+            card.setRuleLocked(dailyChosen);
         }
+        for (ChallengeCardWidget perkCard : perkCards) {
+            perkCard.setRuleLocked(dailyChosen);
+        }
+        browser.layout(scrollPanel, x0, y, headerW, spacing, 26, IDS, cardById, sliderById, perkCards);
+        scrollPanel.setScrollAmount(keep);
     }
 
     private void sendChallengePacket(boolean restart) {
@@ -503,7 +516,11 @@ public class ChallengeSelectionScreen extends Screen {
                 newActive, newPerks, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, restart
         );
 
-        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult, gameSpeedMult, fibMin, newPerks, restart));
+        // Only while the ticked challenges are still exactly the code's: a code the player has since
+        // edited is their own selection again, level locks included.
+        String code = matchesImported(newActive) ? importedCode.encode() : "";
+        ClientPlayNetworking.send(new ChallengePacket(newActive, heartsTicks, slotticks, mobHealthMult, doubleMult,
+                gameSpeedMult, fibMin, newPerks, restart, -1, code));
     }
 
     private List<Integer> getActiveIds() {
@@ -561,13 +578,18 @@ public class ChallengeSelectionScreen extends Screen {
 
         ctx.centeredText(this.font, this.title, width / 2, 8, CraftUI.TEXT_PRIMARY);
 
-        boolean conflict = net.kasax.challengecraft.ChallengeManager.hasConflict(getActiveIds(), getActivePerks());
-        if (conflict) {
-            ctx.centeredText(this.font, Component.translatable("challengecraft.warning.conflict"), width / 2, 24, CraftUI.DANGER);
+        Component conflict = ChallengeBrowser.conflictLine(getActiveIds(), getActivePerks());
+        if (conflict != null) {
+            ctx.centeredText(this.font, conflict, width / 2, 24, CraftUI.DANGER);
         } else {
-            Component combined = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", currentDifficulty))
+            var combined = Component.translatable("challengecraft.worldcreate.difficulty", String.format("%.2f", currentDifficulty))
                     .copy().append(Component.literal("   •   "))
                     .append(Component.translatable("challengecraft.worldcreate.xp_payout", String.format(Locale.ROOT, "%,d", projectedPayout())));
+            // Say that a loaded code is in play, and that its seed only takes effect with a restart.
+            if (!dailyChosen && matchesImported(getActiveIds()) && importedCode.hasSeed()) {
+                combined.append(Component.literal("   •   ")).append(
+                        Component.translatable("challengecraft.code.loaded_seed", String.valueOf(importedCode.seed())));
+            }
             ctx.centeredText(this.font, combined, width / 2, 24, CraftUI.WARNING);
         }
     }
@@ -597,53 +619,4 @@ public class ChallengeSelectionScreen extends Screen {
     }
 
     /** Collapsible category header row inside the scroll panel. */
-    private final class SectionHeaderWidget extends AbstractWidget {
-        private final int index; // 0-3 = category ordinal, 4 = perks
-        private final boolean expanded;
-        private final Anim.Tween hover = new Anim.Tween(0f);
-
-        private SectionHeaderWidget(int x, int y, int width, int index, Component label, boolean expanded) {
-            super(x, y, width, 16, label);
-            this.index = index;
-            this.expanded = expanded;
-        }
-
-        @Override
-        protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-            float g = hover.approach(isHovered() ? 1f : 0f, 12f);
-            int color = CraftUI.mix(CraftUI.TEXT_SECONDARY, CraftUI.TEXT_PRIMARY, g);
-            drawCaret(context, getX(), getY() + 3, expanded, CraftUI.mix(CraftUI.GOLD, 0xFFF3D88A, g));
-            context.text(ChallengeSelectionScreen.this.font, getMessage(), getX() + 12, getY() + 3, color, false);
-            int underlineY = getY() + 3 + ChallengeSelectionScreen.this.font.lineHeight + 1;
-            context.fill(getX(), underlineY, getX() + getWidth(), underlineY + 1, CraftUI.applyAlpha(CraftUI.GOLD, 0.6f));
-        }
-
-        private void drawCaret(GuiGraphicsExtractor context, int x, int y, boolean expanded, int color) {
-            if (expanded) {
-                for (int i = 0; i < 4; i++) {
-                    context.fill(x + i, y + i, x + 7 - i, y + i + 1, color);
-                }
-            } else {
-                for (int i = 0; i < 4; i++) {
-                    context.fill(x + 1 + i, y + i, x + 2 + i, y + 7 - i, color);
-                }
-            }
-        }
-
-        @Override
-        public void onClick(MouseButtonEvent event, boolean doubleClick) {
-            if (index < 4) {
-                categoryExpanded[index] = !categoryExpanded[index];
-            } else {
-                perksExpanded = !perksExpanded;
-            }
-            // Defer the rebuild so we do not mutate the panel's child list mid-dispatch.
-            needsRelayout = true;
-        }
-
-        @Override
-        protected void updateWidgetNarration(NarrationElementOutput builder) {
-            defaultButtonNarrationText(builder);
-        }
-    }
 }

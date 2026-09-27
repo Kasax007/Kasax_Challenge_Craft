@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.*;
@@ -44,7 +45,8 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof FallingBlock) continue;
                 if (block instanceof BaseFireBlock) continue;
 
-                if (!block.defaultBlockState().blocksMotion()) continue;
+                // 26.3: BlockState.blocksMotion() removed; motion-blocking is now the block tag below.
+                if (!block.defaultBlockState().is(BlockTags.BLOCKS_MOTION_IN_HEIGHTMAP)) continue;
 
                 // Replacement targets must remain self-supporting and usable as terrain.
                 if (block instanceof SlabBlock) continue;
@@ -100,7 +102,7 @@ public class Chal_16_RandomChunkBlocks {
                 if (block instanceof CarpetBlock) continue;
                 if (block instanceof ButtonBlock) continue;
                 if (block instanceof LeverBlock) continue;
-                if (block instanceof RedStoneWireBlock) continue;
+                if (block instanceof RedstoneWireBlock) continue; // 26.3: RedStoneWireBlock renamed RedstoneWireBlock
                 if (block instanceof RedstoneTorchBlock) continue;
                 if (block instanceof DiodeBlock) continue;
                 if (block instanceof SignBlock) continue;
@@ -116,7 +118,9 @@ public class Chal_16_RandomChunkBlocks {
 
                 if (block instanceof RailBlock) continue;
                 if (block instanceof AbstractBannerBlock) continue;
-                if (block instanceof BedBlock) continue;
+                // 26.3: beds split into BedBlock and StrawBedBlock, siblings under AbstractBedBlock;
+                // checking BedBlock alone let straw-bed halves smear across whole chunks.
+                if (block instanceof net.minecraft.world.level.block.AbstractBedBlock) continue;
                 if (block instanceof FlowerPotBlock) continue;
                 if (block instanceof DoorBlock) continue;
                 if (block instanceof SnowLayerBlock) continue;

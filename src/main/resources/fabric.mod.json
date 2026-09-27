@@ -28,14 +28,17 @@
     ],
     "preLaunch": [
       "net.kasax.challengecraft.client.AwtClipboardFix"
+    ],
+    "modmenu": [
+      "net.kasax.challengecraft.client.ModMenuIntegration"
     ]
   },
   "mixins": [
     "challengecraft.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.19.3",
-    "minecraft": "~26.2",
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
     "java": ">=25",
     "fabric-api": ">=0.156.0"
   }

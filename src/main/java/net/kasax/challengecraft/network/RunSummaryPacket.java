@@ -33,7 +33,9 @@ public class RunSummaryPacket implements CustomPacketPayload {
         ALL_ENTITIES,
         ALL_ADVANCEMENTS,
         LOCKOUT_BINGO,
-        FORCE_ITEM_BATTLE;
+        FORCE_ITEM_BATTLE,
+        // Appended, never inserted: the kind travels as its ordinal.
+        ALL_BIOMES;
 
         private static final Kind[] VALUES = values();
 

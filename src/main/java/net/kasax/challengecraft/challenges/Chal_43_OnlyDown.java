@@ -22,7 +22,7 @@ import java.util.UUID;
  * chorus fruit, gateways), and respawning after death.
  */
 public class Chal_43_OnlyDown {
-    private static final double UP_TOLERANCE = 0.25;
+    public static final double UP_TOLERANCE = 0.25;
     /** Squared single-tick displacement beyond which the movement is treated as a teleport. */
     private static final double TELEPORT_DIST_SQ = 12 * 12;
 

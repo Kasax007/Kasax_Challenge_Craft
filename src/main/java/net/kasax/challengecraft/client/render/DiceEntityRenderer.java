@@ -101,7 +101,9 @@ public class DiceEntityRenderer extends EntityRenderer<DiceEntity, DiceEntityRen
         // The dispatcher has already translated to the entity origin (bottom-centre); lift to the
         // cube's centre so it spins about itself rather than about its base.
         matrices.translate(0.0F, DIE_EDGE_BLOCKS * 0.5F, 0.0F);
-        matrices.mulPose(state.orientation);
+        // 26.3: PoseStack.mulPose(Quaternionfc) was renamed to rotate(Quaternionfc); the
+        // Matrix4fc/Transformation mulPose overloads are unaffected.
+        matrices.rotate(state.orientation);
 
         float scale = DIE_EDGE_BLOCKS / MODEL_EDGE_BLOCKS;
         matrices.scale(scale, scale, scale);

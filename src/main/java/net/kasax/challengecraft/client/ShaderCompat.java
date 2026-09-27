@@ -78,7 +78,10 @@ public final class ShaderCompat {
         try {
             Class<?> apiClass = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
             Class<?> programClass = Class.forName("net.irisshaders.iris.api.v0.IrisProgram");
-            Class<?> pipelineClass = Class.forName("com.mojang.blaze3d.pipeline.RenderPipeline");
+            // Taken from the constant rather than spelled as a string: 26.3 moved the class from
+            // com.mojang.blaze3d.pipeline to com.mojang.renderpearl.api.pipeline, and the old
+            // literal failed Class.forName silently - the ring simply stopped drawing with shaders.
+            Class<?> pipelineClass = net.minecraft.client.renderer.RenderPipelines.DEBUG_QUADS.getClass();
             Object basic = Enum.valueOf(programClass.asSubclass(Enum.class), "BASIC");
             Method assign = apiClass.getMethod("assignPipeline", pipelineClass, programClass);
             assign.invoke(irisApi, net.minecraft.client.renderer.RenderPipelines.DEBUG_QUADS, basic);

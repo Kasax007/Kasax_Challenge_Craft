@@ -648,7 +648,7 @@ public final class Chal_40_LockoutBingo {
 
         long lastDropTick = LAST_MAP_DROP_TICK.getOrDefault(player.getUUID(), Long.MIN_VALUE);
         if (currentTick - lastDropTick >= MAP_DROP_RETRY_TICKS) {
-            player.drop(new ItemStack(ModItems.LOCKOUT_BINGO_MAP), false);
+            net.kasax.challengecraft.util.ServerDrops.dropQuietly(player, new ItemStack(ModItems.LOCKOUT_BINGO_MAP));
             LAST_MAP_DROP_TICK.put(player.getUUID(), currentTick);
         }
     }
@@ -1107,7 +1107,9 @@ public final class Chal_40_LockoutBingo {
             if (structure == null) {
                 return false;
             }
-            start = world.structureManager().getStructureWithPieceAt(pos, structure);
+            // 26.3: getStructureWithPieceAt(BlockPos,Structure) removed; only the (x,y,z,Structure)
+            // overload remains (BlockPos-taking overloads are now Tag/HolderSet-predicate only).
+            start = world.structureManager().getStructureWithPieceAt(pos.getX(), pos.getY(), pos.getZ(), structure);
         }
 
         return start != null && start != StructureStart.INVALID_START && start.isValid();
@@ -1124,7 +1126,9 @@ public final class Chal_40_LockoutBingo {
 
     private static boolean isStructureTag(Identifier structureId) {
         return switch (structureId.toString()) {
-            case "minecraft:village", "minecraft:mineshaft", "minecraft:shipwreck", "minecraft:ocean_ruin", "minecraft:ruined_portal" -> true;
+            // abandoned_camp (26.3) is a tag over one structure per biome variant, like village.
+            case "minecraft:village", "minecraft:mineshaft", "minecraft:shipwreck", "minecraft:ocean_ruin", "minecraft:ruined_portal",
+                 "minecraft:abandoned_camp" -> true;
             default -> false;
         };
     }

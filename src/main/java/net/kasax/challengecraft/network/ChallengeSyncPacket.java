@@ -21,6 +21,11 @@ public class ChallengeSyncPacket implements CustomPacketPayload {
     public final int doubleTroubleMultiplier;
     public final int gameSpeedMultiplier;
     public final int forceItemBattleMinutes;
+    /**
+     * The overworld seed, so a client on a dedicated server can put it into a challenge code. The
+     * integrated server's client reads it directly; this is the only way the other one learns it.
+     */
+    public final long worldSeed;
 
     public static final StreamCodec<FriendlyByteBuf, ChallengeSyncPacket> CODEC = CustomPacketPayload.codec(
             new StreamMemberEncoder<FriendlyByteBuf, ChallengeSyncPacket>() {
@@ -36,6 +41,7 @@ public class ChallengeSyncPacket implements CustomPacketPayload {
                     buf.writeVarInt(pkt.doubleTroubleMultiplier);
                     buf.writeVarInt(pkt.gameSpeedMultiplier);
                     buf.writeVarInt(pkt.forceItemBattleMinutes);
+                    buf.writeLong(pkt.worldSeed);
                 }
             },
             new StreamDecoder<FriendlyByteBuf, ChallengeSyncPacket>() {
@@ -53,12 +59,14 @@ public class ChallengeSyncPacket implements CustomPacketPayload {
                     int doubleTroubleMult = buf.readVarInt();
                     int gameSpeedMult = buf.readVarInt();
                     int fibMinutes = buf.readVarInt();
-                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult, gameSpeedMult, fibMinutes);
+                    long worldSeed = buf.readLong();
+                    return new ChallengeSyncPacket(list, perks, maxHearts, slots, mobMult, doubleTroubleMult, gameSpeedMult, fibMinutes, worldSeed);
                 }
             }
     );
 
-    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult, int gameSpeedMult, int forceItemBattleMinutes) {
+    public ChallengeSyncPacket(List<Integer> active, List<Integer> perks, int maxHearts, int slots, int mobMult, int doubleTroubleMult, int gameSpeedMult, int forceItemBattleMinutes, long worldSeed) {
+        this.worldSeed = worldSeed;
         this.active = active;
         this.perks = perks;
         this.maxHearts = maxHearts;

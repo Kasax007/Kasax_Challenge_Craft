@@ -10,7 +10,6 @@ import net.minecraft.network.chat.Component;
 import net.kasax.challengecraft.client.screen.LevelingScreen;
 import net.kasax.challengecraft.client.ui.CraftUI;
 import net.kasax.challengecraft.client.widget.AnimatedLevelButton;
-import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.UUID;
@@ -20,16 +19,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(TitleScreen.class)
-/** Adds the progression screen button to the title screen. */
+/** Adds the Challenge Hub (or, on narrow windows, the level button and daily card) to the title screen. */
 public abstract class TitleScreenMixin extends Screen {
     protected TitleScreenMixin(Component title) {
         super(title);
     }
 
+    /** Whether this init laid out the Challenge Hub (then the corner level badge is not drawn). */
+    private boolean challengecraft$hub;
+
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
         int x = this.width / 2 - 100;
         int y = this.height / 4 + 48 - 24;
+
+        // The hub: one column right of the vanilla buttons. Only where it fits — at GUI scale 4 on
+        // 1080p there is no room for it, and the compact arrangement below stays.
+        int hubX = x + 200 + 12;
+        this.challengecraft$hub = net.kasax.challengecraft.client.widget.ChallengeHub.build(
+                (TitleScreen) (Object) this, this::addRenderableWidget,
+                hubX, y, this.width - hubX - 8, this.height - y - 14);
+        if (this.challengecraft$hub) {
+            return;
+        }
+
         this.addRenderableWidget(new AnimatedLevelButton(x, y, 200, 20, Component.translatable("challengecraft.mainmenu.leveling_button"), button -> {
             this.minecraft.setScreenAndShow(new LevelingScreen(this));
         }));
@@ -42,6 +55,22 @@ public abstract class TitleScreenMixin extends Screen {
         // the edge, and a menu that breaks at 4x GUI scale is worse than one without a card.
         if (card.getX() + net.kasax.challengecraft.client.widget.DailyCardWidget.WIDTH <= this.width - 4) {
             this.addRenderableWidget(card);
+            // A friend's challenge code, straight into world creation with everything filled in.
+            int codeY = y + net.kasax.challengecraft.client.widget.DailyCardWidget.HEIGHT + 4;
+            if (codeY + 20 <= this.height - 4) {
+                this.addRenderableWidget(new net.kasax.challengecraft.client.widget.CraftButton(card.getX(), codeY,
+                        net.kasax.challengecraft.client.widget.DailyCardWidget.WIDTH, 20,
+                        Component.translatable("challengecraft.code.play"),
+                        net.kasax.challengecraft.client.widget.CraftButton.Style.NEUTRAL,
+                        b -> this.minecraft.setScreenAndShow(new net.kasax.challengecraft.client.screen.ChallengeCodeScreen(
+                                this, null, Component.translatable("challengecraft.code.hint.title"), code -> {
+                                    net.kasax.challengecraft.client.ChallengeCodeClient.arm(code);
+                                    net.minecraft.client.gui.screens.worldselection.CreateWorldScreen.openFresh(this.minecraft, () -> {
+                                        net.kasax.challengecraft.client.ChallengeCodeClient.clear();
+                                        this.minecraft.setScreenAndShow(new net.minecraft.client.gui.screens.TitleScreen());
+                                    });
+                                }))));
+            }
         }
     }
 
@@ -49,10 +78,10 @@ public abstract class TitleScreenMixin extends Screen {
     private void onMouseClicked(MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
         if (this.minecraft == null) return;
 
-        com.mojang.blaze3d.platform.Window window = this.minecraft.getWindow();
-
-        boolean isCommaHeld = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_COMMA);
-        boolean isPeriodHeld = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_PERIOD);
+        // 26.3: GLFW replaced by SDL; InputConstants.isKeyDown reads the global SDL keyboard
+        // state directly and no longer takes a Window, and GLFW_KEY_* moved onto InputConstants.
+        boolean isCommaHeld = InputConstants.isKeyDown(InputConstants.KEY_COMMA);
+        boolean isPeriodHeld = InputConstants.isKeyDown(InputConstants.KEY_PERIOD);
 
         // Hidden dev shortcut kept away from normal title-screen clicks.
         if (event.x() <= 10 && event.y() <= 10 && isCommaHeld && isPeriodHeld) {
@@ -66,6 +95,9 @@ public abstract class TitleScreenMixin extends Screen {
 
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void onRender(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (this.challengecraft$hub) {
+            return;   // the hub's level card says the same, bigger
+        }
         long totalXp;
         if (this.minecraft != null && this.minecraft.getUser() != null) {
             totalXp = XpManager.getXp(this.minecraft.getUser().getProfileId());

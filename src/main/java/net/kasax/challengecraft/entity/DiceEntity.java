@@ -15,6 +15,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.InterpolationHandler;
+import net.minecraft.world.entity.LinearInterpolationHandler;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -36,9 +37,9 @@ import java.util.UUID;
  * branch on the orientation</b>; doing so would break that proof.
  *
  * <p><b>Sides:</b> physics runs server-only. The client receives positions from the normal entity
- * tracker and smooths them with a {@link InterpolationHandler} (a plain {@code Entity} returns
- * {@code null} from {@code getInterpolator()} and would hard-snap on every packet), and receives
- * the orientation through tracked data via {@link #onSyncedDataUpdated}.
+ * tracker and smooths them with a {@link InterpolationHandler} (a plain {@code Entity} builds
+ * {@link InterpolationHandler#NO_OP} from {@code createInterpolationHandler()} and would hard-snap
+ * on every packet), and receives the orientation through tracked data via {@link #onSyncedDataUpdated}.
  */
 public class DiceEntity extends Entity {
     private static final EntityDataAccessor<Quaternionfc> ORIENTATION =
@@ -48,8 +49,6 @@ public class DiceEntity extends Entity {
             SynchedEntityData.defineId(DiceEntity.class, EntityDataSerializers.BYTE);
 
     private static final int DISPLAY_TICKS_AFTER_REST = 60; // let the player see the result
-
-    private final InterpolationHandler interpolator = new InterpolationHandler(this, 3);
 
     /** Server-authoritative orientation; on the client this mirrors the tracked value. */
     private final Quaternionf orientation = new Quaternionf();
@@ -70,9 +69,15 @@ public class DiceEntity extends Entity {
         super(type, world);
     }
 
+    // 26.3: InterpolationHandler became an interface (SteppedInterpolationHandler/
+    // LinearInterpolationHandler impl it) and Entity.getInterpolation() is now final, returning
+    // whatever createInterpolationHandler() built in the Entity constructor — override that
+    // instead. LinearInterpolationHandler reproduces the old InterpolationHandler class 1:1
+    // (same DEFAULT_INTERPOLATION_STEPS = 3, same lerp/rotLerp math) and is NO_OP server-side,
+    // matching the pre-26.3 null-on-server behavior this class's javadoc used to describe.
     @Override
-    public InterpolationHandler getInterpolation() {
-        return this.interpolator;
+    protected InterpolationHandler createInterpolationHandler() {
+        return LinearInterpolationHandler.create(this, 3);
     }
 
     // ---- the four abstract members -----------------------------------------------------------
@@ -175,7 +180,10 @@ public class DiceEntity extends Entity {
             // Without this, a resting die keeps slerping between two slightly different quaternions
             // as tickDelta cycles 0..1 every frame — which reads as a permanent micro-jitter.
             this.lastOrientation.set(this.orientation);
-            this.interpolator.interpolate();
+            // 26.3: position interpolation is no longer called manually here — Entity.commonTick(),
+            // invoked by the level's tick loop right before tick() runs, now calls
+            // getInterpolation().interpolate() itself on the client. Calling it again here would
+            // consume two interpolation steps per tick and halve the smoothing window.
             return;
         }
 

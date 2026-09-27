@@ -92,6 +92,21 @@ public class ClientCommands implements ClientModInitializer {
                             return ran ? 1 : 0;
                         }));
 
+        // All Biomes (49): the checklist is already on the client (every find syncs the whole
+        // list), so the screen opens without a round trip to the server.
+        dispatcher.register(
+                net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal("challengecraft_all_biomes_list")
+                        .executes(ctx -> {
+                            if (!net.kasax.challengecraft.challenges.Chal_49_AllBiomes.isActive()
+                                    || net.kasax.challengecraft.client.screen.AllBiomesHUD.all().isEmpty()) {
+                                ctx.getSource().sendFeedback(Component.translatable("challengecraft.command.all_biomes.inactive")
+                                        .withStyle(ChatFormatting.RED));
+                                return 0;
+                            }
+                            pendingScreen = new net.kasax.challengecraft.client.screen.AllBiomesScreen();
+                            return 1;
+                        }));
+
         // Reopens the last run summary. Without this the card is a one-shot: miss it and the run
         // it describes is gone.
         dispatcher.register(

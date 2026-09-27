@@ -46,7 +46,7 @@ public class PlayerAdvancementTrackerMixin {
                     ChallengeSavedData data = ChallengeSavedData.get(player.level().getServer().overworld());
                     LOGGER.info("[Advancement] Free the End completed. Tainted: {}, Initial Difficulty: {}", data.isTainted(), data.getInitialDifficulty());
 
-                    if (data.getActive().contains(22) || data.getActive().contains(23)) {
+                    if (data.getActive().contains(22) || data.getActive().contains(23) || data.getActive().contains(49)) {
                         LOGGER.info("[Advancement] Skipping Ender Dragon XP award because All Items (22) or All Entities (23) challenge is active.");
                         return;
                     }

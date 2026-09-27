@@ -33,7 +33,13 @@
     "DiceMovementMixin",
     "ServerLevelBorderSpawnsMixin",
     "SpawnPlacementBorderMixin",
-    "SpawnPlacementGroundBorderMixin"
+    "SpawnPlacementGroundBorderMixin",
+    "CushionMovementMixin",
+    "CushionRideRulesMixin",
+    "CushionElytraMixin",
+    "CushionPistonMixin",
+    "CushionInfiniteMixin",
+    "CushionBreakMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -44,6 +50,8 @@
     "InGameHudMixin",
     "MinecraftClientMixin",
     "TitleScreenMixin",
-    "VideoSettingsScreenMixin"
+    "VideoSettingsScreenMixin",
+    "CushionReachPickMixin",
+    "CushionReachUseMixin"
   ]
 }

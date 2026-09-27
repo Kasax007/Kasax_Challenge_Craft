@@ -9,6 +9,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
@@ -362,7 +363,8 @@ public class Chal_38_ChunkHunt {
     private static BlockPos trySurfaceSpawnPos(ServerLevel world, Entity entity, int x, int z, int y) {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState floorState = world.getBlockState(pos.below());
-        if (!floorState.blocksMotion()) {
+        // 26.3: BlockState.blocksMotion() removed; motion-blocking is now the block tag below.
+        if (!floorState.is(BlockTags.BLOCKS_MOTION_IN_HEIGHTMAP)) {
             return null;
         }
         if (isDisallowedNetherRoofPos(world, pos)) {

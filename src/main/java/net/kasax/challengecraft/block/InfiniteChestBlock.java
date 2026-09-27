@@ -1,6 +1,5 @@
 package net.kasax.challengecraft.block;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.*;
 import net.minecraft.core.BlockPos;
@@ -41,7 +40,9 @@ import java.util.List;
 
 /** World block for the infinite chest, including screen opening and waterlogging behavior. */
 public class InfiniteChestBlock extends BaseEntityBlock implements SimpleWaterloggedBlock {
-    public static final MapCodec<InfiniteChestBlock> CODEC = simpleCodec(InfiniteChestBlock::new);
+    // 26.3: per-block MapCodec/codec() mechanism removed from Block/BaseEntityBlock entirely
+    // (verified against mc263 BaseEntityBlock.java and e.g. ShulkerBoxBlock.java, which also
+    // dropped their CODEC field and codec() override) - no replacement needed, just delete both.
     public static final EnumProperty<Direction> FACING = HorizontalDirectionalBlock.FACING;
     public static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
@@ -86,11 +87,6 @@ public class InfiniteChestBlock extends BaseEntityBlock implements SimpleWaterlo
     @Override
     public FluidState getFluidState(BlockState state) {
         return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(state);
-    }
-
-    @Override
-    protected MapCodec<? extends BaseEntityBlock> codec() {
-        return CODEC;
     }
 
     @Nullable

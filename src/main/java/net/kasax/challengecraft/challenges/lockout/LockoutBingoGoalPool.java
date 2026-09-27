@@ -26,7 +26,8 @@ public final class LockoutBingoGoalPool {
             "minecraft:acacia_log",
             "minecraft:dark_oak_log",
             "minecraft:mangrove_log",
-            "minecraft:cherry_log"
+            "minecraft:cherry_log",
+            "minecraft:poplar_log"   // 26.3
     );
     private static final List<String> IRON_ARMOR = List.of(
             "minecraft:iron_helmet",
@@ -268,6 +269,7 @@ public final class LockoutBingoGoalPool {
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_jungle", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:jungle", "minecraft:jungle_sapling"),
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_badlands", LockoutBingoGoalDifficulty.HARD, "minecraft:badlands", "minecraft:red_sand"),
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_swamp", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:swamp", "minecraft:lily_pad"),
+            biome(LockoutBingoGoalCategory.EXPLORATION, "visit_dappled_forest", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:dappled_forest", "minecraft:poplar_sapling"),
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_mangrove_swamp", LockoutBingoGoalDifficulty.HARD, "minecraft:mangrove_swamp", "minecraft:mangrove_propagule"),
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_snowy_biome", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:snowy_plains", "minecraft:snowball"),
             biome(LockoutBingoGoalCategory.EXPLORATION, "visit_cherry_grove", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:cherry_grove", "minecraft:cherry_sapling"),
@@ -286,6 +288,7 @@ public final class LockoutBingoGoalPool {
             structure("visit_shipwreck", LockoutBingoGoalDifficulty.EASY, "minecraft:shipwreck", "minecraft:oak_planks"),
             structure("visit_ocean_ruin", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:ocean_ruin", "minecraft:trident"),
             structure("visit_ruined_portal", LockoutBingoGoalDifficulty.EASY, "minecraft:ruined_portal", "minecraft:obsidian"),
+            structure("visit_abandoned_camp", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:abandoned_camp", "minecraft:straw_bed"),
             structure("visit_pillager_outpost", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:pillager_outpost", "minecraft:crossbow"),
             structure("visit_trial_chambers", LockoutBingoGoalDifficulty.HARD, "minecraft:trial_chambers", "minecraft:trial_spawner"),
             structure("visit_ancient_city", LockoutBingoGoalDifficulty.EXPERT, "minecraft:ancient_city", "minecraft:sculk_shrieker"),

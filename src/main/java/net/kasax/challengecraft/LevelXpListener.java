@@ -153,7 +153,7 @@ public class LevelXpListener {
         if (!hasWeapon) {
             ItemStack weapon = createInfinityWeapon(player.level().getServer());
             if (!player.getInventory().add(weapon)) {
-                player.drop(weapon, false);
+                net.kasax.challengecraft.util.ServerDrops.dropQuietly(player, weapon);
             }
             player.sendSystemMessage(Component.translatable("challengecraft.infinity_weapon.granted").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
         }

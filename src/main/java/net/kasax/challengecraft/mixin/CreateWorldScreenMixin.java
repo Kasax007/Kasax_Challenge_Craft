@@ -23,6 +23,10 @@ import java.util.List;
 /** Adds the challenge setup tab to vanilla world creation. */
 public class CreateWorldScreenMixin {
     private net.kasax.challengecraft.client.screen.ChallengeTab challengeTab;
+    private int challengeTabIndex;
+
+    @org.spongepowered.asm.mixin.Shadow
+    private net.minecraft.client.gui.components.tabs.MenuTabBar tabNavigationBar;
 
     @ModifyArg(
             method = "init",
@@ -40,27 +44,60 @@ public class CreateWorldScreenMixin {
     )
     private Tab[] addChallengeTab(Tab[] original) {
         Tab[] extended = Arrays.copyOf(original, original.length + 1);
-        var t = new net.kasax.challengecraft.client.screen.ChallengeTab();
-        extended[original.length] = t;
-        this.challengeTab = t;
+        // init() runs again on every resize and on every return from a sub-screen (the code dialog,
+        // vanilla's game-rule editor), and vanilla builds fresh tabs each time. A fresh challenge
+        // tab would forget every card the player had ticked, so it is built once and reused; the
+        // vanilla tabs rebuild themselves from the shared uiState.
+        if (this.challengeTab == null) {
+            CreateWorldScreen self = (CreateWorldScreen) (Object) this;
+            var t = new net.kasax.challengecraft.client.screen.ChallengeTab();
+            t.bindSeed(() -> self.getUiState().getSeed(), seed -> self.getUiState().setSeed(seed));
+            var code = net.kasax.challengecraft.client.ChallengeCodeClient.pending();
+            if (code != null && !net.kasax.challengecraft.client.DailyClientState.isArmed()) {
+                t.applySetup(code);
+                ChallengeCraft.LOGGER.info("[Client:CreateWorld] Challenge-Code {} vorbelegt", code.encode());
+            }
+            net.kasax.challengecraft.client.ChallengeCodeClient.clear();
+            this.challengeTab = t;
+        }
+        this.challengeTabIndex = original.length;
+        extended[original.length] = this.challengeTab;
         return extended;
     }
 
     /**
-     * Pins the daily's seed into the world-creation state.
+     * Pins the daily's seed — or a title-screen code's — into the world-creation state.
      *
      * <p>A daily is only comparable if everyone plays the same terrain, so the seed is not the
      * player's to choose here. Written into the UI state rather than intercepted later, so the
      * player can SEE which seed they are getting instead of having it silently swapped underneath
-     * them at create time.
+     * them at create time. At HEAD, not TAIL: the World tab copies the seed into its text box once,
+     * when it is built inside init(), and has no listener for later changes — set at TAIL, the seed
+     * applied but the box kept showing the old value.
      */
-    @Inject(method = "init", at = @At("TAIL"))
+    @Inject(method = "init", at = @At("HEAD"))
     private void challengecraft$applyDailySeed(CallbackInfo ci) {
-        var entry = net.kasax.challengecraft.client.DailyClientState.entry();
-        if (entry == null || !entry.hasFixedSeed()) return;
         CreateWorldScreen self = (CreateWorldScreen) (Object) this;
-        self.getUiState().setSeed(Long.toString(entry.seed()));
-        ChallengeCraft.LOGGER.info("[Client:CreateWorld] Daily-Seed {} vorbelegt", entry.seed());
+        var entry = net.kasax.challengecraft.client.DailyClientState.entry();
+        if (entry != null) {
+            if (entry.hasFixedSeed()) {
+                self.getUiState().setSeed(Long.toString(entry.seed()));
+                ChallengeCraft.LOGGER.info("[Client:CreateWorld] Daily-Seed {} vorbelegt", entry.seed());
+            }
+            return;
+        }
+        var code = net.kasax.challengecraft.client.ChallengeCodeClient.pending();
+        if (code != null && code.hasSeed()) {
+            self.getUiState().setSeed(Long.toString(code.seed()));
+        }
+    }
+
+    /** Back from the code dialog, land on the challenge tab again rather than on the first one. */
+    @Inject(method = "init", at = @At("TAIL"))
+    private void challengecraft$reselectChallengeTab(CallbackInfo ci) {
+        if (this.challengeTab != null && this.challengeTab.consumeReopen() && this.tabNavigationBar != null) {
+            this.tabNavigationBar.selectTab(this.challengeTabIndex, false);
+        }
     }
 
     @Inject(method = "onCreate", at = @At("HEAD"), cancellable = true)

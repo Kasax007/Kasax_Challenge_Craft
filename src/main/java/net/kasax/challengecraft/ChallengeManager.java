@@ -79,7 +79,8 @@ public class ChallengeManager {
                 data.getMobHealthMultiplier(),
                 data.getDoubleTroubleMultiplier(),
                 data.getGameSpeedMultiplier(),
-                data.getForceItemBattleMinutes()
+                data.getForceItemBattleMinutes(),
+                server.overworld().getSeed()
         );
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerPlayNetworking.send(player, pkt);
@@ -92,6 +93,9 @@ public class ChallengeManager {
         }
         if (active.contains(26)) {
             net.kasax.challengecraft.challenges.Chal_26_AllAchievements.syncProgressToAll(server, data);
+        }
+        if (active.contains(49)) {
+            net.kasax.challengecraft.challenges.Chal_49_AllBiomes.syncToAll(server);
         }
         if (active.contains(40)) {
             net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.syncToAll(server);
@@ -164,6 +168,9 @@ public class ChallengeManager {
             case 44 -> 6.0;  // Progressive Block Drops (full drop lockout; 600 XP on completion)
             case 45 -> 0.0;  // Force Item Battle (minigame: flat 100-XP prize instead)
             case 46 -> 7.0;  // Dice Movement (walking gated by a die roll; enormously lengthens a run)
+            case 47 -> 8.0;  // Cushion Only (every move is place + sit; harsher than Dice's budget)
+            case 49 -> 12.0; // All Biomes (every Overworld, Nether and End biome; like All Achievements)
+            case 48 -> 3.0;  // Red Light, Green Light (lethal, but warned by yellow and fair to knockback)
             default -> 0.0;
         };
     }
@@ -184,46 +191,79 @@ public class ChallengeManager {
         return Math.max(0, total);
     }
 
+    /**
+     * Every pair that may not be active together. A perk is named by its {@code LevelManager.PERK_*}
+     * id (101+), which is how {@link #findConflict} tells the two kinds apart. One table instead of a
+     * chain of ifs so the screens can SAY which two collide, not just that something does.
+     */
+    private static final List<int[]> CONFLICTS = List.of(
+            new int[]{2, 14}, // No Block Drops + Random Block Drops
+            new int[]{3, 15}, // No Mob Drops + Random Mob Drops
+            new int[]{8, 20}, // No Crafting Table + Randomized Crafting
+            new int[]{9, 25}, // ExpWorldBorder + DamageWorldBorder
+            new int[]{38, 9}, // Chunk Hunt + Level Border
+            new int[]{38, 16}, // Chunk Hunt + Random Chunk Blocks
+            new int[]{38, 23}, // Chunk Hunt + All Entities
+            new int[]{38, 25}, // Chunk Hunt + Damage Border
+            new int[]{40, 22}, // Lockout Bingo + All Items
+            new int[]{40, 23}, // Lockout Bingo + All Entities
+            new int[]{40, 26}, // Lockout Bingo + All Achievements
+            new int[]{40, 38}, // Lockout Bingo + Chunk Hunt
+            new int[]{7, LevelManager.PERK_TOUGH_SKIN},
+            new int[]{27, LevelManager.PERK_RESISTANCE},
+            new int[]{28, 25},
+            new int[]{29, LevelManager.PERK_FIRE_RESISTANCE},
+            new int[]{41, 43}, // Only Down already implies No Jumping
+            new int[]{44, 2}, // Progressive Block Drops + No Block Drops
+            new int[]{44, 14}, // Progressive Block Drops + Random Block Drops
+            new int[]{45, 22},
+            new int[]{45, 23},
+            new int[]{45, 26},
+            new int[]{45, 38},
+            new int[]{45, 40},
+            new int[]{46, 40}, // + Lockout Bingo
+            new int[]{46, 45}, // + Force Item Battle
+            new int[]{46, 38}, // + Chunk Hunt (must reach the mob)
+            new int[]{47, 46}, // + Dice Movement (two movement systems)
+            new int[]{47, 41}, // + No Jumping (already implied)
+            new int[]{47, 17}, // + 500 Blocks = Item (never walks, never pays)
+            new int[]{47, 28}, // + Walk = Damage (never walks, free difficulty)
+            new int[]{47, 40}, // + Lockout Bingo (race minigame)
+            new int[]{47, 45}, // + Force Item Battle (race minigame)
+            new int[]{49, 11}, // All Biomes + Skyblock (no terrain to walk to any biome)
+            new int[]{49, 40}, // All Biomes + Lockout Bingo (minigame)
+            new int[]{49, 45}  // All Biomes + Force Item Battle (minigame)
+    );
+
     public static boolean hasConflict(List<Integer> ids, List<Integer> perks) {
-        if (ids.contains(2) && ids.contains(14)) return true; // No Block Drops + Random Block Drops
-        if (ids.contains(3) && ids.contains(15)) return true; // No Mob Drops + Random Mob Drops
-        if (ids.contains(8) && ids.contains(20)) return true; // No Crafting Table + Randomized Crafting
-        if (ids.contains(9) && ids.contains(25)) return true; // ExpWorldBorder + DamageWorldBorder
-        if (ids.contains(38) && ids.contains(9)) return true; // Chunk Hunt + Level Border
-        if (ids.contains(38) && ids.contains(16)) return true; // Chunk Hunt + Random Chunk Blocks
-        if (ids.contains(38) && ids.contains(23)) return true; // Chunk Hunt + All Entities
-        if (ids.contains(38) && ids.contains(25)) return true; // Chunk Hunt + Damage Border
-        if (ids.contains(40) && ids.contains(22)) return true; // Lockout Bingo + All Items
-        if (ids.contains(40) && ids.contains(23)) return true; // Lockout Bingo + All Entities
-        if (ids.contains(40) && ids.contains(26)) return true; // Lockout Bingo + All Achievements
-        if (ids.contains(40) && ids.contains(38)) return true; // Lockout Bingo + Chunk Hunt
-        
-        if (ids.contains(7) && perks.contains(LevelManager.PERK_TOUGH_SKIN)) return true;
+        return findConflict(ids, perks) != null;
+    }
 
-        if (ids.contains(27) && perks.contains(LevelManager.PERK_RESISTANCE)) return true;
+    /** The first colliding pair as {@code {a, b}} (a perk as its 101+ id), or null. */
+    public static int[] findConflict(List<Integer> ids, List<Integer> perks) {
+        for (int[] pair : CONFLICTS) {
+            if (isOn(pair[0], ids, perks) && isOn(pair[1], ids, perks)) {
+                return pair;
+            }
+        }
+        return null;
+    }
 
-        if (ids.contains(28) && ids.contains(25)) return true;
+    /**
+     * The ids already switched on that {@code candidate} would collide with — what a card shows as
+     * "does not combine with …" before the player even clicks it.
+     */
+    public static List<Integer> conflictsWith(int candidate, List<Integer> ids, List<Integer> perks) {
+        List<Integer> out = new ArrayList<>();
+        for (int[] pair : CONFLICTS) {
+            if (pair[0] == candidate && isOn(pair[1], ids, perks)) out.add(pair[1]);
+            if (pair[1] == candidate && isOn(pair[0], ids, perks)) out.add(pair[0]);
+        }
+        return out;
+    }
 
-        if (ids.contains(29) && perks.contains(LevelManager.PERK_FIRE_RESISTANCE)) return true;
-
-        if (ids.contains(41) && ids.contains(43)) return true; // Only Down already implies No Jumping
-        if (ids.contains(44) && ids.contains(2)) return true;  // Progressive Block Drops + No Block Drops
-        if (ids.contains(44) && ids.contains(14)) return true; // Progressive Block Drops + Random Block Drops
-
-        // Force Item Battle is a standalone minigame like Lockout Bingo.
-        if (ids.contains(45) && ids.contains(22)) return true;
-        if (ids.contains(45) && ids.contains(23)) return true;
-        if (ids.contains(45) && ids.contains(26)) return true;
-        if (ids.contains(45) && ids.contains(38)) return true;
-        if (ids.contains(45) && ids.contains(40)) return true;
-
-        // Dice Movement gates walking behind a die roll, which makes the timed/race minigames
-        // literally unplayable rather than merely harder — so those combinations are blocked.
-        if (ids.contains(46) && ids.contains(40)) return true; // + Lockout Bingo
-        if (ids.contains(46) && ids.contains(45)) return true; // + Force Item Battle
-        if (ids.contains(46) && ids.contains(38)) return true; // + Chunk Hunt (must reach the mob)
-
-        return false;
+    private static boolean isOn(int id, List<Integer> ids, List<Integer> perks) {
+        return id > 100 ? perks.contains(id) : ids.contains(id);
     }
 
     /**
@@ -638,6 +678,9 @@ public class ChallengeManager {
         if (Chal_44_ProgressiveBlockDrops.isActive()) ids.add(44);
         if (Chal_45_ForceItemBattle.isActive()) ids.add(45);
         if (net.kasax.challengecraft.challenges.Chal_46_Dice.isActive()) ids.add(46);
+        if (net.kasax.challengecraft.challenges.Chal_47_CushionOnly.isActive()) ids.add(47);
+        if (net.kasax.challengecraft.challenges.Chal_48_RedLight.isActive()) ids.add(48);
+        if (net.kasax.challengecraft.challenges.Chal_49_AllBiomes.isActive()) ids.add(49);
         return ids;
     }
 
@@ -688,6 +731,9 @@ public class ChallengeManager {
         Chal_44_ProgressiveBlockDrops.setActive(active);
         Chal_45_ForceItemBattle.setActive(active);
         net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_47_CushionOnly.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_48_RedLight.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_49_AllBiomes.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerLevel world, ChallengeSavedData data) {
@@ -788,6 +834,27 @@ public class ChallengeManager {
             case 46 -> {
                 net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(true);
                 LOGGER.info("Challenge 46 ON");
+            }
+            case 47 -> {
+                net.kasax.challengecraft.challenges.Chal_47_CushionOnly.setActive(true);
+                // Switched on in a running world: hand out the kit now, not on the next join.
+                if (world != null) {
+                    net.kasax.challengecraft.challenges.Chal_47_CushionOnly.onActivated(world.getServer());
+                }
+                LOGGER.info("Challenge 47 ON");
+            }
+            case 48 -> {
+                // The light itself starts on the next server tick (Chal_48_RedLight.tick).
+                net.kasax.challengecraft.challenges.Chal_48_RedLight.setActive(true);
+                LOGGER.info("Challenge 48 ON");
+            }
+            case 49 -> {
+                net.kasax.challengecraft.challenges.Chal_49_AllBiomes.setActive(true);
+                // Switched on in a running world: the checklist has to reach the HUD now.
+                if (world != null) {
+                    net.kasax.challengecraft.challenges.Chal_49_AllBiomes.syncToAll(world.getServer());
+                }
+                LOGGER.info("Challenge 49 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

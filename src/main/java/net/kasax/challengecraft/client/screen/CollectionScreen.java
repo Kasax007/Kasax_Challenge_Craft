@@ -29,6 +29,11 @@ public class CollectionScreen extends Screen {
 
     private final List<Row> rows;
     private final int currentIndex;
+    /**
+     * False for a checklist without an order (All Biomes): rows before {@code currentIndex} are done,
+     * the rest are simply missing — none of them is "the current one".
+     */
+    private final boolean ordered;
 
     private WidgetScrollPanel panel;
     private EditBox search;
@@ -47,9 +52,14 @@ public class CollectionScreen extends Screen {
     private int hoverMouseY;
 
     protected CollectionScreen(Component title, List<Row> rows, int currentIndex) {
+        this(title, rows, currentIndex, true);
+    }
+
+    protected CollectionScreen(Component title, List<Row> rows, int currentIndex, boolean ordered) {
         super(title);
         this.rows = rows;
         this.currentIndex = currentIndex;
+        this.ordered = ordered;
     }
 
     @Override
@@ -140,7 +150,7 @@ public class CollectionScreen extends Screen {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             boolean done = rowIndex < currentIndex;
-            boolean current = rowIndex == currentIndex;
+            boolean current = ordered && rowIndex == currentIndex;
 
             CraftUI.CardState state = done ? CraftUI.CardState.ACTIVE
                     : (current ? CraftUI.CardState.SELECTED : CraftUI.CardState.IDLE);
@@ -160,6 +170,9 @@ public class CollectionScreen extends Screen {
             } else if (current) {
                 stateText = Component.translatable("challengecraft.collection.state.current");
                 chipAccent = CraftUI.GOLD;
+            } else if (!ordered) {
+                stateText = Component.translatable("challengecraft.collection.state.missing");
+                chipAccent = CraftUI.TEXT_MUTED;
             } else {
                 stateText = Component.translatable("challengecraft.collection.state.upcoming");
                 chipAccent = CraftUI.TEXT_MUTED;

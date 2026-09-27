@@ -94,7 +94,8 @@ public class Chal_11_SkyblockWorld {
                             || state.is(net.minecraft.tags.BlockTags.LOGS)) {
                         break;   // a tree column: nothing to stand on here
                     }
-                    if (!state.blocksMotion()) break;
+                    // 26.3: BlockState.blocksMotion() removed — Heightmap now tests this tag directly.
+                    if (!state.is(net.minecraft.tags.BlockTags.BLOCKS_MOTION_IN_HEIGHTMAP)) break;
                     if (world.getBlockEntity(p) != null) {
                         // The starting chest is part of the island and is usually its highest
                         // block. Standing on it would be odd, and this scan used to REPLACE its

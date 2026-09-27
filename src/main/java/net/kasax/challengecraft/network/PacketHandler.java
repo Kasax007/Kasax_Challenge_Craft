@@ -51,6 +51,28 @@ public class PacketHandler {
                             }
                         }
 
+                        // A challenge code only carries its seed into Save and Restart. It never lifts
+                        // a level lock (user's rule, 2026-09-27): the ordinary check below runs on every
+                        // challenge and perk exactly as for a hand-picked selection. It must still
+                        // decode and describe exactly what is being set, or the seed would belong to
+                        // some other setup.
+                        net.kasax.challengecraft.code.ChallengeCode code = null;
+                        if (!isDaily && !packet.code.isEmpty()) {
+                            try {
+                                code = net.kasax.challengecraft.code.ChallengeCode.decode(packet.code);
+                            } catch (net.kasax.challengecraft.code.ChallengeCode.InvalidCodeException e) {
+                                code = null;
+                            }
+                            if (code == null
+                                    || !new java.util.HashSet<>(code.challengeIds()).equals(new java.util.HashSet<>(packet.active))
+                                    || !new java.util.HashSet<>(code.perkIds()).equals(new java.util.HashSet<>(packet.perks))) {
+                                ChallengeCraft.LOGGER.warn("[Server] Denied code {} from {}: does not match {}",
+                                        packet.code, player.getName().getString(), packet.active);
+                                player.sendSystemMessage(Component.translatable("challengecraft.code.mismatch")
+                                        .withStyle(ChatFormatting.RED));
+                                return;
+                            }
+                        }
                         for (int cid : isDaily ? java.util.List.<Integer>of() : packet.active) {
                             if (!net.kasax.challengecraft.LevelManager.isChallengeUnlocked(cid, playerLevel)) {
                                 ChallengeCraft.LOGGER.warn("[Server] Denied ChallengePacket from {} (challenge {} locked for level {})", player.getName().getString(), cid, playerLevel);
@@ -159,6 +181,11 @@ public class PacketHandler {
                                 // The setDaily above marked the world we are about to archive.
                                 // The one that matters is the fresh one.
                                 ChallengeWorldRestarter.forceNextDaily(packet.dailyIndex);
+                            } else if (code != null && code.hasSeed()) {
+                                // The same parking spot the daily uses, so a dedicated server that
+                                // restarts its process still lands on the code's seed.
+                                ChallengeWorldRestarter.forceNextSeed(code.seed());
+                                ChallengeCraft.LOGGER.info("[Server] Neustart mit Code-Seed {}", code.seed());
                             }
                             ChallengeWorldRestarter.initiateRestart(server);
                         }
@@ -225,7 +252,9 @@ public class PacketHandler {
                                 long count = storage.removeItems(key, amountToRemove);
                                 if (count > 0) {
                                     net.minecraft.world.item.ItemStack out = key.toStack((int) count);
-                                    player.getInventory().placeItemBackInInventory(out);
+                                    // 26.3: placeItemBackInInventory(ItemStack) removed; now takes a trailing
+                                    // Prediction. Server-driven (infinite chest withdrawal), not client-predicted -> SERVER_ONLY.
+                                    player.getInventory().placeItemBackInInventory(out, net.minecraft.util.Prediction.SERVER_ONLY);
                                 }
                                 syncInfiniteChest(player, be);
                             }

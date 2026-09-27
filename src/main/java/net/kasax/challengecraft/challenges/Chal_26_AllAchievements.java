@@ -118,7 +118,8 @@ public class Chal_26_AllAchievements {
         AdvancementHolder entry = server.getAdvancements().get(id);
         if (entry != null && entry.value().display().isPresent()) {
             var display = entry.value().display().get();
-            return new AdvancementInfo(id, display.getTitle(), display.getIcon().create(), display.getDescription());
+            // 26.3: DisplayInfo became a record; getTitle()/getIcon()/getDescription() -> title()/icon()/description()
+            return new AdvancementInfo(id, display.title(), display.icon().create(), display.description());
         }
         return new AdvancementInfo(id, Component.nullToEmpty(id.toString()), new ItemStack(net.minecraft.world.item.Items.BARRIER), Component.empty());
     }
@@ -146,6 +147,7 @@ public class Chal_26_AllAchievements {
         // Completion rewards are shared across the chained collection challenges.
         if (data.getActive().contains(22) && data.getAllItemsIndex() < data.getAllItemsOrder().size()) return;
         if (data.getActive().contains(23) && data.getAllEntitiesIndex() < data.getAllEntitiesOrder().size()) return;
+        if (data.getActive().contains(49) && !Chal_49_AllBiomes.isComplete(server, data)) return;
 
         // Asked BEFORE the record loop below: afterwards the stored best is this very run, so the
         // comparison would be against itself and always answer "no".

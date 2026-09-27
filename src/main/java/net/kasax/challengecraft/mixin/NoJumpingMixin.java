@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.mixin;
 
 import net.kasax.challengecraft.challenges.Chal_41_NoJumping;
+import net.kasax.challengecraft.challenges.Chal_47_CushionOnly;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -23,7 +24,10 @@ public abstract class NoJumpingMixin {
      */
     @Inject(method = "jumpFromGround", at = @At("HEAD"), cancellable = true)
     private void onJump(CallbackInfo ci) {
-        if (!Chal_41_NoJumping.isActive()) {
+        // Cushion Only (47) forbids the jump too - a jump is a way to change position - but keeps
+        // its own message, since "use a cushion" is the answer there, not "no jumping".
+        boolean cushions = Chal_47_CushionOnly.isActive();
+        if (!Chal_41_NoJumping.isActive() && !cushions) {
             return;
         }
 
@@ -35,7 +39,7 @@ public abstract class NoJumpingMixin {
         ci.cancel();
         // Only the server copy messages, so singleplayer doesn't show it twice.
         if (player instanceof ServerPlayer serverPlayer) {
-            serverPlayer.sendOverlayMessage(Chal_41_NoJumping.BLOCKED_MESSAGE);
+            serverPlayer.sendOverlayMessage(cushions ? Chal_47_CushionOnly.BLOCKED_MESSAGE : Chal_41_NoJumping.BLOCKED_MESSAGE);
         }
     }
 }

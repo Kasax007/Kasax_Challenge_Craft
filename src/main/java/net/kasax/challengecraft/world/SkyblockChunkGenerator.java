@@ -77,28 +77,27 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         return MAP_CODEC;
     }
 
+    // 26.3: fillFromNoise/buildSurface/applyCarvers were removed from ChunkGenerator and folded into
+    // one abstract buildTerrain(...) pass (see NoiseBasedChunkGenerator/FlatLevelSource in mc263 —
+    // both do noise fill, surface and carving inside this single method now). The nullable
+    // WorldGenRegion parameter is the same region the old buildSurface got (ChunkStatusTasks.buildTerrain
+    // passes its own `region` straight through), and WorldGenRegion already implements
+    // ServerLevelAccessor via WorldGenLevel, so no cast is needed for it any more.
     @Override
-    public CompletableFuture<ChunkAccess> fillFromNoise(
+    public CompletableFuture<ChunkAccess> buildTerrain(
+            ChunkAccess chunk,
             Blender blender,
             RandomState noiseConfig,
             StructureManager structureAccessor,
-            ChunkAccess chunk
-    ) {
-        return CompletableFuture.completedFuture(chunk);
-    }
-
-    @Override
-    public void buildSurface(
+            net.minecraft.world.level.biome.BiomeManager biomeAccess,
             WorldGenRegion region,
-            StructureManager structureAccessor,
-            RandomState noiseConfig,
-            ChunkAccess chunk
+            java.util.Set<Holder<net.minecraft.world.level.biome.Biome>> possibleBiomes
     ) {
-        if (isNether) return;
+        if (isNether || region == null) return CompletableFuture.completedFuture(chunk);
         ChunkPos pos = chunk.getPos();
-        if (pos.x() != 0 || pos.z() != 0) return;
+        if (pos.x() != 0 || pos.z() != 0) return CompletableFuture.completedFuture(chunk);
 
-        ServerLevelAccessor worldAccess = (ServerLevelAccessor) region;
+        ServerLevelAccessor worldAccess = region;
         ServerLevel serverWorld = worldAccess.getLevel();
 
         // NO safety block here any more. It sat at the template's origin — beside the island, not
@@ -107,7 +106,8 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
         // real surface, makes that block bedrock and spawns there, which also covers the
         // missing-template case this block was guarding against.
 
-        StructureTemplateManager stm = serverWorld.getServer().getStructureManager();
+        // 26.3: MinecraftServer.getStructureManager() renamed to getStructureTemplateManager().
+        StructureTemplateManager stm = serverWorld.getServer().getStructureTemplateManager();
         Identifier id = Identifier.fromNamespaceAndPath("challengecraft", "classic_skyblock");
         StructureTemplate template = stm.getOrCreate(id);
 
@@ -125,18 +125,8 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
                 serverWorld.getRandom(),
                 2
         );
-    }
 
-
-    @Override
-    public void applyCarvers(
-            WorldGenRegion region,
-            long seed,
-            RandomState noiseConfig,
-            net.minecraft.world.level.biome.BiomeManager biomeAccess,
-            StructureManager structureAccessor,
-            ChunkAccess chunk
-    ) {
+        return CompletableFuture.completedFuture(chunk);
     }
 
     @Override
@@ -223,17 +213,21 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
             }
         };
 
+        // 26.3: createForNormal gained a ChunkPos origin parameter (between seed and biomeSource).
         return ChunkGeneratorStructureState.createForNormal(
                 noiseConfig,
                 seed,
+                this.getOrigin(noiseConfig),
                 this.biomeSource,
                 filtered
         );
     }
 
+    // 26.3: addDebugScreenInfo gained a trailing SamplerContext parameter.
     @Override
     public void addDebugScreenInfo(
-            java.util.List<String> text, RandomState noiseConfig, BlockPos pos
+            java.util.List<String> text, RandomState noiseConfig, BlockPos pos,
+            net.minecraft.world.level.levelgen.densityfunction.SamplerContext samplerContext
     ) {
     }
 }

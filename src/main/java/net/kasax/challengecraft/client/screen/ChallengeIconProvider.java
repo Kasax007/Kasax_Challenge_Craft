@@ -79,6 +79,9 @@ public class ChallengeIconProvider {
         ICONS.put(44, Items.STONE);
         ICONS.put(45, Items.ITEM_FRAME);
         ICONS.put(46, net.kasax.challengecraft.item.ModItems.DICE);
+        ICONS.put(47, Items.CUSHION.pick(net.minecraft.world.item.DyeColor.WHITE));
+        ICONS.put(48, Items.CONCRETE.pick(net.minecraft.world.item.DyeColor.RED));
+        ICONS.put(49, Items.COMPASS);
 
         // Perks
         ICONS.put(101, Items.GOLDEN_CARROT);
@@ -141,8 +144,13 @@ public class ChallengeIconProvider {
      * had no icons until the player had opened world creation once — that flow performs a datapack
      * load — and come back.
      *
-     * <p>{@code VanillaRegistries.createLookup()} builds the same provider from built-in data with
-     * no world and no datapack, which is all {@code build(...)} needs. Re-binding later is harmless:
+     * <p>{@code VanillaRegistries.createWorldLookup()} builds the same provider from built-in data
+     * with no world and no datapack, which is all {@code build(...)} needs. 26.3 split the old
+     * single-builder {@code createLookup()} into {@code createWorldLookup()} (world-gen registries —
+     * enchantments, trim materials, etc., everything item default components can reach) and a new
+     * {@code createReloadableLookup()} (loot tables/advancements/recipes, datapack-reloadable, not
+     * needed here); the world one is the direct rename target, same builder contents. Re-binding
+     * later is harmless:
      * {@code bindComponents} is a plain field assignment, so the real load simply overwrites this
      * with the authoritative map.
      *
@@ -156,7 +164,9 @@ public class ChallengeIconProvider {
         bindAttempted = true;
         try {
             long startedAt = System.currentTimeMillis();
-            var provider = net.minecraft.data.registries.VanillaRegistries.createLookup();
+            // 26.3: VanillaRegistries.createLookup() was split; createWorldLookup() is the rename
+            // target (same static builder, same biome-filter validation) — see class javadoc above.
+            var provider = net.minecraft.data.registries.VanillaRegistries.createWorldLookup();
             net.minecraft.core.registries.BuiltInRegistries.DATA_COMPONENT_INITIALIZERS
                     .build(provider)
                     .forEach(net.minecraft.core.component.DataComponentInitializers.PendingComponents::apply);

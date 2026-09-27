@@ -63,7 +63,9 @@ public class ForceItemHeadIconRenderer {
                 matrices.translate(pos.x - cameraPos.x,
                         pos.y + player.getBbHeight() + 0.9 - cameraPos.y,
                         pos.z - cameraPos.z);
-                matrices.mulPose(camera.orientation);
+                // 26.3: PoseStack.mulPose(Quaternionfc) renamed to rotate(Quaternionfc); mulPose is
+                // now Matrix4fc/Transformation-only. camera.orientation is still a plain Quaternionf.
+                matrices.rotate(camera.orientation);
                 matrices.scale(0.75f, 0.75f, 0.75f);
                 iconState.clear();
                 client.getItemModelResolver().updateForTopItem(iconState, new ItemStack(item),

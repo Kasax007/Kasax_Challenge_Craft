@@ -56,6 +56,7 @@ public class ChallengeSyncHandler {
                 ChallengeCraftClient.SELECTED_DOUBLE_TROUBLE_MULTIPLIER = payload.doubleTroubleMultiplier;
                 ChallengeCraftClient.SELECTED_GAME_SPEED_MULTIPLIER = payload.gameSpeedMultiplier;
                 ChallengeCraftClient.SELECTED_FIB_MINUTES = payload.forceItemBattleMinutes;
+                net.kasax.challengecraft.client.ChallengeCodeClient.setSyncedWorldSeed(payload.worldSeed);
                 
                 Chal_24_MobHealthMultiply.setMultiplier(payload.mobHealthMultiplier);
                 Chal_35_DoubleTrouble.setMultiplier(payload.doubleTroubleMultiplier);
@@ -94,6 +95,14 @@ public class ChallengeSyncHandler {
                 // The movement mixin runs on the client and reads this, not the server map.
                 net.kasax.challengecraft.challenges.Chal_46_Dice.setClientRemaining(payload.remaining);
             });
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(AllBiomesSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> net.kasax.challengecraft.client.screen.AllBiomesHUD.update(payload));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(RedLightSyncPacket.ID, (payload, context) -> {
+            context.client().execute(() -> net.kasax.challengecraft.client.screen.RedLightHUD.update(payload));
         });
 
         ClientPlayNetworking.registerGlobalReceiver(ForceItemResultsPacket.ID, (payload, context) -> {

@@ -41,6 +41,10 @@ public class ChallengeCardWidget extends AbstractWidget {
     private final boolean locked;
     private final int requiredLevel;
     private final Anim.Tween hover = new Anim.Tween(0f);
+    /** The tooltip without a conflict line, so the line can come and go. */
+    private Component baseTooltip;
+    /** "Does not combine with ...", or null. Set by {@code ChallengeBrowser.refreshConflicts}. */
+    private Component conflictNote;
 
     public ChallengeCardWidget(int x, int y, int width, int height, int challengeId, boolean active, Consumer<Boolean> onToggle) {
         super(x, y, width, height, Component.empty());
@@ -76,10 +80,11 @@ public class ChallengeCardWidget extends AbstractWidget {
             Component requirement = challengeId == LevelManager.PERK_INFINITY_WEAPON
                     ? Component.translatable("challengecraft.requirement.infinity_stars", 20)
                     : Component.translatable("challengecraft.requirement.level", requiredLevel);
-            setTooltip(Tooltip.create(Component.translatable("challengecraft.challenge_card.locked", requirement).withStyle(ChatFormatting.RED).append(Component.nullToEmpty("\n")).append(description)));
+            baseTooltip = Component.translatable("challengecraft.challenge_card.locked", requirement).withStyle(ChatFormatting.RED).append(Component.nullToEmpty("\n")).append(description);
         } else {
-            setTooltip(Tooltip.create(description));
+            baseTooltip = description;
         }
+        setTooltip(Tooltip.create(baseTooltip));
     }
 
     @Override
@@ -90,10 +95,13 @@ public class ChallengeCardWidget extends AbstractWidget {
     @Override
     protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         Font tr = Minecraft.getInstance().font;
-        CraftUI.CardState state = locked ? CraftUI.CardState.LOCKED
+        // A locked challenge can still be ON when a daily or a challenge code switched it on —
+        // both waive the level lock. It must then read as switched on, not as unavailable.
+        boolean shownLocked = locked && !active;
+        CraftUI.CardState state = shownLocked ? CraftUI.CardState.LOCKED
                 : (active ? CraftUI.CardState.ACTIVE : CraftUI.CardState.IDLE);
 
-        float g = hover.approach(!locked && isHovered() ? 1f : 0f, 12f);
+        float g = hover.approach(!shownLocked && isHovered() ? 1f : 0f, 12f);
         int lift = Math.round(g * 1.5f);
         int x = getX();
         int y = getY() - lift;
@@ -106,10 +114,19 @@ public class ChallengeCardWidget extends AbstractWidget {
 
         int fill = CraftUI.mix(state.fill, 0xCC243449, g * 0.45f);
         int border = isFocused() ? CraftUI.TEXT_PRIMARY : CraftUI.mix(state.border, state.accent, g);
-        CraftUI.panel(context, x, y, w, h, fill, border, state.accent);
+        boolean clash = conflictNote != null && !shownLocked;
+        if (clash) {
+            border = CraftUI.DANGER;
+        }
+        CraftUI.panel(context, x, y, w, h, fill, border, clash ? CraftUI.DANGER : state.accent);
+        if (clash) {
+            // A small "!" in the corner: this card collides with something that is switched on.
+            context.fill(x + w - 9, y + 2, x + w - 2, y + 10, CraftUI.applyAlpha(CraftUI.DANGER, 0.9f));
+            context.text(tr, "!", x + w - 7, y + 2, 0xFF12161F, false);
+        }
 
         int textX;
-        if (locked) {
+        if (shownLocked) {
             Component label = challengeId == LevelManager.PERK_INFINITY_WEAPON
                     ? Component.translatable("challengecraft.challenge_card.locked_stars_short", 20)
                     : Component.translatable("challengecraft.challenge_card.locked_level_short", requiredLevel);
@@ -120,7 +137,7 @@ public class ChallengeCardWidget extends AbstractWidget {
             textX = x + 25;
         }
 
-        int textColor = locked ? CraftUI.TEXT_MUTED : (active ? CraftUI.TEXT_PRIMARY : CraftUI.TEXT_SECONDARY);
+        int textColor = shownLocked ? CraftUI.TEXT_MUTED : (active ? CraftUI.TEXT_PRIMARY : CraftUI.TEXT_SECONDARY);
         int maxTextWidth = w - (textX - x) - 6;
         String titleStr = CraftUI.trimToWidth(tr, title.getString(), maxTextWidth);
 
@@ -147,7 +164,9 @@ public class ChallengeCardWidget extends AbstractWidget {
 
     @Override
     public void onClick(MouseButtonEvent event, boolean doubleClick) {
-        if (locked) return;
+        // Switching a locked challenge OFF is always allowed (a code may have turned it on);
+        // only switching it on needs the level.
+        if (locked && !active) return;
         active = !active;
         if (onToggle != null) {
             onToggle.accept(active);
@@ -220,5 +239,23 @@ public class ChallengeCardWidget extends AbstractWidget {
 
     public int getChallengeId() {
         return challengeId;
+    }
+
+    /** Whether the player's level (or stars) does not unlock this yet. */
+    public boolean isLevelLocked() {
+        return locked;
+    }
+
+    public Component getTitle() {
+        return title;
+    }
+
+    public void setConflictNote(Component note) {
+        if (java.util.Objects.equals(note, conflictNote)) {
+            return;
+        }
+        conflictNote = note;
+        setTooltip(Tooltip.create(note == null ? baseTooltip
+                : note.copy().withStyle(ChatFormatting.RED).append(Component.nullToEmpty("\n")).append(baseTooltip)));
     }
 }

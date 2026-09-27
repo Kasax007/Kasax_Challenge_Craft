@@ -11,6 +11,12 @@ base {
 }
 
 repositories {
+	// Mod Menu, compile-only: the config-screen entrypoint is picked up when Mod Menu is installed
+	// and simply never loaded when it is not. 21.x is the 26.3 line (20.x = 26.2).
+	maven {
+		name = "TerraformersMC"
+		url = "https://maven.terraformersmc.com/releases/"
+	}
 }
 
 fabricApi {
@@ -26,6 +32,7 @@ dependencies {
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+	compileOnly("com.terraformersmc:modmenu:${project.modmenu_version}") { transitive = false }
 	
 }
 
@@ -39,6 +46,9 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
+	// A version port routinely produces more than javac's default cap of 100 errors, and a
+	// truncated list hides which files still need work.
+	it.options.compilerArgs += ["-Xmaxerrs", "2000"]
 }
 
 java {

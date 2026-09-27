@@ -23,7 +23,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "challengecraft:infinite_chest"
+        "recipes": "challengecraft:infinite_chest"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

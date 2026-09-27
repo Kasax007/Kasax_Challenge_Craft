@@ -13,6 +13,14 @@ public class LevelSyncHandler {
                 net.kasax.challengecraft.ChallengeCraft.LOGGER.info("[Client] Received LevelSyncPacket for {}: {}", payload.uuid, payload.xp);
                 if (context.player().getUUID().equals(payload.uuid)) {
                     boolean changed = ChallengeCraftClient.LOCAL_PLAYER_XP != payload.xp;
+                    // 0 means "not synced yet this session" (see refreshLocalPlayerXp), not level 1:
+                    // the first sync after joining must not sound like a level-up.
+                    long before = ChallengeCraftClient.LOCAL_PLAYER_XP;
+                    if (before > 0 && net.kasax.challengecraft.LevelManager.getLevelForXp(payload.xp)
+                            > net.kasax.challengecraft.LevelManager.getLevelForXp(before)) {
+                        net.kasax.challengecraft.client.SoundCues.play(
+                                net.kasax.challengecraft.client.SoundCues.Cue.LEVEL_UP, 10);
+                    }
                     net.kasax.challengecraft.ChallengeCraftClient.LOCAL_PLAYER_XP = payload.xp;
                     XpManager.setXp(payload.uuid, payload.xp);
 

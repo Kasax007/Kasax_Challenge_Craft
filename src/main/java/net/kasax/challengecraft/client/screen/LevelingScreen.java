@@ -17,7 +17,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -154,12 +154,13 @@ public class LevelingScreen extends Screen {
         if (this.layoutEditMode && this.pinnedMilestone != null) {
             // 26.2 folded key/scancode/modifiers into KeyEvent; the shift check moved onto it too.
             int step = event.hasShiftDown() ? LAYOUT_STEP * 2 : LAYOUT_STEP;
+            // 26.3: GLFW replaced by SDL; key constants now live on InputConstants (com.mojang.blaze3d.platform).
             boolean handled = switch (event.key()) {
-                case GLFW.GLFW_KEY_LEFT -> nudgePinnedMilestone(-step, 0);
-                case GLFW.GLFW_KEY_RIGHT -> nudgePinnedMilestone(step, 0);
-                case GLFW.GLFW_KEY_UP -> nudgePinnedMilestone(0, -step);
-                case GLFW.GLFW_KEY_DOWN -> nudgePinnedMilestone(0, step);
-                case GLFW.GLFW_KEY_R -> {
+                case InputConstants.KEY_LEFT -> nudgePinnedMilestone(-step, 0);
+                case InputConstants.KEY_RIGHT -> nudgePinnedMilestone(step, 0);
+                case InputConstants.KEY_UP -> nudgePinnedMilestone(0, -step);
+                case InputConstants.KEY_DOWN -> nudgePinnedMilestone(0, step);
+                case InputConstants.KEY_R -> {
                     resetMilestoneOffset(this.pinnedMilestone);
                     yield true;
                 }
@@ -581,7 +582,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 46; challengeId++) {
+        for (int challengeId = 1; challengeId <= 49; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Component.translatable("challengecraft.worldcreate.challenge" + challengeId),

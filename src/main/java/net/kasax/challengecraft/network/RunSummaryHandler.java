@@ -33,6 +33,7 @@ public final class RunSummaryHandler {
                 context.client().execute(() -> {
                     pending = payload;
                     last = payload;
+                    net.kasax.challengecraft.client.RunHistory.onRunFinished(payload);
                 }));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

@@ -44,6 +44,11 @@ public class ChallengeRewardOverlay {
 
     public static void start(long oldXpVal, long newXpVal, long gain, boolean gameComp) {
         startTime = System.currentTimeMillis() + DELAY_MS;
+        if (gameComp) {
+            // In time with the overlay appearing, not with the packet.
+            net.kasax.challengecraft.client.SoundCues.play(net.kasax.challengecraft.client.SoundCues.Cue.RUN_COMPLETE,
+                    (int) (DELAY_MS / 50));
+        }
         xpGained = gain;
         oldXp = oldXpVal;
         isGameComp = gameComp;
@@ -165,7 +170,7 @@ public class ChallengeRewardOverlay {
                     rewards.add("MASTER");
                 }
 
-                for (int id = 1; id <= 46; id++) {
+                for (int id = 1; id <= 49; id++) {
                     if (LevelManager.getRequiredLevel(id) == l) {
                         rewards.add(id);
                     }

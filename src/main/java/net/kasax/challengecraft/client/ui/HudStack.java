@@ -65,10 +65,13 @@ public final class HudStack {
         if (client.gui.hud.isHidden() || client.font == null) {
             return;
         }
-        Font tr = client.font;
+        var settings = net.kasax.challengecraft.client.config.TimerSettings.get();
+        if (!settings.cardsVisible || net.kasax.challengecraft.client.config.TimerSettings.hiddenByKey) {
+            return;
+        }
 
         // Bucket active cards by row.
-        Map<Integer, List<HudCard>> rows = new HashMap<>();
+        Map<Integer, List<HudCard>> rows = new java.util.TreeMap<>();
         Set<String> activeIds = new HashSet<>();
         for (Source source : SOURCES) {
             HudCard card = source.supplier.get();
@@ -77,49 +80,91 @@ public final class HudStack {
                 activeIds.add(card.id);
             }
         }
-        if (rows.isEmpty()) {
-            resetInactive(activeIds);
-            return;
+        if (!rows.isEmpty()) {
+            draw(context, client.font, rows, client.getWindow().getGuiScaledWidth(),
+                    client.getWindow().getGuiScaledHeight(), settings, true);
         }
+        resetInactive(activeIds);
+    }
 
-        int sw = client.getWindow().getGuiScaledWidth();
+    /**
+     * Draws a stack of card rows where the settings put it — the live HUD and the settings screen's
+     * draggable preview share this, so the preview cannot disagree with the game.
+     *
+     * @param animate slide-in and progress flash; off for the preview
+     */
+    public static void draw(GuiGraphicsExtractor context, Font tr, Map<Integer, List<HudCard>> rows,
+                            int sw, int sh, net.kasax.challengecraft.client.config.TimerSettings s, boolean animate) {
+        float scale = s.cardsScale;
+        float anchorX = s.cardsCustom ? s.cardsX * sw : sw / 2f;
+        float anchorY = s.cardsCustom ? s.cardsY * sh : TOP;
         long now = System.currentTimeMillis();
         // Cards grow with their content but never wider than the screen (minus a small margin).
-        int maxCardWidth = sw - 12;
+        int maxCardWidth = Math.max(60, (int) ((sw - 12) / scale));
 
-        for (Map.Entry<Integer, List<HudCard>> entry : rows.entrySet()) {
-            List<HudCard> cards = entry.getValue();
-            // Compute each card's width once so layout and render stay consistent.
-            Map<HudCard, Integer> widths = new HashMap<>();
+        var pose = context.pose();
+        pose.pushMatrix();
+        try {
+            pose.translate(anchorX, anchorY);
+            pose.scale(scale, scale);
+            int rowIndex = 0;
+            for (List<HudCard> cards : rows.values()) {
+                // Compute each card's width once so layout and render stay consistent.
+                Map<HudCard, Integer> widths = new HashMap<>();
+                int total = -GAP;
+                for (HudCard card : cards) {
+                    int w = card.width(tr, maxCardWidth);
+                    widths.put(card, w);
+                    total += w + GAP;
+                }
+                int x = -total / 2;
+                int rowY = rowIndex * (HudCard.HEIGHT + GAP);
+
+                for (HudCard card : cards) {
+                    int slide = 0;
+                    float flash = 0f;
+                    if (animate) {
+                        State state = STATES.computeIfAbsent(card.id, k -> new State());
+                        float appear = state.appear.approach(1f, 11f);
+                        if (card.progressKey != state.lastKey) {
+                            if (state.lastKey != Integer.MIN_VALUE) {
+                                state.flashAt = now;
+                            }
+                            state.lastKey = card.progressKey;
+                        }
+                        flash = Math.max(0f, 1f - (now - state.flashAt) / 400f);
+                        slide = Math.round((1f - appear) * -(HudCard.HEIGHT + 10));
+                    }
+                    int w = widths.get(card);
+                    card.extractRenderState(context, tr, x, rowY + slide, flash, w);
+                    x += w + GAP;
+                }
+                rowIndex++;
+            }
+        } finally {
+            pose.popMatrix();
+        }
+    }
+
+    /** Screen-space {x, y, w, h} of a stack drawn by {@link #draw}, for dragging it in the preview. */
+    public static int[] bounds(Font tr, Map<Integer, List<HudCard>> rows, int sw, int sh,
+                               net.kasax.challengecraft.client.config.TimerSettings s) {
+        float scale = s.cardsScale;
+        float anchorX = s.cardsCustom ? s.cardsX * sw : sw / 2f;
+        float anchorY = s.cardsCustom ? s.cardsY * sh : TOP;
+        int maxCardWidth = Math.max(60, (int) ((sw - 12) / scale));
+        int widest = 0;
+        for (List<HudCard> cards : rows.values()) {
             int total = -GAP;
             for (HudCard card : cards) {
-                int w = card.width(tr, maxCardWidth);
-                widths.put(card, w);
-                total += w + GAP;
+                total += card.width(tr, maxCardWidth) + GAP;
             }
-            int x = (sw - total) / 2;
-            int rowY = TOP + entry.getKey() * (HudCard.HEIGHT + GAP);
-
-            for (HudCard card : cards) {
-                State state = STATES.computeIfAbsent(card.id, k -> new State());
-                float appear = state.appear.approach(1f, 11f);
-
-                if (card.progressKey != state.lastKey) {
-                    if (state.lastKey != Integer.MIN_VALUE) {
-                        state.flashAt = now;
-                    }
-                    state.lastKey = card.progressKey;
-                }
-                float flash = Math.max(0f, 1f - (now - state.flashAt) / 400f);
-
-                int slide = Math.round((1f - appear) * -(HudCard.HEIGHT + 10));
-                int w = widths.get(card);
-                card.extractRenderState(context, tr, x, rowY + slide, flash, w);
-                x += w + GAP;
-            }
+            widest = Math.max(widest, total);
         }
-
-        resetInactive(activeIds);
+        int height = rows.size() * (HudCard.HEIGHT + GAP) - GAP;
+        int w = Math.round(widest * scale);
+        int h = Math.round(height * scale);
+        return new int[]{Math.round(anchorX - w / 2f), Math.round(anchorY), w, h};
     }
 
     /** Cards that stopped being active reset so they slide in again next time they appear. */
