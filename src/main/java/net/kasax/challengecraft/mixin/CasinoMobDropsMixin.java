@@ -18,7 +18,7 @@ public abstract class CasinoMobDropsMixin {
     @Inject(method = "dropFromLootTable(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;Z)V",
             at = @At("HEAD"), cancellable = true)
     private void challengecraft$noCasinoLoot(ServerLevel world, DamageSource source, boolean causedByPlayer, CallbackInfo ci) {
-        if (((LivingEntity) (Object) this).getTags().contains(LossWaves.TAG)) {
+        if (((LivingEntity) (Object) this).entityTags().contains(LossWaves.TAG)) {
             ci.cancel();
         }
     }

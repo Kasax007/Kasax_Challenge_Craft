@@ -36,7 +36,6 @@ public class CroupierEntity extends Entity {
     public CroupierEntity(EntityType<? extends CroupierEntity> type, Level world) {
         super(type, world);
         this.setNoGravity(true);
-        this.setInvulnerable(true);
     }
 
     @Override

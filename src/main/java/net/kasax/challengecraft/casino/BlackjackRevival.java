@@ -229,7 +229,6 @@ public final class BlackjackRevival {
 
     private static void kill(ServerPlayer player, DamageSource source) {
         LET_DIE.add(player.getUUID());
-        player.invulnerableTime = 0;
         ServerLevel level = (ServerLevel) player.level();
         player.hurtServer(level, source, Float.MAX_VALUE);
         if (player.isAlive() && player.getHealth() > 0) {
