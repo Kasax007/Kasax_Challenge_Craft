@@ -29,7 +29,8 @@ import java.util.UUID;
  * Server side of the slot machine. The whole play (paid spin plus every free spin it triggers) is
  * decided the moment the lever is pulled and sent to every client nearby, who all watch the same
  * reels; the win is credited only when the presentation has finished, so the balance on the HUD
- * never gives the result away early.
+ * never gives the result away early. A machine runs one play at a time, a player may keep several
+ * machines running at once.
  *
  * <h2>Item stakes</h2>
  * Right-clicking the machine with an item bets the whole stack at its Jeton value. The first click
@@ -55,7 +56,6 @@ public final class SlotGame {
 
     private static final Map<Long, Long> BUSY_UNTIL = new HashMap<>();
     private static final Map<UUID, Quote> QUOTES = new HashMap<>();
-    private static final Map<UUID, Long> PLAYER_BUSY = new HashMap<>();
     private static final List<Payout> PAYOUTS = new ArrayList<>();
     private static final List<Fountain> FOUNTAINS = new ArrayList<>();
     private static int serial;
@@ -68,10 +68,6 @@ public final class SlotGame {
         long now = level.getServer().getTickCount();
         if (BUSY_UNTIL.getOrDefault(pos.asLong(), 0L) > now) {
             player.sendOverlayMessage(Component.translatable("challengecraft.casino.slot.busy").withStyle(ChatFormatting.GRAY));
-            return;
-        }
-        if (PLAYER_BUSY.getOrDefault(player.getUUID(), 0L) > now) {
-            player.sendOverlayMessage(Component.translatable("challengecraft.casino.slot.one_at_a_time").withStyle(ChatFormatting.GRAY));
             return;
         }
         CasinoAccount account = CasinoEconomy.account(player);
@@ -116,7 +112,7 @@ public final class SlotGame {
     private static void spin(ServerPlayer player, ServerLevel level, BlockPos pos, long stake, Item item, long unitCenti, long now) {
         RandomSource random = level.getRandom();
         SlotMath.Play play = SlotMath.play(random);
-        long win = play.units() * stake / SlotMath.LINES;
+        long win = SlotMath.pay(play.units(), stake);
         int ticks = SlotMath.presentationTicks(play);
 
         int n = play.spins().size();
@@ -126,7 +122,7 @@ public final class SlotGame {
         for (int i = 0; i < n; i++) {
             SlotMath.Spin s = play.spins().get(i);
             System.arraycopy(s.stops(), 0, stops, i * SlotMath.REELS, SlotMath.REELS);
-            wins[i] = s.units() * stake / SlotMath.LINES;
+            wins[i] = SlotMath.pay(s.units(), stake);
             masks[i] = s.expandMask();
         }
         String itemId = item == null ? "" : BuiltInRegistries.ITEM.getKey(item).toString();
@@ -138,7 +134,6 @@ public final class SlotGame {
         }
 
         BUSY_UNTIL.put(pos.asLong(), now + ticks + 4);
-        PLAYER_BUSY.put(player.getUUID(), now + ticks + 4);
         PAYOUTS.add(new Payout(player.getUUID(), level.dimension().identifier().toString(), pos.asLong(), stake, win,
                 item, unitCenti, now + ticks, win >= stake * 50));
         level.playSound(null, pos, CasinoSounds.LEVER, SoundSource.BLOCKS, 0.9f, 1.0f);
@@ -232,7 +227,6 @@ public final class SlotGame {
         PAYOUTS.clear();
         FOUNTAINS.clear();
         BUSY_UNTIL.clear();
-        PLAYER_BUSY.clear();
         QUOTES.clear();
         CasinoSavedData.get(server).touch();
     }
@@ -241,7 +235,6 @@ public final class SlotGame {
         PAYOUTS.clear();
         FOUNTAINS.clear();
         BUSY_UNTIL.clear();
-        PLAYER_BUSY.clear();
         QUOTES.clear();
     }
 

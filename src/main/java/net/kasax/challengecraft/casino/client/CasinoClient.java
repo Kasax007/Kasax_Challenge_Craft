@@ -9,7 +9,12 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.ModelLayerRegistry;
+import net.kasax.challengecraft.casino.CasinoDeviceBlock;
 import net.kasax.challengecraft.casino.CasinoNet;
+import net.kasax.challengecraft.casino.CasinoPartBlock;
+import net.kasax.challengecraft.casino.DeviceLayouts;
+import net.kasax.challengecraft.casino.DeviceSpace;
+import net.kasax.challengecraft.casino.PlinkoGame;
 import net.kasax.challengecraft.casino.CasinoRegistry;
 import net.kasax.challengecraft.casino.CasinoSounds;
 import net.kasax.challengecraft.casino.CrashGame;
@@ -22,6 +27,9 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -67,8 +75,12 @@ public final class CasinoClient {
                 ctx.client().setScreenAndShow(new CashierScreen(p));
             }
         }));
-        ClientPlayNetworking.registerGlobalReceiver(CasinoNet.SlotResult.ID, (p, ctx) -> ctx.client().execute(() ->
-                CasinoClientState.SLOTS.put(p.pos(), new SlotAnimation(p, CasinoClientState.clientTick))));
+        ClientPlayNetworking.registerGlobalReceiver(CasinoNet.SlotResult.ID, (p, ctx) -> ctx.client().execute(() -> {
+            CasinoClientState.SLOT_LAST.remove(p.pos());
+            CasinoClientState.SLOTS.put(p.pos(), new SlotAnimation(p, CasinoClientState.clientTick));
+        }));
+        ClientPlayNetworking.registerGlobalReceiver(CasinoNet.PlinkoBall.ID, (p, ctx) -> ctx.client().execute(() ->
+                CasinoClientState.PLINKO_BALLS.add(new CasinoClientState.PlinkoDrop(p, CasinoClientState.clientTick, -1))));
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.RouletteState.ID, (p, ctx) -> ctx.client().execute(() -> {
             CasinoClientState.ROULETTE.put(p.pos(), p);
             CasinoClientState.ROULETTE_RECEIVED.put(p.pos(), CasinoClientState.clientTick);
@@ -134,12 +146,17 @@ public final class CasinoClient {
         while (ALL_IN.consumeClick()) if (inWorld) send(CasinoNet.Action.BET_ALL_IN);
         while (CASH_OUT.consumeClick()) send(CasinoNet.Action.CRASH_CASH_OUT);
 
-        // Slot sound tracks: every machine plays its own timeline where it stands.
+        CasinoClientState.aim = aimAt(client);
+
+        // Slot sound tracks: every machine plays its own timeline where it stands. A finished play
+        // stays on the reels until the machine spins again.
         float now = 0f;
         for (Iterator<Map.Entry<Long, SlotAnimation>> it = CasinoClientState.SLOTS.entrySet().iterator(); it.hasNext(); ) {
-            SlotAnimation anim = it.next().getValue();
+            Map.Entry<Long, SlotAnimation> entry = it.next();
+            SlotAnimation anim = entry.getValue();
             float t = anim.elapsed(now);
             if (anim.finished(t)) {
+                CasinoClientState.SLOT_LAST.put(entry.getKey(), anim);
                 it.remove();
                 continue;
             }
@@ -158,9 +175,28 @@ public final class CasinoClient {
                     case EXPAND -> CasinoSounds.EXPAND;
                     case COINS -> CasinoSounds.COINS;
                 };
-                float volume = e.cue() == SlotAnimation.Cue.SPIN ? 0.55f : e.cue() == SlotAnimation.Cue.COINS ? 0.45f : 1.0f;
+                float volume = e.cue() == SlotAnimation.Cue.SPIN ? 0.45f : e.cue() == SlotAnimation.Cue.COINS ? 0.4f : 0.8f;
                 client.level.playLocalSound(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, sound,
                         SoundSource.BLOCKS, volume, e.pitch(), false);
+            }
+        }
+
+        // Plinko balls: a soft tick on every peg, and bookkeeping once they land.
+        String me = client.player.getName().getString();
+        for (Iterator<CasinoClientState.PlinkoDrop> it = CasinoClientState.PLINKO_BALLS.iterator(); it.hasNext(); ) {
+            CasinoClientState.PlinkoDrop d = it.next();
+            long t = CasinoClientState.clientTick - d.startTick();
+            BlockPos pos = BlockPos.of(d.ball().pos());
+            if (t >= PlinkoGame.FALL_TICKS) {
+                CasinoClientState.PlinkoDrop landed = new CasinoClientState.PlinkoDrop(d.ball(), d.startTick(), CasinoClientState.clientTick);
+                CasinoClientState.PLINKO_LAST.put(d.ball().pos(), landed);
+                if (d.ball().player().equals(me)) CasinoClientState.PLINKO_MINE.put(d.ball().pos(), landed);
+                it.remove();
+                continue;
+            }
+            if (t >= 8 && (t - 8) % 4 == 0 && client.player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5) < 24 * 24) {
+                client.level.playLocalSound(pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5, CasinoSounds.TICK,
+                        SoundSource.BLOCKS, 0.18f, 1.5f + client.level.getRandom().nextFloat() * 0.5f, false);
             }
         }
 
@@ -179,6 +215,17 @@ public final class CasinoClient {
                 client.level.addParticle(ParticleTypes.FLAME, x, y - 0.4, z, 0, -0.1, 0);
             }
         }
+    }
+
+    /** The device spot under the crosshair, if any. */
+    private static CasinoClientState.Aim aimAt(Minecraft client) {
+        if (!(client.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return null;
+        BlockPos master = CasinoPartBlock.master(client.level, hit.getBlockPos());
+        BlockState state = client.level.getBlockState(master);
+        if (!(state.getBlock() instanceof CasinoDeviceBlock block)) return null;
+        DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(block.getDeviceType(),
+                DeviceSpace.toDevice(master, state.getValue(CasinoDeviceBlock.FACING), hit.getLocation()));
+        return new CasinoClientState.Aim(master, block.getDeviceType(), zone);
     }
 
     public static void send(int action) {

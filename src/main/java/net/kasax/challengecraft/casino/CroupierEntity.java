@@ -64,6 +64,42 @@ public class CroupierEntity extends Entity {
         return false;
     }
 
+    // He is part of the booth: nothing pushes, burns, drowns or blows him away.
+
+    @Override
+    public void push(double x, double y, double z) {
+    }
+
+    @Override
+    public boolean isPushedByFluid() {
+        return false;
+    }
+
+    @Override
+    public boolean ignoreExplosion(net.minecraft.world.level.Explosion explosion) {
+        return true;
+    }
+
+    @Override
+    public net.minecraft.world.level.material.PushReaction getPistonPushReaction() {
+        return net.minecraft.world.level.material.PushReaction.IGNORE_ENTITY;
+    }
+
+    @Override
+    public boolean canBeHitByProjectile() {
+        return false;
+    }
+
+    @Override
+    public boolean isAttackable() {
+        return false;
+    }
+
+    @Override
+    public boolean canFreeze() {
+        return false;
+    }
+
     @Override
     protected void readAdditionalSaveData(ValueInput input) {
     }

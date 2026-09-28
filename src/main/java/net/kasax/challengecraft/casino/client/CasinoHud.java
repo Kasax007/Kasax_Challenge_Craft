@@ -7,11 +7,13 @@ import net.kasax.challengecraft.casino.CasinoDeviceBlock;
 import net.kasax.challengecraft.casino.CasinoEconomy;
 import net.kasax.challengecraft.casino.CasinoNet;
 import net.kasax.challengecraft.casino.CasinoRegistry;
-import net.kasax.challengecraft.casino.CasinoSlotTopBlock;
+import net.kasax.challengecraft.casino.CasinoPartBlock;
 import net.kasax.challengecraft.casino.CasinoSounds;
 import net.kasax.challengecraft.casino.CrashGame;
 import net.kasax.challengecraft.casino.CrashMath;
+import net.kasax.challengecraft.casino.DeviceLayouts;
 import net.kasax.challengecraft.casino.DeviceType;
+import net.kasax.challengecraft.casino.RouletteMath;
 import net.kasax.challengecraft.casino.SlotMath;
 import net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins;
 import net.kasax.challengecraft.client.ui.CraftUI;
@@ -40,13 +42,13 @@ import java.util.Locale;
  * <ul>
  *   <li>a card in the objective stack: time and amount of the next fee, own balance, and a red
  *       warning when the whole team cannot cover it;</li>
- *   <li>the big reel panel above the hotbar while a nearby slot machine plays — readable reels,
- *       win lines, the count-up, free-spin banners and the lucky item;</li>
- *   <li>the crash panel next to a pad: the climbing multiplier, the flight curve and who is still
- *       aboard;</li>
- *   <li>a small hint while looking at a device, and banners for fees, deposits, unlocks, waves.</li>
+ *   <li>one line under the crosshair saying what the spot of a device the player aims at does
+ *       (which chip, which bet and what it pays, what the button does);</li>
+ *   <li>banners for fees, deposits, unlocks and waves.</li>
  * </ul>
- * None of it is a screen: the game keeps running and the player keeps moving while it shows.
+ * Playing happens on the devices themselves (see {@code CasinoWorldRenderer}). The reel panel and
+ * the crash panel this overlay used to draw are kept below, unused, in case another feature wants
+ * them again ({@link #drawSlotPanel}, {@link #drawCrashPanel}).
  */
 @Environment(EnvType.CLIENT)
 public final class CasinoHud {
@@ -99,13 +101,8 @@ public final class CasinoHud {
         int h = client.getWindow().getGuiScaledHeight();
         float partial = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
 
-        SlotAnimation slot = nearestSlot(client);
-        if (slot != null) drawSlotPanel(context, font, slot, w, h, partial);
-        CasinoNet.CrashState crash = nearestCrash(client);
-        if (crash != null) drawCrashPanel(context, font, crash, w, h, partial);
-        // Under the crosshair normally; below the slot panel while it covers the middle of the screen.
-        int hintY = slot != null ? h - 62 : h / 2 + 12;
-        if (client.gui.screen() == null) drawDeviceHint(context, font, client, w, hintY);
+        // Under the fee card at the top, out of the way of the device the player looks at.
+        if (client.gui.screen() == null) drawDeviceHint(context, font, client, w, 44);
         drawBanners(context, font, w);
     }
 
@@ -410,26 +407,71 @@ public final class CasinoHud {
     // ---- device hint --------------------------------------------------------------------------
 
     private static void drawDeviceHint(GuiGraphicsExtractor ctx, Font font, Minecraft client, int w, int y) {
-        if (!(client.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return;
-        BlockState state = client.level.getBlockState(CasinoSlotTopBlock.base(client.level, hit.getBlockPos()));
-        if (!(state.getBlock() instanceof CasinoDeviceBlock block)) return;
+        CasinoClientState.Aim aim = CasinoClientState.aim;
         CasinoNet.State s = CasinoClientState.state;
-        if (s == null) return;
-        DeviceType type = block.getDeviceType();
-        String key = switch (type) {
-            case SLOT -> "challengecraft.casino.hint.slot";
-            case CRASH -> "challengecraft.casino.hint.crash";
-            case ROULETTE -> "challengecraft.casino.hint.roulette";
-            case CASHIER -> "challengecraft.casino.hint.cashier";
-        };
-        Component line1 = Component.translatable(key);
-        ctx.centeredText(font, line1, w / 2, y, CraftUI.TEXT_PRIMARY);
-        if (type == DeviceType.SLOT || type == DeviceType.CRASH) {
-            Component bet = Component.translatable(s.betLevel() < 0 ? "challengecraft.casino.hint.bet_all_in"
-                            : "challengecraft.casino.hint.bet", CasinoEconomy.formatFull(s.betAmount()),
-                    CasinoClient.BET_UP.getTranslatedKeyMessage(), CasinoClient.BET_DOWN.getTranslatedKeyMessage());
-            ctx.centeredText(font, bet, w / 2, y + 11, CraftUI.GOLD);
+        if (aim == null || s == null) return;
+        DeviceLayouts.Zone zone = aim.zone();
+        Component line;
+        int colour = CraftUI.TEXT_PRIMARY;
+        if (zone.kind() == DeviceLayouts.CHIP) {
+            int level = DeviceLayouts.trayLevel(s.betLevel() < 0 ? DeviceLayouts.ALL_IN_LEVEL : s.betLevel(), zone.a());
+            line = level >= DeviceLayouts.ALL_IN_LEVEL ? Component.translatable("challengecraft.casino.hint.chip_all_in")
+                    : Component.translatable("challengecraft.casino.hint.chip", CasinoEconomy.formatFull(DeviceLayouts.STAKES[level] * 100));
+            colour = CraftUI.GOLD;
+        } else if (zone.kind() == DeviceLayouts.BET) {
+            line = Component.translatable("challengecraft.casino.hint.bet_spot", betName(zone.a(), zone.b()),
+                    RouletteMath.odds(zone.a()), CasinoEconomy.formatFull(s.betAmount()), myBet(aim, zone));
+        } else if (zone.kind() == DeviceLayouts.TAKE_BACK) {
+            line = Component.translatable("challengecraft.casino.hint.take_back");
+        } else if (zone.kind() == DeviceLayouts.BUTTON || (zone.kind() == DeviceLayouts.PLAY && aim.type() == DeviceType.CRASH)) {
+            line = Component.translatable("challengecraft.casino.hint.crash", CasinoEconomy.formatFull(s.betAmount()),
+                    CasinoClient.CASH_OUT.getTranslatedKeyMessage());
+        } else if (zone.kind() == DeviceLayouts.PLAY) {
+            line = switch (aim.type()) {
+                case SLOT -> Component.translatable("challengecraft.casino.hint.slot", CasinoEconomy.formatFull(s.betAmount()));
+                case PLINKO -> Component.translatable("challengecraft.casino.hint.plinko", CasinoEconomy.formatFull(s.betAmount()));
+                case CASHIER -> Component.translatable("challengecraft.casino.hint.cashier");
+                default -> Component.translatable("challengecraft.casino.hint.roulette");
+            };
+        } else if (aim.type() == DeviceType.ROULETTE) {
+            line = Component.translatable("challengecraft.casino.hint.roulette");
+        } else {
+            return;
         }
+        int tw = font.width(line);
+        ctx.fill(w / 2 - tw / 2 - 4, y - 3, w / 2 + tw / 2 + 4, y + font.lineHeight + 1, 0x90000000);
+        ctx.centeredText(font, line, w / 2, y, colour);
+    }
+
+    /** "Split 17/20", "Street 13–15", "Red"... */
+    private static Component betName(int kind, int target) {
+        return switch (kind) {
+            case RouletteMath.STRAIGHT -> Component.translatable("challengecraft.casino.bet.straight", target);
+            case RouletteMath.SPLIT -> Component.translatable("challengecraft.casino.bet.split", target / 100, target % 100);
+            case RouletteMath.STREET -> Component.translatable("challengecraft.casino.bet.street", target, target + 2);
+            case RouletteMath.CORNER -> Component.translatable("challengecraft.casino.bet.corner", target, target + 1, target + 3, target + 4);
+            case RouletteMath.SIX_LINE -> Component.translatable("challengecraft.casino.bet.six_line", target, target + 5);
+            case RouletteMath.DOZEN -> Component.translatable("challengecraft.casino.bet.dozen", target * 12 + 1, target * 12 + 12);
+            case RouletteMath.COLUMN -> Component.translatable("challengecraft.casino.bet.column", target + 1);
+            case RouletteMath.RED -> Component.translatable("challengecraft.casino.bet.red");
+            case RouletteMath.BLACK -> Component.translatable("challengecraft.casino.bet.black");
+            case RouletteMath.EVEN -> Component.translatable("challengecraft.casino.bet.even");
+            case RouletteMath.ODD -> Component.translatable("challengecraft.casino.bet.odd");
+            case RouletteMath.LOW -> Component.translatable("challengecraft.casino.bet.low");
+            default -> Component.translatable("challengecraft.casino.bet.high");
+        };
+    }
+
+    /** What the viewer already has on that spot, as a short suffix ("" if nothing). */
+    private static Component myBet(CasinoClientState.Aim aim, DeviceLayouts.Zone zone) {
+        CasinoNet.RouletteState rs = CasinoClientState.ROULETTE.get(aim.master().asLong());
+        if (rs == null) return Component.empty();
+        String me = Minecraft.getInstance().player.getName().getString();
+        long mine = 0;
+        for (CasinoNet.RouletteBet b : rs.bets()) {
+            if (b.player().equals(me) && b.kind() == zone.a() && b.target() == zone.b()) mine += b.amount();
+        }
+        return mine == 0 ? Component.empty() : Component.translatable("challengecraft.casino.hint.yours", CasinoEconomy.formatFull(mine));
     }
 
     // ---- banners ------------------------------------------------------------------------------
@@ -479,7 +521,7 @@ public final class CasinoHud {
     }
 
     private static void ui(Minecraft client, SoundEvent sound, float pitch) {
-        client.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, 0.9f));
+        client.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, 0.45f));
     }
 
     private static void drawBanners(GuiGraphicsExtractor ctx, Font font, int w) {

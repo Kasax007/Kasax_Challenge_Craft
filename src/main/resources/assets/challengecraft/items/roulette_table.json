@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "challengecraft:block/roulette_table"
+    "model": "challengecraft:block/roulette_table_item"
   }
 }

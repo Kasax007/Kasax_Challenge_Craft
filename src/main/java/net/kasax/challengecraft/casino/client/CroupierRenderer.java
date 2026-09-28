@@ -31,7 +31,7 @@ import java.util.Map;
 /**
  * The croupier: a player-shaped model with a top hat and a bow tie, drawn from one 64×64 skin
  * ({@code textures/entity/croupier.png}, player skin layout, base layer only so it can be drawn
- * solid). He follows the nearest player with his head, breathes, taps his fingers on the counter
+ * solid). He follows the nearest player with his head, breathes, now and then straightens his cuffs
  * and plays a gesture — wave, take, pay out, tip the hat — whenever the server bumps
  * {@link CroupierEntity#GESTURE}.
  *
@@ -94,8 +94,10 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
                 CubeListBuilder.create().texOffs(16, 16).addBox(-4f, 0f, -2f, 8f, 12f, 4f), PartPose.ZERO);
         body.addOrReplaceChild("bow_tie",
                 CubeListBuilder.create().texOffs(44, 32).addBox(-2f, 0.4f, -2.7f, 4f, 1.6f, 1f), PartPose.ZERO);
+        // Tails of the tailcoat, hinged at the back of the waist so they hang flush from it.
         body.addOrReplaceChild("coat_tail",
-                CubeListBuilder.create().texOffs(0, 44).addBox(-4f, 11f, 1.6f, 8f, 5f, 1f), PartPose.rotation(0.12f, 0f, 0f));
+                CubeListBuilder.create().texOffs(0, 44).addBox(-4f, 0f, 0f, 8f, 5f, 1f),
+                PartPose.offsetAndRotation(0f, 10f, 1.9f, 0.08f, 0f, 0f));
         r.addOrReplaceChild("right_arm",
                 CubeListBuilder.create().texOffs(40, 16).addBox(-3f, -2f, -2f, 4f, 12f, 4f), PartPose.offset(-5f, 2f, 0f));
         r.addOrReplaceChild("left_arm",
@@ -160,9 +162,9 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
         leftArm.xRot = -0.35f + Mth.sin(t * 0.06f + 1.3f) * 0.04f;
         rightArm.zRot = 0.06f;
         leftArm.zRot = -0.06f;
-        // Drumming fingers on the counter every few seconds.
-        float drum = (t % 90f) < 14f ? Mth.sin(t * 2.4f) * 0.08f : 0f;
-        leftArm.xRot += drum;
+        // Now and then he straightens his cuffs: one slow, smooth lift of the left forearm.
+        float cycle = t % 160f;
+        if (cycle < 40f) leftArm.xRot -= 0.18f * Mth.sin(cycle / 40f * Mth.PI);
 
         if (s.gesture >= 0f) {
             float g = s.gesture;

@@ -2,13 +2,19 @@
   "casino.chip": {
     "sounds": [
       {
-        "name": "challengecraft:casino/chip1"
+        "name": "challengecraft:casino/chip1",
+        "volume": 0.4,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/chip2"
+        "name": "challengecraft:casino/chip2",
+        "volume": 0.4,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/chip3"
+        "name": "challengecraft:casino/chip3",
+        "volume": 0.4,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.chip"
@@ -16,10 +22,14 @@
   "casino.chip_stack": {
     "sounds": [
       {
-        "name": "challengecraft:casino/chip_stack1"
+        "name": "challengecraft:casino/chip_stack1",
+        "volume": 0.4,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/chip_stack2"
+        "name": "challengecraft:casino/chip_stack2",
+        "volume": 0.4,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.chip_stack"
@@ -27,13 +37,19 @@
   "casino.card_slide": {
     "sounds": [
       {
-        "name": "challengecraft:casino/card_slide1"
+        "name": "challengecraft:casino/card_slide1",
+        "volume": 0.5,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/card_slide2"
+        "name": "challengecraft:casino/card_slide2",
+        "volume": 0.5,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/card_slide3"
+        "name": "challengecraft:casino/card_slide3",
+        "volume": 0.5,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.card_slide"
@@ -41,13 +57,19 @@
   "casino.card_place": {
     "sounds": [
       {
-        "name": "challengecraft:casino/card_place1"
+        "name": "challengecraft:casino/card_place1",
+        "volume": 0.5,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/card_place2"
+        "name": "challengecraft:casino/card_place2",
+        "volume": 0.5,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/card_place3"
+        "name": "challengecraft:casino/card_place3",
+        "volume": 0.5,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.card_place"
@@ -55,7 +77,9 @@
   "casino.card_flip": {
     "sounds": [
       {
-        "name": "challengecraft:casino/card_flip"
+        "name": "challengecraft:casino/card_flip",
+        "volume": 0.5,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.card_flip"
@@ -63,22 +87,34 @@
   "casino.coins": {
     "sounds": [
       {
-        "name": "challengecraft:casino/coins1"
+        "name": "challengecraft:casino/coins1",
+        "volume": 0.3,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coins2"
+        "name": "challengecraft:casino/coins2",
+        "volume": 0.3,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coins3"
+        "name": "challengecraft:casino/coins3",
+        "volume": 0.3,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coins4"
+        "name": "challengecraft:casino/coins4",
+        "volume": 0.3,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coins5"
+        "name": "challengecraft:casino/coins5",
+        "volume": 0.3,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coins6"
+        "name": "challengecraft:casino/coins6",
+        "volume": 0.3,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.coins"
@@ -86,10 +122,14 @@
   "casino.coin_shower": {
     "sounds": [
       {
-        "name": "challengecraft:casino/coin_shower1"
+        "name": "challengecraft:casino/coin_shower1",
+        "volume": 0.45,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/coin_shower2"
+        "name": "challengecraft:casino/coin_shower2",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.coin_shower"
@@ -97,7 +137,9 @@
   "casino.lever": {
     "sounds": [
       {
-        "name": "challengecraft:casino/lever"
+        "name": "challengecraft:casino/lever",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.lever"
@@ -105,7 +147,9 @@
   "casino.reel_spin": {
     "sounds": [
       {
-        "name": "challengecraft:casino/reel_spin"
+        "name": "challengecraft:casino/reel_spin",
+        "volume": 0.22,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.reel_spin"
@@ -113,13 +157,19 @@
   "casino.reel_stop": {
     "sounds": [
       {
-        "name": "challengecraft:casino/reel_stop1"
+        "name": "challengecraft:casino/reel_stop1",
+        "volume": 0.35,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/reel_stop2"
+        "name": "challengecraft:casino/reel_stop2",
+        "volume": 0.35,
+        "attenuation_distance": 12
       },
       {
-        "name": "challengecraft:casino/reel_stop3"
+        "name": "challengecraft:casino/reel_stop3",
+        "volume": 0.35,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.reel_stop"
@@ -127,7 +177,9 @@
   "casino.reel_tension": {
     "sounds": [
       {
-        "name": "challengecraft:casino/reel_tension"
+        "name": "challengecraft:casino/reel_tension",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.reel_tension"
@@ -135,7 +187,9 @@
   "casino.win_small": {
     "sounds": [
       {
-        "name": "challengecraft:casino/win_small"
+        "name": "challengecraft:casino/win_small",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.win_small"
@@ -143,7 +197,9 @@
   "casino.win_big": {
     "sounds": [
       {
-        "name": "challengecraft:casino/win_big"
+        "name": "challengecraft:casino/win_big",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.win_big"
@@ -152,7 +208,8 @@
     "sounds": [
       {
         "name": "challengecraft:casino/win_epic",
-        "attenuation_distance": 32
+        "attenuation_distance": 12,
+        "volume": 0.45
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.win_epic"
@@ -160,7 +217,9 @@
   "casino.free_spins": {
     "sounds": [
       {
-        "name": "challengecraft:casino/free_spins"
+        "name": "challengecraft:casino/free_spins",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.free_spins"
@@ -168,7 +227,9 @@
   "casino.expand": {
     "sounds": [
       {
-        "name": "challengecraft:casino/expand"
+        "name": "challengecraft:casino/expand",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.expand"
@@ -176,7 +237,9 @@
   "casino.scatter": {
     "sounds": [
       {
-        "name": "challengecraft:casino/scatter"
+        "name": "challengecraft:casino/scatter",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.scatter"
@@ -184,7 +247,9 @@
   "casino.roulette_spin": {
     "sounds": [
       {
-        "name": "challengecraft:casino/roulette_spin"
+        "name": "challengecraft:casino/roulette_spin",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.roulette_spin"
@@ -192,7 +257,9 @@
   "casino.roulette_drop": {
     "sounds": [
       {
-        "name": "challengecraft:casino/roulette_drop"
+        "name": "challengecraft:casino/roulette_drop",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.roulette_drop"
@@ -201,7 +268,8 @@
     "sounds": [
       {
         "name": "challengecraft:casino/rocket_launch",
-        "attenuation_distance": 64
+        "attenuation_distance": 12,
+        "volume": 0.45
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.rocket_launch"
@@ -209,7 +277,9 @@
   "casino.rocket_flight": {
     "sounds": [
       {
-        "name": "challengecraft:casino/rocket_flight"
+        "name": "challengecraft:casino/rocket_flight",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.rocket_flight"
@@ -217,7 +287,9 @@
   "casino.cash_out": {
     "sounds": [
       {
-        "name": "challengecraft:casino/cash_out"
+        "name": "challengecraft:casino/cash_out",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.cash_out"
@@ -226,7 +298,8 @@
     "sounds": [
       {
         "name": "challengecraft:casino/crash",
-        "attenuation_distance": 96
+        "attenuation_distance": 12,
+        "volume": 0.45
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.crash"
@@ -234,7 +307,8 @@
   "casino.register": {
     "sounds": [
       {
-        "name": "challengecraft:casino/register"
+        "name": "challengecraft:casino/register",
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.register"
@@ -242,7 +316,8 @@
   "casino.fee_warning": {
     "sounds": [
       {
-        "name": "challengecraft:casino/fee_warning"
+        "name": "challengecraft:casino/fee_warning",
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.fee_warning"
@@ -250,7 +325,9 @@
   "casino.lose": {
     "sounds": [
       {
-        "name": "challengecraft:casino/lose"
+        "name": "challengecraft:casino/lose",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.lose"
@@ -258,7 +335,8 @@
   "casino.house_sends": {
     "sounds": [
       {
-        "name": "challengecraft:casino/house_sends"
+        "name": "challengecraft:casino/house_sends",
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.house_sends"
@@ -266,7 +344,8 @@
   "casino.revive": {
     "sounds": [
       {
-        "name": "challengecraft:casino/revive"
+        "name": "challengecraft:casino/revive",
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.revive"
@@ -274,7 +353,9 @@
   "casino.bust": {
     "sounds": [
       {
-        "name": "challengecraft:casino/bust"
+        "name": "challengecraft:casino/bust",
+        "volume": 0.45,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.bust"
@@ -283,7 +364,8 @@
     "sounds": [
       {
         "name": "challengecraft:casino/bankrupt",
-        "attenuation_distance": 64
+        "attenuation_distance": 64,
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.bankrupt"
@@ -291,7 +373,9 @@
   "casino.tick": {
     "sounds": [
       {
-        "name": "challengecraft:casino/tick"
+        "name": "challengecraft:casino/tick",
+        "volume": 0.35,
+        "attenuation_distance": 12
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.tick"
@@ -299,7 +383,8 @@
   "casino.unlock": {
     "sounds": [
       {
-        "name": "challengecraft:casino/unlock"
+        "name": "challengecraft:casino/unlock",
+        "volume": 0.6
       }
     ],
     "subtitle": "subtitles.challengecraft.casino.unlock"

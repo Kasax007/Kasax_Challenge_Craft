@@ -2,6 +2,7 @@ package net.kasax.challengecraft.casino;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -24,6 +25,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,9 +37,8 @@ import java.util.Map;
  * the actions a client may send. The rules of each game live in their own classes.
  */
 public final class CasinoGames {
-    /** Selectable stakes in chips. Stepping past the top goes all-in. */
-    public static final long[] BET_LEVELS = {10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000,
-            50_000, 100_000, 250_000, 500_000, 1_000_000};
+    /** Selectable stakes in chips (the chips on every tray). Stepping past the top goes all-in. */
+    public static final long[] BET_LEVELS = DeviceLayouts.STAKES;
     public static final int ALL_IN = -1;
 
     private static int tickCounter;
@@ -62,8 +63,10 @@ public final class CasinoGames {
     public static void register() {
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (!active()) return InteractionResult.PASS;
-            BlockPos pos = CasinoSlotTopBlock.base(level, hit.getBlockPos());
-            if (!(level.getBlockState(pos).getBlock() instanceof CasinoDeviceBlock block)) return InteractionResult.PASS;
+            if (BoothProtection.denyUse(player, level, hand, hit)) return InteractionResult.FAIL;
+            BlockPos pos = CasinoPartBlock.master(level, hit.getBlockPos());
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof CasinoDeviceBlock)) return InteractionResult.PASS;
             ItemStack held = player.getItemInHand(hand);
             // Building around a device must stay possible.
             if (player.isShiftKeyDown() && held.getItem() instanceof BlockItem) return InteractionResult.PASS;
@@ -75,13 +78,50 @@ public final class CasinoGames {
             }
             DeviceType type = CasinoDevices.at((ServerLevel) level, pos);
             if (type == null) return InteractionResult.PASS;
+            DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(type,
+                    DeviceSpace.toDevice(pos, state.getValue(CasinoDeviceBlock.FACING), hit.getLocation()));
+            if (zone.kind() == DeviceLayouts.CHIP) {
+                selectStake(sp, zone.a());
+                return InteractionResult.SUCCESS;
+            }
             switch (type) {
                 case SLOT -> SlotGame.use(sp, pos, held);
+                case PLINKO -> PlinkoGame.use(sp, (ServerLevel) level, pos);
                 case CRASH -> CrashGame.use(sp, (ServerLevel) level, pos);
-                case ROULETTE -> RouletteGame.open(sp, (ServerLevel) level, pos);
+                case ROULETTE -> {
+                    if (zone.kind() == DeviceLayouts.BET) {
+                        RouletteGame.placeBet(sp, pos, zone.a(), zone.b(), betAmount(account(sp)) / CasinoAccount.CENTI);
+                    } else if (zone.kind() == DeviceLayouts.TAKE_BACK) {
+                        RouletteGame.clearBets(sp, pos);
+                    } else {
+                        sp.sendOverlayMessage(Component.translatable("challengecraft.casino.roulette.aim").withStyle(ChatFormatting.GRAY));
+                    }
+                }
                 case CASHIER -> openCashier(sp, 0);
             }
             return InteractionResult.SUCCESS;
+        });
+
+        // Left-click on the roulette felt takes chips back instead of breaking the table
+        // (sneak to break it). Decided on both sides so the client does not start mining either.
+        AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
+            if (!active() || player.isSpectator()) return InteractionResult.PASS;
+            if (BoothProtection.denyBreak(player, level, pos)) return InteractionResult.FAIL;
+            BlockPos master = CasinoPartBlock.master(level, pos);
+            BlockState state = level.getBlockState(master);
+            if (!(state.getBlock() instanceof CasinoDeviceBlock block) || block.getDeviceType() != DeviceType.ROULETTE
+                    || player.isShiftKeyDown()) {
+                return InteractionResult.PASS;
+            }
+            if (!level.isClientSide() && player instanceof ServerPlayer sp) {
+                net.minecraft.world.phys.HitResult pick = sp.pick(sp.blockInteractionRange(), 1f, false);
+                if (pick instanceof net.minecraft.world.phys.BlockHitResult bhr) {
+                    DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(DeviceType.ROULETTE,
+                            DeviceSpace.toDevice(master, state.getValue(CasinoDeviceBlock.FACING), bhr.getLocation()));
+                    if (zone.kind() == DeviceLayouts.BET) RouletteGame.removeBet(sp, master, zone.a(), zone.b());
+                }
+            }
+            return InteractionResult.FAIL;
         });
 
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
@@ -117,6 +157,7 @@ public final class CasinoGames {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> server.execute(() -> {
             if (!active()) return;
             ServerPlayer p = handler.player;
+            GamblingNotice.send(p);
             if (CasinoSavedData.get(server).isBankrupt()) {
                 p.setGameMode(net.minecraft.world.level.GameType.SPECTATOR); // the House already won
             }
@@ -130,6 +171,7 @@ public final class CasinoGames {
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             SlotGame.flush(server);
+            PlinkoGame.flush(server);
             CrashGame.refundAll(server);
             RouletteGame.refundAll(server);
         });
@@ -141,6 +183,7 @@ public final class CasinoGames {
         SlotGame.tick(server);
         CrashGame.tick(server);
         RouletteGame.tick(server);
+        PlinkoGame.tick(server);
         BlackjackRevival.tick(server);
         if (tickCounter % 20 == 0) {
             CasinoEconomy.tickFee(server);
@@ -225,7 +268,6 @@ public final class CasinoGames {
             case CasinoNet.Action.BJ_DOUBLE -> BlackjackRevival.act(player, BlackjackTable.DOUBLE);
             case CasinoNet.Action.BJ_SPLIT -> BlackjackRevival.act(player, BlackjackTable.SPLIT);
             case CasinoNet.Action.CASHIER_TAB -> openCashier(player, a.a());
-            case CasinoNet.Action.ROULETTE_LEAVE -> RouletteGame.leave(player);
             default -> {
             }
         }
@@ -243,6 +285,23 @@ public final class CasinoGames {
             }
         }
         return out;
+    }
+
+    public static CasinoAccount account(ServerPlayer player) {
+        return CasinoEconomy.account(player);
+    }
+
+    /** A chip of a tray was clicked: that chip's value becomes the player's stake. */
+    public static void selectStake(ServerPlayer player, int slot) {
+        CasinoAccount a = CasinoEconomy.account(player);
+        int level = DeviceLayouts.trayLevel(a.betLevel, slot);
+        a.betLevel = level >= DeviceLayouts.ALL_IN_LEVEL ? ALL_IN : level;
+        CasinoSavedData.get(player.level().getServer()).touch();
+        CasinoEconomy.playTo(player, CasinoSounds.CHIP, 0.7f, a.betLevel == ALL_IN ? 0.7f : 0.9f + 0.03f * a.betLevel);
+        player.sendOverlayMessage(Component.translatable(a.betLevel == ALL_IN
+                        ? "challengecraft.casino.bet.all_in" : "challengecraft.casino.bet.level",
+                CasinoEconomy.formatFull(betAmount(a))).withStyle(ChatFormatting.GOLD));
+        CasinoEconomy.sync(player);
     }
 
     private static void changeBet(ServerPlayer player, int action) {

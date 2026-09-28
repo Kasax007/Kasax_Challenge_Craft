@@ -1,7 +1,8 @@
 # The House Always Wins (Challenge 50): Konzept & Umsetzung
 
 > Branch `26.3-the-house-always-wins`, basierend auf `26.3` (Minecraft 26.3, Mojmap, Fabric 0.161).
-> Stand: Umsetzung v1. Alle Zahlen sind nachgerechnet; die Skripte liegen unter `scripts/casino/`.
+> Stand: Umsetzung v2 (Spiele ohne Menüs, 96 % RTP, Plinko). Alle Zahlen sind nachgerechnet; die Skripte
+> liegen unter `scripts/casino/`.
 
 ---
 
@@ -13,9 +14,15 @@ kaufst Items zurück und kaufst die Casino-Geräte. **Alle 10 Minuten** kassiert
 Gebühr vom **gemeinsamen Guthaben des Teams**. Kann das Team nicht zahlen, **gewinnt das Haus und der
 Run ist verloren**.
 
-Zocken kannst du an drei Geräten: Spielautomat, Crash-Startrampe und Roulette-Tisch, jeweils mit
-**100 % RTP**. Verlorene Wetten schicken dir Monster auf den Hals. Jeder Tod kostet **25 % deiner Jetons**,
-und eine Hand **Blackjack** entscheidet, ob du mit deinem Inventar zurückkommst.
+Zocken kannst du an vier Geräten: Spielautomat, Plinko, Crash-Startrampe und Roulette-Tisch. **Das Haus
+gewinnt immer:** Jedes Spiel zahlt im Schnitt **96 %** der Einsätze zurück. Wer die Gebühr sicher zahlen
+will, muss also **farmen**; Glücksspiel ist die schnelle, aber auf Dauer teure Abkürzung. Verlorene Wetten
+schicken dir Monster auf den Hals. Jeder Tod kostet **25 % deiner Jetons**, und eine Hand **Blackjack**
+entscheidet, ob du mit deinem Inventar zurückkommst.
+
+Gespielt wird **direkt an den Geräten**, ohne Menüs: Einsatz-Jetons liegen auf jedem Gerät, Ergebnisse
+stehen auf seinen Anzeigen, beim Roulette setzt du auf dem Filz des Tisches. Wer einer Welt mit dieser
+Challenge beitritt, bekommt im Chat einen kurzen **Hinweis zu Glücksspielsucht** mit Links zu Hilfsangeboten.
 
 ---
 
@@ -25,12 +32,14 @@ und eine Hand **Blackjack** entscheidet, ob du mit deinem Inventar zurückkommst
 |---|---|
 | Rohe Erze | **wertlos** wie in ProjectE, erst schmelzen |
 | Items kaufen | **nur Items, die man schon einmal eingezahlt hat** |
-| Roulette | **klassisch** (einfache Null, Null gibt den Einsatz zurück) |
+| Roulette | **klassisch** (einfache Null, die Null verliert) |
+| RTP | **96 %** in allen vier Spielen |
+| Bedienung | **ohne Menüs**, alles am Gerät; die alten Screens bleiben als Reserve im Code |
 | Blackjack | **nur als Todesmechanik** |
 | Hardcore | **keine Wiederbelebung** per Blackjack |
 | 25 % beim Tod | gilt **immer**, auch wenn man Blackjack gewinnt |
 | Einsatzlimit | **All-in erlaubt** |
-| Croupier | **fest am Spawn** in einem kleinen Stand |
+| Croupier | **fest am Spawn** in einem **unzerstörbaren** Stand |
 | Geräte | beim Croupier **mit Rohstoffen kaufen**; der Kauf schaltet das Gerät **und sein Rezept** frei |
 | Konten | **getrennt pro Spieler**, die Gebühr wird aber vom **Team-Gesamtguthaben** bezahlt, **anteilig** |
 | Gebühr nicht zahlbar | **Run verloren** |
@@ -73,16 +82,24 @@ Smaragd 16 384 · Netherit 57 344 · Enderauge 1 792 · Brot 72 · Rohes Eisen /
   5×5-Plattform aus poliertem Schwarzstein mit rotem Teppich, Goldblock-Ecken mit Laternenpfosten,
   drei **Kassentresen** (eigenes Modell mit Marmorplatte, Messingleiste und Tischglocke) und dahinter
   der **Croupier** (eigenes Modell und eigener Skin: Frack, rote Weste, Fliege, Zylinder, Schnurrbart).
-- Der Croupier dreht den Kopf zum nächsten Spieler, atmet, trommelt mit den Fingern und macht Gesten:
-  winken beim Öffnen, nehmen beim Einzahlen, auszahlen beim Kaufen, Hut ziehen beim Gerätekauf.
-  Er ist unverwundbar und wird ersetzt, falls er verschwindet.
+- Der Croupier dreht den Kopf zum nächsten Spieler, atmet, richtet ab und zu seine Manschetten und macht
+  Gesten: winken beim Öffnen, nehmen beim Einzahlen, auszahlen beim Kaufen, Hut ziehen beim Gerätekauf.
+  Die Frackschöße hängen hinten an seiner Taille.
+- **Unzerstörbar:** Stand und Croupier bestehen aus eigenen Blöcken, die wie die Vanilla-Blöcke aussehen,
+  aber nicht abbaubar sind (auch nicht im Kreativmodus), jeder Explosion standhalten, nicht brennen, von
+  Kolben nicht bewegt werden und keine Flüssigkeit hineinlassen. Im Stand (5×5, bis 4 Blöcke hoch) kann
+  niemand Blöcke, Wasser, Lava oder Feuer platzieren. Der Croupier ist unverwundbar, wird weder geschoben
+  noch von Wasser oder Explosionen bewegt und kehrt an seinen Platz zurück, falls ihn doch etwas versetzt.
+  Ein Stand aus einer älteren Version wird automatisch neu gebaut.
 - **Kasse** (Rechtsklick auf Croupier oder Tresen), vier Tabs:
   - **Einzahlen:** Inventar-Raster, Stacks anklicken, Wert live, „Auswahl einzahlen“ oder
     „Alles Wertvolle (ohne Hotbar)“.
   - **Items kaufen:** alle bekannten Items mit Suche, ×1 / ×16 / ×64 / Max. Der Preis entspricht dem
     Einzahlwert, das Haus nimmt keinen Aufschlag.
   - **Konto:** nächste Gebühr, Countdown, Team-Gesamt, jeder Spieler mit Guthaben und Anteil.
-  - **Geräte:** die drei Geräte mit Preis, eigenem Bestand und Kauf-Button.
+  - **Geräte:** die vier Geräte mit Preis, eigenem Bestand und Kauf-Button.
+  - Alle Texte passen in ihre Kästen: Zu lange Zeilen (vor allem auf Deutsch) werden verkleinert statt
+    abgeschnitten.
 - **Schnell-Einzahlen ohne Menü:** Schleich-Rechtsklick mit einem Stack auf den Croupier.
 
 ### 3.4 Geräte kaufen und craften
@@ -90,6 +107,7 @@ Smaragd 16 384 · Netherit 57 344 · Enderauge 1 792 · Brot 72 · Rohes Eisen /
 | Gerät | Preis beim Croupier | Rezept danach (Werkbank) |
 |---|---|---|
 | **Spielautomat** | 12 Eisen, 8 Redstone, 1 Gold | `IOI / IGL / IRI` (Eisen, Gold, Glasscheibe, Hebel, Redstone-Block) |
+| **Plinko-Brett** | 8 Eisen, 4 Gold, 12 Lapis | `PNP / NLN / IGI` (Bretter, Eisennugget, Lapisblock, Eisen, Gold) |
 | **Crash-Startrampe** | 8 Gold, 16 Schwarzpulver, 8 Papier | `GFG / GTG / SSS` (Gold, Feuerwerksrakete, TNT, Glatter-Stein-Stufe) |
 | **Roulette-Tisch** | 4 Diamanten, 8 Gold, 1 Smaragd | `WWW / DED / P P` (grüne Wolle, Diamant, Smaragd, Bretter) |
 
@@ -172,9 +190,17 @@ Alle Ergebnisse entstehen auf dem Server. Der Crash-Punkt wird erst bei der Expl
 Hole-Card des Dealers erst beim Aufdecken. Slot-Gewinne werden erst gutgeschrieben, wenn die Animation
 fertig ist.
 
-**Einsatz:** Mit **`+` / `-`** (Tasten frei belegbar, Kategorie „Challenge Craft · Casino“) wählst du die
-Stufe: 10 … 1 000 000. Nach der höchsten Stufe kommt **All-in**; es gibt auch eine eigene All-in-Taste.
-Schaust du auf ein Gerät, zeigt ein Hinweis unter dem Fadenkreuz Einsatz und Bedienung.
+**Ohne Menüs:** Jedes Spiel wird am Gerät selbst gespielt. Worauf du zielst, sagt eine Zeile oben unter
+der Gebühren-Karte (welcher Jeton, welche Wette mit Quote, was der Knopf tut).
+
+**Einsatz:** Jedes Gerät hat eine **Jeton-Ablage** mit fünf Jetons rund um deinen aktuellen Einsatz
+(10 … 1 000 000, danach **All-in**). Rechtsklick auf einen Jeton macht ihn zu deinem Einsatz; der gewählte
+liegt erhöht auf einem Goldring, der anvisierte hebt sich leicht. Die Ablage zeigt jedem Spieler **seinen
+eigenen** Einsatz. Die Tasten **`+` / `-`** (und eine All-in-Taste) funktionieren weiterhin als Reserve.
+
+**Mehrspieler:** Konten, Einsätze, Wetten, Plinko-Kugeln und Crash-Plätze gehören immer einem Spieler.
+Ein Automat dreht immer nur ein Spiel, aber ein Spieler kann **mehrere Automaten gleichzeitig** laufen
+lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jetons hervorgehoben.
 
 ### 7.1 Spielautomat „Minenfieber“
 
@@ -183,38 +209,54 @@ Schaust du auf ein Gerät, zeigt ein Hinweis unter dem Fadenkreuz Einsatz und Be
 - Gewinntabelle (× Linieneinsatz): Totem 10/200/2 000/10 000 · Netherit 10/100/1 000/5 000 ·
   Diamant 5/40/400/2 000 · Smaragd, Gold –/30/100/750 · Lapis, Eisen –/5/40/150 · Kupfer, Kohle –/5/25/100.
   Scatter zahlt 2/17/500 × Gesamteinsatz.
-- **RTP 99,998 %** (exakt), Trefferquote 27,8 %, Freispiele etwa alle 151 Spins. Die Java-Mathematik ist
+- Die Walzen und die Tabelle ergeben 99,998 %; ausgezahlt werden davon **96 %** jedes Gewinns, also
+  **RTP 95,998 %** (exakt). Trefferquote 27,8 %, Freispiele etwa alle 151 Spins. Die Java-Mathematik ist
   gegen die Python-Rechnung geprüft, und der Server schreibt den RTP beim Start ins Log.
 - **Bedienung:** Rechtsklick dreht mit dem aktuellen Einsatz. **Item-Einsatz:** Rechtsklick mit einem
   Item in der Hand nennt den Wert, ein **zweiter Klick** innerhalb von 3 Sekunden setzt den ganzen Stack.
   Gewinne kommen dann **als dieses Item** zurück und schießen als **Fontäne** aus dem Automaten
   (bis 40 Stacks, der Rest geht als Jetons aufs Konto). Große Gewinne (≥ 50×) werden im Chat angekündigt.
-- **Darstellung:** Die Walzen drehen sich als **Trommeln hinter dem Glas** des Automaten, mit leuchtenden
-  Gewinnlinien und expandierenden Items. Zusätzlich erscheint über der Hotbar ein **großes Walzen-Panel**
-  (kein Menü, du kannst dich weiter bewegen): versetzter Start, Bremsen mit Nachfedern,
-  **Spannungsphase** bei 2 Scattern, Linien-Highlights, hochzählender Gewinn, Freispiel-Intro mit
-  Glücksitem-Auswahl, Big/Mega/Epic-Win-Banner.
+- **Darstellung (nur am Automaten):** Die Walzen drehen sich als **Trommeln hinter dem Glas** und halten
+  **von links nach rechts** an, mit Bremsen und Nachfedern, **Spannungsphase** bei 2 Scattern, leuchtenden
+  Gewinnlinien und expandierenden Items. Die **Anzeige unter den Walzen** zeigt „VIEL GLÜCK“, den
+  hochzählenden Gewinn, Freispiele mit Zähler oder „KEIN GEWINN“ und darunter deinen Einsatz. Das Ergebnis
+  **bleibt stehen**, bis der Automat das nächste Mal gedreht wird.
 
-### 7.2 Crash
+### 7.2 Plinko
 
-- Crash-Punkt `M = 1/U`, also **P(M ≥ x) = 1/x → 100 % RTP für jede Strategie**. Der Multiplikator wächst
-  mit `e^(0,07·s)`, der Deckel liegt bei 1 000× („ins All“, alle an Bord bekommen 1 000×).
-- Rechtsklick auf die Startrampe setzt deinen Einsatz. Die erste Wette startet einen 10-Sekunden-Countdown
-  mit Ticken. **Aussteigen:** Rechtsklick auf die Rampe **oder Taste `G` von überall**.
-- **Darstellung:** Die Rakete zittert auf der Rampe, startet mit Donnern und steigt mit Funken und
-  Rauchspur in den Himmel. Beim Crash explodiert sie als Feuerwerk mit Knall. Rechts oben zeigt ein Panel
-  Multiplikator, Flugkurve, Mitspieler mit Ausstiegspunkten und den Verlauf.
+- 12 Reihen Stifte, 13 Fächer; jede Reihe lenkt die Kugel mit 50 % nach links oder rechts.
+  Multiplikatoren `30 · 10 · 3 · 2 · 1,3 · 0,5 · 0,3 · 0,5 · 1,3 · 2 · 3 · 10 · 30` →
+  **RTP 96,001 %** (exakt 393 220 / 409 600).
+- Das Brett ist 2 × 2 Blöcke groß. **Rechtsklick lässt eine Kugel** mit deinem Einsatz fallen; mehrere
+  Kugeln (auch mehrerer Spieler) fallen gleichzeitig. Deine Kugeln sind golden, die der anderen rosa.
+  Jeder Stift tickt leise, das getroffene Fach leuchtet auf. Unter dem Brett zeigt die Anzeige deinen
+  Einsatz und dein letztes Ergebnis.
 
-### 7.3 Roulette
+### 7.3 Crash
 
-- Europäischer Kessel, normale Quoten, **Null = Einsatz zurück** (Plein auf die Null zahlt 36:1).
-  Alle **21 967** möglichen Wetten haben exakt 100 % RTP (geprüft).
-- Rechtsklick auf den Tisch öffnet das Tableau (die Welt läuft weiter). Klick auf eine Zahl setzt Plein,
-  auf die Linie zwischen zwei Zahlen Cheval, auf eine Ecke Carré, auf den Streifen unter einer Spalte eine
-  Transversale, unter der Linie zwischen zwei Spalten ein Sixain. Dazu Dutzende, Kolonnen und einfache
-  Chancen. Jetons wählst du unten oder mit dem Mausrad. Beim Überfahren siehst du eine Vorschau mit Quote.
-- Gemeinsame Runden: 25 Sekunden Einsätze, 8 Sekunden Kugellauf, Ergebnis. Das Rad dreht sich **im Tableau
-  und auf dem Tisch in der Welt synchron**, die Kugel rattert über die Rauten und fällt ins richtige Fach.
+- Crash-Punkt `M = 0,96/U` (mindestens 1,00), also **P(M > x) = 0,96/x → 96 % RTP für jede Strategie**.
+  4 % der Raketen platzen schon auf der Rampe. Der Multiplikator wächst mit `e^(0,07·s)`, der Deckel liegt
+  bei 1 000× („ins All“, alle an Bord bekommen 1 000×).
+- Die Station ist 2 Blöcke breit: links die Rampe, rechts ein **Pult mit Monitor**, großem Knopf und
+  Jeton-Ablage. **Rechtsklick auf Knopf oder Rampe** setzt ein bzw. zahlt aus; `G` zahlt von überall aus.
+- **Darstellung:** Die Rakete ist ein kleines **3D-Modell, aufrecht auf der Rampe** (sieht von allen Seiten
+  gleich aus), zittert im Countdown, startet mit Donnern und steigt mit Funken und Rauchspur. Der
+  **Monitor** zeigt Multiplikator, Flugkurve, Countdown, Mitspieler mit Ausstiegspunkten und die letzten
+  Crash-Punkte; der Knopf ist rot („SETZEN“) oder pulsiert grün („AUSZAHLEN“).
+
+### 7.4 Roulette
+
+- Europäischer Kessel, klassische Quoten (Plein 35:1 … einfache Chancen 1:1), **die Null verliert**. Das
+  ergibt 36/37 = 97,3 %; das Haus behält zusätzlich 1/75 jeder Auszahlung → **genau 96 %** für jede Wette.
+- **Großer Tisch** (4 × 2 Blöcke) mit Kessel, Tableau, Jeton-Ablage, „ZURÜCK“-Schild und einer Tafel
+  hinter dem Kessel (Countdown, gezogene Zahl, deine Jetons und Auszahlung, die letzten Zahlen).
+- **Setzen direkt auf dem Filz:** Zielen zeigt, welche Wette es wäre, und hebt alle abgedeckten Zahlen
+  hervor. Auf eine Zahl → Plein, auf die Linie zwischen zwei Zahlen → Cheval, auf eine Kreuzung → Carré,
+  an den Rand über einer Spalte → Transversale, über einer Linie → Sixain; dazu Dutzende, Kolonnen und
+  einfache Chancen. **Rechtsklick** legt den gewählten Jeton hin, **Linksklick** nimmt deine Jetons von
+  dieser Stelle zurück (Schleichen + Linksklick baut den Tisch ab), „ZURÜCK“ nimmt alle deine Jetons.
+- Gemeinsame Runden: 25 Sekunden Einsätze, 8 Sekunden Kugellauf, Ergebnis. Die Kugel rattert über die
+  Rauten und fällt ins richtige Fach, die Gewinnzahl blinkt auf dem Tableau.
 
 ---
 
@@ -224,9 +266,11 @@ Schaust du auf ein Gerät, zeigt ein Hinweis unter dem Fadenkreuz Einsatz und Be
   (Kenney Boardgame Pack), Münzen (Kenney RPG Audio, StarNinjas) und Metall (Kenney Impact); synthetisiert
   sind Walzen, Hebel, Spannung, Fanfaren, Freispiel-Glissando, Kugellauf, Raketenstart, Explosion,
   Registrierkasse, Glocke, Unheil-Stinger, Wiederbelebung und Gong.
-  Alles ist mono (wird mit der Entfernung leiser), getrimmt, hat Fades gegen Klicks, ist per RMS auf
-  einheitliche Zielpegel gemischt, mit Limiter bei −1 dBFS und leichtem Raumhall für musikalische Cues.
-  Alle Aufnahmen sind **CC0**.
+  Alles ist mono, getrimmt, hat Fades gegen Klicks, ist per RMS auf einheitliche Zielpegel gemischt, mit
+  Limiter bei −1 dBFS und leichtem Raumhall für musikalische Cues. Alle Aufnahmen sind **CC0**.
+- **Lautstärke und Ort:** Gerätesounds kommen **vom Gerät** (sie werden mit der Entfernung leiser und sind
+  nach etwa 12–16 Blöcken weg) und sind deutlich leiser gemischt (Walzen 22 %, Stopps 35 %, sonst 45 %).
+  Persönliche Klicks (Einsatz wählen) hört nur der jeweilige Spieler.
 - **Grafiken** (`scripts/casino/make_textures.py`, `make_models.py`): 21 Blocktexturen als Pixel-Art im
   Minecraft-Stil, 4 Blockmodelle, der Croupier-Skin, der Beutel, das Roulette-Rad (hochaufgelöst),
   Filz sowie Karten- und Jeton-Atlas (Kenney Boardgame Pack, CC0).
@@ -240,30 +284,23 @@ Die Challenge ist Level 8 und steht in der Kategorie „Chaos“. Für schnelle 
 | Befehl | Wirkung |
 |---|---|
 | `/casino chips <Anzahl>` | Jetons gutschreiben (negativ: abziehen) |
-| `/casino unlock` | alle drei Geräte freischalten und ins Inventar legen |
+| `/casino unlock` | alle vier Geräte freischalten und ins Inventar legen |
 | `/casino fee` | nächste Gebühr sofort abbuchen |
 | `/casino feescale <Prozent>` | Gebührenkurve skalieren |
 | `/casino booth` | Stand am Spawn neu bauen |
 | `/casino status` | Konten, Einsätze, Gebühr im Chat |
 
-Beim Serverstart schreibt das Log `[Casino] slot machine RTP ... 99.9977 %` und
-`[Casino] 1290 item values loaded`.
+Beim Serverstart schreibt das Log `[Casino] RTP slot 95.9978 %, plinko 96.0010 %, roulette 96.0000 %,
+crash 96.0000 %` und `[Casino] 1290 item values loaded`.
 
 ---
 
-## 10. Was ich hier nicht prüfen konnte
+## 10. Was geprüft ist
 
-In dieser Umgebung sind `maven.fabricmc.net` und die Mojang-Server gesperrt, außerdem gibt es nur Java 21.
-**Die Mod ließ sich daher nicht kompilieren oder starten.** Um das Risiko klein zu halten:
+Die Mod baut gegen 26.3 und wurde im echten Client (Software-OpenGL, ohne Soundkarte) gespielt: alle vier
+Geräte platziert und gespielt, zwei Automaten gleichzeitig, mehrere Plinko-Kugeln, Crash über Knopf und
+Taste, Roulette-Wetten auf dem Filz inklusive Auszahlung, Blackjack nach dem Tod, der Stand gegen TNT,
+Wasser, Lava und Abbauen im Kreativmodus, die Kasse auf Englisch und Deutsch.
 
-- Jeder Minecraft- und Fabric-Aufruf folgt einem Muster, das es im 26.3-Code der Mod schon gibt, oder
-  ist gegen Fabric API 26.3, das Fabric-Referenzmod (26.2) oder eine 26.1-API-Übersicht abgeglichen.
-- Die reine Spiellogik (Slot, Roulette, Crash, Blackjack) ist mit Java 21 kompiliert und getestet.
-- Ohne Minecraft-Klassen parst `javac` alle Dateien fehlerfrei, und alle Verweise zwischen den eigenen
-  Klassen sind konsistent.
-
-Aufrufe, deren genaue 26.3-Signatur ich nicht direkt belegen konnte (falls der Build meckert, liegt es
-am ehesten hier): `Entity.kill(ServerLevel)`, `Mob.setPersistenceRequired`/
-`setTarget`, `Entity.addTag`, `ServerLevel.sendParticles`, `BlockState.isFaceSturdy`,
-`Level.playLocalSound`, `pose().rotate(float)` im GUI,
-`Screen.rebuildWidgets()`, `EditBox.setResponder`, `SoundEvents.FIREWORK_ROCKET_LARGE_BLAST`.
+Nicht geprüft: das **Hören** der Sounds (keine Soundkarte) und echtes Mehrspieler mit zwei Clients; die
+Mehrspieler-Logik ist so gebaut, dass alles pro Spieler läuft (siehe 7).

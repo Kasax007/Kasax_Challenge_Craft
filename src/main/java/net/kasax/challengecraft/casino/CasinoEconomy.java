@@ -473,8 +473,11 @@ public final class CasinoEconomy {
      * A quiet sound at the player. Deliberately positional rather than private: the server-side
      * {@code Player.playSound} skips the player itself (their client is expected to predict it).
      */
+    /** A sound only this player hears (personal feedback such as changing the stake). */
     public static void playTo(ServerPlayer player, SoundEvent sound, float volume, float pitch) {
-        player.level().playSound(null, player.getX(), player.getY(), player.getZ(), sound, SoundSource.PLAYERS, volume * 0.6f, pitch);
+        player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
+                net.minecraft.core.Holder.direct(sound), SoundSource.PLAYERS, player.getX(), player.getY(), player.getZ(),
+                volume * 0.6f, pitch, player.getRandom().nextLong()));
     }
 
     public static UUID uuidOf(String key) {

@@ -11,10 +11,11 @@ import java.util.List;
  * "Minenfieber", the slot machine: 5 reels × 3 rows, 10 fixed lines, a wild, a scatter and free
  * spins with one randomly chosen <b>expanding</b> lucky item (the "Book of …" mechanic).
  *
- * <p>The reel strips and pay table are the exact ones solved in {@code scripts/casino/slot_final.py}:
- * return to player <b>99.998 %</b> (exact fraction 92754935089733/92757105698400), hit rate 27.8 %,
- * free spins every ~151 spins. {@link #theoreticalRtp()} recomputes it at start-up and logs it, so a
- * careless edit to a strip or a pay shows up in the log instead of silently changing the odds.
+ * <p>The reel strips and pay table are the exact ones solved in {@code scripts/casino/slot_final.py}
+ * for a fair machine (99.998 %, exact fraction 92754935089733/92757105698400), hit rate 27.8 %, free
+ * spins every ~151 spins. Every win is then paid at {@link #PAYOUT_PERCENT} % — the House's 4 % — so
+ * the machine returns <b>96.0 %</b>. {@link #theoreticalRtp()} recomputes it at start-up and logs it,
+ * so a careless edit to a strip or a pay shows up in the log instead of silently changing the odds.
  * <b>Change strips or pays only together with that script.</b>
  *
  * <p>All amounts here are in <b>line-bet units</b> (a total bet is 10 line bets), which keeps every
@@ -27,6 +28,8 @@ public final class SlotMath {
     public static final int ITEM_SYMBOLS = 8;
     public static final int REELS = 5, ROWS = 3, LINES = 10;
     public static final int FREE_SPINS = 10;
+    /** Share of the table value that is actually paid out. */
+    public static final int PAYOUT_PERCENT = 96;
     /** Maximum win per paid spin including its free spins: 5000 × total bet. */
     public static final long MAX_WIN_UNITS = 5000L * LINES;
 
@@ -154,6 +157,11 @@ public final class SlotMath {
         return stops;
     }
 
+    /** Centi-chips a spin of {@code units} line units pays on a total bet of {@code stake}. */
+    public static long pay(long units, long stake) {
+        return units * stake * PAYOUT_PERCENT / (100L * LINES);
+    }
+
     /** A paid spin followed by all the free spins it triggers. */
     public record Play(List<Spin> spins, int lucky, long units) {
     }
@@ -224,7 +232,7 @@ public final class SlotMath {
     /**
      * Expected return per unit bet, computed exactly from the strips (in doubles): line pays from
      * the per-reel symbol frequencies, scatter and lucky-item visibility from every 3-symbol window.
-     * Must print ~0.99998.
+     * Must print ~0.96.
      */
     public static double theoreticalRtp() {
         double[][] freq = new double[REELS][10];
@@ -262,7 +270,7 @@ public final class SlotMath {
             for (int k = 0; k <= REELS; k++) expandEv += d[k] * PAY[x][k] / ITEM_SYMBOLS;
         }
         double sessionSpins = FREE_SPINS / (1 - FREE_SPINS * pTrigger);
-        return base + pTrigger * sessionSpins * (base + expandEv);
+        return (base + pTrigger * sessionSpins * (base + expandEv)) * PAYOUT_PERCENT / 100.0;
     }
 
     private static double[] countDistribution(double[] p) {

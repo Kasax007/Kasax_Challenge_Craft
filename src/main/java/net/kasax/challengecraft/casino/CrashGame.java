@@ -142,7 +142,7 @@ public final class CrashGame {
                     String.format(java.util.Locale.ROOT, "%.2f", m), CasinoEconomy.formatFull(s.payout)).withStyle(ChatFormatting.GREEN));
         }
         if (level != null) {
-            level.playSound(null, r.pos, CasinoSounds.CASH_OUT, SoundSource.BLOCKS, 1.0f, 1.0f);
+            level.playSound(null, r.pos, CasinoSounds.CASH_OUT, SoundSource.BLOCKS, 0.8f, 1.0f);
             broadcast(level, r);
         }
     }
@@ -168,7 +168,7 @@ public final class CrashGame {
                         r.phase = FLYING;
                         r.flightTicks = 0;
                         r.crashPoint = CrashMath.crashPoint(level.getRandom());
-                        level.playSound(null, r.pos, CasinoSounds.ROCKET_LAUNCH, SoundSource.BLOCKS, 1.4f, 1.0f);
+                        level.playSound(null, r.pos, CasinoSounds.ROCKET_LAUNCH, SoundSource.BLOCKS, 0.9f, 1.0f);
                         broadcast(level, r);
                     } else if (r.ticksLeft % 10 == 0) {
                         broadcast(level, r);
@@ -226,11 +226,11 @@ public final class CrashGame {
         r.ticksLeft = AFTERMATH_TICKS;
         double height = Math.min(90.0, 1.2 * r.flightTicks);
         if (space) {
-            level.playSound(null, r.pos, CasinoSounds.WIN_EPIC, SoundSource.BLOCKS, 1.6f, 1.0f);
+            level.playSound(null, r.pos, CasinoSounds.WIN_EPIC, SoundSource.BLOCKS, 1.0f, 1.0f);
         } else {
             level.playSound(null, r.pos.getX() + 0.5, r.pos.getY() + height, r.pos.getZ() + 0.5,
-                    SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.BLOCKS, 6.0f, 0.8f);
-            level.playSound(null, r.pos, CasinoSounds.CRASH, SoundSource.BLOCKS, 1.3f, 1.0f);
+                    SoundEvents.FIREWORK_ROCKET_LARGE_BLAST, SoundSource.BLOCKS, 2.0f, 0.8f);
+            level.playSound(null, r.pos, CasinoSounds.CRASH, SoundSource.BLOCKS, 0.9f, 1.0f);
         }
         broadcast(level, r);
     }

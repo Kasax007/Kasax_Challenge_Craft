@@ -17,16 +17,19 @@ public final class CasinoMod {
         CasinoGames.register();
         BlackjackRevival.register();
         CasinoCommands.register();
+        BoothProtection.register();
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             EmcValues.load();
-            ChallengeCraft.LOGGER.info("[Casino] slot machine RTP (exact from reel strips): {} %",
-                    String.format(Locale.ROOT, "%.4f", SlotMath.theoreticalRtp() * 100.0));
+            ChallengeCraft.LOGGER.info("[Casino] RTP slot {} %, plinko {} %, roulette 96.0000 %, crash 96.0000 %",
+                    String.format(Locale.ROOT, "%.4f", SlotMath.theoreticalRtp() * 100.0),
+                    String.format(Locale.ROOT, "%.4f", PlinkoMath.rtp() * 100.0));
         });
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             SlotGame.reset();
             CrashGame.reset();
             RouletteGame.reset();
+            PlinkoGame.reset();
             BlackjackRevival.reset();
         });
     }

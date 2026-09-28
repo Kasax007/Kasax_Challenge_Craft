@@ -114,7 +114,7 @@ public final class LossWaves {
         player.connection.send(new ClientboundSetTitlesAnimationPacket(5, 40, 15));
         player.connection.send(new ClientboundSetTitleTextPacket(title));
         player.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
-        level.playSound(null, player.getX(), player.getY(), player.getZ(), CasinoSounds.HOUSE_SENDS, SoundSource.HOSTILE, 1.2f, 1.0f);
+        level.playSound(null, player.getX(), player.getY(), player.getZ(), CasinoSounds.HOUSE_SENDS, SoundSource.HOSTILE, 0.9f, 1.0f);
         ServerPlayNetworking.send(player, new CasinoNet.Fx(CasinoNet.Fx.WAVE, loss, Integer.toString(tier), 0L));
     }
 

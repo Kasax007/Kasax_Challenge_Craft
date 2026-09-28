@@ -1,5 +1,109 @@
 {
   "variants": {
-    "": { "model": "challengecraft:block/slot_machine_top" }
+    "facing=north,part=1": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=2": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=3": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=4": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=5": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=6": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=north,part=7": {
+      "model": "challengecraft:block/slot_machine_empty"
+    },
+    "facing=east,part=1": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=2": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=3": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=4": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=5": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=6": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=east,part=7": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 90
+    },
+    "facing=south,part=1": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=2": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=3": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=4": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=5": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=6": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=south,part=7": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 180
+    },
+    "facing=west,part=1": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=2": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=3": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=4": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=5": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=6": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    },
+    "facing=west,part=7": {
+      "model": "challengecraft:block/slot_machine_empty",
+      "y": 270
+    }
   }
 }

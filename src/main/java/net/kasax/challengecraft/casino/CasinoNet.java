@@ -198,6 +198,33 @@ public final class CasinoNet {
         }
     }
 
+    // ---- plinko ------------------------------------------------------------------------------
+
+    /**
+     * A ball dropped on a plinko board, sent to everyone near it. The path is decided when the ball
+     * is dropped (bit r = right at row r); the payout is credited when it lands.
+     */
+    public record PlinkoBall(long pos, String player, long bet, int path, long payout, int serial)
+            implements CustomPacketPayload {
+        public static final Type<PlinkoBall> ID = payloadType("casino_plinko");
+        public static final StreamCodec<RegistryFriendlyByteBuf, PlinkoBall> CODEC = StreamCodec.ofMember(
+                (p, buf) -> {
+                    buf.writeLong(p.pos);
+                    buf.writeUtf(p.player);
+                    buf.writeVarLong(p.bet);
+                    buf.writeVarInt(p.path);
+                    buf.writeVarLong(p.payout);
+                    buf.writeVarInt(p.serial);
+                },
+                buf -> new PlinkoBall(buf.readLong(), buf.readUtf(), buf.readVarLong(), buf.readVarInt(),
+                        buf.readVarLong(), buf.readVarInt()));
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return ID;
+        }
+    }
+
     // ---- roulette ----------------------------------------------------------------------------
 
     /** One chip pile on the felt. */
@@ -419,6 +446,7 @@ public final class CasinoNet {
         PayloadTypeRegistry.clientboundPlay().register(Devices.ID, Devices.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Cashier.ID, Cashier.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SlotResult.ID, SlotResult.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(PlinkoBall.ID, PlinkoBall.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(RouletteState.ID, RouletteState.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CrashState.ID, CrashState.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Blackjack.ID, Blackjack.CODEC);

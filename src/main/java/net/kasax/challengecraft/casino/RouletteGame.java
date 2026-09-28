@@ -22,6 +22,9 @@ import java.util.UUID;
  * a 25-second betting window, then the ball runs for eight seconds and every bet is settled by
  * {@link RouletteMath}. The winning number is decided when the ball is launched — bets are closed
  * by then, so sending it to the clients for the animation gives nothing away.
+ *
+ * <p>Bets are placed on the table itself: right-clicking a spot of the layout puts the player's
+ * selected chip there, left-clicking it takes that player's chips back (see {@link DeviceLayouts}).
  */
 public final class RouletteGame {
     public static final int WAITING = 0, BETTING = 1, SPINNING = 2, RESULT = 3;
@@ -63,7 +66,6 @@ public final class RouletteGame {
     }
 
     private static final Map<String, Table> TABLES = new HashMap<>();
-    private static final Map<UUID, String> WATCHING = new HashMap<>();
     private static int serial;
 
     private RouletteGame() {
@@ -72,18 +74,6 @@ public final class RouletteGame {
     private static Table table(ServerLevel level, BlockPos pos) {
         String dim = level.dimension().identifier().toString();
         return TABLES.computeIfAbsent(dim + "|" + pos.asLong(), k -> new Table(dim, pos.immutable()));
-    }
-
-    public static void open(ServerPlayer player, ServerLevel level, BlockPos pos) {
-        Table t = table(level, pos);
-        WATCHING.put(player.getUUID(), t.dimension + "|" + pos.asLong());
-        CasinoEconomy.sync(player);
-        ServerPlayNetworking.send(player, state(t));
-        ServerPlayNetworking.send(player, new CasinoNet.Fx(CasinoNet.Fx.OPEN_ROULETTE, 0, "", pos.asLong()));
-    }
-
-    public static void leave(ServerPlayer player) {
-        WATCHING.remove(player.getUUID());
     }
 
     public static void placeBet(ServerPlayer player, BlockPos pos, int kind, int target, long chips) {
@@ -124,6 +114,28 @@ public final class RouletteGame {
         broadcast(level, t);
     }
 
+    /** Takes a player's chips off one spot of the layout. */
+    public static void removeBet(ServerPlayer player, BlockPos pos, int kind, int target) {
+        if (!(player.level() instanceof ServerLevel level)) return;
+        Table t = TABLES.get(level.dimension().identifier() + "|" + pos.asLong());
+        if (t == null || t.phase != BETTING) return;
+        long refund = 0;
+        for (Iterator<Bet> it = t.bets.iterator(); it.hasNext(); ) {
+            Bet b = it.next();
+            if (b.player.equals(player.getUUID()) && b.kind == kind && b.target == target) {
+                refund += b.stake;
+                it.remove();
+            }
+        }
+        if (refund > 0) {
+            CasinoEconomy.account(player).balance += refund;
+            CasinoSavedData.get(level.getServer()).touch();
+            level.playSound(null, pos, CasinoSounds.CHIP, SoundSource.BLOCKS, 0.6f, 0.8f);
+            CasinoEconomy.sync(player);
+            broadcast(level, t);
+        }
+    }
+
     public static void clearBets(ServerPlayer player, BlockPos pos) {
         if (!(player.level() instanceof ServerLevel level)) return;
         Table t = table(level, pos);
@@ -152,7 +164,11 @@ public final class RouletteGame {
             if (level == null) continue;
             switch (t.phase) {
                 case WAITING -> {
-                    if (t.bets.isEmpty() && CasinoGames.near(level, t.pos, VIEW_RADIUS).isEmpty()) it.remove();
+                    if (t.bets.isEmpty() && CasinoGames.near(level, t.pos, VIEW_RADIUS).isEmpty()) {
+                        it.remove();
+                    } else if (server.getTickCount() % 40 == 0) {
+                        broadcast(level, t); // keeps the history board current for players walking up
+                    }
                 }
                 case BETTING -> {
                     t.ticksLeft--;
@@ -247,12 +263,10 @@ public final class RouletteGame {
             }
         }
         TABLES.clear();
-        WATCHING.clear();
         CasinoSavedData.get(server).touch();
     }
 
     public static void reset() {
         TABLES.clear();
-        WATCHING.clear();
     }
 }

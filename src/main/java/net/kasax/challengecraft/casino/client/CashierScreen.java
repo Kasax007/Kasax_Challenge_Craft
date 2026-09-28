@@ -97,10 +97,10 @@ public class CashierScreen extends Screen {
                         GOLD, () -> !selectedItem.isEmpty(), () -> buy(n)));
             }
         } else if (tab == TAB_DEVICES) {
-            DeviceType[] devices = {DeviceType.SLOT, DeviceType.CRASH, DeviceType.ROULETTE};
-            for (int i = 0; i < devices.length; i++) {
-                DeviceType d = devices[i];
-                addRenderableWidget(new CasinoButton(x + 12 + i * 110, y + H - 30, 100, 18,
+            List<DeviceType> devices = DeviceType.games();
+            for (int i = 0; i < devices.size(); i++) {
+                DeviceType d = devices.get(i);
+                addRenderableWidget(new CasinoButton(x + 12 + i * (CARD_W + CARD_GAP), y + H - 30, CARD_W, 18,
                         Component.translatable("challengecraft.casino.cashier.buy"), 0xFFB57BFF,
                         () -> canAfford(d), () -> CasinoClient.send(new CasinoNet.Action(CasinoNet.Action.BUY_DEVICE,
                         0L, d.ordinal(), TAB_DEVICES, 0L, ""))));
@@ -210,16 +210,18 @@ public class CashierScreen extends Screen {
             ItemStack s = inv.getItem(hovered);
             long unit = EmcValues.unitValue(s);
             ctx.item(s, infoX + 8, gy + 8);
-            ctx.text(font, Component.literal(CraftUI.trimToWidth(font, s.getHoverName().getString(), W - 250)), infoX + 28, gy + 8, CraftUI.TEXT_PRIMARY, false);
+            ctx.text(font, Component.literal(CraftUI.trimToWidth(font, s.getHoverName().getString(), W - 214 - 34)), infoX + 28, gy + 8, CraftUI.TEXT_PRIMARY, false);
             if (unit > 0 && !CasinoEconomy.isWallet(s.getItem())) {
-                ctx.text(font, Component.translatable("challengecraft.casino.cashier.unit", CasinoEconomy.formatFull(unit * 100)), infoX + 28, gy + 19, GOLD, false);
-                ctx.text(font, Component.translatable("challengecraft.casino.cashier.stack", CasinoEconomy.formatFull(unit * s.getCount() * 100)), infoX + 8, gy + 34, 0xFFFFE9A8, false);
+                fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.unit", CasinoEconomy.formatFull(unit * 100)), infoX + 28, gy + 19, W - 214 - 34, GOLD);
+                fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.stack", CasinoEconomy.formatFull(unit * s.getCount() * 100)), infoX + 8, gy + 34, W - 214 - 14, 0xFFFFE9A8);
             } else {
-                ctx.text(font, Component.translatable("challengecraft.casino.cashier.worthless"), infoX + 28, gy + 19, CraftUI.DANGER, false);
-                ctx.text(font, Component.translatable("challengecraft.casino.cashier.worthless_hint"), infoX + 8, gy + 34, CraftUI.TEXT_MUTED, false);
+                fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.worthless"), infoX + 28, gy + 19, W - 214 - 34, CraftUI.DANGER);
+                paragraph(ctx, Component.translatable("challengecraft.casino.cashier.worthless_hint"), infoX + 7, gy + 34, W - 214 - 14, 106 - 40,
+                        CraftUI.TEXT_MUTED);
             }
         } else {
-            CraftUI.drawWrapped(ctx, font, Component.translatable("challengecraft.casino.cashier.deposit_info"), infoX + 8, gy + 8, W - 230, CraftUI.TEXT_SECONDARY, 8);
+            paragraph(ctx, Component.translatable("challengecraft.casino.cashier.deposit_info"), infoX + 7, gy + 7, W - 214 - 14, 106 - 14,
+                    CraftUI.TEXT_SECONDARY);
         }
         Component sum = Component.translatable("challengecraft.casino.cashier.selected", CasinoEconomy.formatFull(selectedValue * 100));
         ctx.text(font, sum, x + 12, y + H - 42, selectedValue > 0 ? CraftUI.SUCCESS : CraftUI.TEXT_MUTED, false);
@@ -245,7 +247,7 @@ public class CashierScreen extends Screen {
         List<Integer> list = filteredCatalog();
         int gx = x + 12, gy = y + 72;
         if (catalog.items().isEmpty()) {
-            CraftUI.drawWrapped(ctx, font, Component.translatable("challengecraft.casino.cashier.shop_empty"), gx, gy, 150, CraftUI.TEXT_SECONDARY, 8);
+            paragraph(ctx, Component.translatable("challengecraft.casino.cashier.shop_empty"), gx, gy, 158, 110, CraftUI.TEXT_SECONDARY);
         }
         int maxScroll = Math.max(0, (list.size() + SHOP_COLS - 1) / SHOP_COLS - SHOP_ROWS);
         shopScroll = Math.min(shopScroll, maxScroll);
@@ -285,17 +287,18 @@ public class CashierScreen extends Screen {
             ctx.pose().scale(2f, 2f);
             ctx.item(stack, 0, 0);
             ctx.pose().popMatrix();
-            ctx.text(font, Component.literal(CraftUI.trimToWidth(font, stack.getHoverName().getString(), W - 240)), infoX + 50, y + 62, CraftUI.TEXT_PRIMARY, false);
-            ctx.text(font, Component.translatable("challengecraft.casino.cashier.price", CasinoEconomy.formatFull(price * 100)), infoX + 50, y + 74, GOLD, false);
+            ctx.text(font, Component.literal(CraftUI.trimToWidth(font, stack.getHoverName().getString(), W - 192 - 58)), infoX + 50, y + 62, CraftUI.TEXT_PRIMARY, false);
+            fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.price", CasinoEconomy.formatFull(price * 100)), infoX + 50, y + 74, W - 192 - 58, GOLD);
             long canBuy = price > 0 ? CasinoClientState.balance() / (price * 100) : 0;
-            ctx.text(font, Component.translatable("challengecraft.casino.cashier.can_buy", canBuy), infoX + 12, y + 98, CraftUI.TEXT_SECONDARY, false);
+            fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.can_buy", canBuy), infoX + 12, y + 98, W - 192 - 20, CraftUI.TEXT_SECONDARY);
             if (!selectedItem.isEmpty()) {
-                ctx.text(font, Component.translatable("challengecraft.casino.cashier.choose_amount"), infoX + 12, y + 162, CraftUI.TEXT_MUTED, false);
+                fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.choose_amount"), infoX + 12, y + 162, W - 192 - 20, CraftUI.TEXT_MUTED);
             }
         } else {
-            CraftUI.drawWrapped(ctx, font, Component.translatable("challengecraft.casino.cashier.shop_info"), infoX + 8, y + 60, W - 208, CraftUI.TEXT_SECONDARY, 10);
+            paragraph(ctx, Component.translatable("challengecraft.casino.cashier.shop_info"), infoX + 8, y + 60, W - 192 - 16, 112,
+                    CraftUI.TEXT_SECONDARY);
         }
-        ctx.text(font, Component.translatable("challengecraft.casino.cashier.known", catalog.items().size()), x + 12, y + H - 24, CraftUI.TEXT_MUTED, false);
+        fitLeft(ctx, Component.translatable("challengecraft.casino.cashier.known", catalog.items().size()), x + 12, y + H - 24, 162, CraftUI.TEXT_MUTED);
     }
 
     private long priceOf(String id) {
@@ -313,14 +316,14 @@ public class CashierScreen extends Screen {
         CraftUI.panel(ctx, ax - 2, ay - 4, W - 24, 48, 0xE0140E0C, 0xFF4A2A16, s.total() < s.nextFee() ? CraftUI.DANGER : GOLD);
         CraftUI.drawCenteredScaled(ctx, font, Component.translatable("challengecraft.casino.account.next_fee",
                 CasinoEconomy.formatFull(s.nextFee())), x + W / 2, ay + 8, 1.4f, 0xFFFFE9A8);
-        ctx.centeredText(font, Component.translatable("challengecraft.casino.account.in",
-                String.format(Locale.ROOT, "%d:%02d", secs / 60, secs % 60), s.feeIndex()), x + W / 2, ay + 22, CraftUI.TEXT_SECONDARY);
-        ctx.centeredText(font, Component.translatable(s.total() < s.nextFee() ? "challengecraft.casino.account.danger"
-                : "challengecraft.casino.account.safe", CasinoEconomy.formatFull(s.total())), x + W / 2, ay + 32,
+        fitCentered(ctx, Component.translatable("challengecraft.casino.account.in",
+                String.format(Locale.ROOT, "%d:%02d", secs / 60, secs % 60), s.feeIndex()), x + W / 2, ay + 22, W - 32, CraftUI.TEXT_SECONDARY);
+        fitCentered(ctx, Component.translatable(s.total() < s.nextFee() ? "challengecraft.casino.account.danger"
+                : "challengecraft.casino.account.safe", CasinoEconomy.formatFull(s.total())), x + W / 2, ay + 32, W - 32,
                 s.total() < s.nextFee() ? CraftUI.DANGER : CraftUI.SUCCESS);
 
         int ly = ay + 52;
-        ctx.text(font, Component.translatable("challengecraft.casino.account.team"), ax, ly, GOLD, false);
+        fitLeft(ctx, Component.translatable("challengecraft.casino.account.team"), ax, ly, W - 28, GOLD);
         ly += 12;
         for (CasinoNet.Member m : s.members()) {
             if (ly > y + H - 34) break;
@@ -332,42 +335,94 @@ public class CashierScreen extends Screen {
             ctx.text(font, Component.literal(right), x + W - 14 - font.width(right), ly, CraftUI.TEXT_SECONDARY, false);
             ly += 12;
         }
-        ctx.text(font, Component.translatable("challengecraft.casino.account.footer", s.knownCount()), ax, y + H - 24, CraftUI.TEXT_MUTED, false);
+        fitLeft(ctx, Component.translatable("challengecraft.casino.account.footer", s.knownCount()), ax, y + H - 24, W - 28, CraftUI.TEXT_MUTED);
     }
 
     // ---- devices ------------------------------------------------------------------------------
 
+    private static final int CARD_W = 77, CARD_GAP = 4;
+
     private void drawDevices(GuiGraphicsExtractor ctx, int mx, int my) {
-        DeviceType[] devices = {DeviceType.SLOT, DeviceType.CRASH, DeviceType.ROULETTE};
+        List<DeviceType> devices = DeviceType.games();
         CasinoNet.State s = CasinoClientState.state;
         Inventory inv = minecraft.player.getInventory();
-        for (int i = 0; i < devices.length; i++) {
-            DeviceType d = devices[i];
-            int cx = x + 12 + i * 110, cy = y + 54;
+        for (int i = 0; i < devices.size(); i++) {
+            DeviceType d = devices.get(i);
+            int cx = x + 12 + i * (CARD_W + CARD_GAP), cy = y + 54;
             boolean unlocked = s != null && s.unlocked().contains(d.id);
             int accent = unlocked ? 0xFF7BE0A4 : 0xFFB57BFF;
-            CraftUI.panel(ctx, cx, cy, 100, H - 90, 0xE0140E0C, 0xFF3A2A40, accent);
+            CraftUI.panel(ctx, cx, cy, CARD_W, H - 90, 0xE0140E0C, 0xFF3A2A40, accent);
             ctx.pose().pushMatrix();
-            ctx.pose().translate(cx + 34, cy + 6);
-            ctx.pose().scale(2f, 2f);
+            ctx.pose().translate(cx + CARD_W / 2f - 12, cy + 5);
+            ctx.pose().scale(1.5f, 1.5f);
             ctx.item(new ItemStack(CasinoRegistry.item(d)), 0, 0);
             ctx.pose().popMatrix();
-            ctx.centeredText(font, Component.translatable("block.challengecraft." + d.id), cx + 50, cy + 42, CraftUI.TEXT_PRIMARY);
-            CraftUI.drawWrapped(ctx, font, Component.translatable("challengecraft.casino.device." + d.id + ".desc"),
-                    cx + 6, cy + 54, 88, CraftUI.TEXT_MUTED, 4);
-            int py = cy + 96;
-            for (DeviceType.Cost c : d.price) {
+            fitCentered(ctx, Component.translatable("block.challengecraft." + d.id), cx + CARD_W / 2, cy + 36, CARD_W - 6,
+                    CraftUI.TEXT_PRIMARY);
+            paragraph(ctx, Component.translatable("challengecraft.casino.device." + d.id + ".desc"), cx + 5, cy + 47,
+                    CARD_W - 10, 54, CraftUI.TEXT_MUTED);
+            // The price in one row: each item with "have/need" under it.
+            int n = d.price.size();
+            int slotW = (CARD_W - 6) / Math.max(1, n);
+            for (int k = 0; k < n; k++) {
+                DeviceType.Cost c = d.price.get(k);
                 int have = 0;
-                for (int k = 0; k < 36; k++) {
-                    ItemStack st = inv.getItem(k);
+                for (int j = 0; j < 36; j++) {
+                    ItemStack st = inv.getItem(j);
                     if (st.is(c.item()) && !st.isDamaged()) have += st.getCount();
                 }
-                ctx.item(new ItemStack(c.item()), cx + 6, py - 4);
-                ctx.text(font, Component.literal(have + "/" + c.count()), cx + 26, py, have >= c.count() ? CraftUI.SUCCESS : CraftUI.DANGER, false);
-                py += 17;
+                int sx = cx + 3 + k * slotW + slotW / 2;
+                ctx.item(new ItemStack(c.item()), sx - 8, cy + 104);
+                fitCentered(ctx, Component.literal(have + "/" + c.count()), sx, cy + 122, slotW - 2,
+                        have >= c.count() ? CraftUI.SUCCESS : CraftUI.DANGER);
             }
-            ctx.centeredText(font, Component.translatable(unlocked ? "challengecraft.casino.cashier.unlocked"
-                    : "challengecraft.casino.cashier.locked"), cx + 50, y + H - 46, accent);
+            fitCentered(ctx, Component.translatable(unlocked ? "challengecraft.casino.cashier.unlocked"
+                    : "challengecraft.casino.cashier.locked"), cx + CARD_W / 2, cy + 136, CARD_W - 6, accent);
+        }
+    }
+
+    /** Left-aligned single line that shrinks to fit {@code maxWidth}. {@code y} is the text's top. */
+    private void fitLeft(GuiGraphicsExtractor ctx, Component text, int x0, int y0, int maxWidth, int colour) {
+        int w = font.width(text);
+        if (w <= maxWidth) {
+            ctx.text(font, text, x0, y0, colour, false);
+            return;
+        }
+        float k = Math.max(0.55f, (float) maxWidth / w);
+        ctx.pose().pushMatrix();
+        ctx.pose().translate(x0, y0 + font.lineHeight * (1 - k) / 2f);
+        ctx.pose().scale(k, k);
+        ctx.text(font, text, 0, 0, colour, false);
+        ctx.pose().popMatrix();
+    }
+
+    /**
+     * A paragraph wrapped into a box: drawn at full size if it fits, otherwise at the largest
+     * smaller scale at which every line fits — never cut off.
+     */
+    private void paragraph(GuiGraphicsExtractor ctx, Component text, int x0, int y0, int boxW, int boxH, int colour) {
+        for (float k = 1.0f; k >= 0.5f; k -= 0.05f) {
+            int width = (int) (boxW / k);
+            var lines = font.split(text, width);
+            if (lines.size() * font.lineHeight * k <= boxH || k <= 0.51f) {
+                ctx.pose().pushMatrix();
+                ctx.pose().translate(x0, y0);
+                ctx.pose().scale(k, k);
+                for (int i = 0; i < lines.size(); i++) ctx.text(font, lines.get(i), 0, i * font.lineHeight, colour, false);
+                ctx.pose().popMatrix();
+                return;
+            }
+        }
+    }
+
+    /** Centred text that shrinks to fit {@code maxWidth}. {@code y} is the text's top. */
+    private void fitCentered(GuiGraphicsExtractor ctx, Component text, int cx, int y, int maxWidth, int colour) {
+        int w = font.width(text);
+        if (w <= maxWidth) {
+            ctx.centeredText(font, text, cx, y, colour);
+        } else {
+            float k = (float) maxWidth / w;
+            CraftUI.drawCenteredScaled(ctx, font, text, cx, y + font.lineHeight / 2, k, colour);
         }
     }
 

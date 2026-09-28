@@ -42,15 +42,21 @@ public class CasinoButton extends AbstractWidget {
         CraftUI.panel(ctx, getX(), y, getWidth(), getHeight(), fill, border, on ? accent : 0xFF4A4A55);
         int text = on ? CraftUI.mix(0xFFE9DCC2, 0xFFFFFFFF, g) : CraftUI.TEXT_MUTED;
         var font = Minecraft.getInstance().font;
-        String label = CraftUI.trimToWidth(font, getMessage().getString(), getWidth() - 8);
-        ctx.centeredText(font, Component.literal(label), getX() + getWidth() / 2,
-                y + (getHeight() - font.lineHeight) / 2 + 1, text);
+        // A label that is too long (German, mostly) is shrunk to fit rather than cut off.
+        int max = getWidth() - 8;
+        int w = font.width(getMessage());
+        if (w <= max) {
+            ctx.centeredText(font, getMessage(), getX() + getWidth() / 2, y + (getHeight() - font.lineHeight) / 2 + 1, text);
+        } else {
+            CraftUI.drawCenteredScaled(ctx, font, getMessage(), getX() + getWidth() / 2, y + getHeight() / 2 + 1,
+                    Math.max(0.6f, (float) max / w), text);
+        }
     }
 
     @Override
     public void onClick(MouseButtonEvent event, boolean doubleClick) {
         if (!enabled.getAsBoolean()) return;
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(CasinoSounds.CHIP, 1.0f, 0.7f));
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(CasinoSounds.CHIP, 1.0f, 0.4f));
         onPress.run();
     }
 

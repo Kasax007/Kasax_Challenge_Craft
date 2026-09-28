@@ -3,13 +3,10 @@ package net.kasax.challengecraft.casino;
 import net.kasax.challengecraft.ChallengeCraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -21,19 +18,13 @@ import java.util.UUID;
  * lantern posts and the croupier behind the counter. Built once per run, the first time the spawn
  * chunk is loaded with the challenge active; the croupier is respawned if he ever goes missing.
  *
- * <p>Blocks are looked up by id rather than through {@code Blocks} fields — 26.x folded the dyed
- * variants into grouped fields, and an id is the one name that is certain to survive that.
+ * <p>The booth is indestructible: see {@link CasinoBoothBlock} and {@link BoothProtection}.
  */
 public final class CasinoBooth {
     private static final int OFFSET_X = 4;
     private static int missingChecks;
 
     private CasinoBooth() {
-    }
-
-    private static BlockState block(String id) {
-        Block b = BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:" + id));
-        return b == null ? Blocks.AIR.defaultBlockState() : b.defaultBlockState();
     }
 
     public static BlockPos anchor(ServerLevel level) {
@@ -62,6 +53,12 @@ public final class CasinoBooth {
         }
         BlockPos a = BlockPos.of(data.getBoothPos());
         if (!level.isLoaded(a)) return;
+        // A booth from an older version of the mod was built from vanilla blocks: rebuild it once
+        // from the indestructible ones.
+        if (!(level.getBlockState(a.below()).getBlock() instanceof CasinoBoothBlock)) {
+            build(level, a);
+            ChallengeCraft.LOGGER.info("[Casino] booth rebuilt from indestructible blocks at {}", a);
+        }
 
         CroupierEntity croupier = croupier(server);
         if (croupier == null) {
@@ -79,12 +76,17 @@ public final class CasinoBooth {
             missingChecks = 0;
             CroupierEntity fresh = CasinoRegistry.CROUPIER.create(level, EntitySpawnReason.EVENT);
             if (fresh == null) return;
-            fresh.snapTo(a.getX() + 1.5, a.getY(), a.getZ() + 0.5, 90f, 0f);
+            net.minecraft.world.phys.Vec3 home = home(a);
+            fresh.snapTo(home.x, home.y, home.z, 90f, 0f);
             fresh.setYHeadRot(90f);
             fresh.setCustomName(net.minecraft.network.chat.Component.translatable("entity.challengecraft.croupier"));
             fresh.setCustomNameVisible(true);
             level.addFreshEntity(fresh);
             data.setCroupier(fresh.getUUID().toString());
+        } else if (croupier.position().distanceToSqr(home(a)) > 0.01) {
+            // Nothing is supposed to move him, but should anything manage it, he walks back.
+            net.minecraft.world.phys.Vec3 home = home(a);
+            croupier.snapTo(home.x, home.y, home.z, 90f, 0f);
         }
     }
 
@@ -113,13 +115,14 @@ public final class CasinoBooth {
      *   . . C . .        . carpet on polished blackstone
      *   L . . . L
      * </pre>
+     * Everything is built from {@link CasinoBoothBlock}s and the indestructible counter.
      */
     private static void build(ServerLevel level, BlockPos a) {
-        BlockState floor = block("polished_blackstone_bricks");
-        BlockState trim = block("gold_block");
-        BlockState carpet = block("red_carpet");
-        BlockState post = block("dark_oak_fence");
-        BlockState lantern = block("lantern");
+        BlockState floor = CasinoRegistry.booth(CasinoBoothBlock.Kind.FLOOR).defaultBlockState();
+        BlockState trim = CasinoRegistry.booth(CasinoBoothBlock.Kind.TRIM).defaultBlockState();
+        BlockState carpet = CasinoRegistry.booth(CasinoBoothBlock.Kind.CARPET).defaultBlockState();
+        BlockState post = CasinoRegistry.booth(CasinoBoothBlock.Kind.POST).defaultBlockState();
+        BlockState lantern = CasinoRegistry.booth(CasinoBoothBlock.Kind.LANTERN).defaultBlockState();
         BlockState air = Blocks.AIR.defaultBlockState();
 
         for (int dx = -2; dx <= 2; dx++) {
@@ -141,6 +144,10 @@ public final class CasinoBooth {
         for (int dz = -1; dz <= 1; dz++) {
             level.setBlockAndUpdate(a.offset(0, 0, dz), counter);
         }
-        // Carpet under the croupier's feet is part of the platform already.
+    }
+
+    /** Where the croupier stands behind his counter. */
+    private static net.minecraft.world.phys.Vec3 home(BlockPos a) {
+        return new net.minecraft.world.phys.Vec3(a.getX() + 1.5, a.getY(), a.getZ() + 0.5);
     }
 }

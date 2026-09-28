@@ -106,7 +106,7 @@ public class BlackjackScreen extends Screen {
     }
 
     private void play(SoundEvent sound, float pitch) {
-        if (minecraft != null) minecraft.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, 0.9f));
+        if (minecraft != null) minecraft.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, 0.55f));
     }
 
     // ---- layout -----------------------------------------------------------------------------------

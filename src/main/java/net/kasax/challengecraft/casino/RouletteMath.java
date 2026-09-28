@@ -1,16 +1,12 @@
 package net.kasax.challengecraft.casino;
 
 /**
- * European single-zero roulette with the House rule that makes it a fair game (RTP exactly 100 %):
+ * Classic European single-zero roulette: a bet covering k numbers returns 36/k × stake (35:1 on a
+ * single number, 1:1 on red), and the zero loses everything that does not cover it — a return of
+ * 36/37 = 97.3 %. The House keeps another 1/75 of every payout, which brings every bet to exactly
+ * <b>96 %</b> (36/37 × 74/75 = 0.96), the same edge as every other game in the casino.
  *
- * <ul>
- *   <li>every bet pays the normal casino odds, i.e. a bet covering k numbers returns 36/k × stake;</li>
- *   <li>when the ball lands on <b>0</b>, every bet that does not cover 0 gets its stake back;</li>
- *   <li>a straight bet on 0 pays 36:1 (37 × stake) instead of 35:1.</li>
- * </ul>
- * For any bet on k numbers without the zero: k/37 × 36/k + 1/37 × 1 = 36/37 + 1/37 = 1.
- * For the straight zero: 1/37 × 37 = 1. Splits, corners etc. touching the zero are simply not
- * offered, so there is no bet whose odds need a special case beyond the straight zero.
+ * <p>Splits, corners etc. touching the zero are not offered; the zero can only be backed straight.
  */
 public final class RouletteMath {
     public static final int STRAIGHT = 0, SPLIT = 1, STREET = 2, CORNER = 3, SIX_LINE = 4, DOZEN = 5,
@@ -98,15 +94,15 @@ public final class RouletteMath {
         };
     }
 
+    /** Payout odds as printed on the table: "35:1" for a straight bet. */
+    public static int odds(int kind) {
+        return 36 / numbersCovered(kind, 0) - 1;
+    }
+
     /** What a bet of {@code stake} returns (stake included) when the ball lands on {@code n}. */
     public static long payout(int kind, int target, long stake, int n) {
-        if (kind == STRAIGHT && target == 0) {
-            return n == 0 ? stake * 37 : 0;
-        }
-        if (n == 0) {
-            return stake; // the House rule: zero is a push for every bet that does not cover it
-        }
         if (!covers(kind, target, n)) return 0;
-        return stake * 36 / numbersCovered(kind, target);
+        // Classic odds, minus the House's seventy-fifth.
+        return stake * 36 / numbersCovered(kind, target) * 74 / 75;
     }
 }
