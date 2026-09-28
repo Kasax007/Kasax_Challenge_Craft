@@ -7,6 +7,7 @@ import net.kasax.challengecraft.casino.CasinoDeviceBlock;
 import net.kasax.challengecraft.casino.CasinoEconomy;
 import net.kasax.challengecraft.casino.CasinoNet;
 import net.kasax.challengecraft.casino.CasinoRegistry;
+import net.kasax.challengecraft.casino.CasinoSlotTopBlock;
 import net.kasax.challengecraft.casino.CasinoSounds;
 import net.kasax.challengecraft.casino.CrashGame;
 import net.kasax.challengecraft.casino.CrashMath;
@@ -102,7 +103,9 @@ public final class CasinoHud {
         if (slot != null) drawSlotPanel(context, font, slot, w, h, partial);
         CasinoNet.CrashState crash = nearestCrash(client);
         if (crash != null) drawCrashPanel(context, font, crash, w, h, partial);
-        if (client.gui.screen() == null) drawDeviceHint(context, font, client, w, h);
+        // Under the crosshair normally; below the slot panel while it covers the middle of the screen.
+        int hintY = slot != null ? h - 62 : h / 2 + 12;
+        if (client.gui.screen() == null) drawDeviceHint(context, font, client, w, hintY);
         drawBanners(context, font, w);
     }
 
@@ -406,9 +409,9 @@ public final class CasinoHud {
 
     // ---- device hint --------------------------------------------------------------------------
 
-    private static void drawDeviceHint(GuiGraphicsExtractor ctx, Font font, Minecraft client, int w, int h) {
+    private static void drawDeviceHint(GuiGraphicsExtractor ctx, Font font, Minecraft client, int w, int y) {
         if (!(client.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return;
-        BlockState state = client.level.getBlockState(hit.getBlockPos());
+        BlockState state = client.level.getBlockState(CasinoSlotTopBlock.base(client.level, hit.getBlockPos()));
         if (!(state.getBlock() instanceof CasinoDeviceBlock block)) return;
         CasinoNet.State s = CasinoClientState.state;
         if (s == null) return;
@@ -420,12 +423,12 @@ public final class CasinoHud {
             case CASHIER -> "challengecraft.casino.hint.cashier";
         };
         Component line1 = Component.translatable(key);
-        ctx.centeredText(font, line1, w / 2, h / 2 + 12, CraftUI.TEXT_PRIMARY);
+        ctx.centeredText(font, line1, w / 2, y, CraftUI.TEXT_PRIMARY);
         if (type == DeviceType.SLOT || type == DeviceType.CRASH) {
             Component bet = Component.translatable(s.betLevel() < 0 ? "challengecraft.casino.hint.bet_all_in"
                             : "challengecraft.casino.hint.bet", CasinoEconomy.formatFull(s.betAmount()),
                     CasinoClient.BET_UP.getTranslatedKeyMessage(), CasinoClient.BET_DOWN.getTranslatedKeyMessage());
-            ctx.centeredText(font, bet, w / 2, h / 2 + 23, CraftUI.GOLD);
+            ctx.centeredText(font, bet, w / 2, y + 11, CraftUI.GOLD);
         }
     }
 

@@ -56,7 +56,13 @@ public class CasinoDeviceBlock extends Block {
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
+    public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
+        if (type == DeviceType.SLOT) {
+            BlockPos above = context.getClickedPos().above();
+            if (above.getY() > context.getLevel().getMaxY() || !context.getLevel().getBlockState(above).canBeReplaced(context)) {
+                return null; // no room for the marquee
+            }
+        }
         return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
@@ -73,6 +79,9 @@ public class CasinoDeviceBlock extends Block {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
+        if (type == DeviceType.SLOT) {
+            level.setBlock(pos.above(), CasinoRegistry.SLOT_TOP.defaultBlockState(), Block.UPDATE_ALL);
+        }
         if (level instanceof ServerLevel serverLevel) {
             CasinoDevices.register(serverLevel, pos, type);
         }

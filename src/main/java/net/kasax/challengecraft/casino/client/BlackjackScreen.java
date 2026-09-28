@@ -109,12 +109,44 @@ public class BlackjackScreen extends Screen {
         if (minecraft != null) minecraft.getSoundManager().play(SimpleSoundInstance.forUI(sound, pitch, 0.9f));
     }
 
+    // ---- layout -----------------------------------------------------------------------------------
+    // Built for the smallest GUI a 720p window gets (427×240) and anchored to the top and bottom
+    // edges, so larger screens only gain air between the dealer and the player.
+
+    private int buttonsY() {
+        return height - 40;
+    }
+
+    private int timerY() {
+        return buttonsY() - 8;
+    }
+
+    /** Top of the player's cards: their value label sits under them, just above the timer. */
+    private int handsY() {
+        return timerY() - 13 - CARD_H;
+    }
+
+    private int dealerY() {
+        return 56 + Math.max(0, height - 240) / 4;
+    }
+
+    private int shoeX() {
+        return width - 70;
+    }
+
+    /** Centred text that shrinks rather than running off the table on narrow screens. */
+    private void fitted(GuiGraphicsExtractor ctx, Component text, int cy, float scale, int colour) {
+        int max = width - 56;
+        float fit = Math.min(scale, (float) max / Math.max(1, font.width(text)));
+        CraftUI.drawCenteredScaled(ctx, font, text, width / 2, cy, fit, colour);
+    }
+
     @Override
     protected void init() {
         int bw = 78, gap = 6;
         int total = bw * 4 + gap * 3;
         int bx = (width - total) / 2;
-        int by = height - 40;
+        int by = buttonsY();
         String[] keys = {"hit", "stand", "double", "split"};
         int[] masks = {BlackjackTable.HIT, BlackjackTable.STAND, BlackjackTable.DOUBLE, BlackjackTable.SPLIT};
         int[] actions = {CasinoNet.Action.BJ_HIT, CasinoNet.Action.BJ_STAND, CasinoNet.Action.BJ_DOUBLE, CasinoNet.Action.BJ_SPLIT};
@@ -142,8 +174,15 @@ public class BlackjackScreen extends Screen {
         CraftUI.frame(ctx, tx - 4, ty - 4, tw + 8, th + 8, 0x00000000, 0xFF3D2412, CraftUI.GOLD);
         // The printed arc of the table.
         int cx = width / 2;
-        ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.felt1"), cx, height / 2 - 6, 0x60F4E6B0);
-        ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.felt2"), cx, height / 2 + 5, 0x40F4E6B0);
+        // Printed between the dealer's cards and the player's (whose outline reaches ~10 px above them);
+        // the second line only where there is room for it.
+        int gapTop = dealerY() + CARD_H + 2, gapBottom = handsY() - 10;
+        boolean both = gapBottom - gapTop >= 20;
+        int feltY = (gapTop + gapBottom) / 2 - (both ? 9 : 4);
+        ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.felt1"), cx, feltY, 0x60F4E6B0);
+        if (both) {
+            ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.felt2"), cx, feltY + 9, 0x40F4E6B0);
+        }
     }
 
     @Override
@@ -154,21 +193,21 @@ public class BlackjackScreen extends Screen {
         int cx = width / 2;
         float intro = Anim.easeOutCubic(Math.min(1f, (now - openedAt) / 600f));
 
-        CraftUI.drawCenteredScaled(ctx, font, this.title.copy().withStyle(ChatFormatting.BOLD), cx, (int) (26 - (1 - intro) * 20), 1.5f, CraftUI.GOLD);
-        ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.stakes"), cx, 40, CraftUI.TEXT_SECONDARY);
+        fitted(ctx, this.title.copy().withStyle(ChatFormatting.BOLD), (int) (24 - (1 - intro) * 20), 1.5f, CraftUI.GOLD);
+        fitted(ctx, Component.translatable("challengecraft.casino.blackjack.stakes"), 37, 1f, CraftUI.TEXT_SECONDARY);
         if (state.lostChips() > 0) {
-            ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.tax", CasinoEconomy.formatFull(state.lostChips())),
-                    cx, 51, 0xFFE07070);
+            fitted(ctx, Component.translatable("challengecraft.casino.blackjack.tax", CasinoEconomy.formatFull(state.lostChips())),
+                    47, 1f, 0xFFE07070);
         }
 
-        // Shoe.
-        int shoeX = width - 70, shoeY = 30;
+        // Shoe, level with the dealer's cards so the text above has the full width.
+        int shoeX = shoeX(), shoeY = dealerY();
         ctx.fill(shoeX - 2, shoeY - 2, shoeX + CARD_W + 6, shoeY + CARD_H + 2, 0xFF1A0F08);
         drawCard(ctx, -1, shoeX + 4, shoeY, 1f);
 
         // Dealer.
         int[] dealer = state.dealer();
-        int dy = 70;
+        int dy = dealerY();
         int dStart = cx - (dealer.length * (CARD_W + 6)) / 2;
         List<Integer> visible = new ArrayList<>();
         for (int i = 0; i < dealer.length; i++) {
@@ -195,7 +234,7 @@ public class BlackjackScreen extends Screen {
         int handW = 0;
         for (int[] hand : hands) handW += Math.max(2, hand[0]) * 18 + CARD_W + 24;
         int hx = cx - handW / 2;
-        int hy = height / 2 + 24;
+        int hy = handsY();
         for (int i = 0; i < hands.size(); i++) {
             int[] hand = hands.get(i);
             int count = hand[0];
@@ -213,7 +252,7 @@ public class BlackjackScreen extends Screen {
                 ctx.outline(hx - 4, hy - 4 - count * 3, width_ + 8 - 18 + 4, CARD_H + 8 + count * 3, CraftUI.applyAlpha(CraftUI.GOLD, 0.5f + 0.5f * pulse));
             }
             String label = total + (BlackjackTable.isSoft(cards) && total < 21 ? " (soft)" : "") + (hand[1] > 1 ? "  ×2" : "");
-            ctx.centeredText(font, Component.literal(label), hx + width_ / 2 - 9, hy + CARD_H + 6, colour);
+            ctx.centeredText(font, Component.literal(label), hx + width_ / 2 - 9, hy + CARD_H + 3, colour);
             hx += width_ + 24;
         }
 
@@ -221,10 +260,13 @@ public class BlackjackScreen extends Screen {
         if (state.phase() == BlackjackRevival.PLAYING) {
             float left = Math.max(0, state.ticksLeft() - (now - receivedAt) / 50f);
             float frac = left / (20f * 20f);
-            int bw = 200;
-            CraftUI.progressBar(ctx, cx - bw / 2, height - 52, bw, 4, frac, frac < 0.25f ? CraftUI.DANGER : CraftUI.GOLD);
-            ctx.centeredText(font, Component.translatable("challengecraft.casino.blackjack.timer", (int) Math.ceil(left / 20f)),
-                    cx, height - 64, CraftUI.TEXT_SECONDARY);
+            // Bar and seconds on one line, between the hands and the buttons.
+            Component timer = Component.translatable("challengecraft.casino.blackjack.timer", (int) Math.ceil(left / 20f));
+            int bw = 150, tw = font.width(timer);
+            int bx = cx - (bw + 6 + tw) / 2;
+            int ty = timerY();
+            CraftUI.progressBar(ctx, bx, ty, bw, 4, frac, frac < 0.25f ? CraftUI.DANGER : CraftUI.GOLD);
+            ctx.text(font, timer, bx + bw + 6, ty - 2, CraftUI.TEXT_SECONDARY, false);
         }
 
         // Outcome.

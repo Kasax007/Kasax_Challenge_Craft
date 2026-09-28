@@ -62,7 +62,7 @@ public final class CasinoGames {
     public static void register() {
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
             if (!active()) return InteractionResult.PASS;
-            BlockPos pos = hit.getBlockPos();
+            BlockPos pos = CasinoSlotTopBlock.base(level, hit.getBlockPos());
             if (!(level.getBlockState(pos).getBlock() instanceof CasinoDeviceBlock block)) return InteractionResult.PASS;
             ItemStack held = player.getItemInHand(hand);
             // Building around a device must stay possible.

@@ -327,7 +327,8 @@ public class CashierScreen extends Screen {
             float share = s.total() > 0 ? (float) m.balance() / s.total() : 0f;
             ctx.text(font, Component.literal(CraftUI.trimToWidth(font, m.name(), 90)), ax, ly, CraftUI.TEXT_PRIMARY, false);
             CraftUI.progressBar(ctx, ax + 96, ly + 1, 110, 6, share, GOLD);
-            String right = CasinoEconomy.format(m.balance()) + "  −" + CasinoEconomy.format(m.share());
+            String right = CasinoEconomy.format(m.balance())
+                    + (m.share() > 0 ? "  −" + CasinoEconomy.format(m.share()) : "");
             ctx.text(font, Component.literal(right), x + W - 14 - font.width(right), ly, CraftUI.TEXT_SECONDARY, false);
             ly += 12;
         }

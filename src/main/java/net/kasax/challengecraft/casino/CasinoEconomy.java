@@ -73,7 +73,8 @@ public final class CasinoEconomy {
 
     /** Full number with thin grouping: 12 480. */
     public static String formatFull(long centi) {
-        return String.format(Locale.GERMANY, "%,d", centi / CasinoAccount.CENTI);
+        // Space rather than a locale separator: the string is built on the server for every client.
+        return String.format(Locale.ROOT, "%,d", centi / CasinoAccount.CENTI).replace(',', ' ');
     }
 
     // ---- accounts -----------------------------------------------------------------------------

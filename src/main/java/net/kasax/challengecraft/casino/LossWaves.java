@@ -18,12 +18,16 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * "The House sends its regards." Lost bets are not forgotten: every net loss goes on the player's
@@ -47,6 +51,8 @@ public final class LossWaves {
     private static final String[] TIER4 = {"vindicator", "pillager", "witch", "evoker", "creeper"};
     private static final String[] NETHER = {"piglin_brute", "blaze", "wither_skeleton", "magma_cube"};
     private static final String[] END = {"enderman", "endermite"};
+    /** Undead that catch fire in daylight. */
+    private static final Set<String> SUN_BURNERS = Set.of("zombie", "skeleton", "stray");
 
     private LossWaves() {
     }
@@ -122,6 +128,11 @@ public final class LossWaves {
         }
         mob.snapTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, level.getRandom().nextFloat() * 360f, 0f);
         mob.finalizeSpawn(level, level.getCurrentDifficultyAt(at), EntitySpawnReason.EVENT, null);
+        if (SUN_BURNERS.contains(id) && mob.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            // A wave lost at noon must not simply burn away; the helmet never drops.
+            mob.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            mob.setDropChance(EquipmentSlot.HEAD, 0f);
+        }
         mob.addTag(TAG);
         mob.setPersistenceRequired();
         mob.setTarget(target);
