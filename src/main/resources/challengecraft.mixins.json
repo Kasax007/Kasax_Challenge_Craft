@@ -39,7 +39,8 @@
     "CushionElytraMixin",
     "CushionPistonMixin",
     "CushionInfiniteMixin",
-    "CushionBreakMixin"
+    "CushionBreakMixin",
+    "CasinoMobDropsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

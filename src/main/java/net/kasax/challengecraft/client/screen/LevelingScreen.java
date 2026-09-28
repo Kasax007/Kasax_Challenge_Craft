@@ -582,7 +582,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 49; challengeId++) {
+        for (int challengeId = 1; challengeId <= net.kasax.challengecraft.ChallengeManager.MAX_CHALLENGE_ID; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Component.translatable("challengecraft.worldcreate.challenge" + challengeId),

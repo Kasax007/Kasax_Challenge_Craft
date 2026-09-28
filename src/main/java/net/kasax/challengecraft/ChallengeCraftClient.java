@@ -133,6 +133,7 @@ public class ChallengeCraftClient implements ClientModInitializer {
         net.kasax.challengecraft.client.SoundCues.register();
         net.kasax.challengecraft.client.RunHistory.register();
         net.kasax.challengecraft.client.screen.DiceReachRenderer.register();
+        net.kasax.challengecraft.casino.client.CasinoClient.initialize();
         net.kasax.challengecraft.client.screen.ForceItemHeadIconRenderer.register();
         net.kasax.challengecraft.client.ui.HudStack.addSource(net.kasax.challengecraft.client.screen.MobHealthHUD::buildCard, 1);
         net.kasax.challengecraft.client.ui.HudStack.register();

@@ -1,0 +1,316 @@
+package net.kasax.challengecraft.casino;
+
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ResultSlot;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Wiring of the casino into the game: who clicked what, the per-tick drivers of every game, and
+ * the actions a client may send. The rules of each game live in their own classes.
+ */
+public final class CasinoGames {
+    /** Selectable stakes in chips. Stepping past the top goes all-in. */
+    public static final long[] BET_LEVELS = {10, 20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000,
+            50_000, 100_000, 250_000, 500_000, 1_000_000};
+    public static final int ALL_IN = -1;
+
+    private static int tickCounter;
+
+    private CasinoGames() {
+    }
+
+    public static boolean active() {
+        return Chal_50_HouseAlwaysWins.isActive();
+    }
+
+    /** The stake the account's bet level stands for, in centi-chips. All-in rounds down to 10 chips. */
+    public static long betAmount(CasinoAccount a) {
+        if (a.betLevel == ALL_IN) {
+            long chips = Math.max(0, a.balance) / CasinoAccount.CENTI;
+            return (chips / 10) * 10 * CasinoAccount.CENTI;
+        }
+        int i = Math.max(0, Math.min(BET_LEVELS.length - 1, a.betLevel));
+        return BET_LEVELS[i] * CasinoAccount.CENTI;
+    }
+
+    public static void register() {
+        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (!active()) return InteractionResult.PASS;
+            BlockPos pos = hit.getBlockPos();
+            if (!(level.getBlockState(pos).getBlock() instanceof CasinoDeviceBlock block)) return InteractionResult.PASS;
+            ItemStack held = player.getItemInHand(hand);
+            // Building around a device must stay possible.
+            if (player.isShiftKeyDown() && held.getItem() instanceof BlockItem) return InteractionResult.PASS;
+            if (hand != net.minecraft.world.InteractionHand.MAIN_HAND) return InteractionResult.SUCCESS;
+            if (level.isClientSide()) return InteractionResult.SUCCESS;
+            if (!(player instanceof ServerPlayer sp)) return InteractionResult.PASS;
+            if (BlackjackRevival.inLimbo(sp.getUUID()) || CasinoSavedData.get(sp.level().getServer()).isBankrupt()) {
+                return InteractionResult.SUCCESS;
+            }
+            DeviceType type = CasinoDevices.at((ServerLevel) level, pos);
+            if (type == null) return InteractionResult.PASS;
+            switch (type) {
+                case SLOT -> SlotGame.use(sp, pos, held);
+                case CRASH -> CrashGame.use(sp, (ServerLevel) level, pos);
+                case ROULETTE -> RouletteGame.open(sp, (ServerLevel) level, pos);
+                case CASHIER -> openCashier(sp, 0);
+            }
+            return InteractionResult.SUCCESS;
+        });
+
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+            if (!(entity instanceof CroupierEntity)) return InteractionResult.PASS;
+            if (hand != net.minecraft.world.InteractionHand.MAIN_HAND) return InteractionResult.SUCCESS;
+            if (level.isClientSide()) return InteractionResult.SUCCESS;
+            if (!(player instanceof ServerPlayer sp) || !active()) return InteractionResult.SUCCESS;
+            ItemStack held = player.getItemInHand(hand);
+            if (player.isShiftKeyDown() && !held.isEmpty() && !CasinoEconomy.isWallet(held.getItem())) {
+                // Quick deposit: sneak-click with a stack hands the whole stack over, no menu.
+                long credited = CasinoEconomy.depositStack(sp, held);
+                if (held.isEmpty()) sp.setItemInHand(hand, ItemStack.EMPTY);
+                CasinoEconomy.afterDeposit(sp, credited, credited > 0 ? 1 : 0);
+            } else {
+                openCashier(sp, 0);
+            }
+            return InteractionResult.SUCCESS;
+        });
+
+        AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) ->
+                entity instanceof CroupierEntity ? InteractionResult.FAIL : InteractionResult.PASS);
+
+        UseItemCallback.EVENT.register((player, level, hand) -> {
+            if (!active()) return InteractionResult.PASS;
+            if (!CasinoEconomy.isWallet(player.getItemInHand(hand).getItem())) return InteractionResult.PASS;
+            if (level.isClientSide()) return InteractionResult.SUCCESS;
+            if (player instanceof ServerPlayer sp) openCashier(sp, 2);
+            return InteractionResult.SUCCESS;
+        });
+
+        ServerTickEvents.END_SERVER_TICK.register(CasinoGames::tick);
+
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> server.execute(() -> {
+            if (!active()) return;
+            ServerPlayer p = handler.player;
+            if (CasinoSavedData.get(server).isBankrupt()) {
+                p.setGameMode(net.minecraft.world.level.GameType.SPECTATOR); // the House already won
+            }
+            CasinoEconomy.account(p);
+            CasinoDevices.sync(p);
+            CasinoEconomy.sync(p);
+        }));
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            if (active()) BlackjackRevival.onLeave(handler.player);
+        });
+
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            SlotGame.flush(server);
+            CrashGame.refundAll(server);
+            RouletteGame.refundAll(server);
+        });
+    }
+
+    private static void tick(MinecraftServer server) {
+        if (!active()) return;
+        tickCounter++;
+        SlotGame.tick(server);
+        CrashGame.tick(server);
+        RouletteGame.tick(server);
+        BlackjackRevival.tick(server);
+        if (tickCounter % 20 == 0) {
+            CasinoEconomy.tickFee(server);
+            LossWaves.tick(server);
+            boolean bankrupt = CasinoSavedData.get(server).isBankrupt();
+            for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+                if (!bankrupt) CasinoEconomy.ensureWallet(p);
+                CasinoEconomy.sync(p);
+            }
+        }
+        if (tickCounter % 100 == 0) {
+            CasinoBooth.ensure(server);
+        }
+        if (tickCounter % 200 == 0) {
+            CasinoDevices.validate(server);
+        }
+        if (tickCounter % 1200 == 0) {
+            CasinoDevices.syncAll(server);
+        }
+    }
+
+    // ---- cashier ------------------------------------------------------------------------------
+
+    /** Tab 0 = deposit, 1 = shop, 2 = account overview. */
+    public static void openCashier(ServerPlayer player, int tab) {
+        CasinoAccount a = CasinoEconomy.account(player);
+        List<Item> items = new ArrayList<>();
+        for (String id : a.known) {
+            Item item = BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.parse(id));
+            if (item != null && EmcValues.isForSale(item)) items.add(item);
+        }
+        items.sort(Comparator.comparingLong(EmcValues::baseValue).reversed());
+        List<String> ids = new ArrayList<>(items.size());
+        long[] prices = new long[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            ids.add(BuiltInRegistries.ITEM.getKey(items.get(i)).toString());
+            prices[i] = EmcValues.baseValue(items.get(i));
+        }
+        CasinoEconomy.sync(player);
+        ServerPlayNetworking.send(player, new CasinoNet.Cashier(ids, prices, tab));
+        CasinoBooth.gesture(player.level().getServer(), CroupierEntity.GESTURE_WAVE);
+    }
+
+    /** Whether the player is standing at the croupier (deposits and purchases need that). */
+    public static boolean atCroupier(ServerPlayer player) {
+        CroupierEntity c = CasinoBooth.croupier(player.level().getServer());
+        if (c == null) return false;
+        return c.level() == player.level() && c.distanceToSqr(player) < 8 * 8;
+    }
+
+    // ---- client actions -----------------------------------------------------------------------
+
+    public static void handleAction(ServerPlayer player, CasinoNet.Action a) {
+        if (!active()) return;
+        MinecraftServer server = player.level().getServer();
+        boolean bankrupt = CasinoSavedData.get(server).isBankrupt();
+        switch (a.action()) {
+            case CasinoNet.Action.DEPOSIT_SLOTS, CasinoNet.Action.DEPOSIT_ALL, CasinoNet.Action.BUY_ITEM,
+                 CasinoNet.Action.BUY_DEVICE -> {
+                if (bankrupt) return;
+                if (!atCroupier(player)) {
+                    player.sendOverlayMessage(Component.translatable("challengecraft.casino.cashier.too_far").withStyle(ChatFormatting.RED));
+                    return;
+                }
+                switch (a.action()) {
+                    case CasinoNet.Action.DEPOSIT_SLOTS -> CasinoEconomy.depositSlots(player, parseSlots(a.text()));
+                    case CasinoNet.Action.DEPOSIT_ALL -> CasinoEconomy.depositAll(player);
+                    case CasinoNet.Action.BUY_ITEM -> CasinoEconomy.buyItem(player, a.text(), a.a());
+                    default -> {
+                        DeviceType[] types = DeviceType.values();
+                        if (a.a() >= 0 && a.a() < types.length) CasinoEconomy.buyDevice(player, types[a.a()]);
+                    }
+                }
+                openCashier(player, a.b());
+            }
+            case CasinoNet.Action.BET_UP, CasinoNet.Action.BET_DOWN, CasinoNet.Action.BET_ALL_IN -> changeBet(player, a.action());
+            case CasinoNet.Action.ROULETTE_BET -> RouletteGame.placeBet(player, BlockPos.of(a.pos()), a.a(), a.b(), a.amount());
+            case CasinoNet.Action.ROULETTE_CLEAR -> RouletteGame.clearBets(player, BlockPos.of(a.pos()));
+            case CasinoNet.Action.CRASH_CASH_OUT -> CrashGame.cashOutAnywhere(player);
+            case CasinoNet.Action.BJ_HIT -> BlackjackRevival.act(player, BlackjackTable.HIT);
+            case CasinoNet.Action.BJ_STAND -> BlackjackRevival.act(player, BlackjackTable.STAND);
+            case CasinoNet.Action.BJ_DOUBLE -> BlackjackRevival.act(player, BlackjackTable.DOUBLE);
+            case CasinoNet.Action.BJ_SPLIT -> BlackjackRevival.act(player, BlackjackTable.SPLIT);
+            case CasinoNet.Action.CASHIER_TAB -> openCashier(player, a.a());
+            case CasinoNet.Action.ROULETTE_LEAVE -> RouletteGame.leave(player);
+            default -> {
+            }
+        }
+    }
+
+    private static int[] parseSlots(String text) {
+        if (text.isEmpty()) return new int[0];
+        String[] parts = text.split(",");
+        int[] out = new int[Math.min(parts.length, 64)];
+        for (int i = 0; i < out.length; i++) {
+            try {
+                out[i] = Integer.parseInt(parts[i].trim());
+            } catch (NumberFormatException e) {
+                out[i] = -1;
+            }
+        }
+        return out;
+    }
+
+    private static void changeBet(ServerPlayer player, int action) {
+        CasinoAccount a = CasinoEconomy.account(player);
+        if (action == CasinoNet.Action.BET_ALL_IN) {
+            a.betLevel = ALL_IN;
+        } else if (action == CasinoNet.Action.BET_UP) {
+            if (a.betLevel == ALL_IN) return;
+            a.betLevel = a.betLevel >= BET_LEVELS.length - 1 ? ALL_IN : a.betLevel + 1;
+        } else {
+            a.betLevel = a.betLevel == ALL_IN ? BET_LEVELS.length - 1 : Math.max(0, a.betLevel - 1);
+        }
+        CasinoSavedData.get(player.level().getServer()).touch();
+        CasinoEconomy.playTo(player, CasinoSounds.CHIP, 0.6f, a.betLevel == ALL_IN ? 0.7f : 0.9f + 0.03f * a.betLevel);
+        player.sendOverlayMessage(Component.translatable(a.betLevel == ALL_IN
+                        ? "challengecraft.casino.bet.all_in" : "challengecraft.casino.bet.level",
+                CasinoEconomy.formatFull(betAmount(a))).withStyle(ChatFormatting.GOLD));
+        CasinoEconomy.sync(player);
+    }
+
+    // ---- shared bookkeeping for every game ----------------------------------------------------
+
+    /** Records a settled bet: statistics, and the loss meter that turns into mob waves. */
+    public static void settle(ServerPlayer player, long stake, long payout) {
+        CasinoAccount a = CasinoEconomy.account(player);
+        a.wagered += stake;
+        a.won += payout;
+        long net = payout - stake;
+        if (net > a.biggestWin) a.biggestWin = net;
+        long now = player.level().getServer().getTickCount();
+        if (net < 0) {
+            if (a.lossMeter == 0) a.lossStartTick = now;
+            a.lossMeter += -net;
+        } else if (net > 0) {
+            a.lossMeter = Math.max(0, a.lossMeter - net);
+        }
+        a.lastBetTick = now;
+        CasinoSavedData.get(player.level().getServer()).touch();
+    }
+
+    // ---- recipe gate --------------------------------------------------------------------------
+
+    /**
+     * Called from {@code MixinScreenHandler} for every slot click: taking a casino device out of a
+     * crafting result slot needs that device to have been bought from the croupier once.
+     */
+    public static boolean blockLockedCraft(Player player, AbstractContainerMenu menu, int slotIndex) {
+        if (!(player instanceof ServerPlayer sp) || slotIndex < 0 || slotIndex >= menu.slots.size()) return false;
+        Slot slot = menu.slots.get(slotIndex);
+        if (!(slot instanceof ResultSlot)) return false;
+        DeviceType type = CasinoRegistry.deviceOf(slot.getItem().getItem());
+        if (type == null || type == DeviceType.CASHIER) return false;
+        if (active() && CasinoEconomy.isUnlocked(sp, type)) return false;
+        sp.sendOverlayMessage(Component.translatable("challengecraft.casino.recipe.locked",
+                Component.translatable("block.challengecraft." + type.id)).withStyle(ChatFormatting.RED));
+        return true;
+    }
+
+    /** All players standing within {@code radius} blocks of a position in a level. */
+    public static List<ServerPlayer> near(ServerLevel level, BlockPos pos, double radius) {
+        List<ServerPlayer> out = new ArrayList<>();
+        for (ServerPlayer p : level.players()) {
+            if (p.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= radius * radius) out.add(p);
+        }
+        return out;
+    }
+
+    public static Map<String, CasinoAccount> accounts(MinecraftServer server) {
+        return CasinoSavedData.get(server).accounts();
+    }
+}

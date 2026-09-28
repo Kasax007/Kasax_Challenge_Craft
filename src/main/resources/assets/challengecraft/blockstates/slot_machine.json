@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "challengecraft:block/slot_machine"
+    },
+    "facing=east": {
+      "model": "challengecraft:block/slot_machine",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "challengecraft:block/slot_machine",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "challengecraft:block/slot_machine",
+      "y": 270
+    }
+  }
+}

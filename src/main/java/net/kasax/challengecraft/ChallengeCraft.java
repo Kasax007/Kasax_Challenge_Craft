@@ -91,6 +91,8 @@ public class ChallengeCraft implements ModInitializer {
 		// Registering an entity type obliges the client to register a renderer for it —
 		// see ChallengeCraftClient, or a dev client crashes on resource reload.
 		net.kasax.challengecraft.entity.ModEntities.initialize();
+		// The House Always Wins (50): blocks, items, croupier, sounds, packets and game drivers.
+		net.kasax.challengecraft.casino.CasinoMod.initialize();
 		// The daily rotation is hand-maintained, so a bad edit is a typo, not a code path. Checking
 		// it at boot turns "one day in three weeks silently does nothing" into a line in the log.
 		net.kasax.challengecraft.daily.DailyChallenges.validateAndLog();

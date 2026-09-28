@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "W": "minecraft:green_wool",
+    "D": "minecraft:diamond",
+    "E": "minecraft:emerald",
+    "P": "#minecraft:planks"
+  },
+  "pattern": [
+    "WWW",
+    "DED",
+    "P P"
+  ],
+  "result": {
+    "id": "challengecraft:roulette_table"
+  }
+}

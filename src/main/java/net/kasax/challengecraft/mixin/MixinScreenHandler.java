@@ -37,6 +37,12 @@ public abstract class MixinScreenHandler {
 
         Chal_40_LockoutBingo.handleScreenSlotClick(player, handler, slotIndex);
 
+        // Casino devices can only be crafted after buying them from the croupier once.
+        if (net.kasax.challengecraft.casino.CasinoGames.blockLockedCraft(player, handler, slotIndex)) {
+            ci.cancel();
+            return;
+        }
+
         if (Chal_12_LimitedInventory.isActive()) {
             int limited   = Chal_12_LimitedInventory.getLimitedSlots();
             int toDisable = 36 - limited;

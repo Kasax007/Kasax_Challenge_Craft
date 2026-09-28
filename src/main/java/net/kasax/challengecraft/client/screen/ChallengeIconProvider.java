@@ -82,6 +82,7 @@ public class ChallengeIconProvider {
         ICONS.put(47, Items.CUSHION.pick(net.minecraft.world.item.DyeColor.WHITE));
         ICONS.put(48, Items.CONCRETE.pick(net.minecraft.world.item.DyeColor.RED));
         ICONS.put(49, Items.COMPASS);
+        ICONS.put(50, net.kasax.challengecraft.casino.CasinoRegistry.CHIP_WALLET);
 
         // Perks
         ICONS.put(101, Items.GOLDEN_CARROT);
