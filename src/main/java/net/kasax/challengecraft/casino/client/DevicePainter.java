@@ -45,6 +45,7 @@ final class DevicePainter {
     private final List<float[]> quads = new ArrayList<>();
     private final List<float[]> chips = new ArrayList<>();
     private final List<float[]> wheel = new ArrayList<>();
+    private final java.util.Map<Identifier, List<float[]>> textured = new java.util.LinkedHashMap<>();
 
     DevicePainter(Minecraft mc, PoseStack pose, SubmitNodeCollector collector, ItemStackRenderState itemState, int light) {
         this.mc = mc;
@@ -199,6 +200,19 @@ final class DevicePainter {
         }
     }
 
+    /** A textured quad, corners {u, y, v, s, t} in device space, fully lit. */
+    void texturedQuad(Identifier texture,
+                      double u0, double y0, double v0, float s0, float t0,
+                      double u1, double y1, double v1, float s1, float t1,
+                      double u2, double y2, double v2, float s2, float t2,
+                      double u3, double y3, double v3, float s3, float t3) {
+        textured.computeIfAbsent(texture, k -> new ArrayList<>()).add(new float[]{
+                (float) (16 - u0), (float) y0, (float) v0, s0, t0,
+                (float) (16 - u1), (float) y1, (float) v1, s1, t1,
+                (float) (16 - u2), (float) y2, (float) v2, s2, t2,
+                (float) (16 - u3), (float) y3, (float) v3, s3, t3, 255});
+    }
+
     // ---- text and items -----------------------------------------------------------------------
 
     /**
@@ -298,13 +312,18 @@ final class DevicePainter {
         }
         submitTextured(chips, CHIPS);
         submitTextured(wheel, WHEEL);
+        for (var e : textured.entrySet()) submitTextured(e.getValue(), e.getKey(), FULLBRIGHT);
+        textured.clear();
     }
 
     private void submitTextured(List<float[]> list, Identifier texture) {
+        submitTextured(list, texture, light);
+    }
+
+    private void submitTextured(List<float[]> list, Identifier texture, int lightCoords) {
         if (list.isEmpty()) return;
         List<float[]> batch = new ArrayList<>(list);
         list.clear();
-        int lightCoords = light;
         collector.submitCustomGeometry(pose, RenderTypes.entityCutout(texture), (p, buf) -> {
             for (float[] q : batch) {
                 int shade = (int) q[20];

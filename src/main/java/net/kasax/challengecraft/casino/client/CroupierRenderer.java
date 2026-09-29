@@ -64,7 +64,16 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
         public float time;
         public int gestureKind;
         public float gesture; // 0..1 progress, -1 when idle
+        /** Degrees the body is turned towards a counter (a hand of blackjack, a gesture at it). */
+        public float turn;
     }
+
+    /** Turn per counter: counter 0 is on his right (he faces the customers), counter 2 on his left. */
+    private static float turnFor(int counter) {
+        return counter == 0 ? 30f : counter == 2 ? -30f : 0f;
+    }
+
+    private static final Map<Integer, float[]> TURN = new HashMap<>();
 
     public CroupierRenderer(EntityRendererProvider.Context ctx) {
         super(ctx);
@@ -141,6 +150,18 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
         float since = seen[1] == Long.MIN_VALUE ? Float.MAX_VALUE : (entity.tickCount - seen[1]) + tickDelta;
         state.gesture = since < GESTURE_TICKS ? since / GESTURE_TICKS : -1f;
         state.gestureKind = entity.getEntityData().get(CroupierEntity.GESTURE_KIND);
+
+        // Face a counter where a hand is being played, else the one a gesture is aimed at; ease there.
+        float want = 0f;
+        for (CasinoClientState.BjView v : CasinoClientState.BLACKJACK.values()) want = turnFor(v.state.seat());
+        if (state.gesture >= 0f) {
+            int target = entity.getEntityData().get(CroupierEntity.GESTURE_TARGET);
+            if (target >= 0) want = turnFor(target);
+        }
+        float[] turn = TURN.computeIfAbsent(entity.getId(), k -> new float[1]);
+        turn[0] += (want - turn[0]) * 0.12f;
+        state.turn = turn[0];
+        state.headYaw = Mth.clamp(state.headYaw - state.turn, -65f, 65f);
     }
 
     private void pose(State s) {
@@ -186,6 +207,28 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
                     rightArm.yRot = -0.3f * up;
                     head.xRot += 0.2f * up;
                 }
+                case CroupierEntity.GESTURE_DEAL -> {
+                    // A card slid from the shoe across the counter: reach out low, flick back.
+                    rightArm.xRot = -0.35f - 1.25f * up;
+                    rightArm.yRot = 0.25f * Mth.sin(g * Mth.PI * 2f);
+                    body.xRot = 0.08f * up;
+                    head.xRot += 0.25f * up;
+                }
+                case CroupierEntity.GESTURE_FLIP -> {
+                    // Both hands to the card, then a turn of the wrist.
+                    rightArm.xRot = -0.35f - 1.1f * up;
+                    leftArm.xRot = -0.35f - 0.9f * up;
+                    rightArm.zRot = 0.06f + 0.5f * Mth.sin(g * Mth.PI * 2f) * up;
+                    head.xRot += 0.3f * up;
+                }
+                case CroupierEntity.GESTURE_COLLECT -> {
+                    // Sweeps the cards off the felt towards himself.
+                    rightArm.xRot = -0.35f - 1.3f * up;
+                    leftArm.xRot = -0.35f - 1.3f * up;
+                    rightArm.yRot = -0.7f + 1.1f * g;
+                    leftArm.yRot = 0.7f - 1.1f * g;
+                    body.xRot = 0.12f * up;
+                }
                 case CroupierEntity.GESTURE_TIP_HAT -> {
                     rightArm.xRot = -0.35f - 2.7f * up;
                     rightArm.zRot = 0.06f + 0.35f * up;
@@ -204,7 +247,7 @@ public class CroupierRenderer extends EntityRenderer<CroupierEntity, CroupierRen
         matrices.pushPose();
         // The usual living-entity transform: face the body direction, flip into model space
         // (y down, 1/16 scale), and stand the feet on the ground.
-        matrices.rotate(Axis.YP.rotationDegrees(180f - state.bodyYaw));
+        matrices.rotate(Axis.YP.rotationDegrees(180f - state.bodyYaw - state.turn));
         matrices.scale(-1f, -1f, 1f);
         matrices.scale(0.9375f, 0.9375f, 0.9375f);
         matrices.translate(0f, -1.501f, 0f);

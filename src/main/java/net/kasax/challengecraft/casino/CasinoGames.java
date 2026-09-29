@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -66,20 +67,31 @@ public final class CasinoGames {
             if (BoothProtection.denyUse(player, level, hand, hit)) return InteractionResult.FAIL;
             BlockPos pos = CasinoPartBlock.master(level, hit.getBlockPos());
             BlockState state = level.getBlockState(pos);
-            if (!(state.getBlock() instanceof CasinoDeviceBlock)) return InteractionResult.PASS;
+            if (!(state.getBlock() instanceof CasinoDeviceBlock device)) return InteractionResult.PASS;
+            boolean counter = device.getDeviceType() == DeviceType.CASHIER;
             ItemStack held = player.getItemInHand(hand);
-            // Building around a device must stay possible.
-            if (player.isShiftKeyDown() && held.getItem() instanceof BlockItem) return InteractionResult.PASS;
+            // Building around a device must stay possible (not around the croupier's counter).
+            if (!counter && player.isShiftKeyDown() && held.getItem() instanceof BlockItem) return InteractionResult.PASS;
             if (hand != net.minecraft.world.InteractionHand.MAIN_HAND) return InteractionResult.SUCCESS;
             if (level.isClientSide()) return InteractionResult.SUCCESS;
             if (!(player instanceof ServerPlayer sp)) return InteractionResult.PASS;
-            if (BlackjackRevival.inLimbo(sp.getUUID()) || CasinoSavedData.get(sp.level().getServer()).isBankrupt()) {
+            Direction facing = state.getValue(CasinoDeviceBlock.FACING);
+            net.minecraft.world.phys.Vec3 local = DeviceSpace.toDevice(pos, facing, hit.getLocation());
+            if (BlackjackRevival.inLimbo(sp.getUUID())) {
+                // Mid-hand the only thing a player can do is play it, on their own counter.
+                if (counter && BlackjackRevival.seatOf(sp.getUUID()) == CasinoDeviceBlock.counterIndex(level, pos, facing)) {
+                    DeviceLayouts.Zone z = DeviceLayouts.counterZone(BlackjackRevival.seatOf(sp.getUUID()), true,
+                            local.x, local.y, local.z);
+                    if (z.kind() == DeviceLayouts.BJ) BlackjackRevival.act(sp, BlackjackRevival.ACTIONS[z.a()]);
+                }
                 return InteractionResult.SUCCESS;
             }
+            if (CasinoSavedData.get(sp.level().getServer()).isBankrupt()) return InteractionResult.SUCCESS;
             DeviceType type = CasinoDevices.at((ServerLevel) level, pos);
             if (type == null) return InteractionResult.PASS;
-            DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(type,
-                    DeviceSpace.toDevice(pos, state.getValue(CasinoDeviceBlock.FACING), hit.getLocation()));
+            DeviceLayouts.Zone zone = counter
+                    ? DeviceLayouts.counterZone(CasinoDeviceBlock.counterIndex(level, pos, facing), false, local.x, local.y, local.z)
+                    : DeviceLayouts.zoneAt(type, local);
             if (zone.kind() == DeviceLayouts.CHIP) {
                 selectStake(sp, zone.a());
                 return InteractionResult.SUCCESS;
@@ -97,7 +109,17 @@ public final class CasinoGames {
                         sp.sendOverlayMessage(Component.translatable("challengecraft.casino.roulette.aim").withStyle(ChatFormatting.GRAY));
                     }
                 }
-                case CASHIER -> openCashier(sp, 0);
+                case CASHIER -> {
+                    if (zone.kind() == DeviceLayouts.BELL) {
+                        CounterDeposit.deal(sp);
+                    } else if (zone.kind() == DeviceLayouts.PENDING) {
+                        CounterDeposit.takeBack(sp, zone.a());
+                    } else if (!held.isEmpty() && !CasinoEconomy.isWallet(held.getItem())) {
+                        CounterDeposit.place(sp, held);
+                    } else {
+                        openCashier(sp, TAB_SHOP);
+                    }
+                }
             }
             return InteractionResult.SUCCESS;
         });
@@ -129,14 +151,18 @@ public final class CasinoGames {
             if (hand != net.minecraft.world.InteractionHand.MAIN_HAND) return InteractionResult.SUCCESS;
             if (level.isClientSide()) return InteractionResult.SUCCESS;
             if (!(player instanceof ServerPlayer sp) || !active()) return InteractionResult.SUCCESS;
+            if (BlackjackRevival.inLimbo(sp.getUUID())) return InteractionResult.SUCCESS;
             ItemStack held = player.getItemInHand(hand);
             if (player.isShiftKeyDown() && !held.isEmpty() && !CasinoEconomy.isWallet(held.getItem())) {
                 // Quick deposit: sneak-click with a stack hands the whole stack over, no menu.
                 long credited = CasinoEconomy.depositStack(sp, held);
                 if (held.isEmpty()) sp.setItemInHand(hand, ItemStack.EMPTY);
                 CasinoEconomy.afterDeposit(sp, credited, credited > 0 ? 1 : 0);
+            } else if (!held.isEmpty() && !CasinoEconomy.isWallet(held.getItem())) {
+                // Handing the croupier a stack lays it on the counter, like clicking the counter.
+                CounterDeposit.place(sp, held);
             } else {
-                openCashier(sp, 0);
+                openCashier(sp, TAB_SHOP);
             }
             return InteractionResult.SUCCESS;
         });
@@ -148,7 +174,7 @@ public final class CasinoGames {
             if (!active()) return InteractionResult.PASS;
             if (!CasinoEconomy.isWallet(player.getItemInHand(hand).getItem())) return InteractionResult.PASS;
             if (level.isClientSide()) return InteractionResult.SUCCESS;
-            if (player instanceof ServerPlayer sp) openCashier(sp, 2);
+            if (player instanceof ServerPlayer sp && !BlackjackRevival.inLimbo(sp.getUUID())) openCashier(sp, 2);
             return InteractionResult.SUCCESS;
         });
 
@@ -166,10 +192,14 @@ public final class CasinoGames {
             CasinoEconomy.sync(p);
         }));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            if (active()) BlackjackRevival.onLeave(handler.player);
+            if (!active()) return;
+            BlackjackRevival.onLeave(handler.player);
+            CounterDeposit.returnAll(handler.player);
         });
 
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            CounterDeposit.returnAll(server);
+            BlackjackRevival.abortAll(server);
             SlotGame.flush(server);
             PlinkoGame.flush(server);
             CrashGame.refundAll(server);
@@ -185,12 +215,13 @@ public final class CasinoGames {
         RouletteGame.tick(server);
         PlinkoGame.tick(server);
         BlackjackRevival.tick(server);
+        CasinoBooth.tickGestures(server);
         if (tickCounter % 20 == 0) {
             CasinoEconomy.tickFee(server);
             LossWaves.tick(server);
             boolean bankrupt = CasinoSavedData.get(server).isBankrupt();
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                if (!bankrupt) CasinoEconomy.ensureWallet(p);
+                if (!bankrupt && !BlackjackRevival.inLimbo(p.getUUID())) CasinoEconomy.ensureWallet(p);
                 CasinoEconomy.sync(p);
             }
         }
@@ -206,6 +237,8 @@ public final class CasinoGames {
     }
 
     // ---- cashier ------------------------------------------------------------------------------
+
+    public static final int TAB_SHOP = 1;
 
     /** Tab 0 = deposit, 1 = shop, 2 = account overview. */
     public static void openCashier(ServerPlayer player, int tab) {

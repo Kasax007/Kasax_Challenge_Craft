@@ -27,11 +27,20 @@ public class CroupierEntity extends Entity {
             SynchedEntityData.defineId(CroupierEntity.class, EntityDataSerializers.INT);
     public static final EntityDataAccessor<Integer> GESTURE_KIND =
             SynchedEntityData.defineId(CroupierEntity.class, EntityDataSerializers.INT);
+    /** Which counter the gesture is aimed at: -1 none (straight ahead), 0..2 left to right. */
+    public static final EntityDataAccessor<Integer> GESTURE_TARGET =
+            SynchedEntityData.defineId(CroupierEntity.class, EntityDataSerializers.INT);
 
     public static final int GESTURE_WAVE = 0;
     public static final int GESTURE_TAKE = 1;
     public static final int GESTURE_PAY = 2;
     public static final int GESTURE_TIP_HAT = 3;
+    /** Slides a card from the shoe onto a counter. */
+    public static final int GESTURE_DEAL = 4;
+    /** Turns his hole card over. */
+    public static final int GESTURE_FLIP = 5;
+    /** Sweeps the cards off the counter: the House won the hand. */
+    public static final int GESTURE_COLLECT = 6;
 
     public CroupierEntity(EntityType<? extends CroupierEntity> type, Level world) {
         super(type, world);
@@ -42,9 +51,15 @@ public class CroupierEntity extends Entity {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         builder.define(GESTURE, 0);
         builder.define(GESTURE_KIND, GESTURE_WAVE);
+        builder.define(GESTURE_TARGET, -1);
     }
 
     public void gesture(int kind) {
+        gesture(kind, -1);
+    }
+
+    public void gesture(int kind, int target) {
+        this.entityData.set(GESTURE_TARGET, target);
         this.entityData.set(GESTURE_KIND, kind);
         this.entityData.set(GESTURE, this.entityData.get(GESTURE) + 1);
     }

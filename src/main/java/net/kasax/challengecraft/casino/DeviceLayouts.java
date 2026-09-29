@@ -27,6 +27,12 @@ public final class DeviceLayouts {
     public static final int TAKE_BACK = 4;
     /** Roulette: a bet; {@code a} = {@link RouletteMath} kind, {@code b} = target. */
     public static final int BET = 5;
+    /** Cashier: the bell that closes the deal for the items on the counter. */
+    public static final int BELL = 6;
+    /** Cashier: an item lying on the counter; {@code a} = its slot 0..8. */
+    public static final int PENDING = 7;
+    /** Cashier during a hand of blackjack: {@code a} = 0 hit, 1 stand, 2 double, 3 split. */
+    public static final int BJ = 8;
 
     public record Zone(int kind, int a, int b) {
         public static final Zone EMPTY = new Zone(NONE, 0, 0);
@@ -226,6 +232,45 @@ public final class DeviceLayouts {
             return new Zone(BET, EVEN_KINDS[(int) Math.min(5, Math.floor((u - GRID_U0) / (2 * CELL_W)))], 0);
         }
         return Zone.EMPTY;
+    }
+
+    // ---- the cashier counters -----------------------------------------------------------------
+
+    /** Top of the marble counter slab. */
+    public static final double COUNTER_TOP = 14.5;
+    /** The deposit tray on the middle counter: 3 × 3 slots, slot i at (SLOT_U[i % 3], SLOT_V[i / 3]). */
+    public static final double[] SLOT_U = {3.4, 8.0, 12.6};
+    public static final double[] SLOT_V = {6.2, 9.6, 13.0};
+    public static final int DEPOSIT_SLOTS = 9;
+    public static final double BELL_U = 13.3, BELL_V = 3.1, BELL_R = 1.5;
+    /** The four blackjack plaques along the front edge of a counter. */
+    public static final double PLAQUE_V0 = 1.3, PLAQUE_V1 = 3.5, PLAQUE_U0 = 0.6, PLAQUE_GAP = 0.3;
+    public static final double PLAQUE_W = (16 - 2 * PLAQUE_U0 - 3 * PLAQUE_GAP) / 4;
+
+    public static double plaqueU(int i) {
+        return PLAQUE_U0 + i * (PLAQUE_W + PLAQUE_GAP);
+    }
+
+    /**
+     * The zone on counter {@code index} (0..2): with a hand of blackjack running on it for this
+     * player, its four plaques; otherwise the bell and the deposit tray of the middle counter.
+     */
+    public static Zone counterZone(int index, boolean playing, double u, double y, double v) {
+        if (Math.abs(y - COUNTER_TOP) > 3.5) return new Zone(PLAY, 0, 0);
+        if (playing) {
+            if (v >= PLAQUE_V0 - 0.3 && v <= PLAQUE_V1 + 0.3) {
+                for (int i = 0; i < 4; i++) {
+                    if (u >= plaqueU(i) - 0.15 && u <= plaqueU(i) + PLAQUE_W + 0.15) return new Zone(BJ, i, 0);
+                }
+            }
+            return new Zone(PLAY, 0, 0);
+        }
+        if (index != 1) return new Zone(PLAY, 0, 0);
+        if (sq(u - BELL_U) + sq(v - BELL_V) <= sq(BELL_R)) return new Zone(BELL, 0, 0);
+        for (int i = 0; i < DEPOSIT_SLOTS; i++) {
+            if (Math.abs(u - SLOT_U[i % 3]) <= 2.1 && Math.abs(v - SLOT_V[i / 3]) <= 1.6) return new Zone(PENDING, i, 0);
+        }
+        return new Zone(PLAY, 0, 0);
     }
 
     // ---- hit zones ----------------------------------------------------------------------------

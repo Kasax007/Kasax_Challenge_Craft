@@ -328,11 +328,13 @@ public final class CasinoNet {
      * The revival table. Cards are 0..51 (rank = c % 13 with 0 = ace, suit = c / 13); -1 is a card
      * lying face down. {@code hands} is flattened: per hand {count, stake, finished, cards...}.
      */
-    public record Blackjack(int phase, int[] dealer, int[] hands, int active, int allowed, int outcome,
-                            int ticksLeft, long lostChips, int serial) implements CustomPacketPayload {
+    public record Blackjack(String player, int seat, int phase, int[] dealer, int[] hands, int active, int allowed,
+                            int outcome, int ticksLeft, long lostChips, int serial) implements CustomPacketPayload {
         public static final Type<Blackjack> ID = payloadType("casino_blackjack");
         public static final StreamCodec<RegistryFriendlyByteBuf, Blackjack> CODEC = StreamCodec.ofMember(
                 (p, buf) -> {
+                    buf.writeUtf(p.player);
+                    buf.writeVarInt(p.seat + 1);
                     buf.writeVarInt(p.phase);
                     buf.writeVarInt(p.dealer.length);
                     for (int c : p.dealer) buf.writeVarInt(c + 1);
@@ -345,6 +347,8 @@ public final class CasinoNet {
                     buf.writeVarInt(p.serial);
                 },
                 buf -> {
+                    String player = buf.readUtf();
+                    int seat = buf.readVarInt() - 1;
                     int phase = buf.readVarInt();
                     int n = buf.readVarInt();
                     int[] dealer = new int[n];
@@ -356,7 +360,40 @@ public final class CasinoNet {
                     int ticks = buf.readVarInt();
                     long lost = buf.readVarLong();
                     int serial = buf.readVarInt();
-                    return new Blackjack(phase, dealer, hands, active, allowed, outcome, ticks, lost, serial);
+                    return new Blackjack(player, seat, phase, dealer, hands, active, allowed, outcome, ticks, lost, serial);
+                });
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return ID;
+        }
+    }
+
+    // ---- the cashier counter -----------------------------------------------------------------
+
+    /**
+     * The items the receiving player has laid on the counter and what each stack would fetch
+     * (chips; 0 = the House does not buy it). {@code counter} is the packed position of the middle
+     * counter they lie on.
+     */
+    public record Pending(long counter, List<net.minecraft.world.item.ItemStack> items, long[] values)
+            implements CustomPacketPayload {
+        public static final Type<Pending> ID = payloadType("casino_pending");
+        public static final StreamCodec<RegistryFriendlyByteBuf, Pending> CODEC = StreamCodec.ofMember(
+                (p, buf) -> {
+                    buf.writeLong(p.counter);
+                    net.minecraft.world.item.ItemStack.OPTIONAL_LIST_STREAM_CODEC.encode(buf, p.items);
+                    buf.writeVarInt(p.values.length);
+                    for (long v : p.values) buf.writeVarLong(v);
+                },
+                buf -> {
+                    long counter = buf.readLong();
+                    List<net.minecraft.world.item.ItemStack> items =
+                            net.minecraft.world.item.ItemStack.OPTIONAL_LIST_STREAM_CODEC.decode(buf);
+                    int n = buf.readVarInt();
+                    long[] values = new long[n];
+                    for (int i = 0; i < n; i++) values[i] = buf.readVarLong();
+                    return new Pending(counter, items, values);
                 });
 
         @Override
@@ -450,6 +487,7 @@ public final class CasinoNet {
         PayloadTypeRegistry.clientboundPlay().register(RouletteState.ID, RouletteState.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CrashState.ID, CrashState.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Blackjack.ID, Blackjack.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(Pending.ID, Pending.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Fx.ID, Fx.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(Action.ID, Action.CODEC);
 

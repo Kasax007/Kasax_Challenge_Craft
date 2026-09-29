@@ -83,9 +83,21 @@ public final class EmcValues {
         return hasValue(item) && !NOT_FOR_SALE.contains(item);
     }
 
+    /**
+     * Whether an item carries other items (a filled shulker box, a bundle). Such stacks are never
+     * bought or staked — their value would only be the empty container's and the contents would
+     * be lost — so they count as worthless until emptied.
+     */
+    public static boolean hasContents(ItemStack stack) {
+        var container = stack.get(DataComponents.CONTAINER);
+        if (container != null && container.nonEmptyItemCopyStream().findAny().isPresent()) return true;
+        var bundle = stack.get(DataComponents.BUNDLE_CONTENTS);
+        return bundle != null && !bundle.isEmpty();
+    }
+
     /** Value of ONE item of this stack in chips, with damage and enchantments applied. */
     public static long unitValue(ItemStack stack) {
-        if (stack.isEmpty()) return 0L;
+        if (stack.isEmpty() || hasContents(stack)) return 0L;
         long value = baseValue(stack.getItem());
         if (value <= 0) return 0L;
 

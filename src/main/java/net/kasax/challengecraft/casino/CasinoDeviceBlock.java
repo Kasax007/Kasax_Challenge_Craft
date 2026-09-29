@@ -95,6 +95,21 @@ public class CasinoDeviceBlock extends Block {
         }
     }
 
+    /**
+     * Which of the croupier's counters this is, 0..2 from the customer's left: the number of
+     * counters directly to its left.
+     */
+    public static int counterIndex(BlockGetter level, BlockPos pos, Direction facing) {
+        Direction left = DeviceSpace.right(facing).getOpposite();
+        int n = 0;
+        BlockPos p = pos.relative(left);
+        while (n < 2 && level.getBlockState(p).getBlock() instanceof CasinoDeviceBlock d && d.getDeviceType() == DeviceType.CASHIER) {
+            n++;
+            p = p.relative(left);
+        }
+        return n;
+    }
+
     /** Whether every part cell of the device at {@code pos} is still there. */
     public boolean complete(BlockGetter level, BlockPos pos, BlockState state) {
         Direction facing = state.getValue(FACING);

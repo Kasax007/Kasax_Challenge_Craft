@@ -222,9 +222,7 @@ def cashier_counter():
         box([0, 0, 2], [16, 13, 14], "side", {"north": "front", "down": "wood"}, full=("north",)),
         box([0, 13, 1], [16, 14.5, 15], "marble"),
         box([0, 11, 1.2], [16, 12, 2], "brass"),
-        box([6.5, 14.5, 6.5], [9.5, 15, 9.5], "brass"),
-        box([7, 15, 7], [9, 16.2, 9], "brass"),
-        box([7.7, 16.2, 7.7], [8.3, 16.8, 8.3], "brass"),
+        # No bell here: only the middle counter has one, drawn by CounterView (it is the deal bell).
     ]
     return {"parent": "block/block", "textures": tex, "elements": el, "display": BLOCK_DISPLAY}
 

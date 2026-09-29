@@ -100,7 +100,15 @@ Smaragd 16 384 · Netherit 57 344 · Enderauge 1 792 · Brot 72 · Rohes Eisen /
   - **Geräte:** die vier Geräte mit Preis, eigenem Bestand und Kauf-Button.
   - Alle Texte passen in ihre Kästen: Zu lange Zeilen (vor allem auf Deutsch) werden verkleinert statt
     abgeschnitten.
-- **Schnell-Einzahlen ohne Menü:** Schleich-Rechtsklick mit einem Stack auf den Croupier.
+- **Einzahlen am Tresen (ohne Menü):** Rechtsklick mit einem Stack auf den mittleren Tresen (oder den
+  Croupier) legt ihn auf die Marmorplatte. Dort steht pro Stack und in Summe, was das Haus dafür zahlen
+  würde. Ein Klick auf einen liegenden Stack nimmt ihn zurück, bis zu 9 Stacks passen drauf.
+  **Die Glocke** schließt den Deal ab: Der Croupier nimmt die Ware, schiebt die Jetons herüber, und die
+  Chips fliegen sichtbar zu dir. Wertloses (z. B. Rohstoffe ohne EMC) und gefüllte Shulkerkisten oder
+  Bündel zeigen 0 und kommen beim Deal zurück ins Inventar (oder vor die Füße, wenn es voll ist). Jeder
+  Spieler sieht nur seinen eigenen Stapel. Nichts geht verloren: Beim Ausloggen, beim Server-Stopp und
+  beim Bankrott kommt alles, was noch auf dem Tresen liegt, zurück.
+- **Schnell-Einzahlen:** Schleich-Rechtsklick mit einem Stack auf den Croupier.
 
 ### 3.4 Geräte kaufen und craften
 
@@ -170,11 +178,20 @@ braucht man Farmen (Eisen, Gold, Mobs) oder Glück am Automaten. **Zum Einstelle
 1. Bei jedem Tod behält das Haus **25 % des Guthabens** (mit Banner und Sound).
 2. **Totem in der Hand:** Das Totem rettet dich, es ist kein Tod und es gibt keine Abgabe.
 3. **Hardcore aktiv:** Du stirbst normal, es gibt keine Hand Blackjack.
-4. Sonst wird der Tod abgefangen. Du bist an Ort und Stelle eingefroren und unverwundbar, und es öffnet
-   sich der **Blackjack-Tisch** („Das Haus bietet dir ein Spiel an“):
+4. Sonst wird der Tod abgefangen, und du stehst plötzlich **am Stand des Croupiers**, vor dem linken oder
+   rechten Tresen („Das Haus bietet dir ein Spiel an“, mit Untertitel, was zu tun ist). Dein Inventar
+   hält das Haus solange fest, du bist eingefroren und unverwundbar, du kannst weder weglaufen noch Items
+   benutzen oder an den Geräten spielen. Der Croupier winkt, teilt die Karten sichtbar auf den Tresen aus,
+   deckt seine verdeckte Karte um, zieht nach und zahlt aus oder sammelt ein. Du spielst, indem du die
+   Schilder **ZIEHEN / HALTEN / VERDOPPELN / TEILEN** auf dem Tresen anklickst (nicht erlaubte sind
+   ausgegraut). Eine Tafel zeigt beide Hände mit Summe und die Restzeit, links am Bildschirm erklärt eine
+   Anleitung, was gerade passiert und was von dir erwartet wird. Andere Spieler in der Nähe sehen die
+   Hand mit. Zwei Spieler können gleichzeitig spielen (je ein Tresen). Sind beide Plätze belegt oder
+   fehlt der Stand, wird die Hand wie früher im Blackjack-Fenster am Todesort gespielt:
    - **Gewonnen:** Du respawnst an **deinem Spawnpunkt** (Bett, Anker oder Weltspawn) mit
      **komplettem Inventar und XP**, dazu Totem-Animation, Sound und ohne Todesbildschirm.
-   - **Verloren:** Du stirbst normal dort, wo du gefallen bist; die Items liegen dort.
+   - **Verloren:** Du stirbst normal dort, wo du gefallen bist (auch wenn am Tresen gespielt wurde);
+     die Items liegen dort.
    - **Unentschieden:** Es wird neu gegeben.
    - Ziehen, Halten, Verdoppeln und Teilen sind möglich. Pro Entscheidung hast du 20 Sekunden, danach
      wird automatisch gehalten. Wer das Spiel verlässt, verliert die Hand.
@@ -302,5 +319,10 @@ Geräte platziert und gespielt, zwei Automaten gleichzeitig, mehrere Plinko-Kuge
 Taste, Roulette-Wetten auf dem Filz inklusive Auszahlung, Blackjack nach dem Tod, der Stand gegen TNT,
 Wasser, Lava und Abbauen im Kreativmodus, die Kasse auf Englisch und Deutsch.
 
-Nicht geprüft: das **Hören** der Sounds (keine Soundkarte) und echtes Mehrspieler mit zwei Clients; die
-Mehrspieler-Logik ist so gebaut, dass alles pro Spieler läuft (siehe 7).
+Dazu im Einzelspieler: Einzahlen am Tresen (wertlose Items und gefüllte Shulkerkisten kommen zurück,
+Stapel kommt beim Ausloggen zurück) und Blackjack am Tresen (Gewinn und Verlust, Items liegen am Todesort).
+
+Mehrspieler mit dediziertem Server und zwei Clients: Hinweis beim Beitreten, Roulette mit Einsätzen beider
+Spieler, anteilige Gebühr, eine Crash-Runde mit zwei Spielern (einer zahlt aus, der andere bleibt drin),
+mehrere Plinko-Kugeln. Noch offen im Mehrspieler: gleichzeitiges Einzahlen am Tresen und zwei
+gleichzeitige Blackjack-Hände. Nicht geprüft: das **Hören** der Sounds (keine Soundkarte).

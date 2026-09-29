@@ -53,6 +53,12 @@ public final class CasinoBooth {
         }
         BlockPos a = BlockPos.of(data.getBoothPos());
         if (!level.isLoaded(a)) return;
+        // The counters are devices too: clients draw deposits and blackjack hands on them.
+        for (int i = 0; i < 3; i++) {
+            if (level.getBlockState(counter(a, i)).getBlock() instanceof CasinoDeviceBlock) {
+                CasinoDevices.register(level, counter(a, i), DeviceType.CASHIER);
+            }
+        }
         // A booth from an older version of the mod was built from vanilla blocks: rebuild it once
         // from the indestructible ones.
         if (!(level.getBlockState(a.below()).getBlock() instanceof CasinoBoothBlock)) {
@@ -102,8 +108,51 @@ public final class CasinoBooth {
     }
 
     public static void gesture(MinecraftServer server, int kind) {
+        gesture(server, kind, -1);
+    }
+
+    public static void gesture(MinecraftServer server, int kind, int target) {
         CroupierEntity c = croupier(server);
-        if (c != null) c.gesture(kind);
+        if (c != null) c.gesture(kind, target);
+    }
+
+    /** A gesture played a little later (the croupier takes, then pays). */
+    private record Later(int kind, int target, long at) {
+    }
+
+    private static final java.util.List<Later> LATER = new java.util.ArrayList<>();
+
+    public static void gestureLater(MinecraftServer server, int kind, int target, int ticks) {
+        LATER.add(new Later(kind, target, server.getTickCount() + ticks));
+    }
+
+    public static void tickGestures(MinecraftServer server) {
+        if (LATER.isEmpty()) return;
+        long now = server.getTickCount();
+        for (java.util.Iterator<Later> it = LATER.iterator(); it.hasNext(); ) {
+            Later l = it.next();
+            if (l.at > now) continue;
+            it.remove();
+            gesture(server, l.kind, l.target);
+        }
+    }
+
+    /** The booth's anchor, or null while it has not been built. */
+    public static BlockPos anchorOf(MinecraftServer server) {
+        CasinoSavedData data = CasinoSavedData.get(server);
+        return data.isBoothBuilt() ? BlockPos.of(data.getBoothPos()) : null;
+    }
+
+    /** Counter {@code index} (0..2, left to right as seen by a customer) of a booth at {@code a}. */
+    public static BlockPos counter(BlockPos a, int index) {
+        // The counters face west; a customer looking east has north (-z) on the left.
+        return a.offset(0, 0, index - 1);
+    }
+
+    /** Where a customer stands in front of counter {@code index}, facing it. */
+    public static net.minecraft.world.phys.Vec3 customerSpot(BlockPos a, int index) {
+        BlockPos c = counter(a, index);
+        return new net.minecraft.world.phys.Vec3(c.getX() - 0.5, c.getY(), c.getZ() + 0.5);
     }
 
     /**

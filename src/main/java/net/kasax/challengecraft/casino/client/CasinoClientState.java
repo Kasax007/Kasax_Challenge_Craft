@@ -25,6 +25,31 @@ public final class CasinoClientState {
     public record Aim(BlockPos master, DeviceType type, DeviceLayouts.Zone zone) {
     }
 
+    /** Chips the croupier slides over after a deal: {@code count} chips from {@code from} to the player. */
+    public record ChipFlight(net.minecraft.world.phys.Vec3 from, long startTick, int count, int colour) {
+    }
+
+    /**
+     * A hand of blackjack played at a counter, with the moment each card lands and each turn-over
+     * happens on this client, so the cards arrive one after the other however the packets bunch up.
+     */
+    public static final class BjView {
+        public CasinoNet.Blackjack state;
+        public final Map<String, Long> appear = new HashMap<>();
+        public final Map<String, Integer> cardShown = new HashMap<>();
+        public final Map<String, Long> flipAt = new HashMap<>();
+        public final java.util.Set<String> sounded = new java.util.HashSet<>();
+        public long lastEvent;
+        /** Client tick the current state arrived (the clock counts down from there). */
+        public long stateTick;
+        /** When the outcome may show: after the last card has landed. */
+        public long settledAt;
+
+        public BjView(CasinoNet.Blackjack state) {
+            this.state = state;
+        }
+    }
+
     /** A plinko ball on its way down; {@code landedAt} is set once it reached its bucket. */
     public record PlinkoDrop(CasinoNet.PlinkoBall ball, long startTick, long landedAt) {
     }
@@ -40,6 +65,11 @@ public final class CasinoClientState {
     public static final Map<Long, PlinkoDrop> PLINKO_LAST = new HashMap<>();
     public static final Map<Long, PlinkoDrop> PLINKO_MINE = new HashMap<>();
     public static volatile Aim aim;
+    /** The items this player has laid on the counter. */
+    public static CasinoNet.Pending pending;
+    /** Hands being played at the counters, by player name. */
+    public static final Map<String, BjView> BLACKJACK = new HashMap<>();
+    public static final List<ChipFlight> FLIGHTS = new ArrayList<>();
     public static final Map<Long, CasinoNet.RouletteState> ROULETTE = new HashMap<>();
     public static final Map<Long, Long> ROULETTE_RECEIVED = new HashMap<>();
     public static final Map<Long, CasinoNet.CrashState> CRASH = new HashMap<>();
@@ -83,6 +113,9 @@ public final class CasinoClientState {
         PLINKO_LAST.clear();
         PLINKO_MINE.clear();
         aim = null;
+        pending = null;
+        BLACKJACK.clear();
+        FLIGHTS.clear();
         ROULETTE.clear();
         ROULETTE_RECEIVED.clear();
         CRASH.clear();

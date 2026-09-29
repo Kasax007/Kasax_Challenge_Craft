@@ -102,7 +102,12 @@ public final class CasinoHud {
         float partial = client.getDeltaTracker().getGameTimeDeltaPartialTick(false);
 
         // Under the fee card at the top, out of the way of the device the player looks at.
-        if (client.gui.screen() == null) drawDeviceHint(context, font, client, w, 44);
+        CasinoClientState.BjView hand = CasinoClientState.BLACKJACK.get(client.player.getName().getString());
+        if (hand != null) {
+            drawHandGuide(context, font, hand, w);
+        } else if (client.gui.screen() == null) {
+            drawDeviceHint(context, font, client, w, 44);
+        }
         drawBanners(context, font, w);
     }
 
@@ -421,6 +426,17 @@ public final class CasinoHud {
         } else if (zone.kind() == DeviceLayouts.BET) {
             line = Component.translatable("challengecraft.casino.hint.bet_spot", betName(zone.a(), zone.b()),
                     RouletteMath.odds(zone.a()), CasinoEconomy.formatFull(s.betAmount()), myBet(aim, zone));
+        } else if (zone.kind() == DeviceLayouts.BELL) {
+            CasinoNet.Pending pend = CasinoClientState.pending;
+            long total = 0;
+            if (pend != null) for (long v : pend.values()) total += v;
+            line = pend == null || pend.items().isEmpty() ? Component.translatable("challengecraft.casino.hint.bell_empty")
+                    : Component.translatable("challengecraft.casino.hint.bell", CasinoEconomy.formatFull(total * 100));
+            colour = CraftUI.GOLD;
+        } else if (zone.kind() == DeviceLayouts.PENDING) {
+            CasinoNet.Pending pend = CasinoClientState.pending;
+            if (pend == null || zone.a() >= pend.items().size()) return;
+            line = Component.translatable("challengecraft.casino.hint.take_item", pend.items().get(zone.a()).getHoverName());
         } else if (zone.kind() == DeviceLayouts.TAKE_BACK) {
             line = Component.translatable("challengecraft.casino.hint.take_back");
         } else if (zone.kind() == DeviceLayouts.BUTTON || (zone.kind() == DeviceLayouts.PLAY && aim.type() == DeviceType.CRASH)) {
@@ -430,7 +446,7 @@ public final class CasinoHud {
             line = switch (aim.type()) {
                 case SLOT -> Component.translatable("challengecraft.casino.hint.slot", CasinoEconomy.formatFull(s.betAmount()));
                 case PLINKO -> Component.translatable("challengecraft.casino.hint.plinko", CasinoEconomy.formatFull(s.betAmount()));
-                case CASHIER -> Component.translatable("challengecraft.casino.hint.cashier");
+                case CASHIER -> Component.translatable("challengecraft.casino.hint.counter");
                 default -> Component.translatable("challengecraft.casino.hint.roulette");
             };
         } else if (aim.type() == DeviceType.ROULETTE) {
@@ -441,6 +457,76 @@ public final class CasinoHud {
         int tw = font.width(line);
         ctx.fill(w / 2 - tw / 2 - 4, y - 3, w / 2 + tw / 2 + 4, y + font.lineHeight + 1, 0x90000000);
         ctx.centeredText(font, line, w / 2, y, colour);
+    }
+
+    /**
+     * While the player's own hand of blackjack runs at a counter: what is going on, what is at
+     * stake, what to do, and where the hand stands — the whole time, not just in a title.
+     */
+    private static void drawHandGuide(GuiGraphicsExtractor ctx, Font font, CasinoClientState.BjView v, int w) {
+        // A column at the left edge: the middle of the screen belongs to the counter.
+        CasinoNet.Blackjack s = v.state;
+        int pw = Math.max(130, Math.min(200, w / 2 - 70)), x = 6, y = 46; // below the fee card
+        float k = 0.85f;
+        int inner = (int) ((pw - 12) / k);
+        List<net.minecraft.util.FormattedCharSequence> body = new ArrayList<>();
+        List<Integer> colours = new ArrayList<>();
+        java.util.function.BiConsumer<Component, Integer> add = (c, col) -> {
+            for (var line : font.split(c, inner)) {
+                body.add(line);
+                colours.add(col);
+            }
+        };
+        add.accept(Component.translatable("challengecraft.casino.blackjack.guide.stakes"), CraftUI.TEXT_PRIMARY);
+        add.accept(Component.translatable("challengecraft.casino.blackjack.guide.goal"), CraftUI.TEXT_PRIMARY);
+        boolean playing = s.phase() == net.kasax.challengecraft.casino.BlackjackRevival.PLAYING;
+        if (playing) {
+            add.accept(Component.translatable("challengecraft.casino.blackjack.guide.how"), CraftUI.GOLD);
+            int[] masks = {net.kasax.challengecraft.casino.BlackjackTable.HIT, net.kasax.challengecraft.casino.BlackjackTable.STAND,
+                    net.kasax.challengecraft.casino.BlackjackTable.DOUBLE, net.kasax.challengecraft.casino.BlackjackTable.SPLIT};
+            String[] keys = {"hit", "stand", "double", "split"};
+            for (int i = 0; i < 4; i++) {
+                if ((s.allowed() & masks[i]) != 0) {
+                    add.accept(Component.translatable("challengecraft.casino.blackjack.guide." + keys[i]), CraftUI.TEXT_SECONDARY);
+                }
+            }
+        }
+        Component status;
+        int statusColour;
+        if (playing) {
+            float left = Math.max(0, s.ticksLeft() - (CasinoClientState.clientTick - v.stateTick));
+            status = Component.translatable("challengecraft.casino.blackjack.guide.clock", (int) Math.ceil(left / 20f));
+            statusColour = left < 100 ? CraftUI.DANGER : CraftUI.GOLD;
+        } else if (CasinoClientState.clientTick < v.settledAt) {
+            status = Component.translatable("challengecraft.casino.blackjack.guide.dealer_plays");
+            statusColour = CraftUI.TEXT_SECONDARY;
+        } else {
+            String key = s.outcome() == net.kasax.challengecraft.casino.BlackjackRevival.WIN ? "win"
+                    : s.outcome() == net.kasax.challengecraft.casino.BlackjackRevival.LOSE ? "lose" : "push";
+            status = Component.translatable("challengecraft.casino.blackjack.guide.result." + key);
+            statusColour = key.equals("win") ? CraftUI.GOLD : key.equals("lose") ? CraftUI.DANGER : CraftUI.INFO;
+        }
+        List<net.minecraft.util.FormattedCharSequence> statusLines = font.split(status, inner);
+        int lh = (int) Math.ceil(font.lineHeight * k) + 1;
+        int ph = 20 + (body.size() + statusLines.size()) * lh + 8;
+        CraftUI.frame(ctx, x, y, pw, ph, 0xE0180C08, 0xFF4A2A16, CraftUI.GOLD);
+        Component title = Component.translatable("challengecraft.casino.blackjack.title");
+        float tk = Math.min(1f, (float) (pw - 10) / font.width(title));
+        CraftUI.drawCenteredScaled(ctx, font, title, x + pw / 2, y + 9, tk, CraftUI.GOLD);
+        ctx.pose().pushMatrix();
+        ctx.pose().translate(x + 6, y + 20);
+        ctx.pose().scale(k, k);
+        int ly = 0;
+        for (int i = 0; i < body.size(); i++) {
+            ctx.text(font, body.get(i), 0, ly, colours.get(i), false);
+            ly += (int) (lh / k);
+        }
+        ly += 4;
+        for (var line : statusLines) {
+            ctx.text(font, line, 0, ly, statusColour, false);
+            ly += (int) (lh / k);
+        }
+        ctx.pose().popMatrix();
     }
 
     /** "Split 17/20", "Street 13–15", "Red"... */

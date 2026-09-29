@@ -30,6 +30,7 @@ public final class CasinoMod {
             CrashGame.reset();
             RouletteGame.reset();
             PlinkoGame.reset();
+            CounterDeposit.reset();
             BlackjackRevival.reset();
         });
     }

@@ -325,8 +325,15 @@ public class CashierScreen extends Screen {
         int ly = ay + 52;
         fitLeft(ctx, Component.translatable("challengecraft.casino.account.team"), ax, ly, W - 28, GOLD);
         ly += 12;
-        for (CasinoNet.Member m : s.members()) {
-            if (ly > y + H - 34) break;
+        // Largest holders first, the viewer always shown; whatever does not fit is summed up in one row.
+        String me = net.minecraft.client.Minecraft.getInstance().getUser().getName();
+        java.util.List<CasinoNet.Member> rows = new java.util.ArrayList<>(s.members());
+        rows.sort(java.util.Comparator.comparing((CasinoNet.Member m) -> !m.name().equals(me))
+                .thenComparing(m -> -m.balance()));
+        int fit = Math.max(1, (y + H - 34 - ly) / 12 + 1);
+        int hidden = rows.size() > fit ? rows.size() - (fit - 1) : 0;
+        if (hidden > 0) rows = rows.subList(0, fit - 1);
+        for (CasinoNet.Member m : rows) {
             float share = s.total() > 0 ? (float) m.balance() / s.total() : 0f;
             ctx.text(font, Component.literal(CraftUI.trimToWidth(font, m.name(), 90)), ax, ly, CraftUI.TEXT_PRIMARY, false);
             CraftUI.progressBar(ctx, ax + 96, ly + 1, 110, 6, share, GOLD);
@@ -334,6 +341,9 @@ public class CashierScreen extends Screen {
                     + (m.share() > 0 ? "  −" + CasinoEconomy.format(m.share()) : "");
             ctx.text(font, Component.literal(right), x + W - 14 - font.width(right), ly, CraftUI.TEXT_SECONDARY, false);
             ly += 12;
+        }
+        if (hidden > 0) {
+            fitLeft(ctx, Component.translatable("challengecraft.casino.account.more", hidden), ax, ly, W - 28, CraftUI.TEXT_MUTED);
         }
         fitLeft(ctx, Component.translatable("challengecraft.casino.account.footer", s.knownCount()), ax, y + H - 24, W - 28, CraftUI.TEXT_MUTED);
     }

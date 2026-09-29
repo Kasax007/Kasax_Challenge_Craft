@@ -94,17 +94,39 @@ public final class CasinoClient {
             }
         }));
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.Blackjack.ID, (p, ctx) -> ctx.client().execute(() -> {
-            CasinoClientState.blackjack = p;
-            if (p.phase() == 2) {
-                if (ctx.client().gui.screen() instanceof BlackjackScreen screen) screen.closeFromServer();
+            Minecraft mc = ctx.client();
+            boolean mine = mc.player != null && p.player().equals(mc.player.getName().getString());
+            if (p.seat() >= 0) {
+                // Played at a counter: drawn in the world for everybody watching, no screen.
+                if (p.phase() == 2) {
+                    CasinoClientState.BLACKJACK.remove(p.player());
+                } else {
+                    CasinoClientState.BjView v = CasinoClientState.BLACKJACK.get(p.player());
+                    if (v == null || (v.state.phase() == 1 && p.phase() == 0)) {
+                        v = new CasinoClientState.BjView(p); // a new hand after a push starts from scratch
+                        CasinoClientState.BLACKJACK.put(p.player(), v);
+                    }
+                    CounterView.schedule(v, p, CasinoClientState.clientTick);
+                    v.stateTick = CasinoClientState.clientTick;
+                }
+                if (mine && mc.gui.screen() instanceof BlackjackScreen screen) screen.closeFromServer();
                 return;
             }
-            if (ctx.client().gui.screen() instanceof BlackjackScreen screen) {
+            if (!mine) return;
+            // The fallback: played where the player fell, in the blackjack screen.
+            CasinoClientState.blackjack = p;
+            if (p.phase() == 2) {
+                if (mc.gui.screen() instanceof BlackjackScreen screen) screen.closeFromServer();
+                return;
+            }
+            if (mc.gui.screen() instanceof BlackjackScreen screen) {
                 screen.update(p);
             } else {
-                ctx.client().setScreenAndShow(new BlackjackScreen(p));
+                mc.setScreenAndShow(new BlackjackScreen(p));
             }
         }));
+        ClientPlayNetworking.registerGlobalReceiver(CasinoNet.Pending.ID, (p, ctx) -> ctx.client().execute(() ->
+                CasinoClientState.pending = p));
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.Fx.ID, (p, ctx) -> ctx.client().execute(() -> {
             if (p.kind() == CasinoNet.Fx.OPEN_ROULETTE) {
                 ctx.client().setScreenAndShow(new RouletteScreen(BlockPos.of(p.pos())));
@@ -112,6 +134,14 @@ public final class CasinoClient {
             }
             if (p.kind() == CasinoNet.Fx.REVIVED) {
                 autoRespawnTicks = 200;
+            }
+            if (p.kind() == CasinoNet.Fx.DEPOSIT && p.pos() != 0L) {
+                BlockPos c = BlockPos.of(p.pos());
+                long chips = p.amount() / 100;
+                int count = (int) Math.max(3, Math.min(16, 2 + Math.log10(Math.max(1, chips)) * 3));
+                CasinoClientState.FLIGHTS.add(new CasinoClientState.ChipFlight(
+                        new net.minecraft.world.phys.Vec3(c.getX() + 1.1, c.getY() + 1.35, c.getZ() + 0.5),
+                        CasinoClientState.clientTick, count, DevicePainter.chipColourFor(chips)));
             }
             CasinoHud.fx(p);
         }));
@@ -147,6 +177,24 @@ public final class CasinoClient {
         while (CASH_OUT.consumeClick()) send(CasinoNet.Action.CRASH_CASH_OUT);
 
         CasinoClientState.aim = aimAt(client);
+
+        // Counters: cards landing, chips arriving.
+        for (CasinoClientState.BjView v : CasinoClientState.BLACKJACK.values()) {
+            BlockPos counter = counterPos(client, v.state.seat());
+            if (counter != null) CounterView.tickSounds(client, v, counter);
+        }
+        net.minecraft.world.phys.Vec3 chest = CasinoWorldRenderer.chipTarget(client, 0f);
+        for (Iterator<CasinoClientState.ChipFlight> it = CasinoClientState.FLIGHTS.iterator(); it.hasNext(); ) {
+            CasinoClientState.ChipFlight f = it.next();
+            long t = CasinoClientState.clientTick - f.startTick() - CasinoWorldRenderer.FLIGHT_DELAY;
+            for (int i = 0; i < f.count(); i++) {
+                if (t == (long) i * CasinoWorldRenderer.FLIGHT_GAP + CasinoWorldRenderer.FLIGHT_TICKS) {
+                    client.level.playLocalSound(chest.x, chest.y, chest.z, CasinoSounds.CHIP, SoundSource.PLAYERS, 0.35f,
+                            0.9f + client.level.getRandom().nextFloat() * 0.4f, false);
+                }
+            }
+            if (t > (long) f.count() * CasinoWorldRenderer.FLIGHT_GAP + CasinoWorldRenderer.FLIGHT_TICKS + 2) it.remove();
+        }
 
         // Slot sound tracks: every machine plays its own timeline where it stands. A finished play
         // stays on the reels until the machine spins again.
@@ -223,9 +271,28 @@ public final class CasinoClient {
         BlockPos master = CasinoPartBlock.master(client.level, hit.getBlockPos());
         BlockState state = client.level.getBlockState(master);
         if (!(state.getBlock() instanceof CasinoDeviceBlock block)) return null;
-        DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(block.getDeviceType(),
-                DeviceSpace.toDevice(master, state.getValue(CasinoDeviceBlock.FACING), hit.getLocation()));
+        net.minecraft.core.Direction facing = state.getValue(CasinoDeviceBlock.FACING);
+        net.minecraft.world.phys.Vec3 local = DeviceSpace.toDevice(master, facing, hit.getLocation());
+        DeviceLayouts.Zone zone;
+        if (block.getDeviceType() == net.kasax.challengecraft.casino.DeviceType.CASHIER) {
+            int index = CasinoDeviceBlock.counterIndex(client.level, master, facing);
+            CasinoClientState.BjView mine = CasinoClientState.BLACKJACK.get(client.player.getName().getString());
+            zone = DeviceLayouts.counterZone(index, mine != null && mine.state.seat() == index, local.x, local.y, local.z);
+        } else {
+            zone = DeviceLayouts.zoneAt(block.getDeviceType(), local);
+        }
         return new CasinoClientState.Aim(master, block.getDeviceType(), zone);
+    }
+
+    /** The counter a seat plays at, found among the known devices (the booth's counters). */
+    static BlockPos counterPos(Minecraft client, int seat) {
+        for (CasinoClientState.DevicePos d : CasinoClientState.DEVICES) {
+            if (d.type() != net.kasax.challengecraft.casino.DeviceType.CASHIER) continue;
+            BlockState st = client.level.getBlockState(d.pos());
+            if (!(st.getBlock() instanceof CasinoDeviceBlock)) continue;
+            if (CasinoDeviceBlock.counterIndex(client.level, d.pos(), st.getValue(CasinoDeviceBlock.FACING)) == seat) return d.pos();
+        }
+        return null;
     }
 
     public static void send(int action) {

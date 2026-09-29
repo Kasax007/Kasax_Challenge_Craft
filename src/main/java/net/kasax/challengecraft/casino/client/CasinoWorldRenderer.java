@@ -79,13 +79,58 @@ public final class CasinoWorldRenderer {
                     case PLINKO -> PlinkoView.draw(painter, pos, partial);
                     case CRASH -> CrashView.draw(painter, pos, partial);
                     case ROULETTE -> RouletteView.draw(painter, pos, partial);
-                    default -> {
-                    }
+                    case CASHIER -> CounterView.draw(painter, pos, CasinoDeviceBlock.counterIndex(client.level, pos, facing), partial);
                 }
                 painter.flush();
                 matrices.popPose();
             }
+            drawChipFlights(client, matrices, collector, itemState, cam, partial);
         });
+    }
+
+    // ---- chips slid over by the croupier -------------------------------------------------------
+
+    /** Ticks before the first chip leaves (the croupier takes the goods first) and per chip. */
+    static final int FLIGHT_DELAY = 14, FLIGHT_TICKS = 14, FLIGHT_GAP = 2;
+
+    /** Where chip {@code i} of a flight is at {@code now}, or null when it is not in the air. */
+    static Vec3 chipAt(CasinoClientState.ChipFlight f, int i, float now, Vec3 target) {
+        float t = (now - f.startTick() - FLIGHT_DELAY - i * FLIGHT_GAP) / FLIGHT_TICKS;
+        if (t < 0 || t > 1) return null;
+        float e = t * t * (3 - 2 * t);
+        Vec3 p = f.from().add(target.subtract(f.from()).scale(e));
+        return p.add(0, Math.sin(Math.PI * t) * 0.7, 0);
+    }
+
+    /** Chips land just in front of the player's chest, never in their face. */
+    static Vec3 chipTarget(Minecraft client, float partial) {
+        Vec3 eye = client.player.getEyePosition(partial);
+        Vec3 look = client.player.getViewVector(partial);
+        Vec3 flat = new Vec3(look.x, 0, look.z);
+        if (flat.lengthSqr() > 1e-4) flat = flat.normalize().scale(0.45);
+        return eye.add(flat).add(0, -0.95, 0);
+    }
+
+    private static void drawChipFlights(Minecraft client, PoseStack matrices, SubmitNodeCollector collector,
+                                        ItemStackRenderState itemState, Vec3 cam, float partial) {
+        if (CasinoClientState.FLIGHTS.isEmpty()) return;
+        float now = CasinoClientState.clientTick + partial;
+        Vec3 target = chipTarget(client, partial);
+        for (CasinoClientState.ChipFlight f : CasinoClientState.FLIGHTS) {
+            for (int i = 0; i < f.count(); i++) {
+                Vec3 at = chipAt(f, i, now, target);
+                if (at == null) continue;
+                matrices.pushPose();
+                matrices.translate(at.x - cam.x, at.y - cam.y, at.z - cam.z);
+                matrices.rotate(Axis.YP.rotationDegrees((now * 23 + i * 40) % 360));
+                matrices.rotate(Axis.XP.rotationDegrees((now * 31 + i * 55) % 360));
+                matrices.scale(1f / 16f, 1f / 16f, 1f / 16f);
+                DevicePainter p = new DevicePainter(client, matrices, collector, itemState, DevicePainter.FULLBRIGHT);
+                p.chip(16, 0, 0, 1.0, (f.colour() + i) % 8, 1f);
+                p.flush();
+                matrices.popPose();
+            }
+        }
     }
 
     // ---- slot lines ---------------------------------------------------------------------------

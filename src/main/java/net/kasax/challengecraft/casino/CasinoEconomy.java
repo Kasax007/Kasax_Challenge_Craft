@@ -220,6 +220,7 @@ public final class CasinoEconomy {
     private static void bankrupt(MinecraftServer server, long fee, long total) {
         CasinoSavedData data = CasinoSavedData.get(server);
         data.setBankrupt(true);
+        CounterDeposit.returnAll(server); // goods still on the counter go back before the doors close
         ChallengeSavedData run = ChallengeSavedData.get(server.overworld());
         run.setInitialDifficulty(0);
         run.setTainted(true);
