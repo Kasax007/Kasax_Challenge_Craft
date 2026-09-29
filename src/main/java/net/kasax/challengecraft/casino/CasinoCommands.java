@@ -90,6 +90,17 @@ public final class CasinoCommands {
                                     .withStyle(ChatFormatting.GOLD), false);
                             return 1;
                         }))
+                        .then(Commands.literal("slotforce").then(Commands.argument("kind", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                .suggests((ctx, b) -> net.minecraft.commands.SharedSuggestionProvider.suggest(SlotGame.FORCE_KINDS, b))
+                                .executes(ctx -> {
+                                    ServerPlayer p = ctx.getSource().getPlayerOrException();
+                                    String kind = com.mojang.brigadier.arguments.StringArgumentType.getString(ctx, "kind");
+                                    if (!SlotGame.FORCE_KINDS.contains(kind)) return 0;
+                                    SlotGame.force(p, kind);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Next spin: " + kind)
+                                            .withStyle(ChatFormatting.GOLD), false);
+                                    return 1;
+                                })))
                         .then(Commands.literal("booth").executes(ctx -> {
                             MinecraftServer server = ctx.getSource().getServer();
                             CasinoSavedData.get(server).setBoothBuilt(false, 0L);

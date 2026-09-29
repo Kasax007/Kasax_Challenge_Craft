@@ -60,9 +60,9 @@ final class SlotView {
             float x0 = reelCenterX(r) - REEL_W / 2 + 0.15f;
             float x1 = x0 + REEL_W - 0.3f;
             boolean glow = anim != null && anim.reelInTension(r, t);
-            boolean expanded = anim != null && phase != null
-                    && (phase.kind() == SlotAnimation.Kind.FS_EXPAND || phase.kind() == SlotAnimation.Kind.FS_OUTRO
-                    || phase.kind() == SlotAnimation.Kind.DONE)
+            // A reel the lucky item spreads over glows gold while it does (only then: the expansion
+            // is a moment of the free spin, afterwards the reels show their own symbols again).
+            boolean expanded = anim != null && phase != null && phase.kind() == SlotAnimation.Kind.FS_EXPAND
                     && (anim.result.expandMasks()[Math.min(phase.spin(), anim.spinCount - 1)] & (1 << r)) != 0;
             int segments = 10;
             for (int s = 0; s < segments; s++) {
@@ -89,25 +89,27 @@ final class SlotView {
                     dx + 0.08f, WIN_Y1 + 1, dz, dx - 0.08f, WIN_Y1 + 1, dz, 0xFF1F140F);
         }
         p.collector.submitCustomGeometry(matrices, RenderTypes.debugQuads(), (pose, buf) -> {
-            // Winning lines glow across the glass, one after the other.
-            if (anim != null && phase != null && showsLines(phase)) {
+            if (anim == null || phase == null) return;
+            if (phase.kind() == SlotAnimation.Kind.FS_EXPAND) {
+                // Once the lucky item stands on its reels it pays on all ten lines: they run over
+                // the glass one after another, then glow all together.
+                float k = phase.local() - anim.expandFillEnd(phase.spin());
+                if (k < 0) return;
+                int current = (int) (k / 2f);
+                float pulse = 0.55f + 0.45f * (float) Math.sin(k * 0.45f);
+                for (int l = 0; l < SlotMath.LINES; l++) {
+                    if (current < SlotMath.LINES && l != current) continue;
+                    lineGlow(buf, pose, l, SlotMath.REELS, current < SlotMath.LINES ? 0.36f : 0.14f * pulse);
+                }
+            } else if (showsLines(phase)) {
+                // Winning lines glow across the glass, one after the other.
                 SlotMath.Spin spin = anim.spins.get(anim.spinShown(t));
                 if (!spin.lineWins().isEmpty()) {
                     float clock = phase.kind() == SlotAnimation.Kind.DONE ? CasinoClientState.clientTick : phase.local();
                     int idx = (int) (clock / 14f) % spin.lineWins().size();
                     SlotMath.LineWin w = spin.lineWins().get(idx);
                     float pulse = 0.55f + 0.45f * (float) Math.sin(clock * 0.45f);
-                    int[] rows = SlotMath.LINE_ROWS[w.line()];
-                    for (int r = 0; r < w.count(); r++) {
-                        float cx = reelCenterX(r);
-                        float cy = rowY(rows[r]);
-                        float z = DRUM_AXIS_Z - DRUM_R - 0.3f;
-                        float h = 1.2f;
-                        float[] c = CasinoWorldRenderer.lineColour(w.line());
-                        CasinoWorldRenderer.quad(buf, pose, cx - REEL_W / 2 + 0.2f, cy - h, z, cx + REEL_W / 2 - 0.2f, cy - h, z,
-                                cx + REEL_W / 2 - 0.2f, cy + h, z, cx - REEL_W / 2 + 0.2f, cy + h, z,
-                                c[0], c[1], c[2], c[0], c[1], c[2], 0.28f * pulse);
-                    }
+                    lineGlow(buf, pose, w.line(), w.count(), 0.28f * pulse);
                 }
             }
         });
@@ -118,29 +120,11 @@ final class SlotView {
             boolean spinning = anim != null && anim.reelSpinning(r, t);
             int base = (int) Math.floor(position);
             float frac = position - base;
-            boolean expanded = false;
-            int lucky = -1;
-            if (anim != null && phase != null && anim.result.luckySymbol() >= 0) {
-                int spinIdx = Math.min(phase.spin(), anim.spinCount - 1);
-                boolean showExpand = phase.kind() == SlotAnimation.Kind.FS_EXPAND
-                        || phase.kind() == SlotAnimation.Kind.FS_OUTRO || phase.kind() == SlotAnimation.Kind.DONE;
-                if (showExpand && (anim.result.expandMasks()[spinIdx] & (1 << r)) != 0) {
-                    expanded = true;
-                    lucky = anim.result.luckySymbol();
-                }
-            }
+            // During an expansion the lucky item spreads over this reel cell by cell: each cell
+            // turns over like a card and comes back up as the lucky item.
+            boolean expanding = anim != null && phase != null && phase.kind() == SlotAnimation.Kind.FS_EXPAND
+                    && (anim.result.expandMasks()[phase.spin()] & (1 << r)) != 0;
             float cx = reelCenterX(r);
-            if (expanded) {
-                float grow = phase.kind() == SlotAnimation.Kind.FS_EXPAND ? Math.min(1f, phase.local() / 10f) : 1f;
-                matrices.pushPose();
-                matrices.translate(cx, (WIN_Y0 + WIN_Y1) / 2f, DRUM_AXIS_Z - DRUM_R - 0.1f);
-                float s = REEL_W * (1.0f + 1.4f * CasinoWorldRenderer.easeOutBack(grow));
-                matrices.scale(s, s, s);
-                matrices.rotate(Axis.YP.rotationDegrees(180f));
-                CasinoWorldRenderer.submitItem(p, new ItemStack(SlotMath.SYMBOL_ITEMS[lucky]));
-                matrices.popPose();
-                continue;
-            }
             for (int k = -1; k <= 3; k++) {
                 float rowPos = k - frac; // position of symbol (base + k) relative to the top row
                 float angle = (rowPos - 1f) * ROW_ANGLE;
@@ -156,13 +140,94 @@ final class SlotView {
                 float s = REEL_W * 0.82f;
                 float squash = 0.45f + 0.55f * (float) Math.cos(angle);
                 float lift = 0.05f + 0.5f * s * squash * (float) Math.abs(Math.sin(angle));
+                float flip = 1f, pop = 1f;
+                if (expanding && k >= 0 && k < SlotMath.ROWS) {
+                    float progress = anim.expandProgress(phase.spin(), r, k, phase.local());
+                    if (k == anim.luckyRow(phase.spin(), r)) {
+                        // The cell it spreads from beats once to show where it starts.
+                        float beat = Math.max(0f, 1f - phase.local() / 10f);
+                        pop = 1f + 0.25f * beat * (float) Math.abs(Math.sin(phase.local() * 0.6f));
+                    } else if (progress > 0f) {
+                        pop = 1f + 0.22f * (float) Math.sin(Math.PI * progress);
+                        flip = (float) Math.abs(Math.cos(Math.PI * progress));
+                        if (progress >= 0.5f) symbol = anim.result.luckySymbol();
+                    }
+                }
                 matrices.pushPose();
                 matrices.translate(cx, y, z - lift);
-                matrices.scale(s, s * squash * (spinning ? 1.25f : 1f), s);
+                matrices.scale(s * Math.max(0.03f, flip) * pop, s * squash * pop * (spinning ? 1.25f : 1f), s);
                 matrices.rotate(Axis.YP.rotationDegrees(180f));
                 CasinoWorldRenderer.submitItem(p, new ItemStack(SlotMath.SYMBOL_ITEMS[symbol]));
                 matrices.popPose();
             }
+        }
+        if (anim != null && phase != null && phase.kind() == SlotAnimation.Kind.FS_INTRO && anim.result.luckySymbol() >= 0) {
+            drawPicker(p, anim, phase.local());
+        }
+    }
+
+    /** Model depth of the pick panel in front of the reels, and of the items running on it. */
+    private static final float PICK_Z = 2.75f, PICK_ITEM_Z = 2.4f;
+
+    /**
+     * The free-spins pick: a panel slides in front of the reels and a strip of the item symbols runs
+     * across it, slows down and stops on the lucky item, which then flashes in its gold frame.
+     */
+    private static void drawPicker(DevicePainter p, SlotAnimation anim, float local) {
+        if (local < 6) return;
+        PoseStack matrices = p.pose;
+        float open = Math.min(1f, (local - 6) / 8f); // the panel unfolds from the middle row
+        float cy = (WIN_Y0 + WIN_Y1) / 2f, half = 2.7f * open;
+        float x0 = WIN_X0 + 0.2f, x1 = WIN_X1 - 0.2f;
+        boolean landed = local >= SlotAnimation.PICK_LAND;
+        float flash = landed ? 0.5f + 0.5f * (float) Math.sin((local - SlotAnimation.PICK_LAND) * 0.7f) : 0f;
+        // Panel, gold rails above and below, and the frame of the pick window in the middle.
+        p.quadModel(x0, cy - half, PICK_Z, x1, cy - half, PICK_Z, x1, cy + half, PICK_Z, x0, cy + half, PICK_Z, 0xFF1B0F2E);
+        int rail = 0xFFE8B83A;
+        p.quadModel(x0, cy + half, PICK_Z - 0.02f, x1, cy + half, PICK_Z - 0.02f, x1, cy + half - 0.3f, PICK_Z - 0.02f,
+                x0, cy + half - 0.3f, PICK_Z - 0.02f, rail);
+        p.quadModel(x0, cy - half + 0.3f, PICK_Z - 0.02f, x1, cy - half + 0.3f, PICK_Z - 0.02f, x1, cy - half, PICK_Z - 0.02f,
+                x0, cy - half, PICK_Z - 0.02f, rail);
+        if (open < 1f) return;
+        float mid = (WIN_X0 + WIN_X1) / 2f, w = 1.75f, h = 2.3f;
+        int frame = landed ? DevicePainter.rgb(0.91f, 0.72f + 0.25f * flash, 0.23f + 0.6f * flash) : 0xFF8A6A2A;
+        float fz = PICK_Z - 0.04f, t = 0.28f;
+        p.quadModel(mid - w, cy + h, fz, mid + w, cy + h, fz, mid + w, cy + h - t, fz, mid - w, cy + h - t, fz, frame);
+        p.quadModel(mid - w, cy - h + t, fz, mid + w, cy - h + t, fz, mid + w, cy - h, fz, mid - w, cy - h, fz, frame);
+        p.quadModel(mid - w, cy + h, fz, mid - w + t, cy + h, fz, mid - w + t, cy - h, fz, mid - w, cy - h, fz, frame);
+        p.quadModel(mid + w - t, cy + h, fz, mid + w, cy + h, fz, mid + w, cy - h, fz, mid + w - t, cy - h, fz, frame);
+
+        // The strip: items enter on the player's right (-x) and run to the left (+x).
+        float steps = anim.pickSteps(local);
+        int base = (int) Math.floor(steps);
+        float f = steps - base;
+        for (int k = -2; k <= 3; k++) {
+            float offset = k - f;
+            float x = mid - offset * 3.1f;
+            if (Math.abs(x - mid) > 5.0f) continue;
+            float size = REEL_W * (1.05f - 0.28f * Math.min(2f, Math.abs(offset)));
+            if (landed && k == 0) size *= 1.12f + 0.12f * flash;
+            matrices.pushPose();
+            matrices.translate(x, cy, PICK_ITEM_Z);
+            matrices.scale(size, size, size * 0.5f);
+            matrices.rotate(Axis.YP.rotationDegrees(180f));
+            CasinoWorldRenderer.submitItem(p, new ItemStack(SlotMath.SYMBOL_ITEMS[anim.pickSymbol(base + k)]));
+            matrices.popPose();
+        }
+    }
+
+    /** One pay line glowing over the glass, across the first {@code reels} reels. */
+    private static void lineGlow(com.mojang.blaze3d.vertex.VertexConsumer buf, PoseStack.Pose pose, int line, int reels, float alpha) {
+        int[] rows = SlotMath.LINE_ROWS[line];
+        float z = DRUM_AXIS_Z - DRUM_R - 0.3f;
+        float h = 1.2f;
+        float[] c = CasinoWorldRenderer.lineColour(line);
+        for (int r = 0; r < reels; r++) {
+            float cx = reelCenterX(r);
+            float cy = rowY(rows[r]);
+            CasinoWorldRenderer.quad(buf, pose, cx - REEL_W / 2 + 0.2f, cy - h, z, cx + REEL_W / 2 - 0.2f, cy - h, z,
+                    cx + REEL_W / 2 - 0.2f, cy + h, z, cx - REEL_W / 2 + 0.2f, cy + h, z,
+                    c[0], c[1], c[2], c[0], c[1], c[2], alpha);
         }
     }
 
@@ -182,7 +247,24 @@ final class SlotView {
             long shown = anim.shownWin(t);
             boolean free = phase.kind() == SlotAnimation.Kind.FS_SPIN || phase.kind() == SlotAnimation.Kind.FS_EXPAND
                     || phase.kind() == SlotAnimation.Kind.FS_INTRO;
-            if (live && phase.kind() == SlotAnimation.Kind.BASE_SPIN) {
+            SlotAnimation.Celebration party = live ? anim.celebrationAt(t) : null;
+            int lucky = anim.result.luckySymbol();
+            if (party != null) {
+                // The win's tier in its own colours: gold, then flashing, then all the colours.
+                top = Component.translatable("challengecraft.casino.slot.tier." + party.tier(), CasinoEconomy.format(party.win()));
+                topColour = tierColour(party.tier(), party.local());
+            } else if (live && phase.kind() == SlotAnimation.Kind.FS_INTRO && lucky >= 0 && phase.local() >= SlotAnimation.PICK_START) {
+                boolean landed = phase.local() >= SlotAnimation.PICK_LAND;
+                top = landed ? Component.translatable("challengecraft.casino.slot.display.lucky",
+                        new ItemStack(SlotMath.SYMBOL_ITEMS[lucky]).getHoverName())
+                        : Component.translatable("challengecraft.casino.slot.display.pick");
+                topColour = landed && (CasinoClientState.clientTick / 4) % 2 == 0 ? 0xFFFFF3A0 : 0xFFE8B83A;
+            } else if (live && phase.kind() == SlotAnimation.Kind.FS_EXPAND && lucky >= 0
+                    && phase.local() < anim.expandFillEnd(phase.spin())) {
+                top = Component.translatable("challengecraft.casino.slot.display.expanding",
+                        new ItemStack(SlotMath.SYMBOL_ITEMS[lucky]).getHoverName());
+                topColour = 0xFFFFD24A;
+            } else if (live && phase.kind() == SlotAnimation.Kind.BASE_SPIN) {
                 top = Component.translatable("challengecraft.casino.slot.display.spinning");
                 topColour = 0xFFBBBBBB;
             } else if (live && free) {
@@ -207,6 +289,16 @@ final class SlotView {
         }
     }
 
+    private static int tierColour(int tier, float local) {
+        int blink = (int) (local / 4) % 2;
+        return switch (tier) {
+            case 1 -> 0xFFFFC53D;
+            case 2 -> blink == 0 ? 0xFFFFE27A : 0xFFFF9A2E;
+            case 3 -> blink == 0 ? 0xFFFF6FD8 : 0xFF6FE8FF;
+            default -> 0xFF000000 | java.awt.Color.HSBtoRGB((local % 30) / 30f, 0.65f, 1f);
+        };
+    }
+
     /** Front text shrunk to fit a width. */
     static void fit(DevicePainter p, Component text, double u, double y, double v, double maxWidth, double height, int argb) {
         double w = p.width(text) * height / 7.0;
@@ -215,7 +307,7 @@ final class SlotView {
     }
 
     private static boolean showsLines(SlotAnimation.Phase p) {
-        return p.kind() == SlotAnimation.Kind.BASE_WIN || p.kind() == SlotAnimation.Kind.FS_EXPAND
+        return p.kind() == SlotAnimation.Kind.BASE_WIN
                 || (p.kind() == SlotAnimation.Kind.FS_SPIN && p.local() > SlotMath.FS_STOP_TICK[4] + 2)
                 || p.kind() == SlotAnimation.Kind.DONE;
     }

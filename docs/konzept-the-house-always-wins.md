@@ -250,6 +250,24 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
   Gewinnlinien und expandierenden Items. Die **Anzeige unter den Walzen** zeigt „VIEL GLÜCK“, den
   hochzählenden Gewinn, Freispiele mit Zähler oder „KEIN GEWINN“ und darunter deinen Einsatz. Das Ergebnis
   **bleibt stehen**, bis der Automat das nächste Mal gedreht wird.
+- **Freispiele:** Vor den Walzen klappt eine Tafel auf, auf der die acht Items als Band durchlaufen; das
+  Band wird langsamer (mit einem Klick pro Item) und hält im goldenen Rahmen auf dem **Glücksitem**, das
+  aufblinkt („GLÜCK: Diamant breitet sich aus!“).
+- **Ausbreiten:** Steht das Glücksitem auf genug Walzen, färben sich diese Walzen golden, und das Item
+  **breitet sich Feld für Feld aus**: Von dem Feld, auf dem es steht, drehen sich die Felder darüber und
+  darunter wie Karten um und kommen als Glücksitem wieder hoch, Walze für Walze. Danach laufen die zehn
+  Linien, auf denen es zahlt, nacheinander über das Glas und leuchten zum Schluss alle zusammen. Das ist
+  nur vorübergehend: Im nächsten Freispiel zeigen die Walzen wieder ihre eigenen Symbole.
+- **Gewinnfeier in Stufen** (nach dem Vielfachen des Einsatzes, jede Stufe bringt die der vorigen mit):
+
+  | Stufe | ab | Anzeige | Show |
+  |---|---|---|---|
+  | Großer Gewinn | 5× | Gold | Goldnugget-Fontäne aus dem Automaten, Funken an der Anzeige |
+  | Mega-Gewinn | 20× | Gold/Orange blinkend | dazu Smaragde, Diamanten, Goldbarren und Totem-Funkeln, zweite Fanfare |
+  | Epischer Gewinn | 50× | Pink/Türkis blinkend | dazu Feuerwerk über dem Automaten |
+  | Legendär | 200× | alle Farben | dazu eine Lichtspirale um den Automaten, Noten und goldenes Dauerfeuerwerk, zweite Fanfare |
+
+  Münzgeklimper und Dauer wachsen mit der Stufe (1,5 bis 5,5 Sekunden). Jeder in der Nähe sieht die Show.
 
 ### 7.2 Plinko
 
@@ -322,6 +340,7 @@ Die Challenge ist Level 8 und steht in der Kategorie „Chaos“. Für schnelle 
 | `/casino feescale <Prozent>` | Gebührenkurve skalieren |
 | `/casino booth` | Stand am Spawn neu bauen |
 | `/casino status` | Konten, Einsätze, Gebühr im Chat |
+| `/casino slotforce <freespins\|big\|mega\|epic\|legendary>` | der nächste eigene Spin am Automaten bringt dieses Ergebnis (ein echter, ausgewürfelter Spin dieser Art) |
 
 Beim Serverstart schreibt das Log `[Casino] RTP slot 95.9978 %, plinko 96.0010 %, roulette 96.0000 %,
 crash 96.0000 %` und `[Casino] 1290 item values loaded`.

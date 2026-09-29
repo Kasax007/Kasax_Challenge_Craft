@@ -79,7 +79,111 @@ public final class SlotAnimation {
     }
 
     public boolean finished(float t) {
-        return t >= totalTicks + 40; // linger a moment on the final screen
+        // Linger a moment on the final screen, and never cut a win celebration short.
+        float end = totalTicks + 40;
+        for (Phase p : phases) {
+            int tier = celebrationTier(p);
+            if (tier > 0) end = Math.max(end, p.local() + CELEBRATION_TICKS[tier] + 5);
+        }
+        return t >= end;
+    }
+
+    // ---- the lucky item pick (free-spins intro) -----------------------------------------------
+
+    /** Intro ticks at which the pick strip starts to run and where it lands on the lucky item. */
+    public static final int PICK_START = 16, PICK_LAND = 70;
+    /** Symbols the strip passes before it lands: three full rounds and a bit. */
+    private static final int PICK_STEPS = 3 * SlotMath.ITEM_SYMBOLS + 5;
+
+    /** How far the pick strip has run at intro time {@code local}, in symbols (slowing down). */
+    public float pickSteps(float local) {
+        float x = Math.max(0f, Math.min(1f, (local - PICK_START) / (float) (PICK_LAND - PICK_START)));
+        float e = 1f - (1f - x) * (1f - x) * (1f - x);
+        return PICK_STEPS * e;
+    }
+
+    /** The item symbol at strip position {@code step}; the last step is the lucky item. */
+    public int pickSymbol(int step) {
+        return Math.floorMod(result.luckySymbol() - PICK_STEPS + step, SlotMath.ITEM_SYMBOLS);
+    }
+
+    // ---- the expansion ------------------------------------------------------------------------
+
+    /** Ticks one cell takes to turn over to the lucky item. */
+    public static final int EXPAND_CELL_TICKS = 6;
+
+    /** The row of a reel where the lucky item stands (the cell the expansion spreads from). */
+    public int luckyRow(int spin, int reel) {
+        int[] stops = spins.get(spin).stops();
+        for (int row = 0; row < SlotMath.ROWS; row++) {
+            if (SlotMath.symbolAt(reel, stops[reel], row) == result.luckySymbol()) return row;
+        }
+        return 1;
+    }
+
+    /** Ticks into the expansion at which a cell starts to turn over, or -1 if it does not. */
+    public int expandDelay(int spin, int reel, int row) {
+        int mask = result.expandMasks()[spin];
+        if ((mask & (1 << reel)) == 0) return -1;
+        int order = Integer.bitCount(mask & ((1 << reel) - 1));
+        return order * 5 + Math.abs(row - luckyRow(spin, reel)) * 4;
+    }
+
+    /** 0 = the cell shows its own symbol, 1 = it has turned into the lucky item. */
+    public float expandProgress(int spin, int reel, int row, float local) {
+        int delay = expandDelay(spin, reel, row);
+        if (delay < 0) return 0f;
+        if (row == luckyRow(spin, reel)) return 1f;
+        return Math.max(0f, Math.min(1f, (local - delay) / EXPAND_CELL_TICKS));
+    }
+
+    /** Ticks into the expansion when every cell has turned; the paid lines run after that. */
+    public int expandFillEnd(int spin) {
+        int end = 0;
+        for (int r = 0; r < SlotMath.REELS; r++) {
+            for (int row = 0; row < SlotMath.ROWS; row++) {
+                int d = expandDelay(spin, r, row);
+                if (d >= 0) end = Math.max(end, d + EXPAND_CELL_TICKS);
+            }
+        }
+        return end + 2;
+    }
+
+    // ---- win celebrations ---------------------------------------------------------------------
+
+    /** Celebration length per tier: none, big, mega, epic, legendary. */
+    public static final int[] CELEBRATION_TICKS = {0, 30, 50, 70, 110};
+
+    /** The tier of a win by its multiple of the stake: 5×, 20×, 50× and 200× and up. */
+    public static int tierFor(long win, long bet) {
+        long b = Math.max(1, bet);
+        if (win >= b * 200) return 4;
+        if (win >= b * 50) return 3;
+        if (win >= b * 20) return 2;
+        if (win >= b * 5) return 1;
+        return 0;
+    }
+
+    private int celebrationTier(Phase p) {
+        if (p.kind() == Kind.BASE_WIN) return tierFor(result.spinWins()[0], result.bet());
+        if (p.kind() == Kind.FS_OUTRO) return tierFor(result.totalWin(), result.bet());
+        return 0;
+    }
+
+    /** A win being celebrated: its tier, the ticks since it began and the amount. */
+    public record Celebration(int tier, float local, long win) {
+    }
+
+    /** The celebration running at time t, or null. */
+    public Celebration celebrationAt(float t) {
+        Celebration found = null;
+        for (Phase p : phases) {
+            int tier = celebrationTier(p);
+            if (tier == 0 || t < p.local() || t >= p.local() + CELEBRATION_TICKS[tier]) continue;
+            long win = p.kind() == Kind.BASE_WIN ? result.spinWins()[0] : result.totalWin();
+            found = new Celebration(tier, t - p.local(), win);
+        }
+        return found;
     }
 
     /** The phase at time t; {@code local} is the time since that phase began. */
@@ -202,19 +306,44 @@ public final class SlotAnimation {
                     }
                 }
                 case BASE_WIN -> {
-                    if (start >= from && start < to) out.add(new SoundEvent(winCue(result.spinWins()[0]), 1.0f));
+                    addWinCues(out, start, from, to, result.spinWins()[0]);
                     for (float s = start + 2; s < start + SlotMath.WIN_SHOW_TICKS * 0.7f; s += 3f) {
                         if (s >= from && s < to) out.add(new SoundEvent(Cue.COINS, 0.9f + (s - start) * 0.012f));
                     }
                 }
                 case FS_INTRO -> {
                     if (start >= from && start < to) out.add(new SoundEvent(Cue.FREE_SPINS, 1.0f));
+                    // A click for every item the pick strip passes, higher as it slows down.
+                    int before = (int) Math.floor(pickSteps(from - start));
+                    int after = (int) Math.floor(pickSteps(to - start));
+                    if (after > before && to - start > PICK_START) {
+                        out.add(new SoundEvent(Cue.STOP, 1.25f + 0.02f * after));
+                    }
+                    float land = start + PICK_LAND;
+                    if (land >= from && land < to) {
+                        out.add(new SoundEvent(Cue.SCATTER, 1.2f));
+                        out.add(new SoundEvent(Cue.EXPAND, 1.3f));
+                    }
                 }
                 case FS_EXPAND -> {
                     if (start >= from && start < to) out.add(new SoundEvent(Cue.EXPAND, 1.0f));
+                    // Each cell that turns over clicks, rising from reel to reel.
+                    for (int r = 0; r < SlotMath.REELS; r++) {
+                        for (int row = 0; row < SlotMath.ROWS; row++) {
+                            int d = expandDelay(p.spin(), r, row);
+                            if (d < 0 || row == luckyRow(p.spin(), r)) continue;
+                            float at = start + d;
+                            if (at >= from && at < to) out.add(new SoundEvent(Cue.STOP, 1.05f + 0.07f * r + 0.03f * row));
+                        }
+                    }
+                    float lines = start + expandFillEnd(p.spin());
+                    if (lines >= from && lines < to) out.add(new SoundEvent(Cue.WIN_SMALL, 1.1f));
+                    for (float s = lines + 2; s < start + p.length(); s += 4f) {
+                        if (s >= from && s < to) out.add(new SoundEvent(Cue.COINS, 1.0f + (s - lines) * 0.01f));
+                    }
                 }
                 case FS_OUTRO -> {
-                    if (start >= from && start < to) out.add(new SoundEvent(winCue(result.totalWin()), 1.0f));
+                    addWinCues(out, start, from, to, result.totalWin());
                 }
                 default -> {
                 }
@@ -223,10 +352,27 @@ public final class SlotAnimation {
         return out;
     }
 
-    private Cue winCue(long win) {
-        long bet = Math.max(1, result.bet());
-        if (win >= bet * 50) return Cue.WIN_EPIC;
-        if (win >= bet * 5) return Cue.WIN_BIG;
-        return Cue.WIN_SMALL;
+    /** The fanfare of a win, grander with every tier. */
+    private void addWinCues(List<SoundEvent> out, float start, float from, float to, long win) {
+        int tier = tierFor(win, result.bet());
+        List<SoundEvent> at0 = new ArrayList<>();
+        switch (tier) {
+            case 0 -> at0.add(new SoundEvent(Cue.WIN_SMALL, 1.0f));
+            case 1 -> at0.add(new SoundEvent(Cue.WIN_BIG, 1.0f));
+            case 2 -> {
+                at0.add(new SoundEvent(Cue.WIN_BIG, 1.0f));
+                if (start + 14 >= from && start + 14 < to) out.add(new SoundEvent(Cue.WIN_BIG, 1.25f));
+            }
+            default -> {
+                at0.add(new SoundEvent(Cue.WIN_EPIC, 1.0f));
+                if (tier == 4 && start + 40 >= from && start + 40 < to) out.add(new SoundEvent(Cue.WIN_EPIC, 1.25f));
+            }
+        }
+        if (start >= from && start < to) out.addAll(at0);
+        // A shower of coins, longer for bigger wins.
+        int coins = tier == 0 ? 0 : CELEBRATION_TICKS[tier] - 10;
+        for (float s = start + 6; s < start + 6 + coins; s += 5f) {
+            if (s >= from && s < to) out.add(new SoundEvent(Cue.COINS, 0.9f + (s - start) * 0.006f));
+        }
     }
 }

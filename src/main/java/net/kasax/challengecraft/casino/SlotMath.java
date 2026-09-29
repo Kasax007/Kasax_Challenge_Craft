@@ -73,9 +73,11 @@ public final class SlotMath {
     /** Extra spin time for a reel still turning while two scatters are already showing. */
     public static final int TENSION_TICKS = 14;
     public static final int WIN_SHOW_TICKS = 22;
-    public static final int FS_INTRO_TICKS = 64;
+    /** Free-spins intro: the banner, then the lucky item is picked on a running strip. */
+    public static final int FS_INTRO_TICKS = 96;
     public static final int FS_SPIN_TICKS = 40;
-    public static final int FS_EXPAND_TICKS = 24;
+    /** The lucky item spreads over its reels cell by cell, then the ten lines it pays on run. */
+    public static final int FS_EXPAND_TICKS = 52;
     public static final int FS_OUTRO_TICKS = 50;
 
     private SlotMath() {

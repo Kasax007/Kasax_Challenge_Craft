@@ -243,6 +243,7 @@ public final class CasinoClient {
                 client.level.playLocalSound(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, sound,
                         SoundSource.BLOCKS, volume, e.pitch(), false);
             }
+            SlotEffects.tick(client.level, anim, t);
         }
 
         // Plinko balls: a soft tick on every peg, and bookkeeping once they land.

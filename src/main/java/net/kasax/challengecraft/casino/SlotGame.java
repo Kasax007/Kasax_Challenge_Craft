@@ -109,9 +109,42 @@ public final class SlotGame {
         spin(player, level, pos, stake, null, 0L, now);
     }
 
+    /** Test hook for admins ({@code /casino slotforce}): the kind of outcome a player's next spin rolls. */
+    private static final java.util.Map<java.util.UUID, String> FORCED = new java.util.HashMap<>();
+
+    public static final java.util.List<String> FORCE_KINDS = java.util.List.of("freespins", "big", "mega", "epic", "legendary");
+
+    public static void force(ServerPlayer player, String kind) {
+        FORCED.put(player.getUUID(), kind);
+    }
+
+    /**
+     * Rolls ordinary plays until one of the wanted kind comes up, so a forced outcome is still one
+     * the machine really produces; gives up after a few million tries and takes the last roll.
+     */
+    private static SlotMath.Play forcedPlay(RandomSource random, String kind) {
+        SlotMath.Play play = SlotMath.play(random);
+        for (int i = 0; i < 5_000_000; i++) {
+            // The multiple of the stake actually paid (after the payout percentage).
+            double x = play.units() * SlotMath.PAYOUT_PERCENT / 100.0 / SlotMath.LINES;
+            boolean ok = switch (kind) {
+                case "freespins" -> play.spins().size() > 1
+                        && play.spins().stream().skip(1).anyMatch(s -> s.expandMask() != 0);
+                case "big" -> x >= 5 && x < 20;
+                case "mega" -> x >= 20 && x < 50;
+                case "epic" -> x >= 50 && x < 200;
+                default -> x >= 200;
+            };
+            if (ok) return play;
+            play = SlotMath.play(random);
+        }
+        return play;
+    }
+
     private static void spin(ServerPlayer player, ServerLevel level, BlockPos pos, long stake, Item item, long unitCenti, long now) {
         RandomSource random = level.getRandom();
-        SlotMath.Play play = SlotMath.play(random);
+        String forced = FORCED.remove(player.getUUID());
+        SlotMath.Play play = forced != null ? forcedPlay(random, forced) : SlotMath.play(random);
         long win = SlotMath.pay(play.units(), stake);
         int ticks = SlotMath.presentationTicks(play);
 
