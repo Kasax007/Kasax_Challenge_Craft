@@ -21,7 +21,7 @@ import net.minecraft.network.chat.Component;
  */
 @Environment(EnvType.CLIENT)
 final class PlinkoView {
-    private static final double FACE_V = DeviceLayouts.PLINKO_BOARD_V + 1.4;
+    private static final double FACE_V = DeviceLayouts.PLINKO_BOARD_V + 1.2; // 0.3 px in front of the board face
     private static final int DROP_TICKS = 8;
     private static final int HOP_TICKS = 4;
 
@@ -91,7 +91,7 @@ final class PlinkoView {
     }
 
     private static void drawDisplay(DevicePainter p, BlockPos pos) {
-        double u0 = 2.0, u1 = 30.0, y0 = 1.0, y1 = 4.6, v = 2.9;
+        double u0 = 2.0, u1 = 30.0, y0 = 1.0, y1 = 4.6, v = 2.6; // clear of the base face at v 3
         p.rectFront(u0 - 0.3, y0 - 0.3, u1 + 0.3, y1 + 0.3, v + 0.1, 0xFFB8912F);
         p.rectFront(u0, y0, u1, y1, v, 0xFF07080C);
         CasinoNet.State s = CasinoClientState.state;

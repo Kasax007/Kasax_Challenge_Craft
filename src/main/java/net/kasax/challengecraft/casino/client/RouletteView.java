@@ -164,47 +164,55 @@ final class RouletteView {
     // ---- the board of numbers -----------------------------------------------------------------
 
     private static void drawBoard(DevicePainter p, CasinoNet.RouletteState s, float since) {
-        double u0 = 2.3, u1 = 15.7, y0 = 18.3, y1 = 29.1, v = 30.35;
-        p.rectFront(u0, y0, u1, y1, v, 0xFF07080C);
+        // Depth layers, front to back towards the player (smaller v is closer): the board sits well
+        // in front of the model's face (v 30.4), frames, boxes and text each a clear step further,
+        // so nothing on it can z-fight.
+        double u0 = 2.3, u1 = 15.7, y0 = 18.3, y1 = 29.1;
+        double vBoard = 30.0, vFrame = 29.8, vBox = 29.65, vText = 29.45;
+        p.rectFront(u0, y0, u1, y1, vBoard, 0xFF07080C);
         double cu = (u0 + u1) / 2;
         if (s == null || s.phase() == RouletteGame.WAITING) {
-            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.place"), cu, 27.4, v - 0.2, 12.5, 1.1, 0xFFE3B35A);
+            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.place"), cu, 27.4, vText, 12.5, 1.1, 0xFFE3B35A);
         } else if (s.phase() == RouletteGame.BETTING) {
             int secs = (int) Math.ceil(Math.max(0, s.ticksLeft() - since) / 20.0);
-            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.closing", secs), cu, 27.4, v - 0.03,
+            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.closing", secs), cu, 27.4, vText,
                     12.5, 1.1, secs <= 5 ? 0xFFE25B5B : 0xFF7BE0A4);
         } else if (s.phase() == RouletteGame.SPINNING) {
-            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.no_more"), cu, 27.4, v - 0.2, 12.5, 1.1, 0xFFB7C0D0);
+            SlotView.fit(p, Component.translatable("challengecraft.casino.roulette.board.no_more"), cu, 27.4, vText, 12.5, 1.1, 0xFFB7C0D0);
         } else {
-            // The winning number, big, in its colour.
+            // The winning number, big, in its colour, with a gold frame so black shows on the board.
             int n = s.result();
-            p.rectFront(cu - 2.4, 22.9, cu + 2.4, 27.7, v - 0.1, numberColour(n));
-            p.textFront(Component.literal(Integer.toString(n)), cu, 25.3, v - 0.2, 3.0, 0xFFFFFFFF, 0);
+            p.rectFront(cu - 2.6, 22.7, cu + 2.6, 27.9, vFrame, 0xFFE3B35A);
+            p.rectFront(cu - 2.35, 22.95, cu + 2.35, 27.65, vBox, numberColour(n));
+            p.textFront(Component.literal(Integer.toString(n)), cu, 25.3, vText, 3.0, 0xFFFFFFFF, 0);
         }
-        // History, newest on the left.
+        // History, newest on the left: six framed boxes along the bottom of the board.
         if (s != null) {
-            double hu = u0 + 0.5;
-            for (int i = 0; i < Math.min(8, s.history().length); i++) {
+            double w = 2.0, gap = 0.2;
+            double hu = u0 + (u1 - u0 - (6 * w + 5 * gap)) / 2;
+            int shown = 0;
+            for (int i = 0; i < s.history().length && shown < 6; i++) {
+                if (s.phase() == RouletteGame.RESULT && i == 0) continue; // it is the big number above
                 int n = s.history()[i];
-                if (s.phase() == RouletteGame.RESULT && i == 0) continue;
-                p.rectFront(hu, 19.0, hu + 1.4, 20.6, v - 0.1, numberColour(n));
-                p.textFront(Component.literal(Integer.toString(n)), hu + 0.7, 19.8, v - 0.2, 0.9, 0xFFFFFFFF, 0);
-                hu += 1.65;
-                if (hu > u1 - 1.4) break;
+                p.rectFront(hu - 0.12, 18.68, hu + w + 0.12, 20.92, vFrame, 0xFF5A5F6B);
+                p.rectFront(hu, 18.8, hu + w, 20.8, vBox, numberColour(n));
+                p.textFront(Component.literal(Integer.toString(n)), hu + w / 2, 19.8, vText, 1.1, 0xFFFFFFFF, 0);
+                hu += w + gap;
+                shown++;
             }
             // The viewer's own stake on the table and, after the spin, what it paid.
             long mine = 0, paid = 0;
             String me = p.mc.player.getName().getString();
-            for (CasinoNet.RouletteBet b : s.bets()) {
-                if (!b.player().equals(me)) continue;
-                mine += b.amount();
-                if (s.phase() == RouletteGame.RESULT) paid += RouletteMath.payout(b.kind(), b.target(), b.amount(), s.result());
+            for (CasinoNet.RouletteBet bet : s.bets()) {
+                if (!bet.player().equals(me)) continue;
+                mine += bet.amount();
+                if (s.phase() == RouletteGame.RESULT) paid += RouletteMath.payout(bet.kind(), bet.target(), bet.amount(), s.result());
             }
             if (mine > 0) {
                 Component line = s.phase() == RouletteGame.RESULT
                         ? Component.translatable("challengecraft.casino.roulette.board.paid", CasinoEconomy.format(paid))
                         : Component.translatable("challengecraft.casino.roulette.board.yours", CasinoEconomy.format(mine));
-                SlotView.fit(p, line, cu, 21.6, v - 0.2, 12.5, 0.9, paid > 0 ? 0xFFFFC53D : 0xFFD8D8E0);
+                SlotView.fit(p, line, cu, 21.7, vText, 12.5, 0.9, paid > 0 ? 0xFFFFC53D : 0xFFD8D8E0);
             }
         }
     }

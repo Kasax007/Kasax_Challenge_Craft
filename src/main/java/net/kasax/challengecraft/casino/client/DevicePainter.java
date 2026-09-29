@@ -33,6 +33,7 @@ import java.util.List;
 final class DevicePainter {
     static final int FULLBRIGHT = 0xF000F0;
     private static final Identifier CHIPS = Identifier.fromNamespaceAndPath("challengecraft", "textures/gui/casino/chips.png");
+    private static final Identifier WHITE = Identifier.fromNamespaceAndPath("challengecraft", "textures/misc/white.png");
     private static final Identifier WHEEL = Identifier.fromNamespaceAndPath("challengecraft", "textures/gui/casino/roulette_wheel.png");
 
     final Minecraft mc;
@@ -61,6 +62,16 @@ final class DevicePainter {
         quads.add(new float[]{(float) (16 - u0), (float) y0, (float) v0, (float) (16 - u1), (float) y1, (float) v1,
                 (float) (16 - u2), (float) y2, (float) v2, (float) (16 - u3), (float) y3, (float) v3,
                 Float.intBitsToFloat(argb)});
+    }
+
+    /** A quad given directly in the pose's model space (x, y, z), not in device space. */
+    void quadModel(float x0, float y0, float z0, float x1, float y1, float z1,
+                   float x2, float y2, float z2, float x3, float y3, float z3, int argb) {
+        quads.add(new float[]{x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, Float.intBitsToFloat(argb)});
+    }
+
+    static int rgb(float r, float g, float b) {
+        return 0xFF000000 | (int) (Math.min(1f, r) * 255) << 16 | (int) (Math.min(1f, g) * 255) << 8 | (int) (Math.min(1f, b) * 255);
     }
 
     /** A horizontal rectangle at height y. */
@@ -242,24 +253,48 @@ final class DevicePainter {
 
     // ---- submission ---------------------------------------------------------------------------
 
+    /**
+     * Submits everything collected. Opaque colours go through a culling, depth-writing entity
+     * render type with a plain white texture, so overlapping layers (a box on a board, a chip on
+     * its ring) always stack by depth. {@code debugQuads} neither writes depth nor keeps the
+     * submission order — it is sorted by distance, which let big quads cover small ones from some
+     * angles and made them flicker while moving — so only translucent highlights still use it.
+     */
     void flush() {
         if (!quads.isEmpty()) {
-            List<float[]> batch = new ArrayList<>(quads);
+            List<float[]> solid = new ArrayList<>(), translucent = new ArrayList<>();
+            for (float[] q : quads) ((Float.floatToRawIntBits(q[12]) >>> 24) == 0xFF ? solid : translucent).add(q);
             quads.clear();
-            collector.submitCustomGeometry(pose, RenderTypes.debugQuads(), (p, buf) -> {
-                for (float[] q : batch) {
-                    int c = Float.floatToRawIntBits(q[12]);
-                    float a = (c >>> 24) / 255f, r = ((c >> 16) & 0xFF) / 255f, g = ((c >> 8) & 0xFF) / 255f, b = (c & 0xFF) / 255f;
-                    buf.addVertex(p, q[0], q[1], q[2]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[3], q[4], q[5]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[6], q[7], q[8]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[9], q[10], q[11]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[9], q[10], q[11]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[6], q[7], q[8]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[3], q[4], q[5]).setColor(r, g, b, a);
-                    buf.addVertex(p, q[0], q[1], q[2]).setColor(r, g, b, a);
-                }
-            });
+            if (!solid.isEmpty()) {
+                collector.submitCustomGeometry(pose, RenderTypes.entityCutoutCull(WHITE), (p, buf) -> {
+                    for (float[] q : solid) {
+                        int c = Float.floatToRawIntBits(q[12]);
+                        // Both windings: the culling type keeps whichever faces the camera.
+                        for (int[] order : new int[][]{{0, 1, 2, 3}, {3, 2, 1, 0}}) {
+                            for (int k : order) {
+                                buf.addVertex(p, q[k * 3], q[k * 3 + 1], q[k * 3 + 2]).setColor(c).setUv(0.5f, 0.5f)
+                                        .setOverlay(OverlayTexture.NO_OVERLAY).setLight(FULLBRIGHT).setNormal(p, 0f, 1f, 0f);
+                            }
+                        }
+                    }
+                });
+            }
+            if (!translucent.isEmpty()) {
+                collector.submitCustomGeometry(pose, RenderTypes.debugQuads(), (p, buf) -> {
+                    for (float[] q : translucent) {
+                        int c = Float.floatToRawIntBits(q[12]);
+                        float a = (c >>> 24) / 255f, r = ((c >> 16) & 0xFF) / 255f, g = ((c >> 8) & 0xFF) / 255f, b = (c & 0xFF) / 255f;
+                        buf.addVertex(p, q[0], q[1], q[2]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[3], q[4], q[5]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[6], q[7], q[8]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[9], q[10], q[11]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[9], q[10], q[11]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[6], q[7], q[8]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[3], q[4], q[5]).setColor(r, g, b, a);
+                        buf.addVertex(p, q[0], q[1], q[2]).setColor(r, g, b, a);
+                    }
+                });
+            }
         }
         submitTextured(chips, CHIPS);
         submitTextured(wheel, WHEEL);

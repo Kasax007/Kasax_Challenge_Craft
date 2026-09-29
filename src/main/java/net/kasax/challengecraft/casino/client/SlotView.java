@@ -56,35 +56,33 @@ final class SlotView {
         SlotAnimation.Phase phase = anim == null ? null : anim.phaseAt(t);
 
         // Drum surfaces: ivory, shaded darker towards the top and bottom of the window like a cylinder.
-        p.collector.submitCustomGeometry(matrices, RenderTypes.debugQuads(), (pose, buf) -> {
-            for (int r = 0; r < SlotMath.REELS; r++) {
-                float x0 = reelCenterX(r) - REEL_W / 2 + 0.15f;
-                float x1 = x0 + REEL_W - 0.3f;
-                boolean glow = anim != null && anim.reelInTension(r, t);
-                boolean expanded = anim != null && phase != null
-                        && (phase.kind() == SlotAnimation.Kind.FS_EXPAND || phase.kind() == SlotAnimation.Kind.FS_OUTRO
-                        || phase.kind() == SlotAnimation.Kind.DONE)
-                        && (anim.result.expandMasks()[Math.min(phase.spin(), anim.spinCount - 1)] & (1 << r)) != 0;
-                int segments = 8;
-                for (int s = 0; s < segments; s++) {
-                    float a0 = -1.1f + 2.2f * s / segments;
-                    float a1 = -1.1f + 2.2f * (s + 1) / segments;
-                    float y0 = drumY(a0), y1 = drumY(a1);
-                    float z0 = drumZ(a0) + 0.35f, z1 = drumZ(a1) + 0.35f;
-                    float shade0 = 0.55f + 0.45f * (float) Math.cos(a0);
-                    float shade1 = 0.55f + 0.45f * (float) Math.cos(a1);
-                    float rr = expanded ? 1.0f : glow ? 1.0f : 0.96f;
-                    float gg = expanded ? 0.82f : glow ? 0.93f : 0.93f;
-                    float bb = expanded ? 0.35f : glow ? 0.62f : 0.84f;
-                    CasinoWorldRenderer.quad(buf, pose, x0, y0, z0, x1, y0, z0, x1, y1, z1, x0, y1, z1,
-                            rr * shade0, gg * shade0, bb * shade0, rr * shade1, gg * shade1, bb * shade1, 1f);
-                }
-                // Dark divider between reels.
-                float dx = reelCenterX(r) + REEL_W / 2;
-                float dz = DRUM_AXIS_Z - DRUM_R + 0.2f;
-                CasinoWorldRenderer.quad(buf, pose, dx - 0.08f, WIN_Y0 - 1, dz, dx + 0.08f, WIN_Y0 - 1, dz,
-                        dx + 0.08f, WIN_Y1 + 1, dz, dx - 0.08f, WIN_Y1 + 1, dz, 0.12f, 0.08f, 0.06f, 0.12f, 0.08f, 0.06f, 1f);
+        for (int r = 0; r < SlotMath.REELS; r++) {
+            float x0 = reelCenterX(r) - REEL_W / 2 + 0.15f;
+            float x1 = x0 + REEL_W - 0.3f;
+            boolean glow = anim != null && anim.reelInTension(r, t);
+            boolean expanded = anim != null && phase != null
+                    && (phase.kind() == SlotAnimation.Kind.FS_EXPAND || phase.kind() == SlotAnimation.Kind.FS_OUTRO
+                    || phase.kind() == SlotAnimation.Kind.DONE)
+                    && (anim.result.expandMasks()[Math.min(phase.spin(), anim.spinCount - 1)] & (1 << r)) != 0;
+            int segments = 10;
+            for (int s = 0; s < segments; s++) {
+                float a0 = -1.1f + 2.2f * s / segments;
+                float a1 = -1.1f + 2.2f * (s + 1) / segments;
+                float y0 = drumY(a0), y1 = drumY(a1);
+                float z0 = drumZ(a0) + 0.35f, z1 = drumZ(a1) + 0.35f;
+                float shade = 0.55f + 0.45f * (float) Math.cos((a0 + a1) / 2f);
+                float rr = expanded ? 1.0f : glow ? 1.0f : 0.96f;
+                float gg = expanded ? 0.82f : glow ? 0.93f : 0.93f;
+                float bb = expanded ? 0.35f : glow ? 0.62f : 0.84f;
+                p.quadModel(x0, y0, z0, x1, y0, z0, x1, y1, z1, x0, y1, z1, DevicePainter.rgb(rr * shade, gg * shade, bb * shade));
             }
+            // Dark divider between reels, a little in front of the drums.
+            float dx = reelCenterX(r) + REEL_W / 2;
+            float dz = DRUM_AXIS_Z - DRUM_R + 0.1f;
+            p.quadModel(dx - 0.08f, WIN_Y0 - 1, dz, dx + 0.08f, WIN_Y0 - 1, dz,
+                    dx + 0.08f, WIN_Y1 + 1, dz, dx - 0.08f, WIN_Y1 + 1, dz, 0xFF1F140F);
+        }
+        p.collector.submitCustomGeometry(matrices, RenderTypes.debugQuads(), (pose, buf) -> {
             // Winning lines glow across the glass, one after the other.
             if (anim != null && phase != null && showsLines(phase)) {
                 SlotMath.Spin spin = anim.spins.get(anim.spinShown(t));
@@ -158,7 +156,7 @@ final class SlotView {
 
     /** The two-line display under the reels: the result, and the viewer's own stake. */
     private static void drawDisplay(DevicePainter p, SlotAnimation anim, boolean live, float t) {
-        double u0 = 2.5, u1 = 13.5, y0 = 5.0, y1 = 9.0, v = 2.9;
+        double u0 = 2.5, u1 = 13.5, y0 = 5.0, y1 = 9.0, v = 2.6; // clear of the cabinet face at v 3
         p.rectFront(u0 - 0.35, y0 - 0.35, u1 + 0.35, y1 + 0.35, v + 0.1, 0xFFB8912F);
         p.rectFront(u0, y0, u1, y1, v, 0xFF07080C);
 
