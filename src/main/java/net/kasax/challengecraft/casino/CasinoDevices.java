@@ -102,6 +102,26 @@ public final class CasinoDevices {
         }
     }
 
+    /** Whether the device of this type at {@code pos} has been picked up (only judged where loaded). */
+    public static boolean gone(ServerLevel level, BlockPos pos, DeviceType type) {
+        if (!level.isLoaded(pos)) return false;
+        return !(level.getBlockState(pos).getBlock() instanceof CasinoDeviceBlock d && d.getDeviceType() == type);
+    }
+
+    /** Gives a stake back to its owner, with a note if they are online. */
+    public static void refund(MinecraftServer server, java.util.UUID owner, long centi) {
+        CasinoAccount a = CasinoSavedData.get(server).existing(owner);
+        if (a == null || centi <= 0) return;
+        a.balance += centi;
+        CasinoSavedData.get(server).touch();
+        ServerPlayer p = server.getPlayerList().getPlayer(owner);
+        if (p != null) {
+            CasinoEconomy.sync(p);
+            p.sendOverlayMessage(net.minecraft.network.chat.Component.translatable("challengecraft.casino.device_gone",
+                    CasinoEconomy.formatFull(centi)).withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+    }
+
     public static ServerLevel levelOf(MinecraftServer server, String dimension) {
         for (ServerLevel level : server.getAllLevels()) {
             if (level.dimension().identifier().toString().equals(dimension)) return level;

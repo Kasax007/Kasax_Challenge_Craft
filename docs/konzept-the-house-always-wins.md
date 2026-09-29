@@ -102,9 +102,11 @@ Smaragd 16 384 · Netherit 57 344 · Enderauge 1 792 · Brot 72 · Rohes Eisen /
     abgeschnitten.
 - **Einzahlen am Tresen (ohne Menü):** Rechtsklick mit einem Stack auf den mittleren Tresen (oder den
   Croupier) legt ihn auf die Marmorplatte. Dort steht pro Stack und in Summe, was das Haus dafür zahlen
-  würde. Ein Klick auf einen liegenden Stack nimmt ihn zurück, bis zu 9 Stacks passen drauf.
-  **Die Glocke** schließt den Deal ab: Der Croupier nimmt die Ware, schiebt die Jetons herüber, und die
-  Chips fliegen sichtbar zu dir. Wertloses (z. B. Rohstoffe ohne EMC) und gefüllte Shulkerkisten oder
+  würde. Ein Klick auf einen liegenden Stack nimmt ihn zurück, bis zu 9 Stacks passen drauf; ein Klick
+  auf einen freien Platz der Platte legt dazu. **Die Glocke** schließt den Deal ab: Der Croupier nimmt
+  die Ware, schiebt die Jetons herüber, und die Chips fliegen sichtbar zu dir, und zwar genau die Jetons,
+  aus denen sich der Betrag zusammensetzt (größte zuerst, jeder mit seinem Wert; bis 30 Jetons, ein Rest
+  unter 10 steht nur auf dem Konto). Wertloses (z. B. Rohstoffe ohne EMC) und gefüllte Shulkerkisten oder
   Bündel zeigen 0 und kommen beim Deal zurück ins Inventar (oder vor die Füße, wenn es voll ist). Jeder
   Spieler sieht nur seinen eigenen Stapel. Nichts geht verloren: Beim Ausloggen, beim Server-Stopp und
   beim Bankrott kommt alles, was noch auf dem Tresen liegt, zurück.
@@ -121,6 +123,12 @@ Smaragd 16 384 · Netherit 57 344 · Enderauge 1 792 · Brot 72 · Rohes Eisen /
 
 Der erste Kauf schaltet das **Rezept für diesen Spieler** frei. Vorher lässt sich das Ergebnis aus dem
 Crafting-Feld nicht herausnehmen (mit Hinweis in der Actionbar).
+
+Aufgestellte Geräte lassen sich **mit der Hand abbauen** (etwa so lange wie eine Werkbank, eine Axt
+geht nicht schneller), dabei fällt das Gerät als Item heraus und kann woanders wieder aufgestellt
+werden. Nur die Tresen des Croupiers sind unzerstörbar. Wird ein Roulette-Tisch oder eine Crash-Rampe
+abgebaut, solange noch Einsätze angenommen werden, bekommt jeder seine Jetons zurück; läuft die Kugel
+oder fliegt die Rakete schon, wird die Runde normal zu Ende gespielt.
 
 ---
 
@@ -274,8 +282,12 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
 - **Setzen direkt auf dem Filz:** Zielen zeigt, welche Wette es wäre, und hebt alle abgedeckten Zahlen
   hervor. Auf eine Zahl → Plein, auf die Linie zwischen zwei Zahlen → Cheval, auf eine Kreuzung → Carré,
   an den Rand über einer Spalte → Transversale, über einer Linie → Sixain; dazu Dutzende, Kolonnen und
-  einfache Chancen. **Rechtsklick** legt den gewählten Jeton hin, **Linksklick** nimmt deine Jetons von
-  dieser Stelle zurück (Schleichen + Linksklick baut den Tisch ab), „ZURÜCK“ nimmt alle deine Jetons.
+  einfache Chancen. **Rechtsklick** legt den gewählten Jeton hin, **Linksklick** auf deine Jetons nimmt
+  sie von dieser Stelle zurück, „ZURÜCK“ nimmt alle deine Jetons. Überall sonst baut Linksklick den
+  Tisch normal ab (mit Schleichen auch über deinen Jetons).
+- **Die Jetons liegen so da, wie du sie gesetzt hast:** Jeder Klick legt genau einen Jeton des gewählten
+  Werts oben auf den Stapel (100K und dann 10 ergibt einen 100K-Jeton mit einem 10er obendrauf), der
+  oberste trägt seinen Wert. Ein „Alles“-Einsatz liegt als die Jetons da, aus denen er sich zusammensetzt.
 - Gemeinsame Runden: 25 Sekunden Einsätze, 8 Sekunden Kugellauf, Ergebnis. Die Kugel rattert über die
   Rauten und fällt ins richtige Fach, die Gewinnzahl blinkt auf dem Tableau.
 

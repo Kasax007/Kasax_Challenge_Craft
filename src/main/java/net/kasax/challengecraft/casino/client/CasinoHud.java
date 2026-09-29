@@ -433,10 +433,12 @@ public final class CasinoHud {
             line = pend == null || pend.items().isEmpty() ? Component.translatable("challengecraft.casino.hint.bell_empty")
                     : Component.translatable("challengecraft.casino.hint.bell", CasinoEconomy.formatFull(total * 100));
             colour = CraftUI.GOLD;
+        } else if (zone.kind() == DeviceLayouts.PENDING && CasinoClientState.pending != null
+                && zone.a() < CasinoClientState.pending.items().size()) {
+            line = Component.translatable("challengecraft.casino.hint.take_item",
+                    CasinoClientState.pending.items().get(zone.a()).getHoverName());
         } else if (zone.kind() == DeviceLayouts.PENDING) {
-            CasinoNet.Pending pend = CasinoClientState.pending;
-            if (pend == null || zone.a() >= pend.items().size()) return;
-            line = Component.translatable("challengecraft.casino.hint.take_item", pend.items().get(zone.a()).getHoverName());
+            line = Component.translatable("challengecraft.casino.hint.counter"); // a free spot on the tray
         } else if (zone.kind() == DeviceLayouts.TAKE_BACK) {
             line = Component.translatable("challengecraft.casino.hint.take_back");
         } else if (zone.kind() == DeviceLayouts.BUTTON || (zone.kind() == DeviceLayouts.PLAY && aim.type() == DeviceType.CRASH)) {

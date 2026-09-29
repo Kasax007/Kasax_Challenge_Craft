@@ -52,6 +52,8 @@ public final class CasinoClient {
             new KeyMapping("key.challengecraft.casino_cash_out", InputConstants.Type.KEYBOARD, InputConstants.KEY_G, CATEGORY));
 
     private static int autoRespawnTicks;
+    /** Most chips one payout flight shows; enough for any amount up to a few million. */
+    private static final int MAX_FLIGHT_CHIPS = 30;
 
     private CasinoClient() {
     }
@@ -61,6 +63,17 @@ public final class CasinoClient {
         EntityRendererRegistry.register(CasinoRegistry.CROUPIER, CroupierRenderer::new);
         CasinoWorldRenderer.register();
         CasinoHud.register();
+        // Left-click takes one's own roulette chips back only where they lie; elsewhere it mines.
+        net.kasax.challengecraft.casino.CasinoGames.CLIENT_OWN_BET = (pos, zone) -> {
+            CasinoNet.RouletteState s = CasinoClientState.ROULETTE.get(pos.asLong());
+            Minecraft mc = Minecraft.getInstance();
+            if (s == null || s.phase() != net.kasax.challengecraft.casino.RouletteGame.BETTING || mc.player == null) return false;
+            String me = mc.player.getName().getString();
+            for (CasinoNet.RouletteBet b : s.bets()) {
+                if (b.player().equals(me) && b.kind() == zone.a() && b.target() == zone.b()) return true;
+            }
+            return false;
+        };
 
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.State.ID, (p, ctx) -> ctx.client().execute(() -> {
             CasinoClientState.state = p;
@@ -137,11 +150,14 @@ public final class CasinoClient {
             }
             if (p.kind() == CasinoNet.Fx.DEPOSIT && p.pos() != 0L) {
                 BlockPos c = BlockPos.of(p.pos());
-                long chips = p.amount() / 100;
-                int count = (int) Math.max(3, Math.min(16, 2 + Math.log10(Math.max(1, chips)) * 3));
-                CasinoClientState.FLIGHTS.add(new CasinoClientState.ChipFlight(
-                        new net.minecraft.world.phys.Vec3(c.getX() + 1.1, c.getY() + 1.35, c.getZ() + 0.5),
-                        CasinoClientState.clientTick, count, DevicePainter.chipColourFor(chips)));
+                // The croupier pays out in real chips: the credited amount as the chips that make
+                // it up, largest first (a rest below the smallest chip is only on the account).
+                int[] levels = DeviceLayouts.chipsFor(p.amount() / 100, MAX_FLIGHT_CHIPS);
+                if (levels.length > 0) {
+                    CasinoClientState.FLIGHTS.add(new CasinoClientState.ChipFlight(
+                            new net.minecraft.world.phys.Vec3(c.getX() + 1.1, c.getY() + 1.35, c.getZ() + 0.5),
+                            CasinoClientState.clientTick, levels));
+                }
             }
             CasinoHud.fx(p);
         }));

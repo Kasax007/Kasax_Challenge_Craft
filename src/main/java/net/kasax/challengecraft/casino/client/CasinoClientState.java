@@ -26,7 +26,11 @@ public final class CasinoClientState {
     }
 
     /** Chips the croupier slides over after a deal: {@code count} chips from {@code from} to the player. */
-    public record ChipFlight(net.minecraft.world.phys.Vec3 from, long startTick, int count, int colour) {
+    /** Chips flying from the counter to the player: the stake levels of the chips, largest first. */
+    public record ChipFlight(net.minecraft.world.phys.Vec3 from, long startTick, int[] levels) {
+        public int count() {
+            return levels.length;
+        }
     }
 
     /**

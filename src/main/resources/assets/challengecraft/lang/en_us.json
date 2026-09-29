@@ -885,6 +885,7 @@
   "challengecraft.casino.account.safe": "Team total %s - covered",
   "challengecraft.casino.account.danger": "Team total %s - NOT covered! Deposit or win, or the House wins.",
   "challengecraft.casino.account.team": "Team ledger (balance · share of the next fee)",
+  "challengecraft.casino.device_gone": "The device was picked up - your %s Jetons are back.",
   "challengecraft.casino.account.more": "… and %s more",
   "challengecraft.casino.account.footer": "You know %s items. The fee is split in proportion to what everyone holds.",
   "challengecraft.casino.bankrupt.title": "THE HOUSE WINS",

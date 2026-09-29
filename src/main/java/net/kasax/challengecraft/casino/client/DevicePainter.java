@@ -128,6 +128,28 @@ final class DevicePainter {
     /** A casino chip lying flat, from the GUI chip atlas (colour 0..7), optionally lifted. */
     void chip(double uc, double vc, double y, double r, int colour, float bright) {
         int c = Math.floorMod(colour, 8);
+        chip(uc, vc, y, r, c, bright, CHIP_EDGE[c], CHIP_EDGE[c]);
+    }
+
+    /**
+     * The chip of a stake level. The atlas has eight faces for sixteen values, so the higher values
+     * repeat a face; their edge tells them apart, as on real chips: small values have a plain edge,
+     * 2K–100K a gold-spotted one, and the three top chips (same orange face) white-spotted, gold-
+     * spotted and all gold.
+     */
+    void chipLevel(double uc, double vc, double y, double r, int level, float bright) {
+        int c = chipColour(level);
+        int base = CHIP_EDGE[c], a = base, b = base;
+        if (level >= 7 && level <= 12) b = GOLD_EDGE;
+        else if (level == 13) b = 0xFFF4F4F4;
+        else if (level == 14) b = GOLD_EDGE;
+        else if (level >= 15) a = b = GOLD_EDGE;
+        chip(uc, vc, y, r, c, bright, a, b);
+    }
+
+    private static final int GOLD_EDGE = 0xFFE8B83A;
+
+    private void chip(double uc, double vc, double y, double r, int c, float bright, int edgeA, int edgeB) {
         float t0 = c * 32f / 256f, t1 = (c + 1) * 32f / 256f;
         int shade = (int) (255 * Math.max(0.2f, Math.min(1f, bright)));
         chips.add(new float[]{(float) (16 - (uc - r)), (float) y, (float) (vc - r), t0, 0f,
@@ -135,8 +157,9 @@ final class DevicePainter {
                 (float) (16 - (uc + r)), (float) y, (float) (vc + r), t1, 1f,
                 (float) (16 - (uc - r)), (float) y, (float) (vc + r), t0, 1f, shade});
         // The chip's edge, so a stack reads as a stack.
-        int edge = DevicePainter.shade(CHIP_EDGE[c], 0.85f * bright);
+        int ea = DevicePainter.shade(edgeA, 0.85f * bright), eb = DevicePainter.shade(edgeB, 0.85f * bright);
         for (int i = 0; i < 12; i++) {
+            int edge = i % 2 == 0 ? ea : eb;
             double a0 = Math.PI * 2 * i / 12, a1 = Math.PI * 2 * (i + 1) / 12;
             double ua = uc + Math.cos(a0) * r * 0.97, va = vc + Math.sin(a0) * r * 0.97;
             double ub = uc + Math.cos(a1) * r * 0.97, vb = vc + Math.sin(a1) * r * 0.97;

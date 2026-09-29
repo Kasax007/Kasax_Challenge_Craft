@@ -885,6 +885,7 @@
   "challengecraft.casino.account.safe": "Team gesamt %s - gedeckt",
   "challengecraft.casino.account.danger": "Team gesamt %s - NICHT gedeckt! Einzahlen oder gewinnen, sonst gewinnt das Haus.",
   "challengecraft.casino.account.team": "Team-Konten (Guthaben · Anteil an der nächsten Gebühr)",
+  "challengecraft.casino.device_gone": "Das Gerät wurde abgebaut - deine %s Jetons sind zurück.",
   "challengecraft.casino.account.more": "… und %s weitere",
   "challengecraft.casino.account.footer": "Du kennst %s Items. Die Gebühr wird im Verhältnis zum Guthaben aufgeteilt.",
   "challengecraft.casino.bankrupt.title": "DAS HAUS GEWINNT",

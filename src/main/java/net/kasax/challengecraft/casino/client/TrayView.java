@@ -43,8 +43,8 @@ final class TrayView {
                 p.discTop(u, v, t.y() + 0.15, r * 1.18, 0xC0FFFFFF, 16);
             }
             // A second chip under the selected one, so it reads as a small stack.
-            if (selected) p.chip(u, v, y - 0.34, r, DevicePainter.chipColour(level), 0.8f);
-            p.chip(u, v, y, r, DevicePainter.chipColour(level), 1f);
+            if (selected) p.chipLevel(u, v, y - 0.34, r, level, 0.8f);
+            p.chipLevel(u, v, y, r, level, 1f);
             p.textTop(Component.literal(DevicePainter.chipLabel(level)), u, v, y, r * 0.62, 0xFF101010, 0, p.light);
         }
     }

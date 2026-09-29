@@ -228,7 +228,8 @@ public final class CasinoNet {
     // ---- roulette ----------------------------------------------------------------------------
 
     /** One chip pile on the felt. */
-    public record RouletteBet(String player, int kind, int target, long amount) {
+    /** One player's stake on one spot; {@code placed} lists each placement in chips, in order. */
+    public record RouletteBet(String player, int kind, int target, long amount, long[] placed) {
     }
 
     public record RouletteState(long pos, int phase, int ticksLeft, int result, List<RouletteBet> bets,
@@ -246,6 +247,8 @@ public final class CasinoNet {
                         buf.writeVarInt(b.kind());
                         buf.writeVarInt(b.target());
                         buf.writeVarLong(b.amount());
+                        buf.writeVarInt(b.placed().length);
+                        for (long c : b.placed()) buf.writeVarLong(c);
                     }
                     writeInts(buf, p.history);
                     buf.writeVarInt(p.serial);
@@ -258,7 +261,12 @@ public final class CasinoNet {
                     int n = buf.readVarInt();
                     List<RouletteBet> bets = new ArrayList<>(n);
                     for (int i = 0; i < n; i++) {
-                        bets.add(new RouletteBet(buf.readUtf(), buf.readVarInt(), buf.readVarInt(), buf.readVarLong()));
+                        String who = buf.readUtf();
+                        int kind = buf.readVarInt(), target = buf.readVarInt();
+                        long amount = buf.readVarLong();
+                        long[] placed = new long[Math.min(buf.readVarInt(), 256)];
+                        for (int k = 0; k < placed.length; k++) placed[k] = buf.readVarLong();
+                        bets.add(new RouletteBet(who, kind, target, amount, placed));
                     }
                     int[] history = readInts(buf);
                     int serial = buf.readVarInt();

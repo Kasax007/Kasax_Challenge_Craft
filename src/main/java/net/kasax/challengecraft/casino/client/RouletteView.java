@@ -219,6 +219,9 @@ final class RouletteView {
 
     // ---- chips on the felt --------------------------------------------------------------------
 
+    /** Chips drawn per stack at most; a taller pile would hide the numbers behind it. */
+    private static final int MAX_STACK = 24;
+
     private static void drawBets(DevicePainter p, CasinoNet.RouletteState s) {
         if (s == null || s.bets().isEmpty()) return;
         // Group by spot, then one stack per player on that spot, side by side.
@@ -232,12 +235,24 @@ final class RouletteView {
                 CasinoNet.RouletteBet b = stacks.get(i);
                 double[] at = betAnchor(b.kind(), b.target());
                 double off = (i - (stacks.size() - 1) / 2.0) * 0.9;
-                long chips = b.amount() / 100;
-                int colour = DevicePainter.chipColourFor(chips);
-                int height = (int) Math.min(5, Math.max(1, Math.round(Math.log10(Math.max(10, chips)) - 0.5)));
+                // The chips exactly as they were laid, first at the bottom: each placement is one
+                // chip of the stake picked (an all-in or odd amount as the chips that make it up).
+                List<Integer> levels = new ArrayList<>();
+                long[] placed = b.placed().length > 0 ? b.placed() : new long[]{b.amount() / 100};
+                for (long c : placed) {
+                    for (int level : DeviceLayouts.chipsFor(c, MAX_STACK)) levels.add(level);
+                }
+                if (levels.size() > MAX_STACK) levels = levels.subList(levels.size() - MAX_STACK, levels.size());
                 boolean mine = b.player().equals(me);
-                for (int k = 0; k < height; k++) {
-                    p.chip(at[0] + off, at[1] + off * 0.4, FELT + 0.3 + 0.34 * (k + 1), 1.05, colour, mine ? 1f : 0.82f);
+                double cu = at[0] + off, cv = at[1] + off * 0.4;
+                for (int k = 0; k < levels.size(); k++) {
+                    p.chipLevel(cu, cv, FELT + 0.3 + 0.34 * (k + 1), 1.05, levels.get(k), mine ? 1f : 0.82f);
+                }
+                if (!levels.isEmpty()) {
+                    // The top chip carries its value, like the chips in the tray.
+                    int top = levels.get(levels.size() - 1);
+                    p.textTop(Component.literal(DevicePainter.chipLabel(top)), cu, cv, FELT + 0.32 + 0.34 * levels.size(),
+                            0.62, 0xFF101010, 0, p.light);
                 }
                 if (mine) p.discTop(at[0] + off, at[1] + off * 0.4, FELT + 0.24, 1.25, 0xB0FFD24A, 14);
             }

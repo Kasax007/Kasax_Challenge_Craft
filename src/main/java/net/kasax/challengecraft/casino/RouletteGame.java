@@ -40,6 +40,8 @@ public final class RouletteGame {
         final int kind;
         final int target;
         long stake;
+        /** Each placement in chips, in order, so the stack on the felt is the chips really laid. */
+        final List<Long> placed = new ArrayList<>();
 
         Bet(UUID player, String name, int kind, int target, long stake) {
             this.player = player;
@@ -103,8 +105,12 @@ public final class RouletteGame {
         if (existing == null && mine >= MAX_BETS_PER_PLAYER) return;
         account.balance -= stake;
         CasinoSavedData.get(level.getServer()).touch();
-        if (existing != null) existing.stake += stake;
-        else t.bets.add(new Bet(player.getUUID(), player.getName().getString(), kind, target, stake));
+        if (existing == null) {
+            existing = new Bet(player.getUUID(), player.getName().getString(), kind, target, 0);
+            t.bets.add(existing);
+        }
+        existing.stake += stake;
+        existing.placed.add(chips);
         if (t.phase == WAITING) {
             t.phase = BETTING;
             t.ticksLeft = BETTING_TICKS;
@@ -112,6 +118,16 @@ public final class RouletteGame {
         level.playSound(null, pos, CasinoSounds.CHIP, SoundSource.BLOCKS, 0.7f, 0.9f + level.getRandom().nextFloat() * 0.2f);
         CasinoEconomy.sync(player);
         broadcast(level, t);
+    }
+
+    /** Whether a player has chips on one spot of a table that can still be taken back. */
+    public static boolean hasBet(ServerPlayer player, BlockPos pos, int kind, int target) {
+        Table t = TABLES.get(player.level().dimension().identifier() + "|" + pos.asLong());
+        if (t == null || t.phase != BETTING) return false;
+        for (Bet b : t.bets) {
+            if (b.player.equals(player.getUUID()) && b.kind == kind && b.target == target) return true;
+        }
+        return false;
     }
 
     /** Takes a player's chips off one spot of the layout. */
@@ -162,6 +178,13 @@ public final class RouletteGame {
             Table t = it.next();
             ServerLevel level = CasinoDevices.levelOf(server, t.dimension);
             if (level == null) continue;
+            if ((t.phase == WAITING || t.phase == BETTING) && CasinoDevices.gone(level, t.pos, DeviceType.ROULETTE)) {
+                // The table was picked up before the ball was thrown: every stake goes back. (Once
+                // the ball runs the number is drawn, and the round is settled as usual.)
+                for (Bet b : t.bets) CasinoDevices.refund(server, b.player, b.stake);
+                it.remove();
+                continue;
+            }
             switch (t.phase) {
                 case WAITING -> {
                     if (t.bets.isEmpty() && CasinoGames.near(level, t.pos, VIEW_RADIUS).isEmpty()) {
@@ -242,7 +265,8 @@ public final class RouletteGame {
 
     private static CasinoNet.RouletteState state(Table t) {
         List<CasinoNet.RouletteBet> bets = new ArrayList<>();
-        for (Bet b : t.bets) bets.add(new CasinoNet.RouletteBet(b.name, b.kind, b.target, b.stake));
+        for (Bet b : t.bets) bets.add(new CasinoNet.RouletteBet(b.name, b.kind, b.target, b.stake,
+                b.placed.stream().mapToLong(Long::longValue).toArray()));
         int[] history = t.history.stream().mapToInt(Integer::intValue).toArray();
         // The number travels with the spin so the ball can land on it; bets are already closed.
         int shown = t.phase == SPINNING || t.phase == RESULT ? t.result : -1;

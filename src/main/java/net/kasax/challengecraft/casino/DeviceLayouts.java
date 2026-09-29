@@ -47,6 +47,23 @@ public final class DeviceLayouts {
     public static final int TRAY_SLOTS = 5;
 
     /** The level shown in tray slot {@code slot} while the player's stake is {@code level}. */
+    /**
+     * An amount of chips as the real chips that make it up, largest first: the stake levels
+     * ({@link #STAKES}) a cashier would hand over. At most {@code max} chips; whatever does not fit
+     * (and any rest below the smallest chip) is left out.
+     */
+    public static int[] chipsFor(long chips, int max) {
+        List<Integer> out = new java.util.ArrayList<>();
+        long left = chips;
+        for (int level = STAKES.length - 1; level >= 0 && out.size() < max; level--) {
+            while (left >= STAKES[level] && out.size() < max) {
+                out.add(level);
+                left -= STAKES[level];
+            }
+        }
+        return out.stream().mapToInt(Integer::intValue).toArray();
+    }
+
     public static int trayLevel(int level, int slot) {
         int current = level < 0 ? ALL_IN_LEVEL : level;
         int start = Math.max(0, Math.min(ALL_IN_LEVEL + 1 - TRAY_SLOTS, current - TRAY_SLOTS / 2));

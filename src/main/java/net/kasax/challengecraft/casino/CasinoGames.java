@@ -47,6 +47,12 @@ public final class CasinoGames {
     private CasinoGames() {
     }
 
+    /**
+     * On the client: whether the local player has chips on a roulette spot (set by the client
+     * code, which alone knows the table state there).
+     */
+    public static java.util.function.BiPredicate<BlockPos, DeviceLayouts.Zone> CLIENT_OWN_BET = (pos, zone) -> false;
+
     public static boolean active() {
         return Chal_50_HouseAlwaysWins.isActive();
     }
@@ -112,7 +118,9 @@ public final class CasinoGames {
                 case CASHIER -> {
                     if (zone.kind() == DeviceLayouts.BELL) {
                         CounterDeposit.deal(sp);
-                    } else if (zone.kind() == DeviceLayouts.PENDING) {
+                    } else if (zone.kind() == DeviceLayouts.PENDING && CounterDeposit.hasStack(sp, zone.a())) {
+                        // Only a slot that holds a stack takes it back; the free rest of the tray
+                        // is the counter like everywhere else, so items can be laid there too.
                         CounterDeposit.takeBack(sp, zone.a());
                     } else if (!held.isEmpty() && !CasinoEconomy.isWallet(held.getItem())) {
                         CounterDeposit.place(sp, held);
@@ -124,8 +132,9 @@ public final class CasinoGames {
             return InteractionResult.SUCCESS;
         });
 
-        // Left-click on the roulette felt takes chips back instead of breaking the table
-        // (sneak to break it). Decided on both sides so the client does not start mining either.
+        // Left-click on one's own chips on the roulette felt takes them back instead of breaking the
+        // table; anywhere else a device is mined like any block, so a bought device can be picked up
+        // and set up elsewhere. Decided on both sides so the client does not start mining either.
         AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) -> {
             if (!active() || player.isSpectator()) return InteractionResult.PASS;
             if (BoothProtection.denyBreak(player, level, pos)) return InteractionResult.FAIL;
@@ -135,14 +144,16 @@ public final class CasinoGames {
                     || player.isShiftKeyDown()) {
                 return InteractionResult.PASS;
             }
-            if (!level.isClientSide() && player instanceof ServerPlayer sp) {
-                net.minecraft.world.phys.HitResult pick = sp.pick(sp.blockInteractionRange(), 1f, false);
-                if (pick instanceof net.minecraft.world.phys.BlockHitResult bhr) {
-                    DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(DeviceType.ROULETTE,
-                            DeviceSpace.toDevice(master, state.getValue(CasinoDeviceBlock.FACING), bhr.getLocation()));
-                    if (zone.kind() == DeviceLayouts.BET) RouletteGame.removeBet(sp, master, zone.a(), zone.b());
-                }
-            }
+            net.minecraft.world.phys.HitResult pick = player.pick(player.blockInteractionRange(), 1f, false);
+            if (!(pick instanceof net.minecraft.world.phys.BlockHitResult bhr)) return InteractionResult.PASS;
+            DeviceLayouts.Zone zone = DeviceLayouts.zoneAt(DeviceType.ROULETTE,
+                    DeviceSpace.toDevice(master, state.getValue(CasinoDeviceBlock.FACING), bhr.getLocation()));
+            if (zone.kind() != DeviceLayouts.BET) return InteractionResult.PASS;
+            boolean own = level.isClientSide()
+                    ? CLIENT_OWN_BET.test(master, zone)
+                    : player instanceof ServerPlayer sp && RouletteGame.hasBet(sp, master, zone.a(), zone.b());
+            if (!own) return InteractionResult.PASS;
+            if (player instanceof ServerPlayer sp) RouletteGame.removeBet(sp, master, zone.a(), zone.b());
             return InteractionResult.FAIL;
         });
 

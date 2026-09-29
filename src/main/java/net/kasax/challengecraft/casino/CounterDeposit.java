@@ -145,6 +145,11 @@ public final class CounterDeposit {
         PENDING.clear();
     }
 
+    public static boolean hasStack(ServerPlayer player, int slot) {
+        List<ItemStack> pile = PENDING.get(player.getUUID());
+        return pile != null && slot >= 0 && slot < pile.size();
+    }
+
     public static boolean hasPile(ServerPlayer player) {
         List<ItemStack> pile = PENDING.get(player.getUUID());
         return pile != null && !pile.isEmpty();

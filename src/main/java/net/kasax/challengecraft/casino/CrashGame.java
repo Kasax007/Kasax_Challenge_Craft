@@ -152,6 +152,14 @@ public final class CrashGame {
             Round r = it.next();
             ServerLevel level = CasinoDevices.levelOf(server, r.dimension);
             if (level == null) continue;
+            if (r.phase == BETTING && CasinoDevices.gone(level, r.pos, DeviceType.CRASH)) {
+                // The pad was picked up before lift-off: nobody has played yet, so all stakes go back.
+                for (Map.Entry<UUID, Seat> e : r.seats.entrySet()) {
+                    CasinoDevices.refund(server, e.getKey(), e.getValue().stake);
+                }
+                it.remove();
+                continue;
+            }
             switch (r.phase) {
                 case WAITING -> {
                     if (r.seats.isEmpty()) {

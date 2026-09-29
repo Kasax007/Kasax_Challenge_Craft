@@ -12,6 +12,7 @@ import net.kasax.challengecraft.casino.CrashGame;
 import net.kasax.challengecraft.casino.RouletteGame;
 import net.kasax.challengecraft.casino.RouletteMath;
 import net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
@@ -126,7 +127,15 @@ public final class CasinoWorldRenderer {
                 matrices.rotate(Axis.XP.rotationDegrees((now * 31 + i * 55) % 360));
                 matrices.scale(1f / 16f, 1f / 16f, 1f / 16f);
                 DevicePainter p = new DevicePainter(client, matrices, collector, itemState, DevicePainter.FULLBRIGHT);
-                p.chip(16, 0, 0, 1.0, (f.colour() + i) % 8, 1f);
+                int level = f.levels()[i];
+                p.chipLevel(16, 0, 0, 1.5, level, 1f);
+                // The value on both faces, since the chip tumbles on its way.
+                Component label = Component.literal(DevicePainter.chipLabel(level));
+                p.textTop(label, 16, 0, 0.02, 0.9, 0xFF101010, 0, DevicePainter.FULLBRIGHT);
+                matrices.pushPose();
+                matrices.rotate(Axis.ZP.rotationDegrees(180f));
+                p.textTop(label, 16, 0, 0.02, 0.9, 0xFF101010, 0, DevicePainter.FULLBRIGHT);
+                matrices.popPose();
                 p.flush();
                 matrices.popPose();
             }
