@@ -188,8 +188,12 @@ braucht man Farmen (Eisen, Gold, Mobs) oder Glück am Automaten. **Zum Einstelle
    Anleitung, was gerade passiert und was von dir erwartet wird. Andere Spieler in der Nähe sehen die
    Hand mit. Zwei Spieler können gleichzeitig spielen (je ein Tresen). Sind beide Plätze belegt oder
    fehlt der Stand, wird die Hand wie früher im Blackjack-Fenster am Todesort gespielt:
-   - **Gewonnen:** Du respawnst an **deinem Spawnpunkt** (Bett, Anker oder Weltspawn) mit
-     **komplettem Inventar und XP**, dazu Totem-Animation, Sound und ohne Todesbildschirm.
+   - **Gewonnen:** Du stehst **genau dort, wo du gestorben bist** (gleiche Blickrichtung), mit
+     **komplettem Inventar und XP**, voller Gesundheit und vollem Hunger, dazu Totem-Animation und
+     Sound, ohne Todesbildschirm. Negative Effekte sind weg, und für ein paar Sekunden schützen dich
+     Resistenz und Feuerresistenz. Ist der Todesort selbst tödlich (Lava, in einem Block, Feuer), kommst
+     du an die nächste sichere Stelle in bis zu 6 Blöcken; Wasser zählt nicht als tödlich. Nur wenn es
+     keine sichere Stelle gibt (z. B. ins Void gefallen), respawnst du am Spawnpunkt.
    - **Verloren:** Du stirbst normal dort, wo du gefallen bist (auch wenn am Tresen gespielt wurde);
      die Items liegen dort.
    - **Unentschieden:** Es wird neu gegeben.

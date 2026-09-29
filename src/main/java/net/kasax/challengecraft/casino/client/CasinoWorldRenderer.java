@@ -150,7 +150,10 @@ public final class CasinoWorldRenderer {
     }
 
     public static WheelPose wheelPose(CasinoNet.RouletteState s, float ticksSinceReceived) {
-        float idle = (CasinoClientState.clientTick + ticksSinceReceived) * 0.004f;
+        // The idle turn runs on the client clock alone (plus the frame's partial tick): adding the time
+        // since the last state packet made it jump back on every packet, so it juddered while betting.
+        float partial = ticksSinceReceived - (float) Math.floor(ticksSinceReceived);
+        float idle = (CasinoClientState.clientTick + partial) * 0.004f;
         if (s == null) return new WheelPose(idle, 0, 1, false);
         if (s.phase() != RouletteGame.SPINNING && s.phase() != RouletteGame.RESULT) {
             return new WheelPose(idle, 0, 1, false);

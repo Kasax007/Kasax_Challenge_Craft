@@ -76,6 +76,12 @@ final class SlotView {
                 float bb = expanded ? 0.35f : glow ? 0.62f : 0.84f;
                 p.quadModel(x0, y0, z0, x1, y0, z0, x1, y1, z1, x0, y1, z1, DevicePainter.rgb(rr * shade, gg * shade, bb * shade));
             }
+            // The drum curves away under the bottom row, so from above one looked past it onto the
+            // window's dark floor (model y 10.4) and the row seemed to sit in shadow: carry the
+            // reel's ivory on across that strip of floor up to the glass.
+            float floorY = 10.45f, drumFoot = drumZ((float) Math.asin(((WIN_Y0 + WIN_Y1) / 2f - floorY) / DRUM_R)) + 0.35f;
+            int apron = DevicePainter.rgb(0.96f * 0.78f, 0.93f * 0.78f, 0.84f * 0.78f);
+            p.quadModel(x0, floorY, 2.6f, x1, floorY, 2.6f, x1, floorY, drumFoot, x0, floorY, drumFoot, apron);
             // Dark divider between reels, a little in front of the drums.
             float dx = reelCenterX(r) + REEL_W / 2;
             float dz = DRUM_AXIS_Z - DRUM_R + 0.1f;
@@ -142,11 +148,17 @@ final class SlotView {
                 int symbol = SlotMath.symbolAt(r, base + k, 0);
                 float y = drumY(angle);
                 float z = drumZ(angle);
-                matrices.pushPose();
-                matrices.translate(cx, y, z - 0.05f);
-                matrices.rotate(Axis.XP.rotation(-angle));
+                // The symbol stays upright and is squashed by the drum's curvature instead of being
+                // tilted with it: a tilted item faces the ground on the bottom row, and the world's
+                // item lighting then shades it almost black when seen from above. Upright it is lit
+                // like the middle row; it is pulled forward so its upper or lower half, which would
+                // otherwise sink into the curved drum, stays in front of it.
                 float s = REEL_W * 0.82f;
-                matrices.scale(s, s * (spinning ? 1.25f : 1f), s);
+                float squash = 0.45f + 0.55f * (float) Math.cos(angle);
+                float lift = 0.05f + 0.5f * s * squash * (float) Math.abs(Math.sin(angle));
+                matrices.pushPose();
+                matrices.translate(cx, y, z - lift);
+                matrices.scale(s, s * squash * (spinning ? 1.25f : 1f), s);
                 matrices.rotate(Axis.YP.rotationDegrees(180f));
                 CasinoWorldRenderer.submitItem(p, new ItemStack(SlotMath.SYMBOL_ITEMS[symbol]));
                 matrices.popPose();

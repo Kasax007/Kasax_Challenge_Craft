@@ -7,6 +7,7 @@ import net.kasax.challengecraft.ChallengeCraft;
 import net.kasax.challengecraft.challenges.Chal_21_Hardcore;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
@@ -17,11 +18,17 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -36,8 +43,8 @@ import java.util.UUID;
  * "The House offers you a game." Instead of dying, a player plays one hand of blackjack against
  * the croupier:
  * <ul>
- *   <li><b>win</b> — they respawn at their own spawn point (bed, anchor or world spawn) with their
- *       complete inventory and experience;</li>
+ *   <li><b>win</b> — they are back exactly where they fell (or the nearest safe spot, should that
+ *       be lava, a wall or the void), healed, with their complete inventory and experience;</li>
  *   <li><b>lose</b> — they die exactly where they fell, items drop there, as if nothing happened;</li>
  *   <li><b>push</b> — a new hand is dealt.</li>
  * </ul>
@@ -54,9 +61,10 @@ import java.util.UUID;
  * is played where the player fell, in the blackjack screen (kept for exactly that).
  *
  * <p>Mechanics: the fatal hit is intercepted with Fabric's {@code ALLOW_DEATH} (which fires before
- * totems, so a held totem is simply allowed to do its job). A win stashes the inventory, lets the
- * death happen with an empty inventory and restores everything in {@code AFTER_RESPAWN} — that way
- * vanilla's own respawn logic picks the spawn point, including beds and anchors.
+ * totems, so a held totem is simply allowed to do its job). A win revives the player in place, like
+ * a totem would. Only when there is no safe spot near the place of death (fell into the void, say)
+ * does it stash the inventory, let the death happen with an empty inventory and restore everything
+ * in {@code AFTER_RESPAWN}, so vanilla's respawn picks the spawn point, beds and anchors included.
  */
 public final class BlackjackRevival {
     public static final int PLAYING = 0, RESULT = 1;
@@ -319,6 +327,13 @@ public final class BlackjackRevival {
         if (limbo.held != null) restore(player, limbo.held);
         if (limbo.outcome == WIN) {
             account.revivalsWon++;
+            ServerLevel level = deathLevel(server, limbo);
+            Vec3 back = safeSpot(level, limbo.deathPos);
+            if (back != null) {
+                CasinoSavedData.get(server).touch();
+                reviveAt(player, level, back, limbo);
+                return;
+            }
             Inventory inv = player.getInventory();
             List<ItemStack> items = new ArrayList<>();
             for (int i = 0; i < inv.getContainerSize(); i++) {
@@ -341,10 +356,73 @@ public final class BlackjackRevival {
         kill(player, limbo.source);
     }
 
+    private static ServerLevel deathLevel(MinecraftServer server, Limbo limbo) {
+        ServerLevel level = server.getLevel(limbo.deathLevel);
+        return level == null ? server.overworld() : level;
+    }
+
     private static void backToDeath(ServerPlayer player, Limbo limbo) {
-        ServerLevel level = player.level().getServer().getLevel(limbo.deathLevel);
-        if (level == null) level = player.level().getServer().overworld();
+        ServerLevel level = deathLevel(player.level().getServer(), limbo);
         player.teleportTo(level, limbo.deathPos.x, limbo.deathPos.y, limbo.deathPos.z, Set.of(), limbo.yRot, limbo.xRot, false);
+    }
+
+    /**
+     * Where a winner comes back: the exact place of death if it is survivable, otherwise the
+     * nearest spot around it (a few blocks) with ground underfoot and nothing harmful, or null.
+     */
+    private static Vec3 safeSpot(ServerLevel level, Vec3 death) {
+        if (death.y < level.getMinY()) return null; // the void: nothing to stand on
+        BlockPos at = BlockPos.containing(death);
+        if (survivable(level, at)) return death;
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (int dy = -3; dy <= 6; dy++) {
+            for (int dx = -6; dx <= 6; dx++) {
+                for (int dz = -6; dz <= 6; dz++) {
+                    BlockPos p = at.offset(dx, dy, dz);
+                    double d = p.distToCenterSqr(death);
+                    if (d >= bestDist || !survivable(level, p)) continue;
+                    if (!level.getBlockState(p.below()).isFaceSturdy(level, p.below(), Direction.UP)) continue;
+                    best = p;
+                    bestDist = d;
+                }
+            }
+        }
+        return best == null ? null : Vec3.atBottomCenterOf(best);
+    }
+
+    /** Room for a player at feet position {@code p}, and nothing there that burns (water is fine: the air is refilled). */
+    private static boolean survivable(ServerLevel level, BlockPos p) {
+        if (p.getY() < level.getMinY() || p.getY() + 1 > level.getMaxY()) return false;
+        for (BlockPos q : new BlockPos[]{p, p.above()}) {
+            BlockState state = level.getBlockState(q);
+            if (!state.getCollisionShape(level, q).isEmpty() || state.getFluidState().is(FluidTags.LAVA)) return false;
+            if (state.is(BlockTags.FIRE) || state.is(Blocks.SWEET_BERRY_BUSH) || state.is(Blocks.COBWEB)
+                    || state.is(Blocks.POWDER_SNOW) || state.is(Blocks.WITHER_ROSE)) return false;
+        }
+        BlockState below = level.getBlockState(p.below());
+        return !below.is(Blocks.MAGMA_BLOCK) && !below.is(Blocks.LAVA) && !below.is(BlockTags.CAMPFIRES)
+                && !below.is(Blocks.CACTUS);
+    }
+
+    /** A won hand: back on their feet where they fell, like a totem would do it. */
+    private static void reviveAt(ServerPlayer player, ServerLevel level, Vec3 at, Limbo limbo) {
+        player.teleportTo(level, at.x, at.y, at.z, Set.of(), limbo.yRot, limbo.xRot, false);
+        player.setDeltaMovement(Vec3.ZERO);
+        player.resetFallDistance();
+        player.clearFire();
+        player.setAirSupply(player.getMaxAirSupply());
+        player.removeAllEffects(); // as a respawn would: no poison or wither to finish the job
+        player.setHealth(player.getMaxHealth());
+        player.getFoodData().setFoodLevel(20);
+        player.getFoodData().setSaturation(5.0f);
+        // A short grace so whatever killed them (a mob, a fall of sparks) cannot do it at once again.
+        player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100, 4));
+        player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 200, 0));
+        level.broadcastEntityEvent(player, (byte) 35); // the totem-of-undying flourish
+        level.sendParticles(ParticleTypes.PORTAL, at.x, at.y + 1, at.z, 40, 0.3, 0.8, 0.3, 0.3);
+        level.playSound(null, at.x, at.y, at.z, CasinoSounds.REVIVE, SoundSource.PLAYERS, 1.0f, 1.0f);
+        player.sendSystemMessage(Component.translatable("challengecraft.casino.blackjack.revived").withStyle(ChatFormatting.GOLD));
     }
 
     private static void restore(ServerPlayer player, List<ItemStack> items) {
