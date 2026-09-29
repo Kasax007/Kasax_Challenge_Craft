@@ -55,8 +55,8 @@ final class PlinkoView {
         for (int row = 0; row < PlinkoMath.ROWS; row++) {
             for (int i = 0; i < row + 3; i++) {
                 double u = DeviceLayouts.plinkoPegU(row, i), y = DeviceLayouts.plinkoPegY(row);
-                p.rectFront(u - 0.2, y - 0.2, u + 0.2, y + 0.2, FACE_V - 0.02, 0xFF9AA3B5);
-                p.rectFront(u - 0.1, y + 0.02, u + 0.1, y + 0.16, FACE_V - 0.04, 0xFFE6ECF5);
+                p.rectFront(u - 0.2, y - 0.2, u + 0.2, y + 0.2, FACE_V - 0.08, 0xFF9AA3B5);
+                p.rectFront(u - 0.1, y + 0.02, u + 0.1, y + 0.16, FACE_V - 0.16, 0xFFE6ECF5);
             }
         }
         // Buckets with their multipliers; the one that just caught a ball lights up.
@@ -70,8 +70,8 @@ final class PlinkoView {
             int c = mult >= 1000 ? 0xFFD8342C : mult >= 300 ? 0xFFE8742A : mult >= 200 ? 0xFFE8A92A
                     : mult >= 100 ? 0xFFC8C23A : 0xFF4A5A78;
             if (b == flashBucket && (now / 3) % 2 == 0) c = 0xFFFFFFFF;
-            p.rectFront(u - dx / 2 + 0.12, 6.4, u + dx / 2 - 0.12, 8.8, FACE_V - 0.02, c);
-            p.textFront(Component.literal(PlinkoMath.label(b)), u, 7.6, FACE_V - 0.06, 0.8, 0xFF101010, 0);
+            p.rectFront(u - dx / 2 + 0.12, 6.4, u + dx / 2 - 0.12, 8.8, FACE_V - 0.08, c);
+            p.textFront(Component.literal(PlinkoMath.label(b)), u, 7.6, FACE_V - 0.2, 0.8, 0xFF101010, 0);
         }
         // Balls in the air: the viewer's in gold, everybody else's in white.
         String me = p.mc.player.getName().getString();
@@ -92,7 +92,7 @@ final class PlinkoView {
 
     private static void drawDisplay(DevicePainter p, BlockPos pos) {
         double u0 = 2.0, u1 = 30.0, y0 = 1.0, y1 = 4.6, v = 2.9;
-        p.rectFront(u0 - 0.3, y0 - 0.3, u1 + 0.3, y1 + 0.3, v + 0.02, 0xFFB8912F);
+        p.rectFront(u0 - 0.3, y0 - 0.3, u1 + 0.3, y1 + 0.3, v + 0.1, 0xFFB8912F);
         p.rectFront(u0, y0, u1, y1, v, 0xFF07080C);
         CasinoNet.State s = CasinoClientState.state;
         if (s != null) {

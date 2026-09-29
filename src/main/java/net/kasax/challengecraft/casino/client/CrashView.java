@@ -113,10 +113,10 @@ final class CrashView {
 
         // The curve.
         double gu0 = SU0 + 0.5, gu1 = SU1 - 0.5, gy0 = SY0 + 3.6, gy1 = SY0 + 8.8;
-        p.rectFront(gu0, gy0, gu1, gy1, SV - 0.01, 0xFF0B1020);
+        p.rectFront(gu0, gy0, gu1, gy1, SV - 0.06, 0xFF0B1020);
         for (int i = 1; i < 4; i++) {
             double gy = gy0 + (gy1 - gy0) * i / 4;
-            p.rectFront(gu0, gy - 0.03, gu1, gy + 0.03, SV - 0.02, 0x30FFFFFF);
+            p.rectFront(gu0, gy - 0.03, gu1, gy + 0.03, SV - 0.12, 0x30FFFFFF);
         }
         if (phase == CrashGame.FLYING || phase == CrashGame.CRASHED) {
             double maxT = Math.max(200, flight);
@@ -127,14 +127,14 @@ final class CrashView {
                 double mm = Math.exp(CrashMath.GROWTH_PER_SECOND * ft / 20.0);
                 double cu = gu0 + (gu1 - gu0) * ft / maxT;
                 double cy = Math.min(gy1, gy0 + (gy1 - gy0 - 0.2) * (mm - 1.0) / (maxM - 1.0));
-                segment(p, pu, py, cu, cy, SV - 0.03, colour);
+                segment(p, pu, py, cu, cy, SV - 0.18, colour);
                 pu = cu;
                 py = cy;
             }
         }
         // The multiplier, big, over the curve.
         String mult = String.format(Locale.ROOT, "%.2f×", m);
-        SlotView.fit(p, Component.literal(mult), (SU0 + SU1) / 2, gy1 + 1.9, SV - 0.04, w - 1.0, 2.4, colour);
+        SlotView.fit(p, Component.literal(mult), (SU0 + SU1) / 2, gy1 + 1.9, SV - 0.24, w - 1.0, 2.4, colour);
 
         // Status line.
         Component status = switch (phase) {
@@ -144,7 +144,7 @@ final class CrashView {
                     String.format(Locale.ROOT, "%.2f", s.crashedAt() / 100.0));
             default -> Component.translatable("challengecraft.casino.crash.waiting");
         };
-        SlotView.fit(p, status, (SU0 + SU1) / 2, gy0 - 0.9, SV - 0.04, w - 1.0, 0.85,
+        SlotView.fit(p, status, (SU0 + SU1) / 2, gy0 - 0.9, SV - 0.24, w - 1.0, 0.85,
                 phase == CrashGame.CRASHED ? 0xFFE25B5B : 0xFFB7C0D0);
 
         // Who is aboard: the viewer first, then the others.
@@ -159,9 +159,9 @@ final class CrashView {
                         : phase == CrashGame.CRASHED ? "✖" : "…";
                 int c = seat.cashedAt() > 0 ? 0xFF7BE0A4 : phase == CrashGame.CRASHED ? 0xFFE25B5B : 0xFFE8E8E8;
                 String name = seat.player().length() > 10 ? seat.player().substring(0, 10) : seat.player();
-                p.textFront(Component.literal(name + " " + CasinoEconomy.format(seat.bet())), SU0 + 0.5, ly, SV - 0.04,
+                p.textFront(Component.literal(name + " " + CasinoEconomy.format(seat.bet())), SU0 + 0.5, ly, SV - 0.24,
                         0.75, seat.player().equals(me) ? 0xFFFFE08A : 0xFF9AA3B5, -1);
-                p.textFront(Component.literal(right), SU1 - 0.5, ly, SV - 0.04, 0.75, c, 1);
+                p.textFront(Component.literal(right), SU1 - 0.5, ly, SV - 0.24, 0.75, c, 1);
                 ly -= 1.05;
             }
         }

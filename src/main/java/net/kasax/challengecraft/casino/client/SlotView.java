@@ -159,7 +159,7 @@ final class SlotView {
     /** The two-line display under the reels: the result, and the viewer's own stake. */
     private static void drawDisplay(DevicePainter p, SlotAnimation anim, boolean live, float t) {
         double u0 = 2.5, u1 = 13.5, y0 = 5.0, y1 = 9.0, v = 2.9;
-        p.rectFront(u0 - 0.35, y0 - 0.35, u1 + 0.35, y1 + 0.35, v + 0.02, 0xFFB8912F);
+        p.rectFront(u0 - 0.35, y0 - 0.35, u1 + 0.35, y1 + 0.35, v + 0.1, 0xFFB8912F);
         p.rectFront(u0, y0, u1, y1, v, 0xFF07080C);
 
         Component top;

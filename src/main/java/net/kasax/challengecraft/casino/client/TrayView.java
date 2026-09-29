@@ -38,9 +38,9 @@ final class TrayView {
             double lift = selected ? 0.8 : hover ? 0.45 : 0.0;
             double y = t.y() + 0.34 + lift;
             if (selected) {
-                p.discTop(u, v, t.y() + 0.03, r * 1.28, 0xFFE3B35A, 16);
+                p.discTop(u, v, t.y() + 0.15, r * 1.28, 0xFFE3B35A, 16);
             } else if (hover) {
-                p.discTop(u, v, t.y() + 0.03, r * 1.18, 0xC0FFFFFF, 16);
+                p.discTop(u, v, t.y() + 0.15, r * 1.18, 0xC0FFFFFF, 16);
             }
             // A second chip under the selected one, so it reads as a small stack.
             if (selected) p.chip(u, v, y - 0.34, r, DevicePainter.chipColour(level), 0.8f);

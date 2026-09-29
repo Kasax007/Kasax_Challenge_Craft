@@ -128,7 +128,7 @@ final class DevicePainter {
             double a0 = Math.PI * 2 * i / 12, a1 = Math.PI * 2 * (i + 1) / 12;
             double ua = uc + Math.cos(a0) * r * 0.97, va = vc + Math.sin(a0) * r * 0.97;
             double ub = uc + Math.cos(a1) * r * 0.97, vb = vc + Math.sin(a1) * r * 0.97;
-            quad(ua, y - 0.32, va, ub, y - 0.32, vb, ub, y - 0.01, vb, ua, y - 0.01, va, edge);
+            quad(ua, y - 0.32, va, ub, y - 0.32, vb, ub, y - 0.06, vb, ua, y - 0.06, va, edge);
         }
     }
 
@@ -215,7 +215,7 @@ final class DevicePainter {
         float s = (float) (height / 7.0);
         float w = font.width(seq);
         pose.pushPose();
-        pose.translate((float) (16 - u), (float) (y + 0.04), (float) (v + height / 2));
+        pose.translate((float) (16 - u), (float) (y + 0.08), (float) (v + height / 2));
         pose.rotate(Axis.YP.rotationDegrees(180f));
         pose.rotate(Axis.XP.rotationDegrees(-90f));
         pose.scale(s, -s, s);
@@ -274,8 +274,10 @@ final class DevicePainter {
             for (float[] q : batch) {
                 int shade = (int) q[20];
                 int color = 0xFF000000 | shade << 16 | shade << 8 | shade;
-                for (int[] order : new int[][]{{0, 1, 2, 3}, {3, 2, 1, 0}}) {
-                    for (int k : order) {
+                // One face only: the render type does not cull, and a second copy with the opposite
+                // winding at the same depth z-fights (and is lit as a back face, so it flickers dark).
+                {
+                    for (int k = 0; k < 4; k++) {
                         int o = k * 5;
                         buf.addVertex(p, q[o], q[o + 1], q[o + 2]).setColor(color).setUv(q[o + 3], q[o + 4])
                                 .setOverlay(OverlayTexture.NO_OVERLAY).setLight(lightCoords).setNormal(p, 0f, 1f, 0f);
