@@ -90,7 +90,7 @@ public final class BotPathfinder {
                 bestH = h;
                 best = n;
             }
-            for (Step s : moves(n.pos)) {
+            for (Step s : moves(n.pos, n.step != null && n.step.place() != null && n.step.place().equals(n.pos.below()))) {
                 double cost = cost(n.pos, s);
                 Node m = nodes.computeIfAbsent(s.to().asLong(), k -> new Node(s.to()));
                 if (m.closed) continue;
@@ -108,7 +108,7 @@ public final class BotPathfinder {
 
     String debugMoves(BlockPos p) {
         StringBuilder sb = new StringBuilder();
-        for (Step s : moves(p)) sb.append(s.to().subtract(p).toShortString()).append(s.breaks().isEmpty() ? "" : "b").append(' ');
+        for (Step s : moves(p, false)) sb.append(s.to().subtract(p).toShortString()).append(s.breaks().isEmpty() ? "" : "b").append(' ');
         return sb.length() == 0 ? "no moves" : sb.toString().trim();
     }
 
@@ -143,10 +143,12 @@ public final class BotPathfinder {
 
     private static final int[][] DIRS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
-    private List<Step> moves(BlockPos p) {
+    /** {@code placedBelow}: the step here put a block under the feet (the world does not show it yet). */
+    private List<Step> moves(BlockPos p, boolean placedBelow) {
         List<Step> out = new ArrayList<>(12);
+        boolean floor = placedBelow || solid(p.below());
         // Water with ground right under the feet (a shallow stream) is walked through, not swum.
-        boolean swimming = inWater(p) && !solid(p.below());
+        boolean swimming = inWater(p) && !floor;
         for (int[] d : DIRS) {
             boolean diagonal = d[0] != 0 && d[1] != 0;
             BlockPos t = p.offset(d[0], 0, d[1]);
@@ -162,7 +164,7 @@ public final class BotPathfinder {
             List<BlockPos> flat = breaksFor(t, t.above());
             if (flat != null && canStand(t)) out.add(new Step(t, flat, null));
             // Bridge: nothing to stand on there, so put a block under it (sneaking at the edge).
-            if (abilities.mayPillar() && !swimming && flat != null && flat.isEmpty() && !canStand(t) && canStand(p)
+            if (abilities.mayPillar() && !swimming && flat != null && flat.isEmpty() && !canStand(t) && (floor || canStand(p))
                     && clear(t.below()) && !inWater(t.below())) {
                 out.add(new Step(t, List.of(), t.below()));
             }
@@ -190,7 +192,7 @@ public final class BotPathfinder {
             }
         }
         // Leap over a gap one to three wide (sprint-jumping), landing level or one lower.
-        if (!swimming && solid(p.below()) && clear(p.above(2))) {
+        if (!swimming && floor && clear(p.above(2))) {
             for (int i = 0; i < 4; i++) {
                 int dx = DIRS[i][0], dz = DIRS[i][1];
                 BlockPos first = p.offset(dx, 0, dz);
@@ -235,7 +237,7 @@ public final class BotPathfinder {
         if (swimming && clear(p.above())) out.add(new Step(p.above(), List.of(), null));
         if (swimming && inWater(below)) out.add(new Step(below, List.of(), null));
         // Pillar up: jump and put a block where the feet were.
-        if (abilities.mayPillar() && !swimming && solid(p.below())) {
+        if (abilities.mayPillar() && !swimming && floor) {
             List<BlockPos> head = breaksFor(p.above(2));
             if (head != null) out.add(new Step(p.above(), head, p));
         }

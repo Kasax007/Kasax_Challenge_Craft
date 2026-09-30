@@ -80,6 +80,20 @@ public class BotMovementTests {
         a.run(new SurfaceTask(), 600, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
     }
 
+    /** Out of a closed cave twenty below the grass (gravel and dirt on the way), wooden pickaxe only. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void caveEscape(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "cave_escape");
+        a.fill(0, GROUND, 0, 39, 24, 39, Blocks.STONE);
+        a.fill(0, 17, 0, 39, 18, 39, Blocks.GRAVEL);
+        a.fill(0, 21, 0, 39, 24, 39, Blocks.DIRT);
+        a.fill(0, 25, 0, 39, 25, 39, Blocks.GRASS_BLOCK);
+        a.fill(16, 3, 16, 22, 5, 22, Blocks.AIR);
+        a.fill(19, 6, 19, 19, 6, 19, Blocks.WATER); // a leak in the roof
+        a.spawn(17, 3, 17, new ItemStack(Items.WOODEN_PICKAXE));
+        a.run(new SurfaceTask(), 2400, () -> a.feet().getY() >= 25 && a.bot().body().onGround());
+    }
+
     /** Over a trench two wide and ten deep without a single block: jump it (or go down and up). */
     @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
     public void trenchGap(GameTestHelper h) {

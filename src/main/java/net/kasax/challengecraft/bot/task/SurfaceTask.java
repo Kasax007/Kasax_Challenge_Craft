@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.bot.task;
 
 import net.kasax.challengecraft.bot.Bot;
+import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.BotPlayer;
 import net.kasax.challengecraft.bot.BotTask;
 import net.minecraft.core.BlockPos;
@@ -20,23 +21,29 @@ public final class SurfaceTask implements BotTask {
     private Direction heading;
     private BlockPos jumpedFrom, stepTo;
     private int ticks, stepTicks, bestY = Integer.MIN_VALUE, sinceBest, switches;
-    private boolean stairs;
+    private boolean stairs, navigating;
+    private int navFails;
+    private boolean failedPlace;
 
     /** Deep enough under the ground that walking about on the surface needs a climb first. */
     public static boolean underground(BotPlayer body) {
+        return underground((ServerLevel) body.level(), body.blockPosition());
+    }
+
+    /** {@link #underground(BotPlayer)} for feet at {@code feet}. */
+    public static boolean underground(ServerLevel level, BlockPos feet) {
         // Little sky light where the head is: a cave or a mine. (Under trees or next to a trunk
         // there is plenty; up an open shaft too, and that one needs no climbing either.)
-        ServerLevel level = (ServerLevel) body.level();
-        BlockPos head = body.blockPosition().above();
+        BlockPos head = feet.above();
         if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, head) < 6
                 && head.getY() < level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, head.getX(), head.getZ())) return true;
         // Down a shaft or a ravine (the sky shines straight in): the ground a few blocks around is
         // mostly well above the feet. (One side high is only a cliff or a wall.)
-        int feetY = body.blockPosition().getY(), high = 0, samples = 0;
+        int feetY = feet.getY(), high = 0, samples = 0;
         for (int i = 0; i < 16; i++) {
             double a = i * Math.PI / 8;
-            int x = body.blockPosition().getX() + (int) Math.round(Math.cos(a) * 4);
-            int z = body.blockPosition().getZ() + (int) Math.round(Math.sin(a) * 4);
+            int x = feet.getX() + (int) Math.round(Math.cos(a) * 4);
+            int z = feet.getZ() + (int) Math.round(Math.sin(a) * 4);
             if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
             samples++;
             if (level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) > feetY + 1) high++;
@@ -44,7 +51,7 @@ public final class SurfaceTask implements BotTask {
         // ... and it is hemmed in (a hole or a tunnel, not a valley floor).
         int walls = 0;
         for (Direction d : Direction.Plane.HORIZONTAL) {
-            BlockPos n = body.blockPosition().above().relative(d);
+            BlockPos n = feet.above().relative(d);
             if (!level.getBlockState(n).getCollisionShape(level, n).isEmpty()) walls++;
         }
         return samples > 0 && high * 10 >= samples * 7 && walls >= 2;
@@ -60,7 +67,22 @@ public final class SurfaceTask implements BotTask {
             body.stopInputs();
             return Result.DONE;
         }
-        if (++ticks > 4000) return Result.FAILED;
+        if (++ticks > 6000) return Result.FAILED;
+        // First choice: let the path search find the way up (cave passages, a staircase dug
+        // through whatever is cheapest, pillars where there are blocks). The hand-made climb
+        // below is only for when it finds nothing.
+        if (navFails < 4) {
+            if (!navigating) {
+                bot.navigator().setGoal(p -> !underground(level, p),
+                        new BlockPos(feet.getX(), level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()), feet.getZ()));
+                navigating = true;
+            }
+            BotNavigator.Status s = bot.navigator().tick();
+            if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
+            navigating = false;
+            if (s == BotNavigator.Status.FAILED) navFails++;
+            return Result.RUNNING; // arrived: judged again next tick
+        }
         if (heading == null) heading = body.getDirection();
         // Not getting higher (gravel keeps falling in, water above, a ledge): change the way.
         if (feet.getY() > bestY) {
@@ -80,7 +102,7 @@ public final class SurfaceTask implements BotTask {
         // Pillar: head room, then jump and set a block where the feet were.
         BlockPos head = feet.above(2);
         boolean headSafe = safe(level, head);
-        if (!stairs && jumpedFrom == null && headSafe && bot.actions().hasThrowaway()) {
+        if (!stairs && jumpedFrom == null && headSafe && bot.actions().hasThrowaway() && !failedPlace) {
             if (!clear(level, head)) {
                 bot.actions().breakTick(head);
                 return Result.RUNNING;
@@ -94,7 +116,7 @@ public final class SurfaceTask implements BotTask {
         if (jumpedFrom != null) {
             body.jump = false;
             if (body.getY() > jumpedFrom.getY() + 1.05) {
-                bot.actions().placeThrowaway(jumpedFrom);
+                if (!bot.actions().placeThrowaway(jumpedFrom)) failedPlace = true; // stairs from now on
                 jumpedFrom = null;
             } else if (body.onGround() && ++stepTicks > 20) {
                 jumpedFrom = null; // did not get up (a low ceiling after all): try again
