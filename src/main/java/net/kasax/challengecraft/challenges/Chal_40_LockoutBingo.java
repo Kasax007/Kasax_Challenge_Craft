@@ -352,6 +352,112 @@ public final class Chal_40_LockoutBingo {
         startSoloDebugRun(player, List.of());
     }
 
+    // ---- read access for bots (see bot/lockout) ----
+
+    /** One tile of the running board: its goal and the team that claimed it (null while open). */
+    public record BoardTile(int index, LockoutBingoGoal goal, LockoutBingoTeam claimedBy) {
+    }
+
+    /** Whether a game is on (started, not ended). */
+    public static boolean isRunning(MinecraftServer server) {
+        if (!active) {
+            return false;
+        }
+        LockoutBingoSavedData data = getData(server);
+        return data.isStarted() && !data.isEnded();
+    }
+
+    /** The board as it stands, or an empty list when no game is on. */
+    public static List<BoardTile> board(MinecraftServer server) {
+        if (!active) {
+            return List.of();
+        }
+        LockoutBingoSavedData data = getData(server);
+        List<String> ids = data.getBoardGoalIds();
+        List<BoardTile> out = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            LockoutBingoGoal goal = LockoutBingoGoalPool.byId(ids.get(i));
+            if (goal != null) {
+                out.add(new BoardTile(i, goal, data.getClaimedTeam(i)));
+            }
+        }
+        return out;
+    }
+
+    public static LockoutBingoTeam teamOf(MinecraftServer server, UUID player) {
+        return active ? getData(server).getTeam(player) : null;
+    }
+
+    /** How many tiles {@code team} has claimed. */
+    public static int score(MinecraftServer server, LockoutBingoTeam team) {
+        return active ? getScore(getData(server), team) : 0;
+    }
+
+    /** Puts a player (a bot) into a team in the lobby and marks it ready; starts the game if everyone is. */
+    public static void joinAndReady(ServerPlayer player, LockoutBingoTeam team) {
+        MinecraftServer server = player.level().getServer();
+        if (!active || server == null) {
+            return;
+        }
+        LockoutBingoSavedData data = getData(server);
+        ensureCurrentRun(server, data);
+        if (data.isStarted()) {
+            return;
+        }
+        data.setTeam(player.getUUID(), player.getGameProfile().name(), team);
+        data.setReady(player.getUUID(), true);
+        maybeStartGame(server, data);
+        if (!data.isStarted()) {
+            syncToAll(server);
+        }
+    }
+
+    /**
+     * A game of {@code human} (red) against {@code bot} (blue) on a fresh board, started at once;
+     * {@code forcedGoalIds} are put on the board first.
+     */
+    public static void startVersus(ServerPlayer human, ServerPlayer bot, List<String> forcedGoalIds) {
+        MinecraftServer server = human.level().getServer();
+        if (server == null) {
+            return;
+        }
+        active = true;
+        LockoutBingoSavedData data = getData(server);
+        ensureCurrentRun(server, data);
+        data.resetForRun(data.getRunId());
+        data.setTeam(human.getUUID(), human.getGameProfile().name(), LockoutBingoTeam.RED);
+        data.setTeam(bot.getUUID(), bot.getGameProfile().name(), LockoutBingoTeam.BLUE);
+        data.retainPlayers(Set.of(human.getUUID(), bot.getUUID()));
+
+        long boardSeed = server.overworld().getSeed() ^ server.overworld().getGameTime() ^ human.getUUID().getMostSignificantBits();
+        List<LockoutBingoGoal> goals = new ArrayList<>();
+        for (String id : forcedGoalIds) {
+            LockoutBingoGoal forced = LockoutBingoGoalPool.byId(id);
+            if (forced != null && goals.stream().noneMatch(g -> g.id().equals(id)) && goals.size() < BOARD_SIZE) {
+                goals.add(forced);
+            }
+        }
+        for (LockoutBingoGoal drawn : LockoutBingoGoalPool.pickBoard(boardSeed)) {
+            if (goals.size() >= BOARD_SIZE) {
+                break;
+            }
+            if (goals.stream().noneMatch(g -> g.id().equals(drawn.id()))) {
+                goals.add(drawn);
+            }
+        }
+        data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.overworld().getGameTime());
+        captureGoalStatBaselines(data, List.of(human, bot), goals);
+        data.setStarted(true);
+        data.setEnded(false);
+        data.setWinnerTeam(null);
+        data.clearReady();
+
+        server.getPlayerList().broadcastSystemMessage(Component.translatable("challengecraft.lockout.start.broadcast").withStyle(ChatFormatting.GOLD), false);
+        ensureMap(human, server.getTickCount());
+        syncToAll(server);
+        ServerPlayNetworking.send(human, new LockoutBingoOpenScreenPacket(true));
+    }
+
     /**
      * A solo test board; {@code forcedGoalIds} are placed on it first (unknown ids are skipped), the
      * rest of the 25 tiles are drawn as usual.

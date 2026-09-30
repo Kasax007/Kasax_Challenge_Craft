@@ -1,0 +1,137 @@
+package net.kasax.challengecraft.bot.task;
+
+import net.kasax.challengecraft.bot.Bot;
+import net.kasax.challengecraft.bot.BotPlayer;
+import net.kasax.challengecraft.bot.plan.BotKnowledge;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+
+/**
+ * Smelts {@code count} items in a furnace (one nearby, or its own put down): puts the input and
+ * enough fuel in, waits beside it, takes out what is done — like a player standing at the
+ * furnace, including the experience.
+ */
+public final class SmeltTask extends StationTask {
+    private static final int IN = 0, FUEL = 1, OUT = 2;
+
+    private final BotKnowledge.SmeltRoute route;
+    private final int count;
+    private int target = -1, waited;
+    private boolean loaded;
+
+    public SmeltTask(BotKnowledge.SmeltRoute route, int count) {
+        super(Blocks.FURNACE, Items.FURNACE);
+        this.route = route;
+        this.count = count;
+    }
+
+    @Override
+    protected Result work(Bot bot) {
+        BotPlayer body = bot.body();
+        ServerLevel level = (ServerLevel) body.level();
+        if (!(level.getBlockEntity(station) instanceof AbstractFurnaceBlockEntity furnace)) return Result.FAILED;
+        if (target < 0) target = ObtainPlanner.countAny(body, java.util.Set.of(route.result())) + count;
+
+        takeOutput(body, furnace);
+        if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return Result.DONE;
+
+        if (!loaded) {
+            loaded = true;
+            int in = load(body, furnace);
+            if (in == 0 && furnace.getItem(IN).isEmpty()) {
+                bot.say("nothing to smelt");
+                return Result.FAILED;
+            }
+            loadFuel(body, furnace, furnace.getItem(IN).getCount());
+        }
+        // Keep it burning if the fuel was short; give up if it went out with input left.
+        if (++waited % 40 == 0 && !furnace.getItem(IN).isEmpty() && furnace.getItem(FUEL).isEmpty()) {
+            if (!loadFuel(body, furnace, furnace.getItem(IN).getCount()) && waited > 400 && !isLit(furnace)) {
+                bot.say("out of fuel");
+                return Result.FAILED;
+            }
+        }
+        if (furnace.getItem(IN).isEmpty() && furnace.getItem(OUT).isEmpty()) {
+            return Result.DONE; // all smelted and taken, even if fewer than planned
+        }
+        return waited > count * 220 + 600 ? Result.FAILED : Result.RUNNING;
+    }
+
+    private static boolean isLit(AbstractFurnaceBlockEntity furnace) {
+        return furnace.getBlockState().getValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT);
+    }
+
+    /** Moves up to {@code count} matching input items into the furnace. */
+    private int load(BotPlayer body, AbstractFurnaceBlockEntity furnace) {
+        int moved = 0;
+        var inv = body.getInventory().getNonEquipmentItems();
+        for (ItemStack s : inv) {
+            if (moved >= count) break;
+            if (s.isEmpty() || !route.input().test(s)) continue;
+            ItemStack slot = furnace.getItem(IN);
+            if (!slot.isEmpty() && !ItemStack.isSameItemSameComponents(slot, s)) continue;
+            int n = Math.min(Math.min(count - moved, s.getCount()), s.getMaxStackSize() - slot.getCount());
+            if (n <= 0) continue;
+            if (slot.isEmpty()) furnace.setItem(IN, s.copyWithCount(n));
+            else slot.grow(n);
+            s.shrink(n);
+            moved += n;
+        }
+        furnace.setChanged();
+        return moved;
+    }
+
+    /** Adds fuel for {@code items} more items; the cheapest-to-spare fuel first. */
+    private boolean loadFuel(BotPlayer body, AbstractFurnaceBlockEntity furnace, int items) {
+        ItemStack slot = furnace.getItem(FUEL);
+        double have = slot.isEmpty() ? 0 : BotKnowledge.fuelValue(slot) * slot.getCount();
+        if (have >= items) return true;
+        var inv = body.getInventory().getNonEquipmentItems();
+        ItemStack best = null;
+        for (ItemStack s : inv) {
+            // Never the input, and never what is being made (the first charcoal would feed the fire).
+            if (s.isEmpty() || route.input().test(s) || s.is(route.result()) || BotKnowledge.fuelValue(s) <= 0) continue;
+            if (!slot.isEmpty() && !ItemStack.isSameItemSameComponents(slot, s)) continue;
+            // Coal before wood before sticks: spend what is least useful for anything else.
+            if (best == null || rank(s) < rank(best)) best = s;
+        }
+        if (best == null) return false;
+        double per = BotKnowledge.fuelValue(best);
+        int n = (int) Math.min(best.getCount(), Math.ceil((items - have) / per));
+        n = Math.min(n, best.getMaxStackSize() - slot.getCount());
+        if (n <= 0) return false;
+        if (slot.isEmpty()) furnace.setItem(FUEL, best.copyWithCount(n));
+        else slot.grow(n);
+        best.shrink(n);
+        furnace.setChanged();
+        return true;
+    }
+
+    private static int rank(ItemStack s) {
+        if (s.is(Items.COAL) || s.is(Items.CHARCOAL)) return 0;
+        if (s.is(net.minecraft.tags.ItemTags.PLANKS)) return 1;
+        if (s.is(net.minecraft.tags.ItemTags.LOGS)) return 2;
+        if (s.is(Items.STICK)) return 3;
+        return 4;
+    }
+
+    private void takeOutput(BotPlayer body, AbstractFurnaceBlockEntity furnace) {
+        ItemStack out = furnace.getItem(OUT);
+        if (out.isEmpty()) return;
+        ItemStack taken = out.copy();
+        furnace.setItem(OUT, ItemStack.EMPTY);
+        taken.onCraftedBy(body, taken.getCount());
+        CraftTask.give(body, taken);
+        furnace.awardUsedRecipesAndPopExperience(body);
+        furnace.setChanged();
+    }
+
+    @Override
+    public String describe() {
+        return "smelt " + ObtainPlanner.name(route.result()) + " x" + count;
+    }
+}

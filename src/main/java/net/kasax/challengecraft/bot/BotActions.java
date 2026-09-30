@@ -106,6 +106,36 @@ public final class BotActions {
         return placeHeld(target);
     }
 
+    /**
+     * Puts down a block item (a crafting table, a furnace) next to the bot, on the ground and out of
+     * its way. Returns where it went, or null when there is no spot within reach.
+     */
+    public BlockPos placeNearby(net.minecraft.world.item.Item item) {
+        int slot = BotInventory.slotOf(bot, item);
+        if (slot < 0) return null;
+        ServerLevel level = (ServerLevel) bot.level();
+        BlockPos feet = bot.blockPosition();
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (BlockPos p : BlockPos.betweenClosed(feet.offset(-2, -1, -2), feet.offset(2, 1, 2))) {
+            if (p.getX() == feet.getX() && p.getZ() == feet.getZ()) continue;
+            if (!level.getBlockState(p).canBeReplaced() || !level.getFluidState(p).isEmpty()) continue;
+            BlockPos below = p.below();
+            if (level.getBlockState(below).getCollisionShape(level, below).isEmpty()) continue;
+            if (!inReach(p)) continue;
+            // Not where the bot is standing or about to stand.
+            if (bot.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(p))) continue;
+            double d = p.distSqr(feet) + Math.abs(p.getY() - feet.getY()) * 2;
+            if (d < bestD) {
+                bestD = d;
+                best = p.immutable();
+            }
+        }
+        if (best == null) return null;
+        tools.select(slot);
+        return placeHeld(best) ? best : null;
+    }
+
     /** Places the block item in hand at {@code target}, against any solid neighbour. */
     public boolean placeHeld(BlockPos target) {
         ItemStack held = bot.getMainHandItem();

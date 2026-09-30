@@ -22,7 +22,7 @@ import java.util.UUID;
 
 /** All bots on the server: joining, leaving, ticking their brains, bringing them back after death. */
 public final class BotManager {
-    static final Logger LOG = LoggerFactory.getLogger("ChallengeCraft-Bot");
+    public static final Logger LOG = LoggerFactory.getLogger("ChallengeCraft-Bot");
     private static final Map<UUID, Bot> BOTS = new LinkedHashMap<>();
     private static final int RESPAWN_DELAY = 30;
 

@@ -103,6 +103,12 @@ public final class BotPathfinder {
         return best == first ? null : build(best);
     }
 
+    String debugMoves(BlockPos p) {
+        StringBuilder sb = new StringBuilder();
+        for (Step s : moves(p)) sb.append(s.to().subtract(p).toShortString()).append(s.breaks().isEmpty() ? "" : "b").append(' ');
+        return sb.length() == 0 ? "no moves" : sb.toString().trim();
+    }
+
     private static List<Step> build(Node end) {
         List<Step> steps = new ArrayList<>();
         for (Node n = end; n.parent != null; n = n.parent) steps.add(0, n.step);

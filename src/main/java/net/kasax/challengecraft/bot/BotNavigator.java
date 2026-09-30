@@ -171,7 +171,9 @@ public final class BotNavigator {
         stuck = 0;
         lastDistance = Double.MAX_VALUE;
         if (path == null || path.isEmpty()) {
-            fail("no way found");
+            fail("no way found from " + feet.toShortString() + " (" + bot.level().getBlockState(feet).getBlock().getName().getString()
+                    + " on " + bot.level().getBlockState(feet.below()).getBlock().getName().getString() + ", "
+                    + finder.debugMoves(feet) + ")");
             return false;
         }
         return true;

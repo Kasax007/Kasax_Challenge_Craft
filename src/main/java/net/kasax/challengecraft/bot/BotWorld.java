@@ -65,8 +65,13 @@ public final class BotWorld {
 
     /** Dropped items of a kind (or any, for null) near {@code center}, nearest first. */
     public static List<ItemEntity> drops(ServerLevel level, BlockPos center, double radius, Item item) {
+        return drops(level, center, radius, item == null ? null : Set.of(item));
+    }
+
+    /** Dropped items of any of these kinds (or any, for null) near {@code center}, nearest first. */
+    public static List<ItemEntity> drops(ServerLevel level, BlockPos center, double radius, Set<Item> items) {
         List<ItemEntity> out = level.getEntitiesOfClass(ItemEntity.class, new AABB(center).inflate(radius),
-                e -> e.isAlive() && (item == null || e.getItem().is(item)));
+                e -> e.isAlive() && (items == null || items.contains(e.getItem().getItem())));
         out.sort(Comparator.comparingDouble(e -> e.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(center))));
         return out;
     }

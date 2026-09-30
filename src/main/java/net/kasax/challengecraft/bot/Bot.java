@@ -88,6 +88,7 @@ public final class Bot {
 
     void tick() {
         if (!body.isAlive()) return;
+        reflexes();
         BotTask task = tasks.peek();
         if (task == null) {
             if (brain != null) brain.think(this);
@@ -109,6 +110,21 @@ public final class Bot {
             navigator.stop();
             if (r == BotTask.Result.FAILED) say("x " + task.describe());
             if (brain != null) brain.finished(this, task, r == BotTask.Result.DONE);
+        }
+    }
+
+    private int reflexCooldown;
+
+    /** Things a player does without thinking about them, whatever the plan: eat when hungry. */
+    private void reflexes() {
+        if (reflexCooldown-- > 0) return;
+        reflexCooldown = 20;
+        if (tasks.peek() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        int food = body.getFoodData().getFoodLevel();
+        boolean hurt = body.getHealth() < body.getMaxHealth() * 0.6f && food < 20;
+        if ((food <= 14 || hurt) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
+            actions.reset();
+            interject(new net.kasax.challengecraft.bot.task.EatTask());
         }
     }
 

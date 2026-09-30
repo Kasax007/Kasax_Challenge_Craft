@@ -1,10 +1,10 @@
 package net.kasax.challengecraft.bot.task;
 
 import net.kasax.challengecraft.bot.Bot;
-import net.kasax.challengecraft.bot.BotInventory;
 import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.BotWorld;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -24,34 +24,30 @@ import java.util.function.Predicate;
 public final class MineTask implements BotTask {
     private final String what;
     private final Predicate<BlockState> blocks;
-    private final Item item;
+    private final Set<Item> items;
     private final int count;
     private final Set<BlockPos> skip = new HashSet<>();
     private BlockPos target;
-    private int collectTicks, explores, idle, debugTicks;
+    private int collectTicks, explores, idle;
     private boolean walking;
 
-    public MineTask(String what, Predicate<BlockState> blocks, Item item, int count) {
+    /** Mine until the bot holds {@code count} of the {@code items} together. */
+    public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count) {
         this.what = what;
         this.blocks = blocks;
-        this.item = item;
+        this.items = Set.copyOf(items);
         this.count = count;
     }
 
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
-        if (BotInventory.count(bot.body(), item) >= count) return Result.DONE;
-        if (++debugTicks % 100 == 0) {
-            bot.say("mine: target=" + (target == null ? "-" : target.toShortString()) + " reach="
-                    + (target != null && bot.actions().inReach(target)) + " nav=" + bot.navigator().status()
-                    + " walking=" + walking + " collect=" + collectTicks + " skip=" + skip.size());
-        }
+        if (ObtainPlanner.countAny(bot.body(), items) >= count) return Result.DONE;
 
         // Pick up what fell.
         if (collectTicks > 0) {
             collectTicks--;
-            List<ItemEntity> drops = BotWorld.drops(level, bot.body().blockPosition(), 6, item);
+            List<ItemEntity> drops = BotWorld.drops(level, bot.body().blockPosition(), 6, items);
             if (!drops.isEmpty()) {
                 ItemEntity e = drops.get(0);
                 if (!walking || bot.navigator().status() != BotNavigator.Status.MOVING) {
@@ -127,6 +123,6 @@ public final class MineTask implements BotTask {
 
     @Override
     public String describe() {
-        return "mine " + count + " " + what;
+        return "mine " + what + " (" + count + ")";
     }
 }

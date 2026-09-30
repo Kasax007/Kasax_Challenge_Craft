@@ -7,7 +7,10 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.kasax.challengecraft.bot.task.FollowTask;
 import net.kasax.challengecraft.bot.task.GoToTask;
+import net.kasax.challengecraft.bot.task.EatTask;
+import net.kasax.challengecraft.bot.task.KillTask;
 import net.kasax.challengecraft.bot.task.MineTask;
+import net.kasax.challengecraft.bot.task.ObtainTask;
 import net.kasax.challengecraft.util.ModPermissions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -23,6 +26,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+
+import java.util.Set;
 
 /**
  * {@code /challengecraft_bot ...}: bring bots in and out and give them simple orders by hand (for
@@ -85,10 +90,48 @@ final class BotCommands {
                                             Block block = BuiltInRegistries.BLOCK.getValue(Identifier.parse(StringArgumentType.getString(ctx, "block")));
                                             if (block == Blocks.AIR) return 0;
                                             Item item = block.asItem() == Items.AIR ? Items.AIR : block.asItem();
-                                            bot.doNow(new MineTask(StringArgumentType.getString(ctx, "block"), s -> s.is(block), item,
+                                            bot.doNow(new MineTask(StringArgumentType.getString(ctx, "block"), s -> s.is(block), java.util.Set.of(item),
                                                     IntegerArgumentType.getInteger(ctx, "count")));
                                             return 1;
                                         })))))
+                        .then(Commands.literal("get").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("item", StringArgumentType.word())
+                                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 256)).executes(ctx -> {
+                                            Bot bot = bot(ctx);
+                                            if (bot == null) return 0;
+                                            Item item = BuiltInRegistries.ITEM.getValue(Identifier.parse(StringArgumentType.getString(ctx, "item")));
+                                            if (item == Items.AIR) return 0;
+                                            bot.doNow(new ObtainTask(Set.of(item), IntegerArgumentType.getInteger(ctx, "count")));
+                                            return 1;
+                                        })))))
+                        .then(Commands.literal("kill").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("entity", StringArgumentType.word())
+                                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 64)).executes(ctx -> {
+                                            Bot bot = bot(ctx);
+                                            if (bot == null) return 0;
+                                            var type = BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(StringArgumentType.getString(ctx, "entity")));
+                                            if (type.isEmpty()) return 0;
+                                            bot.doNow(new KillTask(Set.of(type.get()), Set.of(), 0, IntegerArgumentType.getInteger(ctx, "count")));
+                                            return 1;
+                                        })))))
+                        .then(Commands.literal("eat").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new EatTask());
+                                    return 1;
+                                })))
+                        .then(Commands.literal("inv").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    StringBuilder sb = new StringBuilder(bot.name + ":");
+                                    for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+                                        if (!st.isEmpty()) sb.append(' ').append(st.getCount()).append(' ').append(BuiltInRegistries.ITEM.getKey(st.getItem()).getPath()).append(',');
+                                    }
+                                    ok(ctx, sb.toString());
+                                    return 1;
+                                })))
         ));
     }
 
