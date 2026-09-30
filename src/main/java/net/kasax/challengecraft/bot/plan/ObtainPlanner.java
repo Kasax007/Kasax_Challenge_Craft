@@ -79,6 +79,8 @@ public final class ObtainPlanner {
     private long scannedAt = -10_000, costsAt = -1;
     private Map<Item, Double> costs = Map.of();
     private boolean craftOnly;
+    private int budget;
+    private final Map<List<Object>, Integer> impossible = new HashMap<>();
     private Set<Item> assumeHeld = Set.of();
     private Set<Item> keep = Set.of();
 
@@ -140,6 +142,7 @@ public final class ObtainPlanner {
         try {
             Sim sim = Sim.of(bot.body());
             Map<Item, Integer> before = new IdentityHashMap<>(sim.inv);
+            startSearch();
             if (expand(bot, sim, Set.copyOf(items), count, 0, new HashSet<>()) != null) return Set.of();
             Set<Item> out = new HashSet<>();
             sim.inv.forEach((i, n) -> {
@@ -454,7 +457,11 @@ public final class ObtainPlanner {
         Sim sim = Sim.of(bot.body());
         for (Item k : keep) if (!accept.contains(k)) sim.inv.remove(k);
         if (sim.count(accept) >= count) return new Have();
+        startSearch();
+        long t0 = System.nanoTime();
         String why = expand(bot, sim, accept, count, depth, visiting);
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        if (ms > 50) net.kasax.challengecraft.bot.BotManager.LOG.warn("[Bot] planning {} took {} ms ({} steps left of budget)", names(accept), ms, budget);
         if (why != null) return new Stuck(why);
         if (sim.steps.isEmpty()) return new Have();
         Pending first = sim.steps.get(0);
@@ -502,8 +509,27 @@ public final class ObtainPlanner {
 
     /** Plays getting {@code count} of {@code accept} through on {@code sim}; null if it works out, else why not. */
     private String expand(Bot bot, Sim sim, Set<Item> accept, int count, int depth, Set<Item> visiting) {
-        if (sim.count(accept) >= count) return null;
+        int need = count - sim.count(accept);
+        if (need <= 0) return null;
         if (depth > MAX_DEPTH) return "too deep";
+        // Long recipe chains with failed ways branch out fast: a budget per plan, and what could not
+        // be had once is not tried again in the same plan.
+        if (--budget < 0) return "too complicated to plan";
+        // (What is excluded on the way — the thing being made — changes what is possible.)
+        List<Object> key = List.of(accept, Set.copyOf(visiting));
+        Integer failedAt = impossible.get(key);
+        if (failedAt != null && need >= failedAt) return "no way to get " + names(accept);
+        String why = expandWays(bot, sim, accept, count, depth, visiting);
+        if (why != null) impossible.merge(key, need, Math::min);
+        return why;
+    }
+
+    private void startSearch() {
+        budget = 4000;
+        impossible.clear();
+    }
+
+    private String expandWays(Bot bot, Sim sim, Set<Item> accept, int count, int depth, Set<Item> visiting) {
         BotKnowledge k = BotKnowledge.get(bot.server());
         long now = bot.body().level().getGameTime();
 

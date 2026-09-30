@@ -20,10 +20,10 @@ Mensch.
 |---|---|---|
 | Körper | `BotPlayer`, `BotConnection`, `BotManager` | Spieler ohne Client. Eingaben (vor, seitwärts, springen, schleichen, sprinten) treiben die Vanilla-Bewegung. Respawn läuft über `PlayerList.respawn`. |
 | Motorik | `BotPathfinder`, `BotNavigator`, `BotActions`, `BotTools` | A*-Wegsuche (laufen, springen, fallen ≤ 3, schwimmen, durchgraben, hochbauen). Abbauen und Platzieren wie ein Spieler. Werkzeugwahl nach dem Prinzip „das billigste, das reicht“: Stein wird mit der Steinspitzhacke abgebaut, die Eisenspitzhacke bleibt für Gold. |
-| Wahrnehmung | `BotWorld`, Scan im `ObtainPlanner` | Sieht nur, was ein Spieler sehen kann: Blöcke, die an Luft oder Wasser grenzen, und Mobs in der Nähe. **Kein X-Ray**: Vergrabene Erze findet er nur durch Graben. |
+| Wahrnehmung | `BotSenses`, `BotWorld`, Scan im `ObtainPlanner` | Sieht nur, was ein Spieler sehen kann: Blöcke, die an Luft oder Wasser grenzen, Mobs in der Nähe, Biome in Sichtweite (etwa 96 Blöcke), Strukturen, die aus dem Boden ragen oder direkt vor ihm liegen, und ungeöffnete Loot-Kisten darin. **Kein X-Ray**: Vergrabene Erze und Kisten findet er nur durch Graben. |
 | Wissen | `BotKnowledge` | Wird zur Laufzeit **aus dem Spiel selbst** gelesen: alle Crafting- und Schmelzrezepte (auch aus Mods und Datapacks), welche Blöcke welche Items droppen (durch Würfeln der echten Loot-Tabellen), welche Werkzeuge welche Blöcke abbauen. Von Hand gepflegt sind nur: Seltenheit von Blöcken in der Oberwelt, beste Abbauhöhe je Erz und Mob-Drops. |
 | Planung | `ObtainPlanner`, `ObtainTask` | Zerlegt „habe N × X“ rekursiv (siehe unten). |
-| Aufgaben | `task/*` | Abbauen (mit Suche und Strip-Mining), Craften, Schmelzen, Jagen, Essen, Ausrüsten, Arbeitsblock benutzen, Abfolgen |
+| Aufgaben | `task/*` | Abbauen (mit Suche und Strip-Mining), Craften, Schmelzen, Jagen, Essen, Ausrüsten, Arbeitsblock benutzen, Kiste looten, Biom oder Struktur aufsuchen, Item an Mob benutzen (melken, scheren), Eimer füllen, Obsidian herstellen, Portal bauen und durchgehen, an die Oberfläche steigen, Abfolgen |
 | Gehirn | `BotBrain`, `lockout/LockoutBrain` | Entscheidet, was als Nächstes zu tun ist. |
 
 ## Wie der Bot plant
@@ -35,7 +35,10 @@ Beispiel: „Steinspitzhacke“. Der Planer spielt den Weg auf einer **Kopie des
    hergestellt wird, kommt dafür nicht in Frage.
 3. Holzspitzhacke, Stöcke und Werkbank brauchen Bretter, also Stämme. Welche Holzart, entscheidet
    er danach, was in der Nähe steht.
-4. Fürs Schmelzen: ein Ofen und Brennstoff. Kohle nimmt er, wenn sie nahe ist, sonst Holz. Das
+4. Was kein Rezept liefert, kennt er trotzdem: Einen Eimer füllt man an einer sichtbaren Quelle.
+   Obsidian entsteht aus einem Lavapool mit Wassereimer und Diamantspitzhacke: Wasser auf das Ufer
+   gießen, damit es über die Lava läuft, das Wasser wieder aufnehmen und das Obsidian abbauen.
+5. Fürs Schmelzen: ein Ofen und Brennstoff. Kohle nimmt er, wenn sie nahe ist, sonst Holz. Das
    Eingangsmaterial und das Ergebnis werden nie verheizt, Werkzeuge ebenfalls nicht.
 
 Dann gibt er **nur den ersten Schritt** aus, aber so bemessen, dass er für den ganzen Plan reicht:
@@ -45,7 +48,10 @@ echten Inventar. So nutzt er einen glücklichen Drop sofort und reagiert, wenn e
 **Welcher Weg?** Jede Möglichkeit bekommt geschätzte Kosten in Sekunden:
 - Was er im Inventar hat: kostenlos.
 - Was er sieht: der Weg dorthin (Entfernung, Höhenunterschied).
-- Sonst die Seltenheit des Blocks.
+- Liegt in Sichtweite ein Biom, für das der Block typisch ist: der Weg dorthin. Beispiele: Kakao im
+  Dschungel, Ton im Sumpf, Kaktus in der Wüste. Die Suche führt dann auch zuerst dorthin.
+- Sonst die Seltenheit des Blocks, und zwar für die Dimension, in der er ist. Im Nether sind
+  Netherrack und Quarz alltäglich und Oberweltblöcke unerreichbar.
 - Monster am Tag: vierfacher Aufwand.
 - Rezepte summieren ihre Zutaten.
 
@@ -82,6 +88,11 @@ wählt er einen anderen Farbstoff.
   - Bei Angriff durch ein Monster schlägt er zurück.
   - Bei Hunger isst er.
   - Mit dem Kopf unter Wasser hält er Springen gedrückt und taucht auf.
+  - Liegt ein Ufer einen vollen Block über dem Wasser, gräbt er nach ein paar vergeblichen
+    Sprüngen eine Stufe hinein, wie Spieler es auch tun.
+- **Zurück nach oben:** Aus einer Mine steigt er senkrecht auf, indem er springt und einen Block
+  unter sich setzt. Ist über ihm Flüssigkeit oder hat er keine Blöcke, gräbt er eine Treppe. Jede
+  Suche an der Oberfläche beginnt mit diesem Aufstieg.
   - Wenn das Inventar voll wird, wirft er Schutt weg und behält einen Stapel Baumaterial.
 
 ## Lockout Bingo
@@ -107,12 +118,27 @@ Ablauf:
    | Rüstung tragen | die billigsten Teile besorgen und anziehen |
    | N verschiedene Items | die N billigsten besorgen |
    | Arbeitsblöcke | Steinsäge, Schleifstein, Webstuhl, Schmiedetisch oder Kartentisch besorgen, aufstellen und benutzen |
+   | Kuh melken, Schaf scheren | Eimer bzw. Schere besorgen, Tier suchen, benutzen |
+   | Biom besuchen | hingehen, wenn in Sicht; sonst erkunden, länger je seltener |
+   | Struktur besuchen | Dorf, Schiffswrack, Ruinenportal, Tempel, Außenposten, Lager, Ozeanruine: hingehen, wenn gesehen |
+   | Nether betreten | 10 Obsidian, Feuerzeug, Portal bauen, durchgehen; im Nether dann Nether-Ziele, danach zurück |
+   | Tiefe Y ≤ −50, einfache Advancements | hinuntergraben; Steinzeit, Eisen, Rüstung, Diamanten |
 
-2. Er geht auf die billigste Kachel los.
-3. Holt jemand anderes die Kachel, bricht er sofort ab und wählt neu.
-4. Scheitert ein Ziel zweimal, lässt er es 3 Minuten ruhen.
-5. Ziele, die er noch nicht versteht, überlässt er dem Gegner. Dazu gehören Nether, End,
-   Strukturen, Advancements, Brauen, Verzaubern und Handel.
+2. **Routen statt Einzelziele:** Von den schnellsten fünf Kacheln nimmt er die, nach der die
+   nächste am schnellsten geht. Er rechnet mit dem, was er danach in der Hand hätte: Werkzeuge,
+   Ofen, Reste. Steht z. B. Eisenbarren neben Eimer und Schere auf dem Brett, holt er zuerst das
+   Eisen.
+3. **Gelegenheiten unterwegs:** Alle paar Sekunden schaut er, ob etwas nebenher geht:
+   - Eine ungeöffnete Loot-Kiste in der Nähe (Schiffswrack mit Eisen, Ruinenportal mit Feuerzeug,
+     Obsidian und Gold) plündert er.
+   - Eine andere Kachel, die gerade nur Sekunden kostet, erledigt er zwischendurch: die Kuh, die
+     vorbeiläuft, das Zuckerrohr am Ufer, das Biom, durch das er gerade läuft.
+
+   Danach macht er mit seinem Ziel weiter.
+4. Holt jemand anderes die Kachel, bricht er sofort ab und wählt neu.
+5. Scheitert ein Ziel zweimal, lässt er es 3 Minuten ruhen.
+6. Ziele, die er noch nicht versteht, überlässt er dem Gegner. Dazu gehören End, Brauen,
+   Verzaubern, Handel, Zähmen, Züchten und Reiten.
 
 **Schwierigkeitsgrade:** Sie ändern, wie er spielt, nicht was er weiß.
 
@@ -134,6 +160,9 @@ Ablauf:
       „du (Rot) gegen Bot (Blau)“ auf einem neuen Brett
 /challengecraft_bot get <name> <item> <anzahl>  besorgt ein beliebiges Item (Planer-Test)
 /challengecraft_bot mine|kill|goto|follow|eat|stop <name> …
+/challengecraft_bot biome|structure <name> <id>  Biom / Struktur aufsuchen
+/challengecraft_bot milk|portal|surface <name>   Kuh melken / Portal bauen / aufsteigen
+/challengecraft_bot senses <name>               was er gerade wahrnimmt
 /challengecraft_bot status|inv <name>          was er gerade tut / was er dabei hat
 ```
 
@@ -149,15 +178,21 @@ Im Test funktioniert Folgendes:
 - Werkzeug schonen.
 - Schacht und Stollen bis auf Höhe −18 mit Nebenfunden wie Redstone und Kupfer.
 - Lockout-Kacheln selbstständig holen.
+- Aus einem Becken klettern.
+- 24 Blöcke aus einer Mine aufsteigen.
+- Ein Dorf in 50 Blöcken Entfernung erkennen und betreten.
+- Eine Kuh melken.
+- Aus einem Lavapool 3 Obsidian herstellen.
+- Ein Portal bauen, anzünden und in den Nether gehen.
 
 Offen:
-- **Zurück an die Oberfläche** nach dem Graben: eigener Aufstieg statt normaler Wegsuche.
-- **Aus dem Wasser klettern:** Über einen Rand, der einen Block über dem Wasserspiegel liegt,
-  kommt er noch nicht zuverlässig.
+- **Im Nether bewegen:** Lava-Seen, Ghasts, Festungen und Bastionen finden. Er kann hin und zurück,
+  aber die Nether-Ziele sind wenig getestet.
 - **Zusammen mit „The House Always Wins“:** Stirbt der Bot, sitzt er am Blackjack-Tisch fest,
   weil er Casino-Spiele noch nicht kann. Das gehört zum geplanten Casino-Benchmark.
-- **Mehr Zieltypen:** Kuh melken, Schaf scheren, Druckplatte, Bett und Schlafen, Dorfhandel,
-  Nether (Portal bauen), Verzaubern, Brauen.
+- **Mehr Zieltypen:** Druckplatte, Bett und Schlafen, Dorfhandel, Züchten, Zähmen, Verzaubern,
+  Brauen, End.
+- **Ruinenportale reparieren** statt ein neues Portal zu bauen.
 - **Gegner beobachten:** Kacheln bevorzugen, die der Gegner gleich hat, also blocken.
 - **Kampf:** zurückweichen bei wenig Leben, Schild, Bogen.
 - **The House Always Wins als Benchmark:** dasselbe Gehirnprinzip mit Casino-Zielen (Chips
