@@ -214,8 +214,51 @@ public final class LockoutGoals {
                 }
                 yield best;
             }
+            case "ride_horse" -> mount(bot, planner, EntityTypes.HORSE, 1);
+            case "tame_horse" -> mount(bot, planner, EntityTypes.HORSE, 12);
+            case "get_poisoned" -> consume(bot, planner, Set.of(Items.SPIDER_EYE, Items.POISONOUS_POTATO, Items.PUFFERFISH));
+            case "throw_ender_pearl" -> {
+                double c = planner.estimate(bot, Set.of(Items.ENDER_PEARL), 1);
+                yield c >= INF ? null : new Option(c + 2, () -> new SequenceTask("throw an ender pearl", List.of(
+                        () -> new ObtainTask(Set.of(Items.ENDER_PEARL), 1, planner),
+                        () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f))));
+            }
+            case "ring_bell" -> click(bot, "ring a bell", Blocks.BELL);
+            case "use_lectern" -> click(bot, "use a lectern", Blocks.LECTERN);
+            case "sleep_in_village_bed" -> body.level().isDarkOutside() ? clickBed(bot) : null;
             default -> null;
         };
+    }
+
+    /** A block it knows of, clicked: the walk there is the cost. */
+    private static Option click(Bot bot, String what, Block block) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        BlockPos at = bot.memory().nearest(level, bot.body().blockPosition(), s -> s.is(block), Set.of());
+        if (at == null) return null;
+        double cost = 5 + Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5;
+        return new Option(cost, () -> new net.kasax.challengecraft.bot.task.ClickBlockTask(what, s -> s.is(block)));
+    }
+
+    private static Option clickBed(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        BlockPos at = bot.memory().nearest(level, bot.body().blockPosition(), s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of());
+        if (at == null) return null;
+        return new Option(5 + Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5,
+                () -> new net.kasax.challengecraft.bot.task.ClickBlockTask("sleep in a village bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS)));
+    }
+
+    /** Onto a horse (and again, until it stops bucking and is tame). */
+    private static Option mount(Bot bot, ObtainPlanner planner, EntityType<?> type, int times) {
+        double mob = planner.mobEffort(bot, type, 240);
+        if (mob >= INF) return null;
+        return new Option(mob + times * 4, () -> {
+            List<Supplier<BotTask>> steps = new ArrayList<>();
+            for (int i = 0; i < times; i++) {
+                steps.add(() -> new UseOnMobTask(type, Items.AIR, e -> true));
+                steps.add(() -> new net.kasax.challengecraft.bot.task.WaitTask(60));
+            }
+            return new SequenceTask("ride a " + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath(), steps);
+        });
     }
 
     private static Option fall(Bot bot, ObtainPlanner planner, int height, boolean hurt) {
@@ -294,6 +337,8 @@ public final class LockoutGoals {
         double cost;
         if (seen != null) cost = 5 + Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4.0;
         else if (SURFACE_STRUCTURES.contains(path)) cost = unseenEffort(goal);
+        else if (path.equals("mineshaft")) cost = 420;
+        else if (path.equals("trial_chambers")) cost = 700;
         else return null; // underground (mineshaft, stronghold, ancient city): found by chance only
         return new Option(cost, () -> new VisitStructureTask(level, goal.primaryTarget()));
     }

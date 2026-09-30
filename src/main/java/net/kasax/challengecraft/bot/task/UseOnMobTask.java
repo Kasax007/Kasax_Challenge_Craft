@@ -44,7 +44,8 @@ public final class UseOnMobTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
-        if (BotInventory.slotOf(body, tool) < 0) return Result.FAILED;
+        boolean emptyHand = tool == net.minecraft.world.item.Items.AIR;
+        if (!emptyHand && BotInventory.slotOf(body, tool) < 0) return Result.FAILED;
         if (target == null || !target.isAlive() || !suitable.test(target)) {
             target = body.level().getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(48),
                             e -> e.getType() == type && e.isAlive() && suitable.test(e) && !failed.contains(e.getUUID()))
@@ -79,7 +80,8 @@ public final class UseOnMobTask implements BotTask {
             return Result.RUNNING;
         }
         bot.navigator().stop();
-        bot.tools().select(BotInventory.slotOf(body, tool));
+        if (emptyHand) bot.tools().selectEmptyHandPublic();
+        else bot.tools().select(BotInventory.slotOf(body, tool));
         body.lookAt(target.getEyePosition());
         // What the network handler does for a player's click: the interaction event, then the use.
         var hit = new EntityHitResult(target, target.getEyePosition());

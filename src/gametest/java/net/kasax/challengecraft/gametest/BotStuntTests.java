@@ -100,4 +100,37 @@ public class BotStuntTests {
                 () -> new UseOnMobTask(EntityTypes.COW, Items.WHEAT, ready))), 600,
                 () -> h.getLevel().getEntitiesOfClass(Animal.class, h.getBounds().inflate(4), an -> an.isBaby() || an.isInLove()).size() >= 2);
     }
+
+    /** Onto a horse (with an empty hand). */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void rideHorse(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "ride_horse");
+        var horse = EntityTypes.HORSE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        horse.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
+        h.getLevel().addFreshEntity(horse);
+        a.spawn(16, FEET, 20, new ItemStack(Items.DIRT, 3));
+        a.run(new UseOnMobTask(EntityTypes.HORSE, Items.AIR, e -> true), 400, () -> a.bot().body().isPassenger());
+    }
+
+    /** A bell rung. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void ringBell(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "ring_bell");
+        a.fill(28, FEET, 20, 28, FEET, 20, Blocks.BELL);
+        a.spawn(14, FEET, 20);
+        boolean[] rung = {false};
+        a.run(new net.kasax.challengecraft.bot.task.ClickBlockTask("ring a bell", st -> st.is(Blocks.BELL)), 400, () -> {
+            if (h.getLevel().getBlockEntity(a.abs(28, FEET, 20)) instanceof net.minecraft.world.level.block.entity.BellBlockEntity bell && bell.shaking) rung[0] = true;
+            return rung[0];
+        });
+    }
+
+    /** An ender pearl thrown. */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void throwPearl(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "pearl");
+        a.spawn(20, FEET, 20, new ItemStack(Items.ENDER_PEARL));
+        a.run(new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f), 100,
+                () -> a.bot().body().getInventory().countItem(Items.ENDER_PEARL) == 0);
+    }
 }
