@@ -165,6 +165,20 @@ Summe bis 2 h ≈ 146 k, bis 3 h ≈ 411 k, bis 4 h ≈ 745 k. Das ist bewusst h
 braucht man Farmen (Eisen, Gold, Mobs) oder Glück am Automaten. **Zum Einstellen beim Testen:**
 `/casino feescale <Prozent>` skaliert die ganze Kurve (z. B. 50 = halb so teuer).
 
+**Gemessen mit einem Bot** (Baritone 1.20.0 für 26.3 im Test-Client, friedlich, ohne Schmelz- und
+Laufpausen, `legitMine` an = nur gesehene Erze, kein X-Ray):
+
+| Tätigkeit | Ertrag | Jetons pro Minute | pro 10 Minuten |
+|---|---|---:|---:|
+| Holz fällen, ohne Werkzeug | 13 Stämme/min | ~420 | ~4 200 |
+| Erz abbauen, Eisenspitzhacke, 5 min | 82 Kohle, 148 Kupfer, 1 Eisen | ~5 900 (Kupfer/Eisen geschmolzen) | ~59 000 |
+
+Holz allein deckt die ersten vier Gebühren (bis 0:40). Ab etwa der sechsten (1:00, 7 280) muss abgebaut
+und geschmolzen werden. Durchgehendes Abbauen ohne jede Pause liegt beim Deckel von 65 536 pro
+10 Minuten. Ein Mensch mit Schmelzen, Wegen und Monstern schafft realistisch die Hälfte, ab der dritten
+Stunde reicht Abbauen allein also nicht mehr, dafür braucht es Farmen oder Glück an den Geräten. Das
+ist so gewollt. Die Messung ist eine Stichprobe an einem Ort, keine Statistik.
+
 ---
 
 ## 5. Verlorene Wetten: „Das Haus schickt Grüße“
