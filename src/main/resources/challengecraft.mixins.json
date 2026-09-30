@@ -40,7 +40,11 @@
     "CushionPistonMixin",
     "CushionInfiniteMixin",
     "CushionBreakMixin",
-    "CasinoMobDropsMixin"
+    "CasinoMobDropsMixin",
+    "LockoutTriggerMixins$Tame",
+    "LockoutTriggerMixins$Breed",
+    "LockoutTriggerMixins$Trade",
+    "LockoutRespawnMixin"
   ],
   "injectors": {
     "defaultRequire": 1

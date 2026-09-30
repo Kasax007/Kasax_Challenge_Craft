@@ -101,6 +101,12 @@ public final class CasinoCommands {
                                             .withStyle(ChatFormatting.GOLD), false);
                                     return 1;
                                 })))
+                        .then(Commands.literal("revive").executes(ctx -> {
+                            CasinoEconomy.revive(ctx.getSource().getServer());
+                            ctx.getSource().sendSuccess(() -> Component.literal("The House lets you play on")
+                                    .withStyle(ChatFormatting.GOLD), true);
+                            return 1;
+                        }))
                         .then(Commands.literal("booth").executes(ctx -> {
                             MinecraftServer server = ctx.getSource().getServer();
                             CasinoSavedData.get(server).setBoothBuilt(false, 0L);

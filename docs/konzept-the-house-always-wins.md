@@ -341,6 +341,7 @@ Die Challenge ist Level 8 und steht in der Kategorie „Chaos“. Für schnelle 
 | `/casino feescale <Prozent>` | Gebührenkurve skalieren |
 | `/casino booth` | Stand am Spawn neu bauen |
 | `/casino status` | Konten, Einsätze, Gebühr im Chat |
+| `/casino revive` | hebt einen Bankrott auf (zum Testen), überfällige Gebühren werden übersprungen |
 | `/casino slotforce <freespins\|big\|mega\|epic\|legendary>` | der nächste eigene Spin am Automaten bringt dieses Ergebnis (ein echter, ausgewürfelter Spin dieser Art) |
 
 Beim Serverstart schreibt das Log `[Casino] RTP slot 95.9978 %, plinko 96.0010 %, roulette 96.0000 %,

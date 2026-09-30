@@ -242,6 +242,24 @@ public final class CasinoEconomy {
         syncAll(server);
     }
 
+    /**
+     * Test hook ({@code /casino revive}): lifts a bankruptcy. Fees that fell due in the meantime are
+     * skipped, so the next one lies ahead again, and spectators go back to survival.
+     */
+    public static void revive(MinecraftServer server) {
+        CasinoSavedData data = CasinoSavedData.get(server);
+        data.setBankrupt(false);
+        int runTicks = ChallengeTimeUtil.getDisplayRunTicks(server);
+        while (nextFeeIndex(server) * FEE_PERIOD_TICKS <= runTicks) {
+            data.setFeesCharged(data.getFeesCharged() + 1);
+        }
+        data.touch();
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (p.isSpectator()) p.setGameMode(GameType.SURVIVAL);
+        }
+        syncAll(server);
+    }
+
     // ---- deposits -----------------------------------------------------------------------------
 
     /** Deposits whole inventory slots; returns centi-chips credited. */

@@ -455,7 +455,17 @@ public class ChallengeCraft implements ModInitializer {
 						Chal_40_LockoutBingo.startSoloDebugRun(player);
 						context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_solo.started"), true);
 						return 1;
-					}));
+					})
+					// Optional goal ids (space or comma separated) to put on the test board first.
+					.then(Commands.argument("goals", com.mojang.brigadier.arguments.StringArgumentType.greedyString())
+							.executes(context -> {
+								ServerPlayer player = context.getSource().getPlayerOrException();
+								String raw = com.mojang.brigadier.arguments.StringArgumentType.getString(context, "goals");
+								Chal_40_LockoutBingo.startSoloDebugRun(player,
+										java.util.Arrays.stream(raw.split("[,\\s]+")).filter(id -> !id.isBlank()).toList());
+								context.getSource().sendSuccess(() -> Component.translatable("challengecraft.command.lockout_debug_solo.started"), true);
+								return 1;
+							})));
 
 			dispatcher.register(Commands.literal("challengecraft_lockout_debug_claim")
 					.requires(source -> ModPermissions.isOp(source))
