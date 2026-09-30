@@ -60,9 +60,19 @@ public final class LockoutGoals {
     }
 
     private static final double INF = 1e9;
+    private static final Set<EntityType<?>> BOSSES = Set.of(EntityTypes.ENDER_DRAGON, EntityTypes.WITHER, EntityTypes.WARDEN,
+            EntityTypes.ELDER_GUARDIAN, EntityTypes.RAVAGER, EntityTypes.SHULKER, EntityTypes.BREEZE, EntityTypes.GUARDIAN, EntityTypes.PHANTOM);
 
     /** Goals estimated above this (half an hour) are out of reach for now. */
     private static final double MAX_COST = 1800;
+
+    /** Whether the bot knows any way for this goal (whatever the cost; Nether goals count in any dimension). */
+    public static boolean covers(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
+        if (goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER && overworld(bot)) {
+            return goal.type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ADVANCEMENT || option(bot, planner, goal) != null;
+        }
+        return option(bot, planner, goal) != null;
+    }
 
     public static Option plan(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         Option o = option(bot, planner, goal);
@@ -70,6 +80,8 @@ public final class LockoutGoals {
     }
 
     private static Option option(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
+        Option stunt = stunt(bot, planner, goal.id());
+        if (stunt != null) return stunt;
         return switch (goal.type()) {
             case ITEM -> obtain(bot, planner, items(goal.targets()), 1);
             case ITEM_AMOUNT -> obtain(bot, planner, items(goal.targets()), goal.amount());
@@ -150,6 +162,108 @@ public final class LockoutGoals {
                 () -> new ObtainTask(Set.of(Items.FLINT_AND_STEEL), 1, planner).keeping(kit),
                 () -> new ObtainTask(Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.DIRT), 4, planner).keeping(kit),
                 () -> new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()))));
+    }
+
+    // ---- stunts: things to do rather than to have --------------------------------------------
+
+    private static final Set<Item> BLOCKS = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.NETHERRACK);
+    private static final Set<Item> BEDS = beds();
+
+    private static Set<Item> beds() {
+        Set<Item> out = new LinkedHashSet<>();
+        for (Item item : BuiltInRegistries.ITEM) if (new ItemStack(item).is(net.minecraft.tags.ItemTags.BEDS)) out.add(item);
+        return out;
+    }
+
+    private static Option stunt(Bot bot, ObtainPlanner planner, String id) {
+        var body = bot.body();
+        return switch (id) {
+            case "take_fall_damage" -> fall(bot, planner, 5, false);
+            case "fall_20_blocks_and_survive" -> body.getHealth() >= 19 ? fall(bot, planner, 22, true) : null;
+            case "stand_on_bedrock" -> {
+                if (!overworld(bot)) yield null;
+                int down = body.getBlockY() - (body.level().getMinY() + 1);
+                double pick = planner.estimate(bot, Set.of(Items.STONE_PICKAXE, Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE), 1);
+                if (pick >= INF) yield null;
+                yield new Option(pick + down * 2.5 + 20, () -> new SequenceTask("down to the bedrock", List.of(
+                        () -> new ObtainTask(Set.of(Items.STONE_PICKAXE, Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE), 1, planner),
+                        () -> new net.kasax.challengecraft.bot.task.NavGoalTask("stand on the bedrock",
+                                (level, p) -> level.getBlockState(p.below()).is(Blocks.BEDROCK),
+                                b -> new BlockPos(b.body().getBlockX(), b.body().level().getMinY() + 1, b.body().getBlockZ()), 12000))));
+            }
+            case "place_tnt" -> placeThen(bot, planner, Items.TNT, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.NOTHING, null, 0);
+            case "ignite_tnt" -> placeThen(bot, planner, Items.TNT, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.USE_ITEM, Items.FLINT_AND_STEEL, 8);
+            case "survive_explosion" -> body.getHealth() >= 18
+                    ? placeThen(bot, planner, Items.TNT, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.USE_ITEM, Items.FLINT_AND_STEEL, 3) : null;
+            case "activate_pressure_plate" -> placeThen(bot, planner, Items.STONE_PRESSURE_PLATE, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.STEP_ON, null, 0);
+            case "burn_and_survive" -> body.getHealth() >= 16
+                    ? placeThen(bot, planner, Items.CAMPFIRE, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.STEP_ON, null, 0) : null;
+            case "set_spawn" -> bed(bot, planner, false);
+            case "sleep_in_bed" -> body.level().isDarkOutside() ? bed(bot, planner, true) : null;
+            case "tame_wolf" -> tame(bot, planner, EntityTypes.WOLF, Items.BONE, 3);
+            case "tame_cat" -> tame(bot, planner, EntityTypes.CAT, Items.COD, 3);
+            case "breed_cows" -> breed(bot, planner, EntityTypes.COW, Items.WHEAT);
+            case "breed_sheep" -> breed(bot, planner, EntityTypes.SHEEP, Items.WHEAT);
+            case "breed_pigs" -> breed(bot, planner, EntityTypes.PIG, Items.CARROT);
+            case "breed_chickens" -> breed(bot, planner, EntityTypes.CHICKEN, Items.WHEAT_SEEDS);
+            case "breed_animals" -> {
+                Option best = null;
+                for (Option o : new Option[]{breed(bot, planner, EntityTypes.COW, Items.WHEAT), breed(bot, planner, EntityTypes.SHEEP, Items.WHEAT),
+                        breed(bot, planner, EntityTypes.PIG, Items.CARROT), breed(bot, planner, EntityTypes.CHICKEN, Items.WHEAT_SEEDS)}) {
+                    if (o != null && (best == null || o.cost() < best.cost())) best = o;
+                }
+                yield best;
+            }
+            default -> null;
+        };
+    }
+
+    private static Option fall(Bot bot, ObtainPlanner planner, int height, boolean hurt) {
+        double blocks = planner.estimate(bot, BLOCKS, height + 2);
+        if (blocks >= INF) return null;
+        return new Option(blocks + height * 0.7 + 5, () -> new SequenceTask("fall " + height + " blocks", List.of(
+                () -> new ObtainTask(BLOCKS, height + 2, planner),
+                () -> new net.kasax.challengecraft.bot.task.FallTask(height, hurt))));
+    }
+
+    private static Option placeThen(Bot bot, ObtainPlanner planner, Item block, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then then, Item tool, int away) {
+        double c = planner.estimate(bot, Set.of(block), 1) + (tool == null ? 0 : planner.estimate(bot, Set.of(tool), 1));
+        if (c >= INF) return null;
+        List<Supplier<BotTask>> steps = new ArrayList<>();
+        steps.add(() -> new ObtainTask(Set.of(block), 1, planner));
+        if (tool != null) steps.add(() -> new ObtainTask(Set.of(tool), 1, planner).keeping(Set.of(block)));
+        steps.add(() -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(block, then, tool, away));
+        return new Option(c + 6, () -> new SequenceTask("put down " + ObtainPlanner.name(block), steps));
+    }
+
+    private static Option bed(Bot bot, ObtainPlanner planner, boolean sleep) {
+        double c = planner.estimate(bot, BEDS, 1);
+        if (c >= INF) return null;
+        return new Option(c + 6, () -> new SequenceTask(sleep ? "sleep in a bed" : "set the spawn at a bed", List.of(
+                () -> new ObtainTask(BEDS, 1, planner),
+                () -> {
+                    Item bed = BEDS.stream().filter(b -> ObtainPlanner.countAny(bot.body(), Set.of(b)) > 0).findFirst().orElse(BEDS.iterator().next());
+                    return new net.kasax.challengecraft.bot.task.PlaceAndUseTask(bed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0);
+                })));
+    }
+
+    private static Option tame(Bot bot, ObtainPlanner planner, EntityType<?> type, Item food, int count) {
+        double c = planner.estimate(bot, Set.of(food), count), mob = planner.mobEffort(bot, type, 180);
+        if (c >= INF || mob >= INF) return null;
+        return new Option(c + mob + 10, () -> new SequenceTask("tame a " + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath(), List.of(
+                () -> new ObtainTask(Set.of(food), count, planner),
+                () -> new net.kasax.challengecraft.bot.task.TameTask(type, food))));
+    }
+
+    private static Option breed(Bot bot, ObtainPlanner planner, EntityType<?> type, Item food) {
+        double c = planner.estimate(bot, Set.of(food), 2), mob = planner.mobEffort(bot, type, 60);
+        if (c >= INF || mob >= INF) return null;
+        java.util.function.Predicate<net.minecraft.world.entity.LivingEntity> ready = e -> e instanceof net.minecraft.world.entity.animal.Animal a
+                && !a.isBaby() && !a.isInLove() && a.canFallInLove();
+        return new Option(c + mob * 1.5 + 6, () -> new SequenceTask("breed " + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath() + "s", List.of(
+                () -> new ObtainTask(Set.of(food), 2, planner),
+                () -> new UseOnMobTask(type, food, ready),
+                () -> new UseOnMobTask(type, food, ready))));
     }
 
     // ---- places -------------------------------------------------------------------------------
@@ -252,7 +366,13 @@ public final class LockoutGoals {
         EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(entityId)).orElse(null);
         if (type == null) return null;
         double cost = planner.mobEffort(bot, type, INF);
-        if (cost >= INF) return null;
+        if (cost >= INF) {
+            // No drop worth knowing it by: still findable. Monsters come out at night and in caves;
+            // bosses and the rare ones are not a quick tile.
+            if (BOSSES.contains(type)) return null;
+            if (type.getCategory() != net.minecraft.world.entity.MobCategory.MONSTER) return null;
+            cost = bot.body().level().isDarkOutside() ? 150 : 420;
+        }
         return new Option(cost, () -> new KillTask(Set.of(type), Set.of(), 0, 1));
     }
 

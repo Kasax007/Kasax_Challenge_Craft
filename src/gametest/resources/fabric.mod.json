@@ -7,7 +7,8 @@
   "entrypoints": {
     "fabric-gametest": [
       "net.kasax.challengecraft.gametest.BotMovementTests",
-      "net.kasax.challengecraft.gametest.BotSkillTests"
+      "net.kasax.challengecraft.gametest.BotSkillTests",
+      "net.kasax.challengecraft.gametest.BotStuntTests"
     ]
   },
   "depends": {

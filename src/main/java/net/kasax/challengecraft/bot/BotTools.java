@@ -84,6 +84,11 @@ public final class BotTools {
         return score;
     }
 
+    /** An empty hand (for clicking a bed, a bell, a lever). */
+    public void selectEmptyHandPublic() {
+        selectEmptyHand();
+    }
+
     private void selectEmptyHand() {
         Inventory inv = bot.getInventory();
         for (int i = 0; i < 9; i++) {

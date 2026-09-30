@@ -30,6 +30,8 @@ public final class Bot {
     public final java.util.Set<net.minecraft.core.BlockPos> unreachableStations = new java.util.HashSet<>();
     /** For benchmarks: ticks with nothing to do, tasks that failed. */
     public int idleTicks, failures;
+    /** Off while a fall is meant to hurt (a Lockout goal wants the damage). */
+    public boolean waterLandingAllowed = true;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 
@@ -206,7 +208,7 @@ public final class Bot {
             }
             return;
         }
-        if (body.onGround() || body.isInWater() || body.fallDistance < 4 || body.getDeltaMovement().y > -0.3) return;
+        if (!waterLandingAllowed || body.onGround() || body.isInWater() || body.fallDistance < 4 || body.getDeltaMovement().y > -0.3) return;
         int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.WATER_BUCKET);
         if (slot < 0) return;
         net.minecraft.core.BlockPos p = body.blockPosition();
