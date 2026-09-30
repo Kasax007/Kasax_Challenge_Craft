@@ -123,8 +123,8 @@ public final class LockoutGoals {
         Set<Item> bucketKit = Set.of(Items.WATER_BUCKET, Items.BUCKET, Items.FLINT_AND_STEEL);
         return new Option(cost + lava + 75, () -> {
             // The pool in sight now: the gathering may lead away from it.
-            BlockPos pool = BotWorld.nearest((ServerLevel) bot.body().level(), bot.body().blockPosition(), 32, 16,
-                    st -> st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && st.getFluidState().isSource(), true, Set.of());
+            BlockPos pool = bot.memory().nearest((ServerLevel) bot.body().level(), bot.body().blockPosition(),
+                    st -> st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && st.getFluidState().isSource(), Set.of());
             return new SequenceTask("cast a portal to the Nether", List.of(
                 () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner).keeping(Set.of(Items.FLINT_AND_STEEL)),
                 () -> new ObtainTask(Set.of(Items.BUCKET), 1, planner).keeping(Set.of(Items.WATER_BUCKET, Items.FLINT_AND_STEEL)),

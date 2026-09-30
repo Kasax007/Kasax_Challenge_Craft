@@ -217,7 +217,8 @@ final class BotCommands {
                                     bot.senses().tick(bot.body());
                                     ok(ctx, bot.name + " sees biomes " + bot.senses().biomes().keySet().stream().map(Identifier::getPath).sorted().toList()
                                             + ", structures " + bot.senses().structures().keySet().stream().map(Identifier::getPath).sorted().toList()
-                                            + ", loot chests " + bot.senses().lootables().size());
+                                            + ", loot chests " + bot.senses().lootables().size()
+                                            + "; memory: " + bot.memory().summary(bot.body().level().dimension()));
                                     return 1;
                                 })))
                         .then(Commands.literal("status").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)

@@ -81,7 +81,7 @@ public final class CastPortalTask implements BotTask {
         ServerLevel level = (ServerLevel) body.level();
         if (level.dimension() != from) return Result.DONE;
         if (++ticks > 12000) return Result.FAILED;
-        if (ops == null && near != null && bot.body().blockPosition().distManhattan(near) > 24) {
+        if (ops == null && near != null && bot.body().blockPosition().distManhattan(near) > 24 && walkFails <= 8) {
             // Back to the pool it saw first.
             if (!walking) {
                 bot.navigator().goNear(near, 12);
