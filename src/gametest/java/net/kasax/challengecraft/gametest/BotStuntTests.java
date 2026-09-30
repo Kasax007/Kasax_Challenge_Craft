@@ -133,4 +133,20 @@ public class BotStuntTests {
         a.run(new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f), 100,
                 () -> a.bot().body().getInventory().countItem(Items.ENDER_PEARL) == 0);
     }
+
+    /** An emerald for a fletcher's arrows. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void tradeWithFletcher(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "trade");
+        var v = EntityTypes.VILLAGER.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        var fletcher = h.getLevel().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.VILLAGER_PROFESSION)
+                .getOrThrow(net.minecraft.world.entity.npc.villager.VillagerProfession.FLETCHER);
+        v.setVillagerData(v.getVillagerData().withProfession(fletcher));
+        v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        v.setNoAi(true);
+        h.getLevel().addFreshEntity(v);
+        a.spawn(16, FEET, 20, new ItemStack(Items.EMERALD, 1));
+        a.run(new net.kasax.challengecraft.bot.task.TradeTask("trade", (vi, o) -> true), 400,
+                () -> a.bot().body().getInventory().countItem(Items.ARROW) > 0);
+    }
 }

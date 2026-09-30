@@ -97,6 +97,7 @@ public final class LockoutGoals {
             case STRUCTURE -> structure(bot, goal);
             case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
             case ADVANCEMENT -> advancement(bot, planner, goal.id());
+            case TRADE -> trade(bot, planner, goal.id());
             default -> null;
         };
     }
@@ -307,6 +308,57 @@ public final class LockoutGoals {
                 () -> new ObtainTask(Set.of(food), 2, planner),
                 () -> new UseOnMobTask(type, food, ready),
                 () -> new UseOnMobTask(type, food, ready))));
+    }
+
+    // ---- trading --------------------------------------------------------------------------------
+
+    /**
+     * A trade with a villager nearby: of the offers that answer the goal (any, a profession, a
+     * result), the one whose payment is quickest to get (32 sticks for the fletcher's emerald,
+     * coal for the armorer's). Payment first, then the trade.
+     */
+    private static Option trade(Bot bot, ObtainPlanner planner, String id) {
+        java.util.function.BiPredicate<net.minecraft.world.entity.npc.villager.AbstractVillager, net.minecraft.world.item.trading.MerchantOffer> wanted = switch (id) {
+            case "trade_with_villager" -> (v, o) -> true;
+            case "obtain_emerald_by_trade" -> (v, o) -> o.getResult().is(Items.EMERALD);
+            case "buy_bread" -> (v, o) -> o.getResult().is(Items.BREAD);
+            case "buy_arrows" -> (v, o) -> o.getResult().is(Items.ARROW);
+            case "buy_lapis" -> (v, o) -> o.getResult().is(Items.LAPIS_LAZULI);
+            default -> {
+                if (!id.startsWith("trade_with_")) yield null;
+                String profession = id.substring("trade_with_".length());
+                yield (v, o) -> v instanceof net.minecraft.world.entity.npc.villager.Villager vi
+                        && vi.getVillagerData().profession().unwrapKey().map(k -> k.identifier().getPath().equals(profession)).orElse(false);
+            }
+        };
+        if (wanted == null) return null;
+        var body = bot.body();
+        double best = INF;
+        net.minecraft.world.item.trading.MerchantOffer bestOffer = null;
+        net.minecraft.world.entity.npc.villager.AbstractVillager bestVillager = null;
+        for (var v : body.level().getEntitiesOfClass(net.minecraft.world.entity.npc.villager.AbstractVillager.class,
+                new net.minecraft.world.phys.AABB(body.blockPosition()).inflate(96), v -> v.isAlive() && !v.isBaby())) {
+            for (var o : v.getOffers()) {
+                if (o.isOutOfStock() || !wanted.test(v, o)) continue;
+                double c = planner.estimate(bot, Set.of(o.getCostA().getItem()), o.getCostA().getCount());
+                if (!o.getCostB().isEmpty()) c += planner.estimate(bot, Set.of(o.getCostB().getItem()), o.getCostB().getCount());
+                c += Math.sqrt(v.distanceToSqr(body)) / 3.5;
+                if (c < best) {
+                    best = c;
+                    bestOffer = o;
+                    bestVillager = v;
+                }
+            }
+        }
+        if (bestOffer == null || best >= INF) return null;
+        final ItemStack a = bestOffer.getCostA().copy(), b = bestOffer.getCostB().copy();
+        return new Option(best + 5, () -> {
+            List<Supplier<BotTask>> steps = new ArrayList<>();
+            steps.add(() -> new ObtainTask(Set.of(a.getItem()), a.getCount(), planner));
+            if (!b.isEmpty()) steps.add(() -> new ObtainTask(Set.of(b.getItem()), b.getCount(), planner).keeping(Set.of(a.getItem())));
+            steps.add(() -> new net.kasax.challengecraft.bot.task.TradeTask("trade (" + id + ")", wanted));
+            return new SequenceTask("trade: " + id, steps);
+        });
     }
 
     // ---- places -------------------------------------------------------------------------------
