@@ -94,6 +94,9 @@ public final class CastPortalTask implements BotTask {
             }
             case WATER -> {
                 if (level.getBlockState(op.cell()).is(Blocks.OBSIDIAN)) return next();
+                // Already water there (a retry): pour none on top, a second source beside the
+                // first makes water that never goes away.
+                if (level.getFluidState(op.pos()).is(FluidTags.WATER) && level.getFluidState(op.pos()).isSource()) return next();
                 // Lava bucket in hand first, so the water runs only as long as it must.
                 if (BotInventory.slotOf(body, Items.LAVA_BUCKET) < 0) return scoop(bot, level);
                 if (BotInventory.slotOf(body, Items.WATER_BUCKET) < 0) {
@@ -116,11 +119,12 @@ public final class CastPortalTask implements BotTask {
                 if (++wait < 4) return Result.RUNNING;
                 // The water has to be back in the bucket before anything else, or it spreads over
                 // everything (and into the lava pool). Up close, until the source is gone.
-                if (level.getFluidState(op.pos()).is(FluidTags.WATER) && level.getFluidState(op.pos()).isSource()) {
-                    if (!close(bot, op.pos())) return walkNear(bot, op.pos());
+                BlockPos source = waterSourceNear(level, op.pos());
+                if (source != null) {
+                    if (!close(bot, source)) return walkNear(bot, source);
                     bot.navigator().stop();
-                    use(bot, level, Items.BUCKET, Vec3.atCenterOf(op.pos()));
-                    if (level.getFluidState(op.pos()).isSource()) return ++tries > 40 ? Result.FAILED : Result.RUNNING;
+                    use(bot, level, Items.BUCKET, Vec3.atCenterOf(source));
+                    return ++tries > 40 ? Result.FAILED : Result.RUNNING;
                 }
                 if (!level.getBlockState(op.cell()).is(Blocks.OBSIDIAN)) {
                     // Did not set: back to this spot's lava (clearing what is in it) and try again.
@@ -151,6 +155,14 @@ public final class CastPortalTask implements BotTask {
             }
         }
         return Result.RUNNING;
+    }
+
+    /** A water source at or right around {@code p} (the poured one, or one that formed beside it). */
+    private static BlockPos waterSourceNear(ServerLevel level, BlockPos p) {
+        for (BlockPos q : BlockPos.betweenClosed(p.offset(-2, -1, -2), p.offset(2, 1, 2))) {
+            if (level.getFluidState(q).is(FluidTags.WATER) && level.getFluidState(q).isSource()) return q.immutable();
+        }
+        return null;
     }
 
     private Result next() {
