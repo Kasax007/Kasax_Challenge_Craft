@@ -228,6 +228,7 @@ public final class CasinoClient {
             if (client.player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 40 * 40) continue;
             for (SlotAnimation.SoundEvent e : anim.cuesBetween(t - 1f, t)) {
                 SoundEvent sound = switch (e.cue()) {
+                    case LEVER -> net.minecraft.sounds.SoundEvents.LEVER_CLICK;
                     case SPIN -> CasinoSounds.REEL_SPIN;
                     case STOP -> CasinoSounds.REEL_STOP;
                     case SCATTER -> CasinoSounds.SCATTER;

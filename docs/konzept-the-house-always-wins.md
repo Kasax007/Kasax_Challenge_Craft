@@ -241,7 +241,8 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
 - Die Walzen und die Tabelle ergeben 99,998 %; ausgezahlt werden davon **96 %** jedes Gewinns, also
   **RTP 95,998 %** (exakt). Trefferquote 27,8 %, Freispiele etwa alle 151 Spins. Die Java-Mathematik ist
   gegen die Python-Rechnung geprüft, und der Server schreibt den RTP beim Start ins Log.
-- **Bedienung:** Rechtsklick dreht mit dem aktuellen Einsatz. **Item-Einsatz:** Rechtsklick mit einem
+- **Bedienung:** Rechtsklick irgendwo auf den Automaten dreht mit dem aktuellen Einsatz; dabei wird der
+  **Hebel** an der rechten Seite sichtbar gezogen (nach vorne unten, mit Klick) und federt zurück. **Item-Einsatz:** Rechtsklick mit einem
   Item in der Hand nennt den Wert, ein **zweiter Klick** innerhalb von 3 Sekunden setzt den ganzen Stack.
   Gewinne kommen dann **als dieses Item** zurück und schießen als **Fontäne** aus dem Automaten
   (bis 40 Stacks, der Rest geht als Jetons aufs Konto). Große Gewinne (≥ 50×) werden im Chat angekündigt.
@@ -262,7 +263,7 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
 
   | Stufe | ab | Anzeige | Show |
   |---|---|---|---|
-  | Großer Gewinn | 5× | Gold | Goldnugget-Fontäne aus dem Automaten, Funken an der Anzeige |
+  | Großer Gewinn | 5× | Gold | Goldnugget-Fontäne aus der goldenen Kappe oben auf dem Automaten, Funken an der Anzeige |
   | Mega-Gewinn | 20× | Gold/Orange blinkend | dazu Smaragde, Diamanten, Goldbarren und Totem-Funkeln, zweite Fanfare |
   | Epischer Gewinn | 50× | Pink/Türkis blinkend | dazu Feuerwerk über dem Automaten |
   | Legendär | 200× | alle Farben | dazu eine Lichtspirale um den Automaten, Noten und goldenes Dauerfeuerwerk, zweite Fanfare |

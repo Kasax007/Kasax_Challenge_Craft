@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "challengecraft:block/slot_machine"
+    "model": "challengecraft:block/slot_machine_item"
   }
 }

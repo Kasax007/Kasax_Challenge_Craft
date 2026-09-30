@@ -47,6 +47,7 @@ final class SlotView {
         // A finished play stays on the reels: show it as the timeline's final frame.
         float t = anim == null ? 0 : live ? anim.elapsed(partial) : anim.totalTicks + 1000f;
         drawReels(p, anim, t);
+        drawLever(p, live ? anim.leverAngle(t) : 0f);
         drawDisplay(p, anim, live, t);
         TrayView.draw(p, DeviceType.SLOT, pos);
     }
@@ -164,6 +165,45 @@ final class SlotView {
         if (anim != null && phase != null && phase.kind() == SlotAnimation.Kind.FS_INTRO && anim.result.luckySymbol() >= 0) {
             drawPicker(p, anim, phase.local());
         }
+    }
+
+    // ---- the lever ------------------------------------------------------------------------------
+
+    /** The lever's pivot in its mount (model space; the mount itself is part of the block model). */
+    private static final float LEVER_PY = 12.75f, LEVER_PZ = 8.3f;
+
+    /**
+     * The arm and knob of the lever on the player's right, turned by {@code degrees} about the
+     * mount: negative swings the knob towards the player and down, as when it is pulled.
+     */
+    private static void drawLever(DevicePainter p, float degrees) {
+        double a = Math.toRadians(degrees);
+        float cos = (float) Math.cos(a), sin = (float) Math.sin(a);
+        leverBox(p, 0.2f, 13.5f, 8.0f, 0.8f, 20.5f, 8.6f, cos, sin, 0xFFC9CED6);
+        leverBox(p, -0.2f, 20.5f, 7.6f, 1.2f, 21.9f, 9.0f, cos, sin, 0xFFC4262C);
+    }
+
+    /** A box of the lever, turned about the pivot; each face shaded as if lit from above. */
+    private static void leverBox(DevicePainter p, float x0, float y0, float z0, float x1, float y1, float z1,
+                                 float cos, float sin, int argb) {
+        float[][] c = new float[8][];
+        for (int i = 0; i < 8; i++) {
+            float x = (i & 1) == 0 ? x0 : x1, y = (i & 2) == 0 ? y0 : y1, z = (i & 4) == 0 ? z0 : z1;
+            float dy = y - LEVER_PY, dz = z - LEVER_PZ;
+            c[i] = new float[]{x, LEVER_PY + dy * cos - dz * sin, LEVER_PZ + dy * sin + dz * cos};
+        }
+        int top = argb, side = DevicePainter.shade(argb, 0.8f), dark = DevicePainter.shade(argb, 0.6f);
+        face(p, c, 2, 3, 7, 6, top);    // up
+        face(p, c, 0, 4, 5, 1, dark);   // down
+        face(p, c, 0, 1, 3, 2, side);   // north (front)
+        face(p, c, 4, 6, 7, 5, side);   // south
+        face(p, c, 0, 2, 6, 4, dark);   // -x
+        face(p, c, 1, 5, 7, 3, side);   // +x
+    }
+
+    private static void face(DevicePainter p, float[][] c, int a, int b, int d, int e, int argb) {
+        p.quadModel(c[a][0], c[a][1], c[a][2], c[b][0], c[b][1], c[b][2], c[d][0], c[d][1], c[d][2],
+                c[e][0], c[e][1], c[e][2], argb);
     }
 
     /** Model depth of the pick panel in front of the reels, and of the items running on it. */

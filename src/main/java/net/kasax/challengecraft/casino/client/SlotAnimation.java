@@ -88,6 +88,25 @@ public final class SlotAnimation {
         return t >= end;
     }
 
+    // ---- the lever ------------------------------------------------------------------------------
+
+    /** Ticks the lever takes to go down, the moment it rests there, and the ticks it springs back. */
+    public static final int LEVER_DOWN = 5, LEVER_HOLD = 2, LEVER_UP = 10;
+    private static final float LEVER_PULLED = -95f;
+
+    /** The lever's angle at time t: pulled at the start of the play, then springing back up. */
+    public float leverAngle(float t) {
+        if (t <= 0 || t >= LEVER_DOWN + LEVER_HOLD + LEVER_UP) return 0f;
+        if (t < LEVER_DOWN) {
+            float x = t / LEVER_DOWN;
+            return LEVER_PULLED * x * x; // speeding up as the hand pulls it through
+        }
+        if (t < LEVER_DOWN + LEVER_HOLD) return LEVER_PULLED;
+        float x = (t - LEVER_DOWN - LEVER_HOLD) / LEVER_UP;
+        // Back up on its spring, overshooting a little past the rest position.
+        return LEVER_PULLED * (1f - x) * (1f - x) * (float) Math.cos(1.5 * Math.PI * x);
+    }
+
     // ---- the lucky item pick (free-spins intro) -----------------------------------------------
 
     /** Intro ticks at which the pick strip starts to run and where it lands on the lucky item. */
@@ -273,7 +292,7 @@ public final class SlotAnimation {
 
     // ---- sound events -------------------------------------------------------------------------
 
-    public enum Cue { SPIN, STOP, SCATTER, TENSION, WIN_SMALL, WIN_BIG, WIN_EPIC, FREE_SPINS, EXPAND, COINS }
+    public enum Cue { LEVER, SPIN, STOP, SCATTER, TENSION, WIN_SMALL, WIN_BIG, WIN_EPIC, FREE_SPINS, EXPAND, COINS }
 
     public record SoundEvent(Cue cue, float pitch) {
     }
@@ -281,6 +300,10 @@ public final class SlotAnimation {
     /** Sounds that fall due between two moments of the timeline. */
     public List<SoundEvent> cuesBetween(float from, float to) {
         List<SoundEvent> out = new ArrayList<>();
+        // The lever clicks as it bottoms out and again as it snaps back.
+        if (LEVER_DOWN >= from && LEVER_DOWN < to) out.add(new SoundEvent(Cue.LEVER, 0.7f));
+        float back = LEVER_DOWN + LEVER_HOLD + LEVER_UP * 0.55f;
+        if (back >= from && back < to) out.add(new SoundEvent(Cue.LEVER, 0.95f));
         for (Phase p : phases) {
             float start = p.local();
             switch (p.kind()) {

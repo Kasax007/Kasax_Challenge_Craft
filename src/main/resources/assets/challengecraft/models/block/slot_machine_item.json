@@ -827,6 +827,142 @@
           "texture": "#chrome"
         }
       }
+    },
+    {
+      "from": [
+        0.2,
+        13.5,
+        8
+      ],
+      "to": [
+        0.8,
+        20.5,
+        8.6
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.2,
+            0,
+            0.8,
+            7.0
+          ],
+          "texture": "#chrome"
+        },
+        "south": {
+          "uv": [
+            0.2,
+            0,
+            0.8,
+            7.0
+          ],
+          "texture": "#chrome"
+        },
+        "east": {
+          "uv": [
+            8,
+            0,
+            8.6,
+            7.0
+          ],
+          "texture": "#chrome"
+        },
+        "west": {
+          "uv": [
+            8,
+            0,
+            8.6,
+            7.0
+          ],
+          "texture": "#chrome"
+        },
+        "up": {
+          "uv": [
+            0.2,
+            8,
+            0.8,
+            8.6
+          ],
+          "texture": "#chrome"
+        },
+        "down": {
+          "uv": [
+            0.2,
+            8,
+            0.8,
+            8.6
+          ],
+          "texture": "#chrome"
+        }
+      }
+    },
+    {
+      "from": [
+        -0.2,
+        20.5,
+        7.6
+      ],
+      "to": [
+        1.2,
+        21.9,
+        9
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        },
+        "west": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#knob"
+        }
+      }
     }
   ],
   "display": {

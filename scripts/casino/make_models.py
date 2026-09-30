@@ -150,7 +150,7 @@ def roulette_cell(ci, cj):
     return {"parent": "block/block", "textures": ROULETTE_TEX, "elements": el}
 
 
-def slot_machine():
+def slot_machine(with_lever=False):
     tex = {"body": T("slot_body"), "gold": T("slot_gold"), "dark": T("slot_dark"), "panel": T("slot_panel"),
            "marquee": T("slot_marquee"), "top": T("slot_top"), "knob": T("slot_knob"), "chrome": T("slot_chrome"),
            "particle": T("slot_body")}
@@ -168,10 +168,15 @@ def slot_machine():
         with_face(box([1.5, 19, 3], [14.5, 25, 13], "body", {"up": "top"}), "north", "marquee", [0, 4.5, 16, 11.5]),
         box([2.5, 25, 4], [13.5, 26.5, 12], "gold", {"up": "top"}),
         # Lever on the player's right: a north-facing front is seen from the north, so that is -X.
+        # Only its mount is part of the block; the arm and knob swing when the machine is played, so
+        # the world renderer draws them (SlotView#drawLever). The item keeps the whole lever.
         box([0, 12, 7.5], [1, 13.5, 9.5], "chrome"),
-        box([0.2, 13.5, 8], [0.8, 20.5, 8.6], "chrome"),
-        box([-0.2, 20.5, 7.6], [1.2, 21.9, 9], "knob", full=("north", "south", "east", "west", "up", "down")),
     ]
+    if with_lever:
+        el += [
+            box([0.2, 13.5, 8], [0.8, 20.5, 8.6], "chrome"),
+            box([-0.2, 20.5, 7.6], [1.2, 21.9, 9], "knob", full=("north", "south", "east", "west", "up", "down")),
+        ]
     return {"parent": "block/block", "textures": tex, "elements": el, "display": TALL_DISPLAY}
 
 
@@ -246,6 +251,11 @@ for name, fn in MODELS.items():
     write(f"assets/{NS}/models/block/{name}.json", fn())
     write(f"assets/{NS}/blockstates/{name}.json", {"variants": variants(lambda f: f"{NS}:block/{name}")})
     write(f"assets/{NS}/items/{name}.json", {"model": {"type": "minecraft:model", "model": f"{NS}:block/{name}"}})
+
+# The slot machine's item shows the lever, which in the world is drawn (and pulled) by the renderer.
+write(f"assets/{NS}/models/block/slot_machine_item.json", slot_machine(with_lever=True))
+write(f"assets/{NS}/items/slot_machine.json",
+      {"model": {"type": "minecraft:model", "model": f"{NS}:block/slot_machine_item"}})
 
 # Roulette: the master is the front-left cell; its item shows the compact one-block table.
 write(f"assets/{NS}/models/block/roulette_table_item.json", roulette_table())

@@ -51,7 +51,8 @@ final class SlotEffects {
         int tick = (int) party.local();
         int tier = party.tier();
         double cx = pos.getX() + 0.5, cz = pos.getZ() + 0.5;
-        double top = pos.getY() + 2.05;
+        // The top of the cabinet: its gold cap ends 26.5 model pixels up (models/block/slot_machine).
+        double top = pos.getY() + 26.5 / 16.0;
         // The display, just in front of the cabinet face.
         double fx = cx + facing.getStepX() * 0.62, fz = cz + facing.getStepZ() * 0.62, fy = pos.getY() + 0.45;
 
@@ -96,7 +97,7 @@ final class SlotEffects {
         // 4: a spiral of light climbing around the cabinet, and notes flying off it.
         for (int i = 0; i < 2; i++) {
             double a = tick * 0.45 + i * Math.PI;
-            double y = pos.getY() + (tick % 30) / 30.0 * 2.6;
+            double y = pos.getY() + (tick % 30) / 30.0 * 1.8;
             level.addParticle(ParticleTypes.END_ROD, cx + Math.cos(a) * 0.95, y, cz + Math.sin(a) * 0.95, 0, 0.02, 0);
         }
         if (tick % 3 == 0) {
