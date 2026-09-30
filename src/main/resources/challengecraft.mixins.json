@@ -8,6 +8,7 @@
     "MixinPlayerEntityPreventBarrierDrop",
     "MixinScreenHandler",
     "MerchantScreenHandlerAccessor",
+    "FishingHookAccessor",
     "DimensionOptionsMixin",
     "NoBlockDropsMixin",
     "NoChestLootMixin",

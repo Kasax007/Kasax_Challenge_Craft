@@ -224,11 +224,39 @@ public final class LockoutGoals {
                         () -> new ObtainTask(Set.of(Items.ENDER_PEARL), 1, planner),
                         () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f))));
             }
+            case "catch_fish", "advancement_fishy_business" -> {
+                double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
+                Double water = planner.seen(bot, Blocks.WATER);
+                yield rod >= INF || water == null ? null : new Option(rod + water + 40, () -> new SequenceTask("fish", List.of(
+                        () -> new ObtainTask(Set.of(Items.FISHING_ROD), 1, planner),
+                        () -> new net.kasax.challengecraft.bot.task.FishTask())));
+            }
+            case "enchant_item", "advancement_enchanter" -> enchant(bot, planner, Set.of(Items.WOODEN_SWORD, Items.STONE_SWORD, Items.IRON_SWORD,
+                    Items.WOODEN_PICKAXE, Items.STONE_PICKAXE, Items.IRON_PICKAXE, Items.STONE_AXE, Items.STONE_SHOVEL, Items.BOOK));
+            case "enchant_sword" -> enchant(bot, planner, Set.of(Items.WOODEN_SWORD, Items.STONE_SWORD, Items.IRON_SWORD));
+            case "enchant_pickaxe" -> enchant(bot, planner, Set.of(Items.WOODEN_PICKAXE, Items.STONE_PICKAXE, Items.IRON_PICKAXE));
             case "ring_bell" -> click(bot, "ring a bell", Blocks.BELL);
             case "use_lectern" -> click(bot, "use a lectern", Blocks.LECTERN);
             case "sleep_in_village_bed" -> body.level().isDarkOutside() ? clickBed(bot) : null;
             default -> null;
         };
+    }
+
+    /** An enchanting table (made or found), lapis, the item, a level or two of experience. */
+    private static Option enchant(Bot bot, ObtainPlanner planner, Set<Item> items) {
+        double table = nearby(bot, Blocks.ENCHANTING_TABLE) ? 5 : planner.estimate(bot, Set.of(Items.ENCHANTING_TABLE), 1);
+        double lapis = planner.estimate(bot, Set.of(Items.LAPIS_LAZULI), 1);
+        double item = planner.estimate(bot, items, 1);
+        // Experience: a level comes with a little mining or smelting.
+        double xp = bot.body().experienceLevel >= 1 ? 0 : 60;
+        if (table >= INF || lapis >= INF || item >= INF) return null;
+        return new Option(table + lapis + item + xp + 8, () -> new SequenceTask("enchant " + ObtainPlanner.names(items), List.of(
+                () -> nearby(bot, Blocks.ENCHANTING_TABLE) ? null : new ObtainTask(Set.of(Items.ENCHANTING_TABLE), 1, planner),
+                () -> new ObtainTask(Set.of(Items.LAPIS_LAZULI), 1, planner).keeping(Set.of(Items.ENCHANTING_TABLE)),
+                () -> new ObtainTask(items, 1, planner).keeping(Set.of(Items.ENCHANTING_TABLE, Items.LAPIS_LAZULI)),
+                () -> bot.body().experienceLevel >= 1 ? null
+                        : new ObtainTask(Set.of(Items.COAL), 3, planner).keeping(Set.of(Items.ENCHANTING_TABLE, Items.LAPIS_LAZULI)),
+                () -> new net.kasax.challengecraft.bot.task.EnchantTask(items))));
     }
 
     /** A block it knows of, clicked: the walk there is the cost. */

@@ -134,7 +134,7 @@ public class BotStuntTests {
                 () -> a.bot().body().getInventory().countItem(Items.ENDER_PEARL) == 0);
     }
 
-    /** An emerald for a fletcher's arrows. */
+    /** A trade with a fletcher (emeralds for arrows, or the other way round). */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void tradeWithFletcher(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "trade");
@@ -145,8 +145,34 @@ public class BotStuntTests {
         v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
         v.setNoAi(true);
         h.getLevel().addFreshEntity(v);
-        a.spawn(16, FEET, 20, new ItemStack(Items.EMERALD, 1));
+        // (The offers are drawn at random: enough of the usual payments for any of them.)
+        a.spawn(16, FEET, 20, new ItemStack(Items.EMERALD, 16), new ItemStack(Items.GRAVEL, 16), new ItemStack(Items.STICK, 64),
+                new ItemStack(Items.FEATHER, 32), new ItemStack(Items.STRING, 32), new ItemStack(Items.FLINT, 32));
         a.run(new net.kasax.challengecraft.bot.task.TradeTask("trade", (vi, o) -> true), 400,
-                () -> a.bot().body().getInventory().countItem(Items.ARROW) > 0);
+                () -> a.bot().body().getInventory().countItem(Items.EMERALD) != 16 || a.bot().body().getInventory().countItem(Items.ARROW) > 0);
+    }
+
+    /** A fish caught from a pond. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
+    public void catchFish(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "fish");
+        a.fill(14, BotArena.GROUND - 3, 14, 26, BotArena.GROUND, 26, Blocks.WATER);
+        a.spawn(20, FEET, 10, new ItemStack(Items.FISHING_ROD));
+        a.run(new net.kasax.challengecraft.bot.task.FishTask(), 3600, () -> {
+            var inv = a.bot().body().getInventory();
+            return inv.countItem(Items.COD) + inv.countItem(Items.SALMON) + inv.countItem(Items.TROPICAL_FISH) + inv.countItem(Items.PUFFERFISH) > 0;
+        });
+    }
+
+    /** A sword enchanted at its own table. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void enchantSword(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "enchant");
+        a.spawn(20, FEET, 20, new ItemStack(Items.ENCHANTING_TABLE), new ItemStack(Items.LAPIS_LAZULI, 3), new ItemStack(Items.STONE_SWORD));
+        a.bot().body().giveExperienceLevels(5);
+        a.run(new net.kasax.challengecraft.bot.task.EnchantTask(java.util.Set.of(Items.STONE_SWORD)), 400, () -> {
+            for (var st : a.bot().body().getInventory().getNonEquipmentItems()) if (st.is(Items.STONE_SWORD) && st.isEnchanted()) return true;
+            return false;
+        });
     }
 }
