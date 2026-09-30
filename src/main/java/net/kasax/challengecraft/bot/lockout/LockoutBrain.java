@@ -88,9 +88,11 @@ public final class LockoutBrain implements BotBrain {
         if (opening(bot)) return;
         // Leaving: the table it put down comes along.
         if (net.kasax.challengecraft.bot.task.PackTableTask.worth(bot)) {
-            bot.doNow(new net.kasax.challengecraft.bot.task.PackTableTask(bot.ownTable));
+            start(bot, new net.kasax.challengecraft.bot.task.PackTableTask(bot.ownTable), 400);
             return;
         }
+        strategist.update(bot, planner, replanNow);
+        replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
@@ -102,7 +104,8 @@ public final class LockoutBrain implements BotBrain {
             pause = 200; // nothing it can do now; look again in a while (tiles, time of day change)
             return;
         }
-        choices.sort(Comparator.comparingDouble(c -> c.option().cost()));
+        // By the plan: the effort, less what a tile is worth beyond itself (see LockoutStrategist).
+        choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
         Choice pick = difficulty == Difficulty.EASY ? choices.get(0) : lookAhead(bot, choices);
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
@@ -112,9 +115,10 @@ public final class LockoutBrain implements BotBrain {
         goalTask = pick.option().task().get();
         goalStarted = bot.body().level().getGameTime();
         goalBudget = budget(pick.option().cost(), 1200, 9000);
+        String reason = strategist.why(pick.tile().goal().id());
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
-                + choices.size() + " doable)");
-        bot.doNow(goalTask);
+                + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
+        start(bot, goalTask, goalBudget);
     }
 
     private static final Set<net.minecraft.world.item.Item> FOODS = Set.of(net.minecraft.world.item.Items.BREAD,
@@ -129,6 +133,8 @@ public final class LockoutBrain implements BotBrain {
      * Low on food: stock up if it is cheap right now (hay bales in a village make bread, animals
      * around make steak). Returns whether it went for food.
      */
+    private final LockoutStrategist strategist = new LockoutStrategist();
+    private boolean replanNow = true;
     private int openingStep;
 
     private static final List<Set<net.minecraft.world.item.Item>> OPENING = List.of(
@@ -150,7 +156,7 @@ public final class LockoutBrain implements BotBrain {
                 continue;
             }
             bot.say("opening: " + ObtainPlanner.names(want));
-            bot.doNow(new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner));
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner), 2400);
             return true;
         }
         return false;
@@ -173,7 +179,7 @@ public final class LockoutBrain implements BotBrain {
         double cost = planner.estimate(bot, FOODS, have + 4);
         if (cost > 90) return false;
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
-        bot.doNow(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner));
+        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));
         return true;
     }
 
@@ -241,6 +247,16 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long goalStarted, goalBudget, sideStarted, sideBudget;
+    /** Whatever the brain set going last (a goal, food, the opening), and its time allowance. */
+    private BotTask running;
+    private long runningSince, runningBudget;
+
+    private void start(Bot bot, BotTask task, long budgetTicks) {
+        running = task;
+        runningSince = bot.body().level().getGameTime();
+        runningBudget = budgetTicks;
+        bot.doNow(task);
+    }
 
     @Override
     public void tick(Bot bot) {
@@ -249,6 +265,14 @@ public final class LockoutBrain implements BotBrain {
             bot.say("that takes too long, back to the goal");
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
             drop(bot);
+            return;
+        }
+        if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null) {
+            bot.say(running.describe() + " takes too long, something else");
+            running = null;
+            nextFoodCheck = now + 2400; // (if it was food: not the same way again right away)
+            drop(bot);
+            pause = 100;
             return;
         }
         if (goalTask != null && targetId != null && now - goalStarted > goalBudget) {
@@ -308,7 +332,7 @@ public final class LockoutBrain implements BotBrain {
         if (bot.body().level().getGameTime() < nextChance) return;
         nextChance = bot.body().level().getGameTime() + 200;
         for (Choice c : choices(bot, targetIndex)) {
-            if (c.option().cost() < 12) {
+            if (c.option().cost() < 8) {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
                 sideId = c.tile().goal().id();
@@ -354,6 +378,7 @@ public final class LockoutBrain implements BotBrain {
 
     @Override
     public void respawned(Bot bot) {
+        replanNow = true;
         openingStep = 0; // the tools are gone with the rest
         openingTries = 0;
         targetIndex = -1;

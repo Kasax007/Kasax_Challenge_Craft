@@ -209,6 +209,15 @@ public final class ObtainPlanner {
 
     /** Seen: the way there. Not seen: the usual effort, and monsters mostly come out at night. */
     private double mobCost(EntityType<?> type, double effort) {
+        double c = landMobCost(type, effort);
+        // Fish and squid: in the water, fast, hard to corner. A player only hunts them when there is nothing else.
+        var cat = type.getCategory();
+        boolean water = cat == net.minecraft.world.entity.MobCategory.WATER_CREATURE || cat == net.minecraft.world.entity.MobCategory.WATER_AMBIENT
+                || cat == net.minecraft.world.entity.MobCategory.UNDERGROUND_WATER_CREATURE;
+        return water ? c * 4 + 30 : c;
+    }
+
+    private double landMobCost(EntityType<?> type, double effort) {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return INF;
         if (seen != null) return seen;

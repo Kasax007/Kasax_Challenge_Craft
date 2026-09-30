@@ -42,7 +42,8 @@ public final class MineTask implements BotTask {
     private boolean walking, searching;
     private Direction heading;
     private Explorer explorer;
-    private BlockPos lead;
+    private BlockPos lead, approaching;
+    private int approachTicks;
 
     /** Mine until the bot holds {@code count} of the {@code items} together. */
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count) {
@@ -110,6 +111,18 @@ public final class MineTask implements BotTask {
             if (!walking) {
                 bot.navigator().goNear(target, 3.6);
                 walking = true;
+            }
+            // Much longer than the way there should take: this one is not to be had; another.
+            if (!target.equals(approaching)) {
+                approaching = target;
+                approachTicks = 0;
+            }
+            if (++approachTicks > 300 + 25 * Math.sqrt(target.distSqr(bot.body().blockPosition()))) {
+                skip.add(target);
+                target = null;
+                walking = false;
+                bot.navigator().stop();
+                return Result.RUNNING;
             }
             BotNavigator.Status s = bot.navigator().tick();
             if (s == BotNavigator.Status.FAILED) {

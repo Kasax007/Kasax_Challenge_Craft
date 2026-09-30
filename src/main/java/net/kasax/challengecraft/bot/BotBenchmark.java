@@ -45,7 +45,10 @@ public final class BotBenchmark {
         RUNNING.removeIf(b -> b.bot == bot);
         bot.idleTicks = 0;
         bot.failures = 0;
-        Chal_40_LockoutBingo.startSoloDebugRun(bot.body());
+        // The same board for the same world, so runs can be compared.
+        List<String> board = net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalPool.pickBoard(bot.body().level().getServer().overworld().getSeed())
+                .stream().map(net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal::id).toList();
+        Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), board);
         bot.setBrain(new LockoutBrain(difficulty));
         RUNNING.add(new BotBenchmark(bot, ticks));
         BotManager.LOG.info("[BOTBENCH] {} start at {} ({} s, {})", bot.name, bot.body().blockPosition().toShortString(), ticks / 20, difficulty);
