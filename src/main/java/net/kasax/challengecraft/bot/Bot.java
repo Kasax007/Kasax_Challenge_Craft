@@ -173,8 +173,21 @@ public final class Bot {
         tidyInventory();
         BotTask top = tasks.peek();
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.KillTask) return;
+        // Low on health with a monster close: get away first (and eat on the way), as a player
+        // backs off rather than trade the last hearts. A creeper about to blow: always away.
+        if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(6), net.minecraft.world.entity.LivingEntity::isAlive)) {
+                boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0;
+                if (creeper || body.getHealth() <= 7) {
+                    net.minecraft.world.phys.Vec3 away = body.position().subtract(m.position()).normalize().scale(12);
+                    actions.reset();
+                    interject(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3));
+                    return;
+                }
+            }
+        }
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
-        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive()
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && body.getHealth() > 7
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1));

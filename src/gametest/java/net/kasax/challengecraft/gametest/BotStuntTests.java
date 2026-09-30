@@ -175,4 +175,17 @@ public class BotStuntTests {
             return false;
         });
     }
+
+    /** Three hearts left and a zombie next to it: away from it, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void retreatWhenLow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "retreat");
+        var z = EntityTypes.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(22, FEET, 20)));
+        h.getLevel().addFreshEntity(z);
+        a.spawn(20, FEET, 20);
+        a.bot().body().setHealth(6f);
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(300), 300,
+                () -> h.getTick() > 100 && a.bot().body().isAlive() && a.bot().body().distanceTo(z) > 7);
+    }
 }
