@@ -119,6 +119,7 @@ public class ChallengeCraft implements ModInitializer {
 		Chal_38_ChunkHunt.register();
 		Chal_39_NoFood.register();
 		Chal_40_LockoutBingo.register();
+		net.kasax.challengecraft.bot.BotManager.register();
 		Chal_42_RandomMobSpawn.register();
 		Chal_43_OnlyDown.register();
 		Chal_44_ProgressiveBlockDrops.register();

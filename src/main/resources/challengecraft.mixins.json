@@ -44,7 +44,9 @@
     "LockoutTriggerMixins$Tame",
     "LockoutTriggerMixins$Breed",
     "LockoutTriggerMixins$Trade",
-    "LockoutRespawnMixin"
+    "LockoutRespawnMixin",
+    "ConnectionAccessor",
+    "BotRespawnMixin"
   ],
   "injectors": {
     "defaultRequire": 1

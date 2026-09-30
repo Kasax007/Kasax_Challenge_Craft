@@ -1,0 +1,73 @@
+package net.kasax.challengecraft.bot;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+
+/**
+ * What a bot can find around it. By default it only "sees" blocks a player could see: blocks
+ * touching air or water somewhere (the surface, caves, ravines). Buried ores are found by digging,
+ * as a player finds them — no X-ray.
+ */
+public final class BotWorld {
+    private BotWorld() {
+    }
+
+    /** The nearest matching block within {@code radius} (vertical ±{@code height}), or null. */
+    public static BlockPos nearest(ServerLevel level, BlockPos center, int radius, int height, Predicate<BlockState> match,
+                                   boolean exposedOnly, Set<BlockPos> ignore) {
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int cx0 = (center.getX() - radius) >> 4, cx1 = (center.getX() + radius) >> 4;
+        int cz0 = (center.getZ() - radius) >> 4, cz1 = (center.getZ() + radius) >> 4;
+        for (int cx = cx0; cx <= cx1; cx++) {
+            for (int cz = cz0; cz <= cz1; cz++) {
+                if (level.getChunkSource().getChunkNow(cx, cz) == null) continue;
+                int x0 = Math.max(cx << 4, center.getX() - radius), x1 = Math.min((cx << 4) + 15, center.getX() + radius);
+                int z0 = Math.max(cz << 4, center.getZ() - radius), z1 = Math.min((cz << 4) + 15, center.getZ() + radius);
+                int y0 = Math.max(level.getMinY(), center.getY() - height), y1 = Math.min(level.getMaxY() - 1, center.getY() + height);
+                for (int x = x0; x <= x1; x++) {
+                    for (int z = z0; z <= z1; z++) {
+                        for (int y = y0; y <= y1; y++) {
+                            m.set(x, y, z);
+                            BlockState s = level.getBlockState(m);
+                            if (s.isAir() || !match.test(s)) continue;
+                            double d = m.distSqr(center);
+                            if (d >= bestD || ignore.contains(m)) continue;
+                            if (exposedOnly && !exposed(level, m)) continue;
+                            bestD = d;
+                            best = m.immutable();
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Touches air or water on some side: visible from somewhere. */
+    public static boolean exposed(ServerLevel level, BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockState n = level.getBlockState(p.relative(d));
+            if (n.isAir() || !n.getFluidState().isEmpty() && n.getCollisionShape(level, p.relative(d)).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    /** Dropped items of a kind (or any, for null) near {@code center}, nearest first. */
+    public static List<ItemEntity> drops(ServerLevel level, BlockPos center, double radius, Item item) {
+        List<ItemEntity> out = level.getEntitiesOfClass(ItemEntity.class, new AABB(center).inflate(radius),
+                e -> e.isAlive() && (item == null || e.getItem().is(item)));
+        out.sort(Comparator.comparingDouble(e -> e.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(center))));
+        return out;
+    }
+}
