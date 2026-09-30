@@ -338,6 +338,7 @@
   "challengecraft.command.lockout_debug_claim.none": "Kein Lockout-Bingo-Feld für Debug-Beanspruchung verfügbar.",
   "challengecraft.command.progressive_blocks.inactive": "Die Challenge „Fortschreitende Block-Drops“ ist nicht aktiv.",
   "challengecraft.command.progressive_blocks.reminder": "„Fortschreitende Block-Drops“ ist aktiv. Nutze /challengecraft_progressive_blocks_list, um freigeschaltete Blöcke und den nächsten benötigten Block zu sehen.",
+  "challengecraft.lockout.map_inactive": "Lockout-Bingo ist in dieser Welt nicht aktiv.",
   "challengecraft.lockout.team.title": "Lockout-Bingo-Teams",
   "challengecraft.lockout.team.red": "Rot",
   "challengecraft.lockout.team.blue": "Blau",

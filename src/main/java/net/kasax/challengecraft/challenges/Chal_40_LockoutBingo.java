@@ -4,7 +4,6 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.kasax.challengecraft.LevelManager;
@@ -124,28 +123,6 @@ public final class Chal_40_LockoutBingo {
             if (!data.isEnded()) {
                 scanPassiveGoals(server, data);
             }
-        });
-
-        UseItemCallback.EVENT.register((player, world, hand) -> {
-            if (!active) {
-                return InteractionResult.PASS;
-            }
-
-            ItemStack heldStack = player.getItemInHand(hand);
-            if (!heldStack.is(ModItems.LOCKOUT_BINGO_MAP)) {
-                return InteractionResult.PASS;
-            }
-
-            if (world.isClientSide()) {
-                return InteractionResult.SUCCESS;
-            }
-
-            if (player instanceof ServerPlayer serverPlayer) {
-                openAppropriateScreen(serverPlayer);
-                return InteractionResult.SUCCESS_SERVER;
-            }
-
-            return InteractionResult.PASS;
         });
 
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
@@ -335,6 +312,11 @@ public final class Chal_40_LockoutBingo {
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
         ServerPlayNetworking.send(player, buildSyncPacket(server, data));
+    }
+
+    /** What the lockout map opens: the board once the game runs, the team screen before. */
+    public static void openScreenFor(ServerPlayer player) {
+        openAppropriateScreen(player);
     }
 
     public static void setActive(boolean value) {

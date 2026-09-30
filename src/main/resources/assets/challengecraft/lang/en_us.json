@@ -333,6 +333,7 @@
   "challengecraft.player_name.prefix_suffix": "] ",
   "challengecraft.progress.obtained": "Obtained: %s / %s",
   "challengecraft.progress.simple": "%s / %s",
+  "challengecraft.lockout.map_inactive": "Lockout Bingo is not active in this world.",
   "challengecraft.lockout.team.title": "Lockout Bingo Teams",
   "challengecraft.lockout.team.red": "Red",
   "challengecraft.lockout.team.blue": "Blue",
