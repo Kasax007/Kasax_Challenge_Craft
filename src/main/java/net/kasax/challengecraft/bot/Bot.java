@@ -24,6 +24,10 @@ public final class Bot {
     private final BotSenses senses = new BotSenses();
     /** Where things are, as read from the world around it; kept across deaths. */
     private final BotMemory memory = new BotMemory();
+    /** The crafting table it last put down itself (taken along when it moves on). */
+    public net.minecraft.core.BlockPos ownTable;
+    /** Work blocks (tables, furnaces) it could not get to: not counted on again. */
+    public final java.util.Set<net.minecraft.core.BlockPos> unreachableStations = new java.util.HashSet<>();
     /** For benchmarks: ticks with nothing to do, tasks that failed. */
     public int idleTicks, failures;
     /** Chat what it is doing (for testing). */

@@ -86,6 +86,11 @@ public final class LockoutBrain implements BotBrain {
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
         if (opening(bot)) return;
+        // Leaving: the table it put down comes along.
+        if (net.kasax.challengecraft.bot.task.PackTableTask.worth(bot)) {
+            bot.doNow(new net.kasax.challengecraft.bot.task.PackTableTask(bot.ownTable));
+            return;
+        }
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {

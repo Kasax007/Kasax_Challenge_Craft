@@ -29,6 +29,12 @@ public final class CraftTask extends StationTask {
     private final BotKnowledge.CraftRoute route;
     private final int times;
     private int done, wait;
+    private boolean missing;
+
+    /** Whether it stopped for want of ingredients (the recipe is fine: plan the ingredients again). */
+    public boolean missingIngredients() {
+        return missing;
+    }
 
     public CraftTask(BotKnowledge.CraftRoute route, int times) {
         super(Blocks.CRAFTING_TABLE, Items.CRAFTING_TABLE);
@@ -48,6 +54,7 @@ public final class CraftTask extends StationTask {
         wait = TICKS_PER_CRAFT;
         if (!craftOnce(bot.body())) {
             bot.say("missing ingredients for " + ObtainPlanner.name(route.result()));
+            missing = true;
             return done > 0 ? Result.DONE : Result.FAILED;
         }
         done++;

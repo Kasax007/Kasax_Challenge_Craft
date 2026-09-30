@@ -6,6 +6,7 @@ import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.BotWorld;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
@@ -42,7 +43,7 @@ abstract class StationTask implements BotTask {
         ServerLevel level = (ServerLevel) bot.body().level();
         if (station != null && !level.getBlockState(station).is(block)) station = null;
         if (station == null) {
-            station = BotWorld.nearest(level, bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, unreachable);
+            station = BotWorld.nearest(level, bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, bot.unreachableStations);
             walking = false;
             if (station == null) {
                 if (BotInventory.slotOf(bot.body(), item) < 0) {
@@ -50,6 +51,8 @@ abstract class StationTask implements BotTask {
                     return Result.FAILED;
                 }
                 station = bot.actions().placeNearby(item);
+                placedHere = station;
+                if (block == Blocks.CRAFTING_TABLE && station != null) bot.ownTable = station;
                 if (station == null) {
                     // Nowhere to put it here: step aside and try again.
                     if (++placeTries > 4) return Result.FAILED;
@@ -67,7 +70,7 @@ abstract class StationTask implements BotTask {
             }
             BotNavigator.Status s = bot.navigator().tick();
             if (s == BotNavigator.Status.FAILED || s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(station)) {
-                unreachable.add(station);
+                bot.unreachableStations.add(station);
                 station = null;
             }
             return Result.RUNNING;
@@ -79,6 +82,8 @@ abstract class StationTask implements BotTask {
         bot.body().lookAt(station);
         return work(bot);
     }
+
+    private BlockPos placedHere;
 
     /** Called every tick once the station is in reach. */
     protected abstract Result work(Bot bot);

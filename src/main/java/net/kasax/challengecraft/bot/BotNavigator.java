@@ -119,7 +119,8 @@ public final class BotNavigator {
         BotPathfinder.Step step = path.get(index);
         // A step taking far longer than it should (jumping at a wall it cannot get up, pushed back
         // by water again and again): give it up and look for another way, as Baritone does.
-        if (++stepTicks > stepLimit(step)) {
+        // (Digging a step into the bank is work, not being stuck.)
+        if (bankDig == null && ++stepTicks > stepLimit(step) + (bot.isInWater() ? 160 : 0)) {
             avoid.add(step.to().asLong());
             stepTicks = 0;
             path = null;
@@ -151,7 +152,9 @@ public final class BotNavigator {
                 bot.setYRot(yaw);
                 bot.forward = 0.6f; // sneaking stops at the edge by itself
                 if (actions.inReach(place) && !actions.placeThrowaway(place) && ++stuck > STUCK_TICKS) {
-                    return fail("no block to bridge with");
+                    stuck = 0;
+                    path = null; // out of blocks: find a way that needs none
+                    return status;
                 }
                 return status;
             }
@@ -168,7 +171,10 @@ public final class BotNavigator {
             // (Open means air, or water it stood in: a block goes in there as well.)
             boolean open = bot.level().getBlockState(step.place()).getCollisionShape(bot.level(), step.place()).isEmpty();
             if (bot.getY() > step.place().getY() + 1.0 && open) {
-                if (!actions.placeThrowaway(step.place())) return fail("no block to pillar with");
+                if (!actions.placeThrowaway(step.place())) {
+                    path = null; // out of blocks: find a way that needs none
+                    return status;
+                }
             }
             if (!open && bot.onGround()) advance();
             return status;

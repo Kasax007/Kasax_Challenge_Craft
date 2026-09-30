@@ -809,7 +809,7 @@ public final class ObtainPlanner {
     private boolean hasOrSees(Bot bot, Sim sim, Item item, Block block) {
         // Looked up fresh, not from the scan: the bot may have just put one down.
         return sim.count(Set.of(item)) > 0 || BotWorld.nearest((ServerLevel) bot.body().level(),
-                bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, Set.of()) != null;
+                bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, bot.unreachableStations) != null;
     }
 
     private static Set<Item> planks() {

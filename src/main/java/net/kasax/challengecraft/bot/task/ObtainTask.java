@@ -56,6 +56,12 @@ public final class ObtainTask implements BotTask {
                 return Result.FAILED;
             }
             ObtainPlanner.Step st = (ObtainPlanner.Step) p;
+            // Off to something else than crafting: take the table along first.
+            if (!(st.task() instanceof StationTask) && PackTableTask.worth(bot)) {
+                step = new PackTableTask(bot.ownTable);
+                stepPlan = null;
+                return Result.RUNNING;
+            }
             step = st.task();
             stepPlan = st;
             bot.say("  " + step.describe());
@@ -68,11 +74,15 @@ public final class ObtainTask implements BotTask {
             r = Result.FAILED;
         }
         if (r == Result.RUNNING) return Result.RUNNING;
+        if (stepPlan == null) { // the table packed (or not): on with the plan
+            step = null;
+            return Result.RUNNING;
+        }
         bot.navigator().stop();
         bot.actions().reset();
         if (r == Result.FAILED) {
             bot.say("  x " + step.describe());
-            planner.markFailed(stepPlan, bot.body().level().getGameTime());
+            if (stepPlan != null && !(step instanceof CraftTask c && c.missingIngredients())) planner.markFailed(stepPlan, bot.body().level().getGameTime());
             if (++failures > MAX_FAILURES) return Result.FAILED;
         }
         step = null;

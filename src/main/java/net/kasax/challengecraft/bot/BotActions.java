@@ -95,13 +95,33 @@ public final class BotActions {
         return throwawaySlot() >= 0;
     }
 
+    /**
+     * The block to spend: the least useful first (dirt, netherrack, the stone kinds) and the ones
+     * tools and furnaces are made of (cobblestone, blackstone, cobbled deepslate) last, never the
+     * last few of those.
+     */
     private int throwawaySlot() {
         var items = bot.getInventory().getNonEquipmentItems();
+        int best = -1, bestRank = Integer.MAX_VALUE;
+        int crafting = 0;
+        for (var s : items) if (CRAFTING_STONE.contains(s.getItem())) crafting += s.getCount();
         for (int i = 0; i < items.size(); i++) {
-            if (THROWAWAY.contains(items.get(i).getItem())) return i;
+            var item = items.get(i).getItem();
+            if (!THROWAWAY.contains(item)) continue;
+            boolean craftStone = CRAFTING_STONE.contains(item);
+            if (craftStone && crafting <= KEEP_CRAFTING_STONE) continue;
+            int rank = craftStone ? 2 : item == Items.DIRT || item == Items.NETHERRACK || item == Items.COARSE_DIRT ? 0 : 1;
+            if (rank < bestRank) {
+                bestRank = rank;
+                best = i;
+            }
         }
-        return -1;
+        return best;
     }
+
+    private static final Set<net.minecraft.world.item.Item> CRAFTING_STONE = Set.of(Items.COBBLESTONE, Items.BLACKSTONE, Items.COBBLED_DEEPSLATE);
+    /** Enough for a pickaxe or an axe: a player keeps that much stone rather than build with it. */
+    private static final int KEEP_CRAFTING_STONE = 3;
 
     /** Puts a throwaway block at {@code target}, against the block below it. */
     public boolean placeThrowaway(BlockPos target) {
