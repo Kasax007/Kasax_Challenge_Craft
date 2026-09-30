@@ -13,13 +13,15 @@ import java.util.Set;
  * the next plan takes another (other trees, a different recipe, hunting instead of mining).
  */
 public final class ObtainTask implements BotTask {
-    private static final int MAX_FAILURES = 8;
+    private static final int MAX_FAILURES = 4;
 
     private final Set<Item> items;
     private final int count;
     private final ObtainPlanner planner;
+    private final boolean craftOnly;
+    private Set<Item> keep = Set.of();
     private BotTask step;
-    private String stepKey;
+    private ObtainPlanner.Step stepPlan;
     private int failures;
 
     public ObtainTask(Set<Item> items, int count) {
@@ -27,15 +29,27 @@ public final class ObtainTask implements BotTask {
     }
 
     public ObtainTask(Set<Item> items, int count, ObtainPlanner planner) {
+        this(items, count, planner, false);
+    }
+
+    /** With {@code craftOnly}, the items have to come out of a crafting grid (for "craft X" goals). */
+    public ObtainTask(Set<Item> items, int count, ObtainPlanner planner, boolean craftOnly) {
         this.items = Set.copyOf(items);
         this.count = count;
         this.planner = planner;
+        this.craftOnly = craftOnly;
+    }
+
+    /** Items not to use up while getting these (see {@link ObtainPlanner#plan(Bot, java.util.Collection, int, boolean, Set)}). */
+    public ObtainTask keeping(Set<Item> keep) {
+        this.keep = Set.copyOf(keep);
+        return this;
     }
 
     @Override
     public Result tick(Bot bot) {
         if (step == null) {
-            ObtainPlanner.Plan p = planner.plan(bot, items, count);
+            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, keep);
             if (p instanceof ObtainPlanner.Have) return Result.DONE;
             if (p instanceof ObtainPlanner.Stuck s) {
                 bot.say("can't get " + ObtainPlanner.names(items) + ": " + s.why());
@@ -43,7 +57,7 @@ public final class ObtainTask implements BotTask {
             }
             ObtainPlanner.Step st = (ObtainPlanner.Step) p;
             step = st.task();
-            stepKey = st.key();
+            stepPlan = st;
             bot.say("  " + step.describe());
         }
         Result r;
@@ -58,11 +72,16 @@ public final class ObtainTask implements BotTask {
         bot.actions().reset();
         if (r == Result.FAILED) {
             bot.say("  x " + step.describe());
-            planner.markFailed(stepKey, bot.body().level().getGameTime());
+            planner.markFailed(stepPlan, bot.body().level().getGameTime());
             if (++failures > MAX_FAILURES) return Result.FAILED;
         }
         step = null;
         return Result.RUNNING;
+    }
+
+    @Override
+    public String status() {
+        return describe() + (step == null ? "" : " > " + step.status());
     }
 
     public BotTask step() {
@@ -71,6 +90,6 @@ public final class ObtainTask implements BotTask {
 
     @Override
     public String describe() {
-        return "get " + ObtainPlanner.names(items) + " x" + count;
+        return (craftOnly ? "craft " : "get ") + ObtainPlanner.names(items) + " x" + count;
     }
 }

@@ -8,4 +8,9 @@ public interface BotTask {
 
     /** For chat and logs, e.g. "mine 3 iron ore". */
     String describe();
+
+    /** What it is up to in detail, for the status command. */
+    default String status() {
+        return describe();
+    }
 }

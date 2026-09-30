@@ -7,10 +7,12 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.kasax.challengecraft.bot.task.FollowTask;
 import net.kasax.challengecraft.bot.task.GoToTask;
+import net.kasax.challengecraft.bot.lockout.LockoutBrain;
 import net.kasax.challengecraft.bot.task.EatTask;
 import net.kasax.challengecraft.bot.task.KillTask;
 import net.kasax.challengecraft.bot.task.MineTask;
 import net.kasax.challengecraft.bot.task.ObtainTask;
+import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
 import net.kasax.challengecraft.util.ModPermissions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -121,6 +123,19 @@ final class BotCommands {
                                     bot.doNow(new EatTask());
                                     return 1;
                                 })))
+                        .then(Commands.literal("lockout").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> lockout(ctx, LockoutBrain.Difficulty.NORMAL))
+                                .then(Commands.argument("difficulty", StringArgumentType.word())
+                                        .suggests((c, b) -> SharedSuggestionProvider.suggest(new String[]{"easy", "normal", "hard"}, b))
+                                        .executes(ctx -> lockout(ctx, LockoutBrain.Difficulty.valueOf(
+                                                StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT)))))))
+                        .then(Commands.literal("status").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    ok(ctx, bot.name + " at " + bot.body().blockPosition().toShortString() + ", nav " + bot.navigator().status() + ":" + bot.status());
+                                    return 1;
+                                })))
                         .then(Commands.literal("inv").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     Bot bot = bot(ctx);
@@ -133,6 +148,24 @@ final class BotCommands {
                                     return 1;
                                 })))
         ));
+    }
+
+    /**
+     * Lets the bot play Lockout: joins the running game or the lobby, or, when there is none,
+     * starts one of the command's sender against the bot.
+     */
+    private static int lockout(CommandContext<CommandSourceStack> ctx, LockoutBrain.Difficulty difficulty) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        Bot bot = bot(ctx);
+        if (bot == null) return 0;
+        ServerPlayer me = ctx.getSource().getPlayerOrException();
+        var server = ctx.getSource().getServer();
+        if (!Chal_40_LockoutBingo.isActive() || Chal_40_LockoutBingo.teamOf(server, me.getUUID()) == null
+                && !Chal_40_LockoutBingo.isRunning(server)) {
+            Chal_40_LockoutBingo.startVersus(me, bot.body(), java.util.List.of());
+        }
+        bot.setBrain(new LockoutBrain(difficulty));
+        ok(ctx, bot.name + " plays Lockout (" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")");
+        return 1;
     }
 
     private static Bot bot(CommandContext<CommandSourceStack> ctx) {

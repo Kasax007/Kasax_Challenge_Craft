@@ -54,26 +54,44 @@ public final class ObtainPlanner {
     public record Have() implements Plan {
     }
 
-    /** Do {@code task} next; {@code key} names the way, so the caller can report it as failed. */
-    public record Step(BotTask task, String key) implements Plan {
+    /**
+     * Do {@code task} next; {@code key} names the way, so the caller can report it as failed, and
+     * {@code sources} are the blocks or mobs it relies on finding.
+     */
+    public record Step(BotTask task, String key, Set<?> sources) implements Plan {
     }
 
     public record Stuck(String why) implements Plan {
     }
 
-    private static final double INF = 1e9;
+    private static final double INF = 1e9, MAX_WAY_COST = 1200;
     private static final int SCAN_RADIUS = 32;
     private static final int MAX_DEPTH = 12;
 
     private final Map<String, Long> failed = new HashMap<>();
-    private Set<Block> visibleBlocks = Set.of();
-    private Set<EntityType<?>> visibleMobs = Set.of();
-    private long scannedAt = -10_000;
+    private final Map<Object, Long> missing = new HashMap<>();
+    /** What the bot saw at the last look around, with the effort (seconds) to get to the nearest one. */
+    private Map<Block, Double> visibleBlocks = Map.of();
+    private Map<EntityType<?>, Double> visibleMobs = Map.of();
+    private boolean dark;
+    private long scannedAt = -10_000, costsAt = -1;
     private Map<Item, Double> costs = Map.of();
+    private boolean craftOnly;
+    private Set<Item> keep = Set.of();
 
-    /** Avoid the way named {@code key} for two minutes. */
-    public void markFailed(String key, long gameTime) {
-        failed.put(key, gameTime + 2400);
+    /**
+     * A step failed: avoid its way for two minutes, and if it searched for its blocks or mobs and
+     * found none, count those as not around here for ten (every estimate then goes around them).
+     */
+    public void markFailed(Step step, long gameTime) {
+        failed.put(step.key(), gameTime + 2400);
+        for (Object source : step.sources()) missing.put(source, gameTime + 12000);
+        scannedAt = -10_000; // look again
+    }
+
+    private boolean isMissing(Object source) {
+        Long until = missing.get(source);
+        return until != null && until > costsAt;
     }
 
     private boolean isFailed(String key, long now) {
@@ -82,8 +100,69 @@ public final class ObtainPlanner {
     }
 
     public Plan plan(Bot bot, Collection<Item> accept, int count) {
+        return plan(bot, accept, count, false);
+    }
+
+    /**
+     * Like {@link #plan(Bot, Collection, int)}; with {@code craftOnly} the last step has to be a
+     * crafting recipe (a "craft X" goal counts crafting, not having).
+     */
+    public Plan plan(Bot bot, Collection<Item> accept, int count, boolean craftOnly) {
+        return plan(bot, accept, count, craftOnly, Set.of());
+    }
+
+    /**
+     * ... and {@code keep}: items the bot holds for something else (the red dye already collected
+     * for "5 dye colours") are not to be used up on the way: the plan acts as if they were not there.
+     */
+    public Plan plan(Bot bot, Collection<Item> accept, int count, boolean craftOnly, Set<Item> keep) {
         refresh(bot);
-        return plan(bot, Set.copyOf(accept), count, 0, new HashSet<>());
+        this.craftOnly = craftOnly;
+        this.keep = keep;
+        try {
+            return plan(bot, Set.copyOf(accept), count, 0, new HashSet<>());
+        } finally {
+            this.craftOnly = false;
+            this.keep = Set.of();
+        }
+    }
+
+    /** Rough effort, in seconds of play, to hold {@code count} of these items (0 if it already does). */
+    public double estimate(Bot bot, Collection<Item> items, int count) {
+        refresh(bot);
+        int have = countAny(bot.body(), Set.copyOf(items));
+        if (have >= count) return 0;
+        double best = INF;
+        for (Item i : items) best = Math.min(best, cost(i));
+        return best >= INF ? INF : best * (count - have);
+    }
+
+    /** Rough effort to craft one of these items (from scratch, whatever is held). */
+    public double estimateCraft(Bot bot, Collection<Item> items) {
+        refresh(bot);
+        BotKnowledge k = BotKnowledge.get(bot.server());
+        double best = INF;
+        for (Item i : items) {
+            for (BotKnowledge.Route r : k.routesTo(i)) {
+                if (r instanceof BotKnowledge.CraftRoute) best = Math.min(best, routeCost(r, costs));
+            }
+        }
+        return best;
+    }
+
+    /** Rough effort to find and kill one mob of this kind; INF for mobs the bot does not hunt. */
+    public double mobEffort(Bot bot, EntityType<?> type, double unknown) {
+        refresh(bot);
+        return mobCost(type, BotKnowledge.get(bot.server()).mobEffort(type, unknown));
+    }
+
+    /** Seen: the way there. Not seen: the usual effort, and monsters mostly come out at night. */
+    private double mobCost(EntityType<?> type, double effort) {
+        Double seen = visibleMobs.get(type);
+        if (seen == null && isMissing(type)) return INF;
+        if (seen != null) return seen;
+        boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
+        return monster && !dark ? effort * 4 : effort;
     }
 
     // ---- looking around -----------------------------------------------------------------------
@@ -92,11 +171,14 @@ public final class ObtainPlanner {
         ServerLevel level = (ServerLevel) bot.body().level();
         long now = level.getGameTime();
         if (now - scannedAt < 200) {
-            costs = computeCosts(bot);
+            // Once a tick is enough (the brain asks about every tile in one go).
+            if (now != costsAt) costs = computeCosts(bot);
+            costsAt = now;
             return;
         }
+        costsAt = now;
         scannedAt = now;
-        Set<Block> blocks = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<Block, Double> blocks = new IdentityHashMap<>();
         BlockPos c = bot.body().blockPosition();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int x = -SCAN_RADIUS; x <= SCAN_RADIUS; x++) {
@@ -105,18 +187,23 @@ public final class ObtainPlanner {
                 for (int y = -16; y <= 16; y++) {
                     m.set(c.getX() + x, c.getY() + y, c.getZ() + z);
                     BlockState s = level.getBlockState(m);
-                    if (s.isAir() || blocks.contains(s.getBlock())) continue;
-                    if (BotWorld.exposed(level, m)) blocks.add(s.getBlock());
+                    if (s.isAir()) continue;
+                    // Walking ~4 blocks a second; up and down (climbing, digging) is slower.
+                    double reach = 2 + Math.sqrt(x * x + z * z) / 4.0 + Math.abs(y) * 0.8;
+                    Double known = blocks.get(s.getBlock());
+                    if (known != null && known <= reach) continue;
+                    if (BotWorld.exposed(level, m)) blocks.put(s.getBlock(), reach);
                 }
             }
         }
         visibleBlocks = blocks;
-        Set<EntityType<?>> mobs = new HashSet<>();
+        Map<EntityType<?>, Double> mobs = new HashMap<>();
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(c).inflate(48),
                 e -> e.isAlive() && !(e instanceof Player))) {
-            mobs.add(e.getType());
+            mobs.merge(e.getType(), 5 + e.distanceTo(bot.body()) / 3.0, Math::min);
         }
         visibleMobs = mobs;
+        dark = level.isDarkOutside();
         costs = computeCosts(bot);
     }
 
@@ -156,15 +243,16 @@ public final class ObtainPlanner {
             best = Math.min(best, c);
         }
         for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
-            double effort = visibleMobs.contains(d.type()) ? 8 : d.effort();
-            best = Math.min(best, effort / d.count());
+            best = Math.min(best, mobCost(d.type(), d.effort()) / d.count());
         }
         return best;
     }
 
     private double blockCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         BlockState s = block.defaultBlockState();
-        double find = visibleBlocks.contains(block) ? 2 : BotKnowledge.rarity(block);
+        if (isMissing(block)) return INF;
+        Double seen = visibleBlocks.get(block);
+        double find = seen != null ? Math.min(seen, BotKnowledge.rarity(block)) : BotKnowledge.rarity(block);
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         return find + breakSeconds + toolCost(bot, k, block, cost);
     }
@@ -288,6 +376,7 @@ public final class ObtainPlanner {
 
     private Plan plan(Bot bot, Set<Item> accept, int count, int depth, Set<Item> visiting) {
         Sim sim = Sim.of(bot.body());
+        for (Item k : keep) if (!accept.contains(k)) sim.inv.remove(k);
         if (sim.count(accept) >= count) return new Have();
         String why = expand(bot, sim, accept, count, depth, visiting);
         if (why != null) return new Stuck(why);
@@ -295,7 +384,8 @@ public final class ObtainPlanner {
         Pending first = sim.steps.get(0);
         int total = 0;
         for (Pending p : sim.steps) if (p.key().equals(first.key())) total += p.amount();
-        return new Step(toTask(bot, first, total), first.key());
+        Set<?> sources = first.kind() == Kind.MINE || first.kind() == Kind.KILL ? (Set<?>) first.data() : Set.of();
+        return new Step(toTask(bot, first, total), first.key(), sources);
     }
 
     @SuppressWarnings("unchecked")
@@ -303,8 +393,11 @@ public final class ObtainPlanner {
         return switch (p.kind()) {
             case MINE -> {
                 Set<Block> blocks = (Set<Block>) p.data();
+                // If it has to dig for them: to the height of the most common of these blocks.
+                Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElseThrow();
+                Integer depth = BotKnowledge.depth(common, bot.body().blockPosition().getY());
                 yield new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
-                        countAny(bot.body(), p.accept()) + total);
+                        countAny(bot.body(), p.accept()) + total, depth);
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);
@@ -321,9 +414,10 @@ public final class ObtainPlanner {
         long now = bot.body().level().getGameTime();
 
         List<Way> ways = new ArrayList<>();
+        boolean onlyCraft = craftOnly && depth == 0;
         // Mining: every block that drops any of the wanted items, in one sweep.
         Map<Block, Double> mineBlocks = new LinkedHashMap<>();
-        for (Item item : accept) {
+        for (Item item : onlyCraft ? Set.<Item>of() : accept) {
             for (BotKnowledge.Drop d : k.blocksDropping(item)) {
                 double c = blockCost(bot, k, d.block(), costs) / Math.max(0.05, d.count());
                 mineBlocks.merge(d.block(), c, Math::min);
@@ -335,10 +429,9 @@ public final class ObtainPlanner {
             if (!isFailed(key, now)) ways.add(new Way(key, c, Kind.MINE, mineBlocks));
         }
         Map<EntityType<?>, Double> mobs = new LinkedHashMap<>();
-        for (Item item : accept) {
+        for (Item item : onlyCraft ? Set.<Item>of() : accept) {
             for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
-                double effort = visibleMobs.contains(d.type()) ? 8 : d.effort();
-                mobs.merge(d.type(), effort / d.count(), Math::min);
+                mobs.merge(d.type(), mobCost(d.type(), d.effort()) / d.count(), Math::min);
             }
         }
         if (!mobs.isEmpty()) {
@@ -350,6 +443,7 @@ public final class ObtainPlanner {
             if (visiting.contains(item)) continue;
             for (BotKnowledge.Route r : k.routesTo(item)) {
                 if (isFailed(r.key(), now)) continue;
+                if (onlyCraft && !(r instanceof BotKnowledge.CraftRoute)) continue;
                 // A recipe that eats one of the wanted items to make another (logs → wood) goes in circles.
                 if (usesAny(r, accept)) continue;
                 ways.add(new Way(r.key(), routeCost(r, costs), Kind.ROUTE, r));
@@ -360,7 +454,8 @@ public final class ObtainPlanner {
         String firstWhy = "no known way to get " + names(accept);
         int tried = 0;
         for (Way w : ways) {
-            if (w.cost() >= INF || tried++ >= 6) break;
+            // Ways that need things the bot won't find (storage blocks, the Nether) are no ways.
+            if (w.cost() >= MAX_WAY_COST || tried++ >= 6) break;
             Sim before = sim.copy();
             String why = switch (w.kind()) {
                 case MINE -> mine(bot, k, sim, accept, count, w, depth, visiting);
@@ -389,6 +484,19 @@ public final class ObtainPlanner {
             Item tool = tools.stream().min(Comparator.comparingDouble(this::cost)).orElseThrow();
             String why = expand(bot, sim, Set.of(tool), sim.count(Set.of(tool)) + 1, depth + 1, v);
             if (why != null) return why;
+        }
+        // Digging down for it: take cheap pickaxes along for the stone on the way, so the good one
+        // (needed for the ore itself) does not wear out on it.
+        Integer digTo = cheapest == null || visibleBlocks.containsKey(cheapest) ? null
+                : BotKnowledge.depth(cheapest, bot.body().blockPosition().getY());
+        if (digTo != null && !accept.contains(Items.STONE_PICKAXE) && !visiting.contains(Items.STONE_PICKAXE)) {
+            int spare = digTo < 30 ? 2 : 1;
+            if (sim.count(Set.of(Items.STONE_PICKAXE)) < spare) {
+                Set<Item> v = new HashSet<>(visiting);
+                v.addAll(accept);
+                String why = expand(bot, sim, Set.of(Items.STONE_PICKAXE), spare, depth + 1, v);
+                if (why != null) return why;
+            }
         }
         Set<Block> harvestable = blocks.keySet().stream()
                 .filter(b -> sim.canHarvest(b.defaultBlockState()))

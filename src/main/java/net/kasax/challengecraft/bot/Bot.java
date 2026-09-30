@@ -76,10 +76,25 @@ public final class Bot {
         say("-> " + task.describe());
     }
 
+    /** Drops everything the bot is doing (the brain decides anew on the next tick). */
+    public void clearTasks() {
+        tasks.clear();
+        navigator.stop();
+        actions.reset();
+        body.stopInputs();
+    }
+
     /** Runs {@code task} first, then returns to what was going on. */
     public void interject(BotTask task) {
         navigator.stop();
         tasks.push(task);
+    }
+
+    /** The task stack, top first, with details (for testing). */
+    public String status() {
+        StringBuilder sb = new StringBuilder();
+        for (BotTask t : tasks) sb.append(" > ").append(t.status());
+        return sb.length() == 0 ? " idle" : sb.toString();
     }
 
     public BotTask current() {
@@ -89,6 +104,7 @@ public final class Bot {
     void tick() {
         if (!body.isAlive()) return;
         reflexes();
+        if (brain != null) brain.tick(this);
         BotTask task = tasks.peek();
         if (task == null) {
             if (brain != null) brain.think(this);
@@ -108,24 +124,67 @@ public final class Bot {
         if (r != BotTask.Result.RUNNING) {
             tasks.remove(task);
             navigator.stop();
-            if (r == BotTask.Result.FAILED) say("x " + task.describe());
+            say((r == BotTask.Result.FAILED ? "x " : "done: ") + task.describe());
             if (brain != null) brain.finished(this, task, r == BotTask.Result.DONE);
         }
     }
 
     private int reflexCooldown;
 
-    /** Things a player does without thinking about them, whatever the plan: eat when hungry. */
+    /**
+     * Things a player does without thinking about them, whatever the plan: hit back at a monster
+     * that attacks, eat when hungry.
+     */
     private void reflexes() {
         if (reflexCooldown-- > 0) return;
-        reflexCooldown = 20;
-        if (tasks.peek() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        reflexCooldown = 10;
+        tidyInventory();
+        BotTask top = tasks.peek();
+        if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.KillTask) return;
+        net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive()
+                && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
+            actions.reset();
+            interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1));
+            return;
+        }
         int food = body.getFoodData().getFoodLevel();
         boolean hurt = body.getHealth() < body.getMaxHealth() * 0.6f && food < 20;
         if ((food <= 14 || hurt) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.EatTask());
         }
+    }
+
+    /** What a player throws away when the inventory fills up (keeping one stack of building blocks). */
+    private static final java.util.Set<net.minecraft.world.item.Item> JUNK = java.util.Set.of(
+            net.minecraft.world.item.Items.DIRT, net.minecraft.world.item.Items.GRAVEL, net.minecraft.world.item.Items.DIORITE,
+            net.minecraft.world.item.Items.ANDESITE, net.minecraft.world.item.Items.GRANITE, net.minecraft.world.item.Items.TUFF,
+            net.minecraft.world.item.Items.COBBLED_DEEPSLATE, net.minecraft.world.item.Items.COBBLESTONE,
+            net.minecraft.world.item.Items.NETHERRACK, net.minecraft.world.item.Items.CALCITE);
+
+    /** Frees slots when the inventory is nearly full: junk first, all but 64 building blocks. */
+    private void tidyInventory() {
+        var inv = body.getInventory().getNonEquipmentItems();
+        int free = 0;
+        for (var s : inv) if (s.isEmpty()) free++;
+        if (free >= 3) return;
+        int keep = 64;
+        for (int i = 0; i < inv.size(); i++) {
+            var s = inv.get(i);
+            if (s.isEmpty() || !JUNK.contains(s.getItem())) {
+                // Anything that is not junk stays; junk with a use (cobblestone) is kept up to a stack.
+                continue;
+            }
+            boolean building = BotActions.THROWAWAY.contains(s.getItem());
+            if (building && keep > 0) {
+                keep -= s.getCount();
+                continue;
+            }
+            inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+            body.drop(s, false, net.minecraft.util.Prediction.SERVER_ONLY);
+        }
+        body.getInventory().setChanged();
     }
 
     public void say(String text) {

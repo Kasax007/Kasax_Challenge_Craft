@@ -182,28 +182,50 @@ public final class BotKnowledge {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
         if (id.contains("nether") || id.startsWith("soul_") || id.contains("basalt") || id.contains("blackstone")
                 || id.contains("crimson") || id.contains("warped") || id.equals("glowstone") || id.equals("magma_block")
-                || id.equals("ancient_debris") || id.equals("shroomlight") || id.contains("quartz_ore")) return 900;
-        if (id.startsWith("end_") || id.contains("purpur") || id.contains("chorus") || id.contains("shulker")) return 2500;
+                || id.equals("ancient_debris") || id.equals("shroomlight") || id.contains("quartz_ore")) return 5000; // the Nether: not yet
+        if (id.startsWith("end_") || id.contains("purpur") || id.contains("chorus") || id.contains("shulker")) return 9000;
         if (s.is(BlockTags.LEAVES)) return 5;
         if (s.is(BlockTags.LOGS)) return id.contains("cherry") || id.contains("mangrove") || id.contains("jungle")
                 || id.contains("acacia") || id.contains("dark_oak") || id.contains("pale") ? 90 : 8;
-        if (s.is(BlockTags.SMALL_FLOWERS)) return 10;
+        if (s.is(BlockTags.SMALL_FLOWERS)) return id.equals("dandelion") || id.equals("poppy") ? 12 : 90;
         return switch (id) {
-            case "dirt", "grass_block", "stone", "sand", "gravel", "short_grass", "tall_grass", "deepslate", "andesite",
-                 "diorite", "granite", "fern", "large_fern" -> 3;
-            case "sandstone", "red_sand", "snow", "snow_block", "tuff", "water", "sugar_cane", "coarse_dirt" -> 15;
-            case "coal_ore" -> 12;
-            case "deepslate_coal_ore", "copper_ore" -> 18;
-            case "iron_ore" -> 22;
-            case "deepslate_copper_ore", "deepslate_iron_ore", "clay", "kelp", "kelp_plant", "seagrass" -> 35;
-            case "gold_ore", "deepslate_gold_ore", "redstone_ore", "deepslate_redstone_ore", "lapis_ore",
-                 "deepslate_lapis_ore", "pumpkin", "cactus", "brown_mushroom", "red_mushroom", "calcite" -> 70;
-            case "melon", "ice", "moss_block", "dripstone_block", "pointed_dripstone", "sweet_berry_bush", "cobweb",
-                 "bamboo", "mud", "podzol", "mycelium", "terracotta", "red_sandstone", "vine", "lily_pad" -> 120;
-            case "obsidian" -> 180;
-            case "diamond_ore", "deepslate_diamond_ore", "packed_ice", "amethyst_cluster", "blue_ice", "sculk" -> 300;
-            case "emerald_ore", "deepslate_emerald_ore" -> 450;
-            default -> 200;
+            case "dirt", "grass_block", "sand", "gravel", "short_grass", "tall_grass", "fern", "large_fern" -> 3;
+            // Under a few blocks of dirt anywhere: dig down.
+            case "stone", "andesite", "diorite", "granite" -> 8;
+            case "sandstone", "red_sand", "snow", "snow_block", "water", "sugar_cane", "coarse_dirt" -> 15;
+            case "coal_ore", "deepslate", "tuff" -> 30;
+            case "copper_ore", "deepslate_coal_ore" -> 40;
+            case "iron_ore" -> 55;
+            case "deepslate_copper_ore", "deepslate_iron_ore", "clay", "kelp", "kelp_plant", "seagrass" -> 70;
+            case "pumpkin", "cactus", "brown_mushroom", "red_mushroom", "calcite" -> 90;
+            case "redstone_ore", "deepslate_redstone_ore" -> 220;
+            case "gold_ore", "deepslate_gold_ore", "lapis_ore", "deepslate_lapis_ore" -> 300;
+            case "melon", "ice", "moss_block", "dripstone_block", "pointed_dripstone",
+                 "sweet_berry_bush", "cobweb", "bamboo", "mud", "podzol", "mycelium", "terracotta", "red_sandstone",
+                 "vine", "lily_pad", "cocoa" -> 140;
+            case "obsidian" -> 200;
+            case "packed_ice", "amethyst_cluster", "blue_ice", "sculk", "hay_block", "bell" -> 320;
+            case "diamond_ore", "deepslate_diamond_ore" -> 600;
+            case "emerald_ore", "deepslate_emerald_ore" -> 600;
+            // Anything else is not lying around in the overworld (storage blocks, bricks, ...): make it.
+            default -> 1500;
+        };
+    }
+
+    /**
+     * The height to dig to for a block found underground (the most common height of an ore),
+     * or null for blocks the bot looks for on the surface.
+     */
+    public static Integer depth(Block block, int surfaceY) {
+        String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+        return switch (id) {
+            case "stone", "andesite", "diorite", "granite" -> surfaceY - 6;
+            case "coal_ore", "copper_ore", "deepslate_coal_ore", "deepslate_copper_ore" -> 44;
+            case "iron_ore", "deepslate_iron_ore" -> 14;
+            case "lapis_ore", "deepslate_lapis_ore", "deepslate", "tuff" -> -2;
+            case "gold_ore", "deepslate_gold_ore" -> -18;
+            case "redstone_ore", "deepslate_redstone_ore", "diamond_ore", "deepslate_diamond_ore" -> -53;
+            default -> null;
         };
     }
 
@@ -249,6 +271,12 @@ public final class BotKnowledge {
             double n = (Double) itemsAndCounts[i + 1];
             mobDrops.computeIfAbsent(item, k -> new ArrayList<>()).add(new MobDrop(type, n, effort));
         }
+    }
+
+    /** The effort to find and kill one of these mobs, from the drop table; {@code unknown} for others. */
+    public double mobEffort(EntityType<?> type, double unknown) {
+        for (List<MobDrop> l : mobDrops.values()) for (MobDrop d : l) if (d.type() == type) return d.effort();
+        return unknown;
     }
 
     public List<MobDrop> mobsDropping(Item item) {

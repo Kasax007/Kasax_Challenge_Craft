@@ -46,23 +46,52 @@ public final class BotTools {
         return false;
     }
 
-    /** Puts the best tool for {@code state} into the hand (a hotbar slot, swapping if needed). */
+    /**
+     * Puts the right tool for {@code state} into the hand (a hotbar slot, swapping if needed): the
+     * cheapest one that does the job, as a player keeps the diamond pickaxe for what needs it and
+     * digs stone with a stone one. A tool about to break is only used when nothing else works.
+     */
     public void equipFor(BlockState state) {
         Inventory inv = bot.getInventory();
-        float hardness = state.getDestroySpeed(bot.level(), bot.blockPosition());
+        float hardness = Math.max(state.getDestroySpeed(bot.level(), bot.blockPosition()), 0.01f);
+        boolean needsTool = state.requiresCorrectToolForDrops();
         int bestSlot = -1;
-        double best = ticksWith(inv.getSelectedItem(), state, Math.max(hardness, 0.01f));
+        double bestScore = Double.MAX_VALUE;
         for (int i = 0; i < inv.getNonEquipmentItems().size(); i++) {
             ItemStack s = inv.getNonEquipmentItems().get(i);
-            if (s.isEmpty()) continue;
-            double t = ticksWith(s, state, Math.max(hardness, 0.01f));
-            // Prefer the tool that also harvests; among equals keep what is in hand.
-            if (t < best) {
-                best = t;
+            double score = score(s, state, hardness, needsTool);
+            if (score < bestScore) {
+                bestScore = score;
                 bestSlot = i;
             }
         }
-        if (bestSlot >= 0) select(bestSlot);
+        // The empty hand, if nothing beats it (keeps tools from wearing on dirt and leaves).
+        if (bestSlot >= 0 && bestScore < score(ItemStack.EMPTY, state, hardness, needsTool)) select(bestSlot);
+        else if (!inv.getSelectedItem().isEmpty() && inv.getSelectedItem().isDamageableItem()) selectEmptyHand();
+    }
+
+    /** Lower is better: ticks to break, then how valuable the tool is; wrong or worn-out tools last. */
+    private static double score(ItemStack s, BlockState state, float hardness, boolean needsTool) {
+        boolean harvests = !needsTool || !s.isEmpty() && s.isCorrectToolForDrops(state);
+        double ticks = ticksWith(s, state, hardness);
+        double score = ticks;
+        if (!harvests) score += 10_000;
+        if (!s.isEmpty() && s.isDamageableItem()) {
+            if (s.getMaxDamage() - s.getDamageValue() <= 3) score += 5_000;
+            // A faster tool is worth it only when it saves real time: value tools by durability.
+            score += s.getMaxDamage() / 25.0;
+        }
+        return score;
+    }
+
+    private void selectEmptyHand() {
+        Inventory inv = bot.getInventory();
+        for (int i = 0; i < 9; i++) {
+            if (inv.getNonEquipmentItems().get(i).isEmpty()) {
+                inv.setSelectedSlot(i);
+                return;
+            }
+        }
     }
 
     /** Makes inventory slot {@code slot} the one in hand. */

@@ -37,7 +37,8 @@ public final class KillTask implements BotTask {
     private final Set<java.util.UUID> unreachable = new java.util.HashSet<>();
     private LivingEntity target;
     private BlockPos deathSpot;
-    private int killed, collectTicks, repath, explores, chaseTicks, direct;
+    private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
+    private net.minecraft.core.Direction heading;
     private boolean walking;
 
     /** {@code loot} may be empty when only the kill matters (then {@code kills} counts). */
@@ -82,10 +83,13 @@ public final class KillTask implements BotTask {
                 target = null;
                 return Result.RUNNING;
             }
+            if (--lookCooldown > 0) return explore(bot);
+            lookCooldown = 20;
             target = nearest(body, level);
             chaseTicks = 0;
-            walking = false;
             if (target == null) return explore(bot);
+            if (walking) bot.navigator().stop();
+            walking = false;
             equipWeapon(bot);
         }
         if (++chaseTicks > 1200) {
@@ -177,17 +181,30 @@ public final class KillTask implements BotTask {
         return dmg[0];
     }
 
+    /** None in sight: walk out in one direction (turning when blocked) for up to two minutes. */
     private Result explore(Bot bot) {
-        if (explores > 8) return Result.FAILED;
+        if (++exploreTicks > 2400 || explores > 40) {
+            bot.say("found no " + describeTypes());
+            return Result.FAILED;
+        }
+        if (heading == null) heading = net.minecraft.core.Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
         if (!walking) {
             explores++;
-            double a = bot.body().getRandom().nextDouble() * Math.PI * 2;
-            BlockPos p = bot.body().blockPosition().offset((int) (Math.cos(a) * 48), 0, (int) (Math.sin(a) * 48));
+            BlockPos p = bot.body().blockPosition().relative(heading, 40).relative(heading.getClockWise(), bot.body().getRandom().nextInt(21) - 10);
             bot.navigator().goNear(bot.body().level().getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
             walking = true;
         }
-        if (bot.navigator().tick() != BotNavigator.Status.MOVING) walking = false;
+        BotNavigator.Status s = bot.navigator().tick();
+        if (s != BotNavigator.Status.MOVING) {
+            walking = false;
+            if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
+        }
+        // Look for them once a second, not every tick.
         return Result.RUNNING;
+    }
+
+    private String describeTypes() {
+        return types.size() == 1 ? BuiltInRegistries.ENTITY_TYPE.getKey(types.iterator().next()).getPath() : "mobs";
     }
 
     @Override
