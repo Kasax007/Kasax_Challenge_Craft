@@ -30,13 +30,24 @@ public final class SurfaceTask implements BotTask {
         BlockPos head = body.blockPosition().above();
         if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, head) < 6
                 && head.getY() < level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, head.getX(), head.getZ())) return true;
-        // Down its own shaft (the sky shines straight in): the ground on all four sides is well above.
-        int lowest = Integer.MAX_VALUE;
-        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-            BlockPos n = body.blockPosition().relative(d);
-            lowest = Math.min(lowest, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, n.getX(), n.getZ()));
+        // Down a shaft or a ravine (the sky shines straight in): the ground a few blocks around is
+        // mostly well above the feet. (One side high is only a cliff or a wall.)
+        int feetY = body.blockPosition().getY(), high = 0, samples = 0;
+        for (int i = 0; i < 16; i++) {
+            double a = i * Math.PI / 8;
+            int x = body.blockPosition().getX() + (int) Math.round(Math.cos(a) * 4);
+            int z = body.blockPosition().getZ() + (int) Math.round(Math.sin(a) * 4);
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            samples++;
+            if (level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) > feetY + 1) high++;
         }
-        return lowest > body.blockPosition().getY() + 1;
+        // ... and it is hemmed in (a hole or a tunnel, not a valley floor).
+        int walls = 0;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            BlockPos n = body.blockPosition().above().relative(d);
+            if (!level.getBlockState(n).getCollisionShape(level, n).isEmpty()) walls++;
+        }
+        return samples > 0 && high * 10 >= samples * 7 && walls >= 2;
     }
 
     @Override
@@ -55,7 +66,7 @@ public final class SurfaceTask implements BotTask {
         if (feet.getY() > bestY) {
             bestY = feet.getY();
             sinceBest = 0;
-        } else if (++sinceBest > 300) {
+        } else if (!bot.actions().isBreaking() && ++sinceBest > 300) {
             sinceBest = 0;
             stairs = !stairs;
             heading = heading.getClockWise();

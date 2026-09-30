@@ -77,6 +77,11 @@ public final class BotActions {
         return false;
     }
 
+    /** Whether a block is being broken right now (progress made this or the last tick). */
+    public boolean isBreaking() {
+        return breaking != null && progress > 0;
+    }
+
     public void reset() {
         if (breaking != null) bot.level().destroyBlockProgress(bot.getId(), breaking, -1);
         breaking = null;

@@ -25,7 +25,10 @@ import java.util.function.Predicate;
  */
 public final class BotPathfinder {
     /** One step of a path: the node to reach, what to break first, and where to put a block. */
-    public record Step(BlockPos to, List<BlockPos> breaks, BlockPos place) {
+    public record Step(BlockPos to, List<BlockPos> breaks, BlockPos place, boolean leap) {
+        public Step(BlockPos to, List<BlockPos> breaks, BlockPos place) {
+            this(to, breaks, place, false);
+        }
     }
 
     /** What the search may assume about the bot's abilities. */
@@ -34,7 +37,7 @@ public final class BotPathfinder {
 
     private static final int MAX_FALL = 3;
     private static final double WALK = 4.6, DIAGONAL = 6.5, JUMP_UP = 7.0, FALL_PER_BLOCK = 1.5,
-            SWIM = 9.0, PILLAR = 14.0, BRIDGE = 12.0, DIG_EXTRA = 2.0;
+            SWIM = 9.0, PILLAR = 14.0, BRIDGE = 12.0, DIG_EXTRA = 2.0, LEAP = 6.0;
 
     private final ServerLevel level;
     private final Abilities abilities;
@@ -123,13 +126,16 @@ public final class BotPathfinder {
     private double cost(BlockPos from, Step s) {
         int dx = s.to().getX() - from.getX(), dy = s.to().getY() - from.getY(), dz = s.to().getZ() - from.getZ();
         double c;
-        if (s.place() != null) c = s.place().getY() < s.to().getY() && s.place().getX() == from.getX() && s.place().getZ() == from.getZ() ? PILLAR : BRIDGE;
+        if (s.leap()) c = WALK * Math.max(Math.abs(dx), Math.abs(dz)) + LEAP;
+        else if (s.place() != null) c = s.place().getY() < s.to().getY() && s.place().getX() == from.getX() && s.place().getZ() == from.getZ() ? PILLAR : BRIDGE;
         else if (inWater(s.to()) || inWater(from)) c = SWIM;
         else if (dy > 0) c = JUMP_UP;
         else if (dy < 0 && dx == 0 && dz == 0) c = WALK;
         else if (dy < 0) c = WALK + FALL_PER_BLOCK * -dy;
         else c = dx != 0 && dz != 0 ? DIAGONAL : WALK;
-        for (BlockPos b : s.breaks()) c += abilities.tools().breakTicks(state(b)) + DIG_EXTRA;
+        // Digging while afloat is five times slower (not on the ground).
+        double digFactor = inWater(from) && !solid(from.below()) ? 5 : 1;
+        for (BlockPos b : s.breaks()) c += abilities.tools().breakTicks(state(b)) * digFactor + DIG_EXTRA;
         return c;
     }
 
@@ -181,6 +187,43 @@ public final class BotPathfinder {
                         break;
                     }
                 }
+            }
+        }
+        // Leap over a gap one to three wide (sprint-jumping), landing level or one lower.
+        if (!swimming && solid(p.below()) && clear(p.above(2))) {
+            for (int i = 0; i < 4; i++) {
+                int dx = DIRS[i][0], dz = DIRS[i][1];
+                BlockPos first = p.offset(dx, 0, dz);
+                if (canStand(first) || !clear(first) || !clear(first.above()) || !clear(first.above(2))) continue;
+                for (int gap = 1; gap <= 3; gap++) {
+                    BlockPos over = p.offset(dx * gap, 0, dz * gap);
+                    if (!clear(over) || !clear(over.above()) || !clear(over.above(2)) || canStand(over)) break;
+                    BlockPos land = p.offset(dx * (gap + 1), 0, dz * (gap + 1));
+                    if (canStand(land) && clear(land.above()) && clear(land.above(2)) && !inWater(land)) {
+                        out.add(new Step(land, List.of(), null, true));
+                        break;
+                    }
+                    if (gap < 3 && clear(land) && clear(land.above()) && canStand(land.below()) && !inWater(land.below())) {
+                        out.add(new Step(land.below(), List.of(), null, true));
+                        break;
+                    }
+                }
+            }
+        }
+        // Out of deep water where the bank is too high: set a block in the water against the bank
+        // (or anything solid) and climb onto it. The search does not know the block is there
+        // afterwards, so it ends its leg on it and plans on from there.
+        if (swimming && abilities.mayPillar() && clear(p.above()) && !inWater(p.above()) && clear(p.above(2))) {
+            for (int i = 0; i < 4; i++) {
+                BlockPos t = p.offset(DIRS[i][0], 0, DIRS[i][1]);
+                if (solid(t) || !clear(t.above()) || !clear(t.above(2)) || inWater(t.above())) continue;
+                if (!inWater(t) && !clear(t)) continue;
+                boolean against = false;
+                for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                    BlockPos n = t.relative(d);
+                    if (!n.equals(p) && solid(n)) against = true;
+                }
+                if (against) out.add(new Step(t.above(), List.of(), t));
             }
         }
         // Straight down: dig the block below and stand on the next one.

@@ -33,6 +33,7 @@ public final class BotNavigator {
     private int index, stuck, replans;
     /** Whether the block being broken is one the navigator is digging through. */
     private boolean digging;
+    private int stepTicks;
     private double lastDistance;
     private Status status = Status.IDLE;
     /** Allow digging and building on the way. */
@@ -58,6 +59,15 @@ public final class BotNavigator {
         double r2 = range * range;
         // Measured from the eyes, which is what reach is about.
         setGoal(p -> Vec3.atCenterOf(p).add(0, 1.12, 0).distanceToSqr(Vec3.atCenterOf(pos)) <= r2, pos);
+    }
+
+    /** Close enough to an item lying about to pick it up (it may hover or lie on a slab). */
+    public void goPickUp(net.minecraft.world.entity.Entity item) {
+        double ix = item.getX(), iy = item.getY(), iz = item.getZ();
+        setGoal(p -> {
+            double dx = p.getX() + 0.5 - ix, dz = p.getZ() + 0.5 - iz;
+            return dx * dx + dz * dz <= 1.1 * 1.1 && iy - p.getY() > -0.6 && iy - p.getY() < 1.6;
+        }, item.blockPosition());
     }
 
     public void setGoal(Predicate<BlockPos> goal, BlockPos steer) {
@@ -105,6 +115,15 @@ public final class BotNavigator {
             if (!replan(feet)) return status;
         }
         BotPathfinder.Step step = path.get(index);
+        // A step taking far longer than it should (jumping at a wall it cannot get up, pushed back
+        // by water again and again): give it up and look for another way, as Baritone does.
+        if (++stepTicks > stepLimit(step)) {
+            stepTicks = 0;
+            path = null;
+            bankDig = null;
+            bankTicks = 0;
+            return status;
+        }
         // Dig first.
         for (BlockPos b : step.breaks()) {
             if (!bot.level().getBlockState(b).getCollisionShape(bot.level(), b).isEmpty()) {
@@ -122,7 +141,7 @@ public final class BotNavigator {
         if (step.place() != null && (step.place().getX() != feet.getX() || step.place().getZ() != feet.getZ())) {
             BlockPos place = step.place();
             if (bot.level().getBlockState(place).getCollisionShape(bot.level(), place).isEmpty()) {
-                bot.sneak = true;
+                bot.sneak = bot.onGround(); // (sneaking in water would only sink it)
                 Vec3 edge = new Vec3(place.getX() + 0.5, bot.getY(), place.getZ() + 0.5);
                 double ex = edge.x - bot.getX(), ez = edge.z - bot.getZ();
                 float yaw = (float) (Mth.atan2(ez, ex) * Mth.RAD_TO_DEG) - 90f;
@@ -156,7 +175,8 @@ public final class BotNavigator {
         // with luck. After a few tries, dig a step into the bank at water height, as players do.
         // Bobbing at the bank: in the water or just above it, against the bank, below the step.
         boolean overWater = bot.isInWater() || !bot.onGround() && !bot.level().getFluidState(feet.below()).isEmpty();
-        if (overWater && bot.horizontalCollision && to.getY() > bot.getY()) bankTicks++;
+        // (Only for a plain hop out; a step that digs its way already has the bank in hand.)
+        if (overWater && bot.horizontalCollision && to.getY() > bot.getY() && step.breaks().isEmpty()) bankTicks++;
         if (bankDig == null && bankTicks > 40) {
             BlockPos bank = to.below();
             if (!bot.level().getBlockState(bank).getCollisionShape(bot.level(), bank).isEmpty()
@@ -177,6 +197,8 @@ public final class BotNavigator {
             }
             return status;
         }
+        if (step.leap()) return leap(to, feet);
+        bot.sprintNow = false;
         Vec3 aim = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
         double dx = aim.x - bot.getX(), dz = aim.z - bot.getZ();
         double flat = Math.sqrt(dx * dx + dz * dz);
@@ -203,11 +225,50 @@ public final class BotNavigator {
         }
         lastDistance = d;
         // Knocked off the path.
-        if (feet.distManhattan(to) > 4) path = null;
+        if (feet.distManhattan(to) > 4 && !step.leap()) path = null;
+        return status;
+    }
+
+    /** Ticks a step may take: its digging plus a generous allowance for the movement itself. */
+    private int stepLimit(BotPathfinder.Step step) {
+        int limit = 80;
+        for (BlockPos b : step.breaks()) limit += (int) Math.min(1200, tools.breakTicks(bot.level().getBlockState(b)) * 6) + 20;
+        if (step.place() != null) limit += 60;
+        return limit;
+    }
+
+    /**
+     * A leap over a gap: run at it sprinting, jump at the very edge, keep pushing forward in the
+     * air. Fallen short (below the landing): look for another way from down there.
+     */
+    private Status leap(BlockPos to, BlockPos feet) {
+        double dx = to.getX() + 0.5 - bot.getX(), dz = to.getZ() + 0.5 - bot.getZ();
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (bot.onGround() && feet.equals(to) && flat < 0.6 || bot.onGround() && flat < 0.4 && Math.abs(bot.getY() - to.getY()) < 0.6) {
+            bot.sprintNow = false;
+            advance();
+            return status;
+        }
+        if (bot.getY() < to.getY() - 1.2) {
+            bot.sprintNow = false;
+            path = null; // fell in
+            return status;
+        }
+        float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
+        bot.setYRot(yaw);
+        bot.setYHeadRot(yaw);
+        bot.forward = 1f;
+        bot.strafe = 0;
+        bot.sprintNow = true;
+        // At the edge: the ground a little ahead is gone.
+        double ux = dx / Math.max(flat, 1e-3), uz = dz / Math.max(flat, 1e-3);
+        BlockPos ahead = BlockPos.containing(bot.getX() + ux * 0.45, bot.getY() - 0.5, bot.getZ() + uz * 0.45);
+        bot.jump = bot.onGround() && bot.level().getBlockState(ahead).getCollisionShape(bot.level(), ahead).isEmpty();
         return status;
     }
 
     private void advance() {
+        stepTicks = 0;
         index++;
         bankTicks = 0;
         stuck = 0;
@@ -232,6 +293,7 @@ public final class BotNavigator {
                 new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(), tools));
         path = finder.find(feet, goal, target, BUDGET);
         index = 0;
+        stepTicks = 0;
         stuck = 0;
         lastDistance = Double.MAX_VALUE;
         if (path == null || path.isEmpty()) {

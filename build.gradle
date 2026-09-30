@@ -23,6 +23,14 @@ fabricApi {
 	configureDataGeneration {
 		client = true
 	}
+	// Headless scenario tests for the bot (src/gametest): ./gradlew runGameTest
+	configureTests {
+		createSourceSet = true
+		modId = "challengecraft-gametest"
+		enableGameTests = true
+		enableClientGameTests = false
+		eula = true
+	}
 }
 
 dependencies {
@@ -81,4 +89,13 @@ publishing {
 	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
 	repositories {
 	}
+}
+
+// The bot scenarios take minutes: run them on purpose (./gradlew runGameTest), not with every build.
+tasks.matching { it.name == 'runGameTest' }.configureEach {
+	onlyIf { gradle.startParameter.taskNames.any { it.toLowerCase().contains('gametest') } }
+}
+// Only some scenarios: ./gradlew runGameTest -PbotTest=pool
+loom.runs.matching { it.name == 'gameTest' }.configureEach {
+	if (project.hasProperty('botTest')) vmArg "-Dfabric-api.gametest.filter=${project.property('botTest')}"
 }

@@ -28,6 +28,8 @@ public class BotPlayer extends ServerPlayer {
     public boolean jump, sneak;
     /** Sprint whenever running straight ahead and fed enough (a player holding the sprint key). */
     public boolean sprintWhenRunning;
+    /** Sprint now whatever the difficulty (a leap needs the run-up). */
+    public boolean sprintNow;
 
     BotPlayer(MinecraftServer server, ServerLevel level, GameProfile profile, ClientInformation info) {
         super(server, level, profile, info);
@@ -49,7 +51,7 @@ public class BotPlayer extends ServerPlayer {
         this.zza = forward;
         this.setJumping(jump);
         this.setShiftKeyDown(sneak);
-        this.setSprinting(sprintWhenRunning && forward > 0.8f && !sneak && getFoodData().getFoodLevel() > 6 && !isUsingItem());
+        this.setSprinting((sprintWhenRunning || sprintNow) && forward > 0.8f && !sneak && getFoodData().getFoodLevel() > 6 && !isUsingItem());
         super.tick();
         // A client player is ticked by its network handler; a bot has none, so tick it here.
         this.doTick();
@@ -67,6 +69,7 @@ public class BotPlayer extends ServerPlayer {
         strafe = 0;
         jump = false;
         sneak = false;
+        sprintNow = false;
         setSprinting(false);
     }
 

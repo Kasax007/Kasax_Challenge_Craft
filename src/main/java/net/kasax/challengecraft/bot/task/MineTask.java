@@ -75,7 +75,7 @@ public final class MineTask implements BotTask {
             if (!drops.isEmpty()) {
                 ItemEntity e = drops.get(0);
                 if (!walking || bot.navigator().status() != BotNavigator.Status.MOVING) {
-                    bot.navigator().goTo(e.blockPosition());
+                    bot.navigator().goPickUp(e);
                     walking = true;
                 }
                 if (bot.navigator().tick() == BotNavigator.Status.FAILED) collectTicks = 0;

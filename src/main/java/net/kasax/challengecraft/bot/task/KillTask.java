@@ -63,7 +63,7 @@ public final class KillTask implements BotTask {
             List<ItemEntity> drops = BotWorld.drops(level, deathSpot, 5, loot.isEmpty() ? null : loot);
             if (!drops.isEmpty()) {
                 if (!walking || bot.navigator().status() != BotNavigator.Status.MOVING) {
-                    bot.navigator().goTo(drops.get(0).blockPosition());
+                    bot.navigator().goPickUp(drops.get(0));
                     walking = true;
                 }
                 if (bot.navigator().tick() == BotNavigator.Status.FAILED) collectTicks = 0;

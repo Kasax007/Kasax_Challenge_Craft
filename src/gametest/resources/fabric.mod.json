@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "challengecraft-gametest",
+  "version": "1.0.0",
+  "name": "Challenge Craft bot tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "net.kasax.challengecraft.gametest.BotMovementTests",
+      "net.kasax.challengecraft.gametest.BotSkillTests"
+    ]
+  },
+  "depends": {
+    "challengecraft": "*",
+    "fabric-gametest-api-v1": "*"
+  }
+}
