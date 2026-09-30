@@ -19,7 +19,8 @@ import java.util.List;
 public final class SurfaceTask implements BotTask {
     private Direction heading;
     private BlockPos jumpedFrom, stepTo;
-    private int ticks, stepTicks;
+    private int ticks, stepTicks, bestY = Integer.MIN_VALUE, sinceBest, switches;
+    private boolean stairs;
 
     /** Deep enough under the ground that walking about on the surface needs a climb first. */
     public static boolean underground(BotPlayer body) {
@@ -50,13 +51,25 @@ public final class SurfaceTask implements BotTask {
         }
         if (++ticks > 4000) return Result.FAILED;
         if (heading == null) heading = body.getDirection();
+        // Not getting higher (gravel keeps falling in, water above, a ledge): change the way.
+        if (feet.getY() > bestY) {
+            bestY = feet.getY();
+            sinceBest = 0;
+        } else if (++sinceBest > 300) {
+            sinceBest = 0;
+            stairs = !stairs;
+            heading = heading.getClockWise();
+            jumpedFrom = null;
+            stepTo = null;
+            if (++switches > 6) return Result.FAILED;
+        }
 
         if (stepTo != null) return step(bot, feet);
 
         // Pillar: head room, then jump and set a block where the feet were.
         BlockPos head = feet.above(2);
         boolean headSafe = safe(level, head);
-        if (jumpedFrom == null && headSafe && bot.actions().hasThrowaway()) {
+        if (!stairs && jumpedFrom == null && headSafe && bot.actions().hasThrowaway()) {
             if (!clear(level, head)) {
                 bot.actions().breakTick(head);
                 return Result.RUNNING;
@@ -129,6 +142,11 @@ public final class SurfaceTask implements BotTask {
         }
         // Gravel or sand above would just fall in again; fine, it gets dug again, but not lava.
         return true;
+    }
+
+    @Override
+    public String status() {
+        return describe() + " [jumpedFrom " + jumpedFrom + ", stepTo " + stepTo + ", heading " + heading + ", ticks " + ticks + "]";
     }
 
     @Override

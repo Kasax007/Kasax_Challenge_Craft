@@ -60,6 +60,7 @@ public final class LockoutBrain implements BotBrain {
     private BotTask goalTask, sideTask;
     private String sideId;
     private long nextChance;
+    private final Set<net.minecraft.core.BlockPos> treasureTried = new java.util.HashSet<>();
     private int pause, checkTicks;
     private boolean joined;
 
@@ -80,6 +81,8 @@ public final class LockoutBrain implements BotBrain {
 
         LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bot.id);
         if (team == null) return;
+        // Keep something to eat: a player who is starving loses more time than bread costs.
+        if (needsFood(bot)) return;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
@@ -102,6 +105,36 @@ public final class LockoutBrain implements BotBrain {
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
                 + choices.size() + " doable)");
         bot.doNow(goalTask);
+    }
+
+    private static final Set<net.minecraft.world.item.Item> FOODS = Set.of(net.minecraft.world.item.Items.BREAD,
+            net.minecraft.world.item.Items.COOKED_BEEF, net.minecraft.world.item.Items.COOKED_PORKCHOP,
+            net.minecraft.world.item.Items.COOKED_MUTTON, net.minecraft.world.item.Items.COOKED_CHICKEN,
+            net.minecraft.world.item.Items.BAKED_POTATO, net.minecraft.world.item.Items.APPLE,
+            net.minecraft.world.item.Items.COOKED_COD, net.minecraft.world.item.Items.COOKED_SALMON,
+            net.minecraft.world.item.Items.CARROT);
+    private long nextFoodCheck;
+
+    /**
+     * Low on food: stock up if it is cheap right now (hay bales in a village make bread, animals
+     * around make steak). Returns whether it went for food.
+     */
+    private boolean needsFood(Bot bot) {
+        long now = bot.body().level().getGameTime();
+        if (now < nextFoodCheck) return false;
+        nextFoodCheck = now + 600;
+        int points = 0;
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
+        }
+        if (points >= 16) return false;
+        int have = ObtainPlanner.countAny(bot.body(), FOODS);
+        double cost = planner.estimate(bot, FOODS, have + 4);
+        if (cost > 90) return false;
+        bot.say("stocking up on food (~" + Math.round(cost) + " s)");
+        bot.doNow(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner));
+        return true;
     }
 
     private record Choice(Chal_40_LockoutBingo.BoardTile tile, LockoutGoals.Option option) {
@@ -192,6 +225,16 @@ public final class LockoutBrain implements BotBrain {
         if (!chests.isEmpty() && chests.get(0).distSqr(bot.body().blockPosition()) < 32 * 32) {
             sideTask = new net.kasax.challengecraft.bot.task.LootTask(chests.get(0));
             bot.say("on the way: a loot chest");
+            bot.interject(sideTask);
+            return;
+        }
+        // A treasure map from a shipwreck: the X is worth a detour when it is not too far.
+        net.kasax.challengecraft.bot.task.TreasureTask treasure = net.kasax.challengecraft.bot.task.TreasureTask.of(bot.body());
+        if (treasure != null && !treasureTried.contains(treasure.column())
+                && treasure.column().distSqr(bot.body().blockPosition().atY(0)) < 250 * 250) {
+            treasureTried.add(treasure.column());
+            sideTask = treasure;
+            bot.say("on the way: the treasure from the map");
             bot.interject(sideTask);
             return;
         }

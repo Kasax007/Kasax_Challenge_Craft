@@ -465,10 +465,40 @@ public final class ObtainPlanner {
         if (why != null) return new Stuck(why);
         if (sim.steps.isEmpty()) return new Have();
         Pending first = sim.steps.get(0);
+        // Everything from the surface first, then down: a digger that comes back up for wood or
+        // wool loses minutes. (Gathering needs no other step first, only tools it already has.)
+        if (digsDown(bot, first)) {
+            for (Pending p : sim.steps) {
+                if (p.kind() == Kind.MINE || p.kind() == Kind.KILL) {
+                    if (!digsDown(bot, p) && usableNow(bot, p)) {
+                        first = p;
+                        break;
+                    }
+                }
+            }
+        }
         int total = 0;
         for (Pending p : sim.steps) if (p.key().equals(first.key())) total += p.amount();
         Set<?> sources = first.kind() == Kind.MINE || first.kind() == Kind.KILL ? (Set<?>) first.data() : Set.of();
         return new Step(toTask(bot, first, total), first.key(), sources);
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean digsDown(Bot bot, Pending p) {
+        if (p.kind() != Kind.MINE) return false;
+        Set<Block> blocks = (Set<Block>) p.data();
+        for (Block b : blocks) if (visibleBlocks.containsKey(b)) return false;
+        Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElse(null);
+        Integer depth = common == null ? null : BotKnowledge.depth(common, bot.body().blockPosition().getY());
+        return depth != null && depth < bot.body().blockPosition().getY() - 8;
+    }
+
+    /** A gathering step the bot can do with what it holds now (the right tool, if any is needed). */
+    @SuppressWarnings("unchecked")
+    private boolean usableNow(Bot bot, Pending p) {
+        if (p.kind() == Kind.KILL) return true;
+        for (Block b : (Set<Block>) p.data()) if (bot.tools().canHarvest(b.defaultBlockState())) return true;
+        return false;
     }
 
     @SuppressWarnings("unchecked")

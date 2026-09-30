@@ -114,6 +114,25 @@ public final class BotNavigator {
                 return status;
             }
         }
+        // Bridge: sneak to the edge, set the block under the next spot against this one, walk on.
+        if (step.place() != null && (step.place().getX() != feet.getX() || step.place().getZ() != feet.getZ())) {
+            BlockPos place = step.place();
+            if (bot.level().getBlockState(place).getCollisionShape(bot.level(), place).isEmpty()) {
+                bot.sneak = true;
+                Vec3 edge = new Vec3(place.getX() + 0.5, bot.getY(), place.getZ() + 0.5);
+                double ex = edge.x - bot.getX(), ez = edge.z - bot.getZ();
+                float yaw = (float) (Mth.atan2(ez, ex) * Mth.RAD_TO_DEG) - 90f;
+                bot.setYRot(yaw);
+                bot.forward = 0.6f; // sneaking stops at the edge by itself
+                if (actions.inReach(place) && !actions.placeThrowaway(place) && ++stuck > STUCK_TICKS) {
+                    return fail("no block to bridge with");
+                }
+                return status;
+            }
+            bot.sneak = false;
+            path.set(index, new BotPathfinder.Step(step.to(), List.of(), null));
+            return status;
+        }
         // Pillar: jump and put a block where the feet were.
         if (step.place() != null) {
             bot.forward = 0;

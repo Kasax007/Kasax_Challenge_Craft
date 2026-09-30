@@ -34,7 +34,7 @@ public final class BotPathfinder {
 
     private static final int MAX_FALL = 3;
     private static final double WALK = 4.6, DIAGONAL = 6.5, JUMP_UP = 7.0, FALL_PER_BLOCK = 1.5,
-            SWIM = 9.0, PILLAR = 14.0, DIG_EXTRA = 2.0;
+            SWIM = 9.0, PILLAR = 14.0, BRIDGE = 12.0, DIG_EXTRA = 2.0;
 
     private final ServerLevel level;
     private final Abilities abilities;
@@ -123,7 +123,7 @@ public final class BotPathfinder {
     private double cost(BlockPos from, Step s) {
         int dx = s.to().getX() - from.getX(), dy = s.to().getY() - from.getY(), dz = s.to().getZ() - from.getZ();
         double c;
-        if (s.place() != null) c = PILLAR;
+        if (s.place() != null) c = s.place().getY() < s.to().getY() && s.place().getX() == from.getX() && s.place().getZ() == from.getZ() ? PILLAR : BRIDGE;
         else if (inWater(s.to()) || inWater(from)) c = SWIM;
         else if (dy > 0) c = JUMP_UP;
         else if (dy < 0 && dx == 0 && dz == 0) c = WALK;
@@ -154,6 +154,11 @@ public final class BotPathfinder {
             // Flat, digging through if needed.
             List<BlockPos> flat = breaksFor(t, t.above());
             if (flat != null && canStand(t)) out.add(new Step(t, flat, null));
+            // Bridge: nothing to stand on there, so put a block under it (sneaking at the edge).
+            if (abilities.mayPillar() && !swimming && flat != null && flat.isEmpty() && !canStand(t) && canStand(p)
+                    && clear(t.below()) && !inWater(t.below())) {
+                out.add(new Step(t, List.of(), t.below()));
+            }
             // One up: head room above us, and room at the target one higher.
             BlockPos up = t.above();
             if (!clear(t) || swimming) {

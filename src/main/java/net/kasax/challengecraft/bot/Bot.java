@@ -110,6 +110,7 @@ public final class Bot {
     void tick() {
         if (!body.isAlive()) return;
         senses.tick(body);
+        waterBucketLanding(); // every tick, busy or not: a fall does not wait
         reflexes();
         if (brain != null) brain.tick(this);
         BotTask task = tasks.peek();
@@ -162,6 +163,43 @@ public final class Bot {
         if ((food <= 14 || hurt) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.EatTask());
+        }
+    }
+
+    private net.minecraft.core.BlockPos mlgWater;
+
+    /**
+     * The water bucket trick: falling deep with a water bucket, look down and pour it on the ground
+     * just before landing (no fall damage), then scoop it up again.
+     */
+    private void waterBucketLanding() {
+        var level = body.level();
+        if (mlgWater != null) {
+            int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.BUCKET);
+            if (body.onGround() || body.isInWater()) {
+                if (slot >= 0 && level.getFluidState(mlgWater).isSource()) {
+                    tools.select(slot);
+                    body.lookAt(net.minecraft.world.phys.Vec3.atCenterOf(mlgWater));
+                    body.gameMode.useItem(body, level, body.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+                }
+                mlgWater = null;
+            }
+            return;
+        }
+        if (body.onGround() || body.isInWater() || body.fallDistance < 4 || body.getDeltaMovement().y > -0.3) return;
+        int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.WATER_BUCKET);
+        if (slot < 0) return;
+        net.minecraft.core.BlockPos p = body.blockPosition();
+        for (int i = 0; i < 4; i++) {
+            net.minecraft.core.BlockPos below = p.below(i + 1);
+            if (!level.getBlockState(below).getCollisionShape(level, below).isEmpty()) {
+                if (body.getY() - (below.getY() + 1) > 3.2 || !level.getFluidState(below).isEmpty()) return;
+                tools.select(slot);
+                body.setXRot(90f);
+                body.gameMode.useItem(body, level, body.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+                mlgWater = below.above();
+                return;
+            }
         }
     }
 

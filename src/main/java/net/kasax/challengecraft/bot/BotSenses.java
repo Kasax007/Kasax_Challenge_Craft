@@ -32,7 +32,7 @@ public final class BotSenses {
     public record SeenStructure(Identifier id, BlockPos spot, BoundingBox box) {
     }
 
-    private static final int VIEW = 96, STEP = 8, NEAR = 20;
+    private static final int VIEW = 96, STEP = 8, NEAR = 20, STRUCTURE_VIEW = 160;
 
     private final Map<Identifier, BlockPos> biomes = new HashMap<>();
     private final Map<Identifier, SeenStructure> structures = new HashMap<>();
@@ -40,18 +40,27 @@ public final class BotSenses {
     private final Set<BlockPos> looted = new HashSet<>();
     private long lookedAt = -10_000;
     private Identifier dimension;
+    /** Portals it went through, per dimension: the way back, however far it walked. */
+    private final Map<Identifier, List<BlockPos>> portals = new HashMap<>();
+    private BlockPos lastPos;
 
     public void tick(BotPlayer body) {
         ServerLevel level = (ServerLevel) body.level();
         long now = level.getGameTime();
         Identifier dim = level.dimension().identifier();
         if (!dim.equals(dimension)) {
+            // Through a portal (or respawned): remember both ends if it was a portal.
+            if (dimension != null && lastPos != null && level.getBlockState(body.blockPosition()).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) {
+                remember(dimension, lastPos);
+                remember(dim, body.blockPosition());
+            }
             dimension = dim;
             biomes.clear();
             structures.clear();
             lootables.clear();
             lookedAt = -10_000;
         }
+        lastPos = body.blockPosition();
         if (now - lookedAt < 100) return;
         lookedAt = now;
         look(body, level);
@@ -77,10 +86,14 @@ public final class BotSenses {
             }
         }
 
-        structures.clear();
+        // Structures: what it has a line of sight to within its view (a player spots the shipwreck's
+        // mast, the village roofs, the ruined portal's obsidian), and what it is right next to.
+        // Once seen, remembered.
         lootables.clear();
         var registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
-        int r = VIEW >> 4;
+        net.minecraft.world.phys.Vec3 eye = body.getEyePosition();
+        int view = Math.min(STRUCTURE_VIEW, level.getServer().getPlayerList().getViewDistance() * 16);
+        int r = view >> 4;
         for (int cx = (c.getX() >> 4) - r; cx <= (c.getX() >> 4) + r; cx++) {
             for (int cz = (c.getZ() >> 4) - r; cz <= (c.getZ() >> 4) + r; cz++) {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
@@ -90,11 +103,14 @@ public final class BotSenses {
                     if (start == null || !start.isValid()) continue;
                     Identifier id = registry.getKey(e.getKey());
                     if (id == null) continue;
+                    int checked = 0;
                     for (StructurePiece piece : start.getPieces()) {
+                        if (checked++ > 10) break;
                         BoundingBox box = piece.getBoundingBox();
+                        if (distance(box, c) > view) continue;
                         BlockPos centre = box.getCenter();
                         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centre.getX(), centre.getZ());
-                        boolean visible = box.maxY() >= surface - 3 || box.isInside(c) || distance(box, c) < NEAR;
+                        boolean visible = box.isInside(c) || distance(box, c) < NEAR || inSight(level, body, eye, box);
                         if (!visible) continue;
                         BlockPos spot = new BlockPos(centre.getX(), Math.max(box.minY(), Math.min(box.maxY(), surface)), centre.getZ());
                         SeenStructure known = structures.get(id);
@@ -104,8 +120,8 @@ public final class BotSenses {
             }
         }
         // Loot chests in what it sees (or right next to it) that nobody opened yet.
-        for (int cx = (c.getX() >> 4) - 3; cx <= (c.getX() >> 4) + 3; cx++) {
-            for (int cz = (c.getZ() >> 4) - 3; cz <= (c.getZ() >> 4) + 3; cz++) {
+        for (int cx = (c.getX() >> 4) - 5; cx <= (c.getX() >> 4) + 5; cx++) {
+            for (int cz = (c.getZ() >> 4) - 5; cz <= (c.getZ() >> 4) + 5; cz++) {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
                 if (chunk == null) continue;
                 for (BlockEntity be : chunk.getBlockEntities().values()) {
@@ -120,6 +136,23 @@ public final class BotSenses {
         lootables.sort((a, b) -> Double.compare(a.distSqr(c), b.distSqr(c)));
     }
 
+    /**
+     * A clear line from the eyes to the top or the middle of a structure part: the first block
+     * the line hits is part of it (or nothing is in the way).
+     */
+    private static boolean inSight(ServerLevel level, BotPlayer body, net.minecraft.world.phys.Vec3 eye, BoundingBox box) {
+        BlockPos centre = box.getCenter();
+        for (net.minecraft.world.phys.Vec3 target : new net.minecraft.world.phys.Vec3[]{
+                new net.minecraft.world.phys.Vec3(centre.getX() + 0.5, box.maxY() + 0.5, centre.getZ() + 0.5),
+                net.minecraft.world.phys.Vec3.atCenterOf(centre)}) {
+            var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, target, net.minecraft.world.level.ClipContext.Block.VISUAL,
+                    net.minecraft.world.level.ClipContext.Fluid.NONE, body));
+            if (hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || box.isInside(hit.getBlockPos())
+                    || hit.getLocation().distanceTo(target) < 1.5) return true;
+        }
+        return false;
+    }
+
     private void note(ServerLevel level, BlockPos p, BlockPos from) {
         level.getBiome(p).unwrapKey().ifPresent(k -> {
             BlockPos known = biomes.get(k.identifier());
@@ -132,6 +165,17 @@ public final class BotSenses {
         double dy = Math.max(0, Math.max(box.minY() - p.getY(), p.getY() - box.maxY()));
         double dz = Math.max(0, Math.max(box.minZ() - p.getZ(), p.getZ() - box.maxZ()));
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private void remember(Identifier dim, BlockPos p) {
+        List<BlockPos> list = portals.computeIfAbsent(dim, k -> new ArrayList<>());
+        if (list.stream().noneMatch(q -> q.distSqr(p) < 16)) list.add(p.immutable());
+    }
+
+    /** The nearest portal it knows of in the dimension it is in (it went through it), or null. */
+    public BlockPos knownPortal(BlockPos from) {
+        List<BlockPos> list = portals.getOrDefault(dimension, List.of());
+        return list.stream().min((a, b) -> Double.compare(a.distSqr(from), b.distSqr(from))).orElse(null);
     }
 
     /** The nearest seen spot of this biome, or null. */

@@ -22,6 +22,7 @@ public final class ThroughPortalTask implements BotTask {
     private boolean walking;
     private int ticks;
     private BotTask build;
+    private BlockPos lastKnown;
 
     @Override
     public Result tick(Bot bot) {
@@ -34,6 +35,13 @@ public final class ThroughPortalTask implements BotTask {
             portal = BotWorld.nearest(level, bot.body().blockPosition(), 64, 24, s -> s.is(Blocks.NETHER_PORTAL), false, Set.of());
             walking = false;
             if (portal == null) {
+                // The one it came through, however far away: it remembers where that was.
+                BlockPos known = bot.senses().knownPortal(bot.body().blockPosition());
+                if (known != null && !known.equals(lastKnown)) {
+                    lastKnown = known;
+                    bot.interject(new GoToTask(known, 3));
+                    return Result.RUNNING;
+                }
                 build = new PortalTask(level);
                 return Result.RUNNING;
             }
