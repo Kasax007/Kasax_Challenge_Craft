@@ -144,8 +144,15 @@ final class CrashView {
                     String.format(Locale.ROOT, "%.2f", s.crashedAt() / 100.0));
             default -> Component.translatable("challengecraft.casino.crash.waiting");
         };
-        SlotView.fit(p, status, (SU0 + SU1) / 2, gy0 - 0.9, SV - 0.6, w - 1.0, 0.85,
-                phase == CrashGame.CRASHED ? 0xFFE25B5B : 0xFFB7C0D0);
+        WinShows.Show show = s == null ? null : WinShows.at(s.pos());
+        if (show != null) {
+            // A big cash-out is being celebrated: its tier and who got it, in the tier's colours.
+            SlotView.fit(p, WinShows.label(show.tier(), show.win()).copy().append(" · " + show.player()),
+                    (SU0 + SU1) / 2, gy0 - 0.9, SV - 0.6, w - 1.0, 0.85, WinShows.tierColour(show.tier(), show.local(0)));
+        } else {
+            SlotView.fit(p, status, (SU0 + SU1) / 2, gy0 - 0.9, SV - 0.6, w - 1.0, 0.85,
+                    phase == CrashGame.CRASHED ? 0xFFE25B5B : 0xFFB7C0D0);
+        }
 
         // Who is aboard: the viewer first, then the others.
         if (s != null && !s.seats().isEmpty()) {

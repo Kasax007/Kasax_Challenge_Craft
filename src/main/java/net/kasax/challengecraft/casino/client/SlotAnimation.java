@@ -170,17 +170,12 @@ public final class SlotAnimation {
 
     // ---- win celebrations ---------------------------------------------------------------------
 
-    /** Celebration length per tier: none, big, mega, epic, legendary. */
-    public static final int[] CELEBRATION_TICKS = {0, 30, 50, 70, 110};
+    /** Celebration length per tier: none, big, mega, epic, legendary (shared by every game). */
+    public static final int[] CELEBRATION_TICKS = WinShows.TICKS;
 
-    /** The tier of a win by its multiple of the stake: 5×, 20×, 50× and 200× and up. */
+    /** The tier of a win by its multiple of the stake, see {@link WinShows#tierFor}. */
     public static int tierFor(long win, long bet) {
-        long b = Math.max(1, bet);
-        if (win >= b * 200) return 4;
-        if (win >= b * 50) return 3;
-        if (win >= b * 20) return 2;
-        if (win >= b * 5) return 1;
-        return 0;
+        return WinShows.tierFor(win, bet);
     }
 
     private int celebrationTier(Phase p) {

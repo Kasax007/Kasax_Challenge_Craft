@@ -175,7 +175,7 @@ public final class CrashGame {
                     if (r.ticksLeft <= 0) {
                         r.phase = FLYING;
                         r.flightTicks = 0;
-                        r.crashPoint = CrashMath.crashPoint(level.getRandom());
+                        r.crashPoint = CasinoTestHooks.crashPoint(level.getRandom());
                         level.playSound(null, r.pos, CasinoSounds.ROCKET_LAUNCH, SoundSource.BLOCKS, 0.9f, 1.0f);
                         broadcast(level, r);
                     } else if (r.ticksLeft % 10 == 0) {

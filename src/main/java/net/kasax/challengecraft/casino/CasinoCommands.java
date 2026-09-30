@@ -101,6 +101,31 @@ public final class CasinoCommands {
                                             .withStyle(ChatFormatting.GOLD), false);
                                     return 1;
                                 })))
+                        .then(Commands.literal("force")
+                                .then(Commands.literal("plinko").then(Commands.argument("bucket", IntegerArgumentType.integer(0, PlinkoMath.ROWS))
+                                        .executes(ctx -> {
+                                            ServerPlayer p = ctx.getSource().getPlayerOrException();
+                                            CasinoTestHooks.forcePlinko(p.getUUID(), IntegerArgumentType.getInteger(ctx, "bucket"));
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Next ball: bucket "
+                                                    + IntegerArgumentType.getInteger(ctx, "bucket")).withStyle(ChatFormatting.GOLD), false);
+                                            return 1;
+                                        })))
+                                .then(Commands.literal("crash").then(Commands.argument("percent", IntegerArgumentType.integer(100, 100_000))
+                                        .executes(ctx -> {
+                                            int pct = IntegerArgumentType.getInteger(ctx, "percent");
+                                            CasinoTestHooks.forceCrash(pct / 100.0);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Next rocket crashes at " + pct / 100.0 + "x")
+                                                    .withStyle(ChatFormatting.GOLD), false);
+                                            return 1;
+                                        })))
+                                .then(Commands.literal("roulette").then(Commands.argument("number", IntegerArgumentType.integer(0, 36))
+                                        .executes(ctx -> {
+                                            int n = IntegerArgumentType.getInteger(ctx, "number");
+                                            CasinoTestHooks.forceRoulette(n);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("Next number: " + n)
+                                                    .withStyle(ChatFormatting.GOLD), false);
+                                            return 1;
+                                        }))))
                         .then(Commands.literal("revive").executes(ctx -> {
                             CasinoEconomy.revive(ctx.getSource().getServer());
                             ctx.getSource().sendSuccess(() -> Component.literal("The House lets you play on")

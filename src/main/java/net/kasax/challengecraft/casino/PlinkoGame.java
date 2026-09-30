@@ -54,7 +54,7 @@ public final class PlinkoGame {
             return;
         }
         account.balance -= stake;
-        int path = PlinkoMath.drop(level.getRandom());
+        int path = CasinoTestHooks.plinkoPath(player.getUUID(), level.getRandom());
         long payout = PlinkoMath.payout(stake, path);
         BALLS.add(new Ball(player.getUUID(), level.dimension().identifier().toString(), pos.asLong(), stake, path,
                 payout, now + FALL_TICKS));

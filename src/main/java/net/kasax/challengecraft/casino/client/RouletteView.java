@@ -185,6 +185,13 @@ final class RouletteView {
             p.rectFront(cu - 2.6, 22.7, cu + 2.6, 27.9, vFrame, 0xFFE3B35A);
             p.rectFront(cu - 2.35, 22.95, cu + 2.35, 27.65, vBox, numberColour(n));
             p.textFront(Component.literal(Integer.toString(n)), cu, 25.3, vText, 3.0, 0xFFFFFFFF, 0);
+            // The biggest win of the spin, if it earns a show: its tier and who got it, for as long
+            // as the number stands on the board (the show itself may be shorter).
+            BestWin best = bestWin(s);
+            if (best.tier() > 0) {
+                SlotView.fit(p, WinShows.label(best.tier(), best.win()).copy().append(" · " + best.player()), cu, 28.35,
+                        vText, 12.5, 0.7, WinShows.tierColour(best.tier(), CasinoClientState.clientTick));
+            }
         }
         // History, newest on the left: six framed boxes along the bottom of the board.
         if (s != null) {
@@ -215,6 +222,31 @@ final class RouletteView {
                 SlotView.fit(p, line, cu, 21.7, vText, 12.5, 0.9, paid > 0 ? 0xFFFFC53D : 0xFFD8D8E0);
             }
         }
+    }
+
+    /** The biggest win of a settled spin: its tier (0 = none), the payout and who got it. */
+    record BestWin(int tier, long win, String player) {
+    }
+
+    /**
+     * Each player's payout against all they staked on this spin; the biggest tier wins, and within
+     * a tier the bigger payout (a straight hit on one chip alone is Mega).
+     */
+    static BestWin bestWin(CasinoNet.RouletteState s) {
+        Map<String, long[]> byPlayer = new LinkedHashMap<>(); // {staked, paid}
+        for (CasinoNet.RouletteBet b : s.bets()) {
+            long[] sums = byPlayer.computeIfAbsent(b.player(), k -> new long[2]);
+            sums[0] += b.amount();
+            sums[1] += RouletteMath.payout(b.kind(), b.target(), b.amount(), s.result());
+        }
+        BestWin best = new BestWin(0, 0, "");
+        for (Map.Entry<String, long[]> e : byPlayer.entrySet()) {
+            int tier = WinShows.tierFor(e.getValue()[1], e.getValue()[0]);
+            if (tier > best.tier() || (tier == best.tier() && tier > 0 && e.getValue()[1] > best.win())) {
+                best = new BestWin(tier, e.getValue()[1], e.getKey());
+            }
+        }
+        return best;
     }
 
     // ---- chips on the felt --------------------------------------------------------------------

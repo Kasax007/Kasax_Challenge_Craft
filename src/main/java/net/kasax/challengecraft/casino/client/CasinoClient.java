@@ -15,6 +15,7 @@ import net.kasax.challengecraft.casino.CasinoPartBlock;
 import net.kasax.challengecraft.casino.DeviceLayouts;
 import net.kasax.challengecraft.casino.DeviceSpace;
 import net.kasax.challengecraft.casino.PlinkoGame;
+import net.kasax.challengecraft.casino.RouletteGame;
 import net.kasax.challengecraft.casino.CasinoRegistry;
 import net.kasax.challengecraft.casino.CasinoSounds;
 import net.kasax.challengecraft.casino.CrashGame;
@@ -95,6 +96,10 @@ public final class CasinoClient {
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.PlinkoBall.ID, (p, ctx) -> ctx.client().execute(() ->
                 CasinoClientState.PLINKO_BALLS.add(new CasinoClientState.PlinkoDrop(p, CasinoClientState.clientTick, -1))));
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.RouletteState.ID, (p, ctx) -> ctx.client().execute(() -> {
+            CasinoNet.RouletteState before = CasinoClientState.ROULETTE.get(p.pos());
+            if (before != null && before.phase() == RouletteGame.SPINNING && p.phase() == RouletteGame.RESULT) {
+                rouletteShow(p);
+            }
             CasinoClientState.ROULETTE.put(p.pos(), p);
             CasinoClientState.ROULETTE_RECEIVED.put(p.pos(), CasinoClientState.clientTick);
         }));
@@ -104,6 +109,17 @@ public final class CasinoClient {
             CasinoClientState.CRASH_RECEIVED.put(p.pos(), CasinoClientState.clientTick);
             if (before != null && before.phase() == CrashGame.FLYING && p.phase() == CrashGame.CRASHED) {
                 CasinoWorldRenderer.onCrash(p);
+            }
+            // Somebody cashed out (or rode the rocket to the cap): a big multiplier gets its show.
+            if (before != null) {
+                for (CasinoNet.CrashSeat seat : p.seats()) {
+                    if (seat.cashedAt() <= 0) continue;
+                    boolean wasAboard = before.seats().stream().anyMatch(b -> b.player().equals(seat.player()) && b.cashedAt() == 0);
+                    if (!wasAboard) continue;
+                    long win = seat.bet() * seat.cashedAt() / 100;
+                    WinShows.start(p.pos(), WinShows.tierFor(win, seat.bet()), win, seat.player(), WinShows.stage(BlockPos.of(p.pos()),
+                            new double[]{8, 2.5, 8}, new double[]{24, 20, 11.5}, new double[]{16, 0, 8}, 1.3, 1.9));
+                }
             }
         }));
         ClientPlayNetworking.registerGlobalReceiver(CasinoNet.Blackjack.ID, (p, ctx) -> ctx.client().execute(() -> {
@@ -247,6 +263,8 @@ public final class CasinoClient {
             SlotEffects.tick(client.level, anim, t);
         }
 
+        WinShows.tick(client);
+
         // Plinko balls: a soft tick on every peg, and bookkeeping once they land.
         String me = client.player.getName().getString();
         for (Iterator<CasinoClientState.PlinkoDrop> it = CasinoClientState.PLINKO_BALLS.iterator(); it.hasNext(); ) {
@@ -254,6 +272,14 @@ public final class CasinoClient {
             long t = CasinoClientState.clientTick - d.startTick();
             BlockPos pos = BlockPos.of(d.ball().pos());
             if (t >= PlinkoGame.FALL_TICKS) {
+                // The ball is in its bucket: a big multiplier gets its show at the board.
+                int tier = WinShows.tierFor(d.ball().payout(), d.ball().bet());
+                if (tier > 0) {
+                    double bu = net.kasax.challengecraft.casino.DeviceLayouts.plinkoBucketU(
+                            net.kasax.challengecraft.casino.PlinkoMath.bucket(d.ball().path()));
+                    WinShows.start(d.ball().pos(), tier, d.ball().payout(), d.ball().player(), WinShows.stage(pos,
+                            new double[]{16, 32.5, 11}, new double[]{bu, 8, 8}, new double[]{16, 0, 8}, 1.4, 2.0));
+                }
                 CasinoClientState.PlinkoDrop landed = new CasinoClientState.PlinkoDrop(d.ball(), d.startTick(), CasinoClientState.clientTick);
                 CasinoClientState.PLINKO_LAST.put(d.ball().pos(), landed);
                 if (d.ball().player().equals(me)) CasinoClientState.PLINKO_MINE.put(d.ball().pos(), landed);
@@ -284,6 +310,13 @@ public final class CasinoClient {
     }
 
     /** The device spot under the crosshair, if any. */
+    /** The ball has settled: the biggest win at the table gets its show at the wheel. */
+    private static void rouletteShow(CasinoNet.RouletteState s) {
+        RouletteView.BestWin best = RouletteView.bestWin(s);
+        WinShows.start(s.pos(), best.tier(), best.win(), best.player(), WinShows.stage(BlockPos.of(s.pos()),
+                new double[]{9, 15.5, 16}, new double[]{9, 24, 29}, new double[]{32, 0, 16}, 2.2, 1.3));
+    }
+
     private static CasinoClientState.Aim aimAt(Minecraft client) {
         if (!(client.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return null;
         BlockPos master = CasinoPartBlock.master(client.level, hit.getBlockPos());

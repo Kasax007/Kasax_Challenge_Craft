@@ -292,7 +292,7 @@ final class SlotView {
             if (party != null) {
                 // The win's tier in its own colours: gold, then flashing, then all the colours.
                 top = Component.translatable("challengecraft.casino.slot.tier." + party.tier(), CasinoEconomy.format(party.win()));
-                topColour = tierColour(party.tier(), party.local());
+                topColour = WinShows.tierColour(party.tier(), party.local());
             } else if (live && phase.kind() == SlotAnimation.Kind.FS_INTRO && lucky >= 0 && phase.local() >= SlotAnimation.PICK_START) {
                 boolean landed = phase.local() >= SlotAnimation.PICK_LAND;
                 top = landed ? Component.translatable("challengecraft.casino.slot.display.lucky",
@@ -327,16 +327,6 @@ final class SlotView {
             Component stake = Component.translatable("challengecraft.casino.display.stake", CasinoEconomy.format(s.betAmount()));
             fit(p, stake, (u0 + u1) / 2, 5.85, v, u1 - u0 - 0.6, 1.0, 0xFF7BE0A4);
         }
-    }
-
-    private static int tierColour(int tier, float local) {
-        int blink = (int) (local / 4) % 2;
-        return switch (tier) {
-            case 1 -> 0xFFFFC53D;
-            case 2 -> blink == 0 ? 0xFFFFE27A : 0xFFFF9A2E;
-            case 3 -> blink == 0 ? 0xFFFF6FD8 : 0xFF6FE8FF;
-            default -> 0xFF000000 | java.awt.Color.HSBtoRGB((local % 30) / 30f, 0.65f, 1f);
-        };
     }
 
     /** Front text shrunk to fit a width. */

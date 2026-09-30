@@ -269,6 +269,8 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
   | Legendär | 200× | alle Farben | dazu eine Lichtspirale um den Automaten, Noten und goldenes Dauerfeuerwerk, zweite Fanfare |
 
   Münzgeklimper und Dauer wachsen mit der Stufe (1,5 bis 5,5 Sekunden). Jeder in der Nähe sieht die Show.
+  **Dieselben Stufen gelten für alle Spiele** (Plinko, Crash, Roulette, siehe dort): gleiche Farben,
+  Fanfaren und Partikel, jeweils aus dem Gerät heraus.
 
 ### 7.2 Plinko
 
@@ -279,6 +281,9 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
   Kugeln (auch mehrerer Spieler) fallen gleichzeitig. Deine Kugeln sind golden, die der anderen rosa.
   Jeder Stift tickt leise, das getroffene Fach leuchtet auf. Unter dem Brett zeigt die Anzeige deinen
   Einsatz und dein letztes Ergebnis.
+- **Gewinnfeier:** Landet eine Kugel im 10er-Fach (Großer Gewinn) oder 30er-Fach (Mega-Gewinn), sprühen
+  Münzen oben aus dem Brett, Funken am getroffenen Fach, und die Anzeige zeigt „GROSSER GEWINN 100“.
+  Höhere Stufen kann Plinko nicht erreichen (höchstens 30×).
 
 ### 7.3 Crash
 
@@ -291,6 +296,9 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
   gleich aus), zittert im Countdown, startet mit Donnern und steigt mit Funken und Rauchspur. Der
   **Monitor** zeigt Multiplikator, Flugkurve, Countdown, Mitspieler mit Ausstiegspunkten und die letzten
   Crash-Punkte; der Knopf ist rot („SETZEN“) oder pulsiert grün („AUSZAHLEN“).
+- **Gewinnfeier:** Wer bei 5× oder mehr aussteigt (oder bis ins All mitfliegt), bekommt die Show seiner
+  Stufe: Münzen aus der Rampe, Funken am Monitor, dazu auf dem Monitor z. B. „MEGA-GEWINN 216 · Alice“.
+  Steigen mehrere aus, läuft die größte Feier.
 
 ### 7.4 Roulette
 
@@ -298,6 +306,10 @@ lassen. Roulette- und Crash-Runden sind gemeinsam, jeder sieht seine eigenen Jet
   ergibt 36/37 = 97,3 %; das Haus behält zusätzlich 1/75 jeder Auszahlung → **genau 96 %** für jede Wette.
 - **Großer Tisch** (4 × 2 Blöcke) mit Kessel, Tableau, Jeton-Ablage, „ZURÜCK“-Schild und einer Tafel
   hinter dem Kessel (Countdown, gezogene Zahl, deine Jetons und Auszahlung, die letzten Zahlen).
+- **Gewinnfeier:** Nach dem Wurf zählt für jeden Spieler seine Auszahlung gegen alles, was er in dieser
+  Runde gesetzt hat; der größte Gewinn am Tisch bekommt die Show (ein Plein-Treffer mit nur einem Jeton
+  ist ein Mega-Gewinn, 34,5×): Münzen und Edelsteine aus dem Kessel, Funken an der Tafel, und über der
+  Zahl steht „MEGA-GEWINN 355 · Alice“, solange die Zahl angezeigt wird.
 - **Setzen direkt auf dem Filz:** Zielen zeigt, welche Wette es wäre, und hebt alle abgedeckten Zahlen
   hervor. Auf eine Zahl → Plein, auf die Linie zwischen zwei Zahlen → Cheval, auf eine Kreuzung → Carré,
   an den Rand über einer Spalte → Transversale, über einer Linie → Sixain; dazu Dutzende, Kolonnen und
@@ -343,6 +355,9 @@ Die Challenge ist Level 8 und steht in der Kategorie „Chaos“. Für schnelle 
 | `/casino status` | Konten, Einsätze, Gebühr im Chat |
 | `/casino revive` | hebt einen Bankrott auf (zum Testen), überfällige Gebühren werden übersprungen |
 | `/casino slotforce <freespins\|big\|mega\|epic\|legendary>` | der nächste eigene Spin am Automaten bringt dieses Ergebnis (ein echter, ausgewürfelter Spin dieser Art) |
+| `/casino force plinko <Fach 0–12>` | die nächste eigene Kugel fällt in dieses Fach |
+| `/casino force crash <Prozent>` | die nächste Rakete stürzt bei diesem Multiplikator ab (2500 = 25×) |
+| `/casino force roulette <Zahl>` | der nächste Wurf ergibt diese Zahl |
 
 Beim Serverstart schreibt das Log `[Casino] RTP slot 95.9978 %, plinko 96.0010 %, roulette 96.0000 %,
 crash 96.0000 %` und `[Casino] 1290 item values loaded`.

@@ -100,7 +100,12 @@ final class PlinkoView {
                     u0 + 0.8, 2.8, v, 1.2, 0xFF7BE0A4, -1);
         }
         CasinoClientState.PlinkoDrop mine = CasinoClientState.PLINKO_MINE.get(pos.asLong());
-        if (mine != null) {
+        WinShows.Show show = WinShows.at(pos.asLong());
+        if (show != null) {
+            // A big multiplier is being celebrated: its tier, in its colours.
+            p.textFront(WinShows.label(show.tier(), show.win()), u1 - 0.8, 2.8, v, 1.2,
+                    WinShows.tierColour(show.tier(), show.local(0)), 1);
+        } else if (mine != null) {
             CasinoNet.PlinkoBall b = mine.ball();
             long net = b.payout() - b.bet();
             Component last = Component.translatable("challengecraft.casino.plinko.display.last",

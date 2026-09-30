@@ -201,7 +201,7 @@ public final class RouletteGame {
                     if (t.ticksLeft <= 0) {
                         t.phase = SPINNING;
                         t.ticksLeft = SPIN_TICKS;
-                        t.result = level.getRandom().nextInt(37);
+                        t.result = CasinoTestHooks.rouletteNumber(level.getRandom());
                         level.playSound(null, t.pos, CasinoSounds.ROULETTE_SPIN, SoundSource.BLOCKS, 1.0f, 1.0f);
                         broadcast(level, t);
                     } else if (t.ticksLeft % 20 == 0) {
