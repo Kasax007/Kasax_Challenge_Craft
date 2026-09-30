@@ -92,7 +92,7 @@ public final class BotArena {
         helper.succeedWhen(() -> {
             boolean ok = bot.body().isAlive() && done.getAsBoolean();
             if (helper.getTick() % 25 == 0 && !removed) LOG.info("[BOTTEST] {} t={} at {} y {} {}", name, helper.getTick(), feet().toShortString(),
-                    String.format("%.2f", bot.body().getY() - abs(0, 0, 0).getY()), bot.status() + " inv " + invSummary() + " nav " + bot.navigator().debug().replace(abs(0, 0, 0).toShortString(), "O"));
+                    String.format("%.2f hp %.0f dt %d", bot.body().getY() - abs(0, 0, 0).getY(), bot.body().getHealth(), bot.body().deathTime), bot.status() + " inv " + invSummary() + " nav " + bot.navigator().debug().replace(abs(0, 0, 0).toShortString(), "O"));
             if (!ok && helper.getTick() >= maxTicks - 2 && !removed) {
                 LOG.info("[BOTTEST] {} FAILED after {} ticks: bot at {} ({})", name, helper.getTick(),
                         bot.body().blockPosition().subtract(abs(0, 0, 0)).toShortString(), bot.status());

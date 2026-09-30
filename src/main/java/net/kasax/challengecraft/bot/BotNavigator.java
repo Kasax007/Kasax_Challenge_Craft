@@ -62,6 +62,15 @@ public final class BotNavigator {
         setGoal(p -> Vec3.atCenterOf(p).add(0, 1.12, 0).distanceToSqr(Vec3.atCenterOf(pos)) <= r2, pos);
     }
 
+    /** Stand within {@code range} blocks of {@code pos}, measured at the feet (being there, not reaching it). */
+    public void goStandNear(BlockPos pos, double range) {
+        double r2 = range * range, dy = Math.max(1, range);
+        setGoal(p -> {
+            double dx = p.getX() - pos.getX(), dz = p.getZ() - pos.getZ();
+            return dx * dx + dz * dz <= r2 && Math.abs(p.getY() - pos.getY()) <= dy;
+        }, pos);
+    }
+
     /** Close enough to an item lying about to pick it up (it may hover or lie on a slab). */
     public void goPickUp(net.minecraft.world.entity.Entity item) {
         double ix = item.getX(), iy = item.getY(), iz = item.getZ();

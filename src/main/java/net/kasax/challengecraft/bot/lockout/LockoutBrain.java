@@ -110,6 +110,8 @@ public final class LockoutBrain implements BotBrain {
         targetIndex = pick.tile().index();
         targetId = pick.tile().goal().id();
         goalTask = pick.option().task().get();
+        goalStarted = bot.body().level().getGameTime();
+        goalBudget = budget(pick.option().cost(), 1200, 9000);
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
                 + choices.size() + " doable)");
         bot.doNow(goalTask);
@@ -230,8 +232,31 @@ public final class LockoutBrain implements BotBrain {
         return best;
     }
 
+    /**
+     * How long a goal may take before it is given up for now: three times the estimate, at least
+     * {@code min} ticks, at most {@code max}. A player notices when something is not working.
+     */
+    private static long budget(double estimateSeconds, long min, long max) {
+        return Math.max(min, Math.min(max, (long) (estimateSeconds * 20 * 3)));
+    }
+
+    private long goalStarted, goalBudget, sideStarted, sideBudget;
+
     @Override
     public void tick(Bot bot) {
+        long now = bot.body().level().getGameTime();
+        if (sideTask != null && now - sideStarted > sideBudget) {
+            bot.say("that takes too long, back to the goal");
+            if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
+            drop(bot);
+            return;
+        }
+        if (goalTask != null && targetId != null && now - goalStarted > goalBudget) {
+            bot.say(targetId + " takes too long, something else first");
+            restUntil.put(targetId, now + REST_TICKS);
+            drop(bot);
+            return;
+        }
         if (++checkTicks % 20 != 0 || targetIndex < 0) return;
         if (checkTicks % 40 == 0 && sideTask == null) takeChances(bot);
         MinecraftServer server = bot.server();
@@ -262,6 +287,8 @@ public final class LockoutBrain implements BotBrain {
         java.util.List<net.minecraft.core.BlockPos> chests = bot.senses().lootables();
         if (!chests.isEmpty() && chests.get(0).distSqr(bot.body().blockPosition()) < 32 * 32) {
             sideTask = new net.kasax.challengecraft.bot.task.LootTask(chests.get(0));
+            sideStarted = bot.body().level().getGameTime();
+            sideBudget = 900;
             bot.say("on the way: a loot chest");
             bot.interject(sideTask);
             return;
@@ -272,6 +299,8 @@ public final class LockoutBrain implements BotBrain {
                 && treasure.column().distSqr(bot.body().blockPosition().atY(0)) < 250 * 250) {
             treasureTried.add(treasure.column());
             sideTask = treasure;
+            sideStarted = bot.body().level().getGameTime();
+            sideBudget = 4800;
             bot.say("on the way: the treasure from the map");
             bot.interject(sideTask);
             return;
@@ -283,6 +312,8 @@ public final class LockoutBrain implements BotBrain {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
                 sideId = c.tile().goal().id();
+                sideStarted = bot.body().level().getGameTime();
+                sideBudget = budget(c.option().cost(), 400, 1200);
                 bot.say("on the way: " + c.tile().goal().title().getString() + " (~" + Math.round(c.option().cost()) + " s)");
                 bot.interject(sideTask);
                 return;

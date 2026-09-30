@@ -24,7 +24,7 @@ import java.util.UUID;
 public final class BotManager {
     public static final Logger LOG = LoggerFactory.getLogger("ChallengeCraft-Bot");
     private static final Map<UUID, Bot> BOTS = new LinkedHashMap<>();
-    private static final int RESPAWN_DELAY = 30;
+    private static final int RESPAWN_DELAY = 20; // deathTime stops counting at 20
 
     private BotManager() {
     }

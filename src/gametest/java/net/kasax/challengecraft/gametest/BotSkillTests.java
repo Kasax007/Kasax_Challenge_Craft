@@ -41,4 +41,17 @@ public class BotSkillTests {
                 new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 12), new ItemStack(Items.COBBLESTONE, 8));
         a.run(new CastPortalTask(h.getLevel()), 3600, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
+
+    /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void respawnAfterDeath(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "respawn");
+        a.spawn(20, FEET, 20);
+        var bot = a.bot();
+        boolean[] died = {false};
+        h.runAfterDelay(100, () -> bot.body().hurtServer(h.getLevel(), h.getLevel().damageSources().genericKill(), 1000f));
+        h.onEachTick(() -> { if (!bot.body().isAlive()) died[0] = true; });
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(4, FEET, 4), 1), 400,
+                () -> died[0] && bot.body().isAlive() && bot.body().getHealth() >= 20f && bot.current() == null);
+    }
 }

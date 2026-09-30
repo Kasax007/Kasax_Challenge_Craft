@@ -21,7 +21,7 @@ public final class GoToTask implements BotTask {
         if (!started) {
             started = true;
             if (range <= 0) bot.navigator().goTo(target);
-            else bot.navigator().goNear(target, range);
+            else bot.navigator().goStandNear(target, range);
         }
         return switch (bot.navigator().tick()) {
             case ARRIVED -> Result.DONE;
