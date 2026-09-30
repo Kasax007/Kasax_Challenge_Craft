@@ -117,6 +117,8 @@ public final class Bot {
         BotTask.Result r;
         try {
             r = task.tick(this);
+            // Head under water: hold jump to swim up, whatever the task does (a player never forgets that).
+            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) body.jump = true;
         } catch (RuntimeException e) {
             BotManager.LOG.warn("[Bot] {} task {} crashed", name, task.describe(), e);
             r = BotTask.Result.FAILED;

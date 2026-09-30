@@ -81,6 +81,7 @@ wählt er einen anderen Farbstoff.
 - **Reflexe**, unabhängig vom Plan:
   - Bei Angriff durch ein Monster schlägt er zurück.
   - Bei Hunger isst er.
+  - Mit dem Kopf unter Wasser hält er Springen gedrückt und taucht auf.
   - Wenn das Inventar voll wird, wirft er Schutt weg und behält einen Stapel Baumaterial.
 
 ## Lockout Bingo
@@ -151,6 +152,10 @@ Im Test funktioniert Folgendes:
 
 Offen:
 - **Zurück an die Oberfläche** nach dem Graben: eigener Aufstieg statt normaler Wegsuche.
+- **Aus dem Wasser klettern:** Über einen Rand, der einen Block über dem Wasserspiegel liegt,
+  kommt er noch nicht zuverlässig.
+- **Zusammen mit „The House Always Wins“:** Stirbt der Bot, sitzt er am Blackjack-Tisch fest,
+  weil er Casino-Spiele noch nicht kann. Das gehört zum geplanten Casino-Benchmark.
 - **Mehr Zieltypen:** Kuh melken, Schaf scheren, Druckplatte, Bett und Schlafen, Dorfhandel,
   Nether (Portal bauen), Verzaubern, Brauen.
 - **Gegner beobachten:** Kacheln bevorzugen, die der Gegner gleich hat, also blocken.
