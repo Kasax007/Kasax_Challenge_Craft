@@ -54,4 +54,31 @@ public class BotSkillTests {
         a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(4, FEET, 4), 1), 400,
                 () -> died[0] && bot.body().isAlive() && bot.body().getHealth() >= 20f && bot.current() == null);
     }
+
+    /** A chest behind a pressure plate over TNT (the desert temple's trap): looted, nothing blows up. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void trapChest(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "trap_chest");
+        // A corridor one wide, the plate in the middle of it, TNT under the plate.
+        a.fill(10, FEET, 19, 24, FEET + 2, 21, Blocks.SANDSTONE);
+        a.fill(11, FEET, 20, 23, FEET + 1, 20, Blocks.AIR);
+        a.fill(17, GROUND, 20, 17, GROUND, 20, Blocks.TNT);
+        a.fill(17, FEET, 20, 17, FEET, 20, Blocks.STONE_PRESSURE_PLATE);
+        a.fill(23, FEET, 20, 23, FEET, 20, Blocks.CHEST);
+        var chestPos = a.abs(23, FEET, 20);
+        if (h.getLevel().getBlockEntity(chestPos) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+            chest.setItem(0, new ItemStack(Items.DIAMOND, 2));
+        }
+        a.spawn(11, FEET, 20, new ItemStack(Items.WOODEN_PICKAXE));
+        boolean[] gone = {false};
+        h.onEachTick(() -> {
+            if (!gone[0] && !h.getLevel().getBlockState(a.abs(17, GROUND, 20)).is(Blocks.TNT)) {
+                gone[0] = true;
+                BotArena.LOG.info("[BOTTEST] trap_chest: the TNT is gone at tick {}, bot at {}, now {}", h.getTick(), a.feet().toShortString(),
+                        h.getLevel().getBlockState(a.abs(17, GROUND, 20)));
+            }
+        });
+        a.run(new net.kasax.challengecraft.bot.task.LootTask(chestPos), 600,
+                () -> !gone[0] && ObtainPlanner.countAny(a.bot().body(), Set.of(Items.DIAMOND)) > 0);
+    }
 }

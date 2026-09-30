@@ -139,10 +139,25 @@ public final class BotNavigator {
         }
         // Dig first.
         for (BlockPos b : step.breaks()) {
-            if (!bot.level().getBlockState(b).getCollisionShape(bot.level(), b).isEmpty()) {
+            var bstate = bot.level().getBlockState(b);
+            // (A pressure plate has no collision, but is very much in the way.)
+            if (!bstate.getCollisionShape(bot.level(), b).isEmpty() || bstate.is(net.minecraft.tags.BlockTags.PRESSURE_PLATES)) {
                 bot.stopInputs();
                 if (!actions.inReach(b)) {
                     return fail("block out of reach");
+                }
+                // A trap (pressure plate): stand still in the middle of the block first; sliding
+                // onto it while breaking it would set it off.
+                var bs = bot.level().getBlockState(b);
+                if (bs.is(net.minecraft.tags.BlockTags.PRESSURE_PLATES)) {
+                    BlockPos here = feet();
+                    double cx = here.getX() + 0.5 - bot.getX(), cz = here.getZ() + 0.5 - bot.getZ();
+                    var v = bot.getDeltaMovement();
+                    if (cx * cx + cz * cz > 0.01 || v.x * v.x + v.z * v.z > 1e-4) {
+                        centreOn(here);
+                        bot.forward = Math.min(bot.forward, 0.15f);
+                        return status;
+                    }
                 }
                 actions.breakTick(b);
                 digging = true;
@@ -229,6 +244,13 @@ public final class BotNavigator {
         bot.setYHeadRot(yaw);
         bot.setXRot(10f);
         bot.forward = flat > 0.15 ? 1f : 0f;
+        // The next step breaks a pressure plate: creep up, so as not to slide onto it.
+        if (index + 1 < path.size() && path.get(index + 1).breaks().stream()
+                .anyMatch(b -> bot.level().getBlockState(b).is(net.minecraft.tags.BlockTags.PRESSURE_PLATES))) {
+            bot.forward = flat > 0.1 ? 0.25f : 0f;
+            bot.setSprinting(false);
+            bot.sprintNow = false;
+        }
         bot.strafe = 0;
         bot.setSprinting(false);
         boolean up = to.getY() > bot.getY() + 0.4;
