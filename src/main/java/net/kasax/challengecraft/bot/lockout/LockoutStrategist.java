@@ -54,6 +54,13 @@ final class LockoutStrategist {
         return wants;
     }
 
+    private boolean ironKit;
+
+    /** Whether the plan invests in iron (tools, bucket) early. */
+    boolean wantsIron() {
+        return ironKit;
+    }
+
     private final Map<String, Double> bonus = new HashMap<>();
     private final Map<String, String> why = new HashMap<>();
     private long plannedAt = Long.MIN_VALUE;
@@ -85,6 +92,7 @@ final class LockoutStrategist {
         bonus.clear();
         why.clear();
         wants.clear();
+        ironKit = false;
         List<LockoutBingoGoal> open = new ArrayList<>();
         for (Chal_40_LockoutBingo.BoardTile t : board) if (t.claimedBy() == null) open.add(t.goal());
         if (open.isEmpty()) return;
@@ -107,7 +115,10 @@ final class LockoutStrategist {
                 }
             }
             if (helped >= 2 && savings > 1.5 * kitCost) {
-                if (kit.name().startsWith("iron")) wants.put(Items.RAW_IRON, net.minecraft.world.level.block.Blocks.IRON_ORE);
+                if (kit.name().startsWith("iron")) {
+                    wants.put(Items.RAW_IRON, net.minecraft.world.level.block.Blocks.IRON_ORE);
+                    ironKit = true;
+                }
                 notes.add(kit.name() + " (~" + Math.round(kitCost) + " s, saves ~" + Math.round(savings) + " s on " + helped + " tiles)");
                 // The tiles that leave the kit (partly) in hand come first.
                 for (LockoutBingoGoal g : open) {
@@ -130,6 +141,13 @@ final class LockoutStrategist {
             wants.put(Items.FLINT, net.minecraft.world.level.block.Blocks.GRAVEL);
         }
 
+        // The desert temple's TNT: nine blocks for the taking once the plate is out of the way.
+        for (LockoutBingoGoal g : open) {
+            if (g.id().contains("tnt") || g.id().contains("gunpowder")) {
+                wants.put(Items.TNT, net.minecraft.world.level.block.Blocks.TNT);
+                break;
+            }
+        }
         // Paper for books, maps and the like: sugar cane at the river bank.
         for (LockoutBingoGoal g : open) {
             String id = g.id();

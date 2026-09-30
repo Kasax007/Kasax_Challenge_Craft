@@ -95,7 +95,12 @@ public final class LockoutGoals {
      */
     private static Option nether(Bot bot, ObtainPlanner planner) {
         if (!overworld(bot)) return null;
-        Option built = builtPortal(bot, planner), cast = castPortal(bot, planner);
+        // The speedrunners' way is the way in: cast a portal at a lava pool. Mining obsidian only
+        // when a diamond pickaxe is already in hand (or there is no lava known at all).
+        Option cast = castPortal(bot, planner);
+        boolean diamondPick = ObtainPlanner.countAny(bot.body(), Set.of(Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE)) > 0;
+        if (cast != null && !diamondPick) return cast;
+        Option built = builtPortal(bot, planner);
         if (built == null) return cast;
         return cast == null || built.cost() <= cast.cost() ? built : cast;
     }

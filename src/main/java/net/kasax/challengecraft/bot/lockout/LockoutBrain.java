@@ -86,6 +86,22 @@ public final class LockoutBrain implements BotBrain {
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
         if (opening(bot)) return;
+        // Iron the quick way: a shipwreck's chests (or a village's) when one is near and the plan
+        // wants iron. Once per structure.
+        if (strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3
+                && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            for (String kind : List.of("shipwreck", "village")) {
+                var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
+                        net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, kind));
+                if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > 160 * 160) continue;
+                String key = kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
+                if (!raided.add(key)) continue;
+                bot.say("iron from the " + kind + " at " + seen.spot().toShortString());
+                start(bot, new net.kasax.challengecraft.bot.task.RaidTask(level, kind), 3600);
+                return;
+            }
+        }
         // Leaving: the table it put down comes along.
         if (net.kasax.challengecraft.bot.task.PackTableTask.worth(bot)) {
             start(bot, new net.kasax.challengecraft.bot.task.PackTableTask(bot.ownTable), 400);
@@ -137,6 +153,7 @@ public final class LockoutBrain implements BotBrain {
     private static final List<String> WORTH_LOOTING = List.of("shipwreck", "ruined_portal", "desert_pyramid", "jungle_pyramid",
             "village", "buried_treasure", "igloo", "pillager_outpost", "bastion", "fortress", "end_city");
     private final Map<String, Integer> lootedIn = new HashMap<>();
+    private final Set<String> raided = new java.util.HashSet<>();
     private boolean replanNow = true;
     private int openingStep;
 

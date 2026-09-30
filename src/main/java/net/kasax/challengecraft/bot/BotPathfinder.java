@@ -314,13 +314,16 @@ public final class BotPathfinder {
     private static boolean dangerous(BlockState s) {
         return s.is(BlockTags.FIRE) || s.is(Blocks.CACTUS) || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.COBWEB)
                 || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.WITHER_ROSE) || s.is(Blocks.MAGMA_BLOCK)
-                || s.is(BlockTags.CAMPFIRES) || s.is(Blocks.LAVA);
+                || s.is(BlockTags.CAMPFIRES) || s.is(Blocks.LAVA)
+                // Traps: the desert temple's plate over the TNT, the jungle temple's tripwires.
+                || s.is(BlockTags.PRESSURE_PLATES) || s.is(Blocks.TRIPWIRE);
     }
 
     boolean breakable(BlockPos p) {
         if (!loaded(p)) return false;
         BlockState s = state(p);
         if (s.isAir() || !s.getFluidState().isEmpty()) return false;
+        if (s.is(Blocks.TRIPWIRE) || s.is(Blocks.TRIPWIRE_HOOK)) return false; // cutting it without shears sets it off
         float hardness = s.getDestroySpeed(level, p);
         if (hardness < 0 || hardness > 50) return false; // bedrock, obsidian and the like are walls
         return abilities.tools().breakTicks(s) < 400;
