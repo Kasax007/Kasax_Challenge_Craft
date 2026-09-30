@@ -1,5 +1,8 @@
 # Bob – Plan zum guten Lockout-Spieler
 
+> Fortschritt: Schritte 1–7 umgesetzt (siehe `docs/konzept-bot.md`, Abschnitt „Stand“). Jetzt:
+> viele ganze Bretter spielen und aus den Benchmarks verbessern.
+
 Stand: 30.09.2026. Dieser Plan ist die Arbeitsgrundlage, um Bob ohne Rückfragen Schritt für Schritt
 zu einem ebenbürtigen Lockout-Gegner zu machen. Jeder Schritt hat messbare Abnahmekriterien; ein
 Schritt gilt erst als fertig, wenn seine Tests grün sind.

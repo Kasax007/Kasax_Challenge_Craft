@@ -195,33 +195,46 @@ ein Spieler auf eine Blockfläche, die er wirklich sieht und erreicht. Seinen St
 danach und nicht im Rahmen, wo das Wasser fällt. Setzt eine Lava nicht (das Wasser war noch nicht
 da), nimmt er sie wieder auf.
 
-## Stand und nächste Schritte
+## Testen
 
-Im Test funktioniert Folgendes:
-- Von null bis zur Steinspitzhacke in etwa 30 s.
-- Holzkohle und Eisen schmelzen.
-- Kühe jagen und Leder einsammeln.
-- Werkzeug schonen.
-- Schacht und Stollen bis auf Höhe −18 mit Nebenfunden wie Redstone und Kupfer.
-- Lockout-Kacheln selbstständig holen.
-- Aus einem Becken klettern.
-- 24 Blöcke aus einer Mine aufsteigen.
-- Ein Dorf in 50 Blöcken Entfernung erkennen und betreten.
-- Eine Kuh melken.
-- Aus einem Lavapool 3 Obsidian herstellen.
-- Ein Portal bauen, anzünden und in den Nether gehen.
-- Ein Portal an einem Lavapool gießen (Speedrunner-Methode) in etwa 70 s; von 7 Eisenbarren,
-  Holz und Feuerstein bis in den Nether in 83 s.
+- **Szenarien ohne Grafik:** `./gradlew runGameTest` baut kleine Arenen (40 × 32 × 40) und schickt
+  Bob hindurch, alle parallel, in wenigen Sekunden Echtzeit. Nur einige:
+  `./gradlew runGameTest "-PbotTest=challengecraft-gametest:*lake*"`. Jedes Ergebnis steht mit
+  Ticks als `[BOTTEST]` im Log. Code: `src/gametest`.
+- **Ganze Runden:** `scripts/bot/bench.sh <seed> [sekunden] [schwierigkeit]` startet einen Server
+  ohne Grafik, lässt Bob allein Lockout spielen (festes Brett je Seed) und spult mit
+  `/tick sprint` vor: 10 Minuten Spiel in etwa 1,5 Minuten. Bericht `[BOTBENCH]`: Meilensteine,
+  Kacheln, Zeit je Aufgabe, Leerlauf, Fehlschläge, Tode.
+- **Viele Welten:** `scripts/bot/bench-many.sh 600 hard 12345 777 …` gibt eine Tabelle.
+- **Einzelfragen:** `scripts/bot/server.sh <seed>` startet nur den Server (rcon mit
+  `scripts/bot/rcon.py`); dann z. B. `challengecraft_bot estimate Bob iron_ingot` oder
+  `challengecraft_bot coverage Bob` (welche Ziele Bob noch gar nicht kann).
 
-Offen:
-- **Im Nether bewegen:** Lava-Seen, Ghasts, Festungen und Bastionen finden. Er kann hin und zurück,
-  aber die Nether-Ziele sind wenig getestet.
-- **Zusammen mit „The House Always Wins“:** Stirbt der Bot, sitzt er am Blackjack-Tisch fest,
-  weil er Casino-Spiele noch nicht kann. Das gehört zum geplanten Casino-Benchmark.
-- **Mehr Zieltypen:** Druckplatte, Bett und Schlafen, Dorfhandel, Züchten, Zähmen, Verzaubern,
-  Brauen, End.
-- **Ruinenportale reparieren** statt ein neues Portal zu bauen.
-- **Gegner beobachten:** Kacheln bevorzugen, die der Gegner gleich hat, also blocken.
-- **Kampf:** zurückweichen bei wenig Leben, Schild, Bogen.
-- **The House Always Wins als Benchmark:** dasselbe Gehirnprinzip mit Casino-Zielen (Chips
-  verdienen, Gebühr zahlen, spielen).
+## Stand
+
+Der Plan mit Analyse und den Schritten 1–7 steht in `docs/bob-plan.md`. Umgesetzt:
+
+1. **Testfundament:** Szenario-Tests, Benchmark-Runner, Entscheidungsprotokoll im Log.
+2. **Bewegung:** Schwimmen, Ausstieg aus Wasser (auch über hohe Ufer, mit Block oder Stufe),
+   Lücken springen, Brücken, Pfeiler (auch mehrere hintereinander), aus Höhlen und Schächten per
+   Pfadsuche, Zeitlimit pro Schritt mit Sperrliste, Fallen (Druckplatten, Stolperdrähte) meiden.
+3. **Weltwissen:** `BotMemory` liest die Chunks um Bob (Blöcke, Tiere), Strukturen in Sichtweite
+   ohne Sichtlinie; Planer und Suche nutzen das.
+4. **Eröffnung und Beharrlichkeit:** Steinspitzhacke und -axt zuerst, Werkbank mitnehmen, Essen
+   erst bei Hunger, Aufpasser für jede Aufgabe (dreifache Schätzung), nie untätig, Respawn.
+5. **Spielplan:** `LockoutStrategist` – Investitionen (Eisen-Kit, Diamanten), Nether-Ausflug,
+   Blocken des Gegners, Nebenbei-Liste (Feuerstein, Eisenerz, Zuckerrohr, TNT), Neuplanung.
+6. **Strategiebuch:** Portal gießen als Standard, Schiffswrack/Dorf für Eisen, gezieltes Plündern
+   (nur lohnende Strukturen, höchstens 3 Kisten), Wüstentempel-Falle, Schatzkarte.
+7. **Fortgeschritten:** Handel, Angeln, Verzaubern, Züchten, Zähmen, Reiten, Bett/Spawn, Stürze
+   (auch 20 Blöcke), Bedrock, TNT, Glocke, Lesepult, Enderperle, Rückzug bei wenig Leben.
+
+Zahlen: 28 Szenarien grün; Ziele ohne Weg 111 → etwa 75 von 312.
+
+## Offen
+
+- Kosten tiefer Rohstoffe (Redstone, Tropfstein) und die Essenssuche sind noch Zeitfresser.
+- Nether-Navigation (Festung, Bastion-Loot-Wege), Brauen, End, Boot-MLG.
+- Ruinenportale reparieren statt gießen.
+- Portal gießen wackelt in etwa jedem dritten Lauf (Test erlaubt 3 Versuche).
+- „The House Always Wins“ als Benchmark (Casino-Ziele).
