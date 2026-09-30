@@ -115,6 +115,11 @@ public final class Bot {
         return sb.length() == 0 ? " idle" : sb.toString();
     }
 
+    /** The task at the bottom of the stack: what it set out to do (the rest is on the way there). */
+    public BotTask root() {
+        return tasks.peekLast();
+    }
+
     public BotTask current() {
         return tasks.peek();
     }

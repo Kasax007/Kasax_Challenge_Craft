@@ -108,6 +108,12 @@ public final class MineTask implements BotTask {
             }
         }
         if (!bot.actions().inReach(target)) {
+            // Far above from down in a mine: up to the surface first (a straight climb beats
+            // picking a way through the rock bit by bit).
+            if (!walking && target.getY() > bot.body().getY() + 12 && SurfaceTask.underground(bot.body())) {
+                bot.interject(new SurfaceTask());
+                return Result.RUNNING;
+            }
             if (!walking) {
                 bot.navigator().goNear(target, 3.6);
                 walking = true;

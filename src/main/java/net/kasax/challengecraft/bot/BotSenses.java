@@ -195,6 +195,12 @@ public final class BotSenses {
     }
 
     /** Unopened loot chests it knows of, nearest first. */
+    /** The known structure (its id) a spot is inside of, or null. */
+    public Identifier structureAt(BlockPos p) {
+        for (SeenStructure st : structures.values()) if (st.box().isInside(p)) return st.id();
+        return null;
+    }
+
     public List<BlockPos> lootables() {
         return lootables;
     }

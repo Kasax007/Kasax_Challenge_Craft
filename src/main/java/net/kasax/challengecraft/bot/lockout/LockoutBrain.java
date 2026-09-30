@@ -134,6 +134,9 @@ public final class LockoutBrain implements BotBrain {
      * around make steak). Returns whether it went for food.
      */
     private final LockoutStrategist strategist = new LockoutStrategist();
+    private static final List<String> WORTH_LOOTING = List.of("shipwreck", "ruined_portal", "desert_pyramid", "jungle_pyramid",
+            "village", "buried_treasure", "igloo", "pillager_outpost", "bastion", "fortress", "end_city");
+    private final Map<String, Integer> lootedIn = new HashMap<>();
     private boolean replanNow = true;
     private int openingStep;
 
@@ -308,9 +311,21 @@ public final class LockoutBrain implements BotBrain {
      */
     private void takeChances(Bot bot) {
         if (bot.current() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
-        java.util.List<net.minecraft.core.BlockPos> chests = bot.senses().lootables();
-        if (!chests.isEmpty() && chests.get(0).distSqr(bot.body().blockPosition()) < 32 * 32) {
-            sideTask = new net.kasax.challengecraft.bot.task.LootTask(chests.get(0));
+        // Chests worth a detour: where the good loot is (iron in a shipwreck, flint and steel and
+        // gold at a ruined portal, the temples' treasure), a few per structure, not every chest in
+        // a mineshaft or a trial chamber full of spiders and silverfish.
+        net.minecraft.core.BlockPos chest = null;
+        for (net.minecraft.core.BlockPos c : bot.senses().lootables()) {
+            if (c.distSqr(bot.body().blockPosition()) > 32 * 32) break;
+            net.minecraft.resources.Identifier in = bot.senses().structureAt(c);
+            if (in == null || !WORTH_LOOTING.stream().anyMatch(w -> in.getPath().startsWith(w))) continue;
+            if (lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 0, Integer::sum) >= 3) continue;
+            chest = c;
+            lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 1, Integer::sum);
+            break;
+        }
+        if (chest != null) {
+            sideTask = new net.kasax.challengecraft.bot.task.LootTask(chest);
             sideStarted = bot.body().level().getGameTime();
             sideBudget = 900;
             bot.say("on the way: a loot chest");
@@ -331,6 +346,24 @@ public final class LockoutBrain implements BotBrain {
         }
         if (bot.body().level().getGameTime() < nextChance) return;
         nextChance = bot.body().level().getGameTime() + 200;
+        // What the plan needs later, lying right here: take it now (flint from the gravel at the
+        // river on the way, the iron ore in the cave wall).
+        for (var want : strategist.wants().entrySet()) {
+            net.minecraft.world.item.Item item = want.getKey();
+            if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
+            if (item == net.minecraft.world.item.Items.FLINT && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.FLINT_AND_STEEL)) > 0) continue;
+            net.minecraft.world.level.block.Block source = want.getValue();
+            net.minecraft.core.BlockPos at = bot.memory().nearest((net.minecraft.server.level.ServerLevel) bot.body().level(),
+                    bot.body().blockPosition(), st -> st.is(source), Set.of());
+            if (at == null || at.distSqr(bot.body().blockPosition()) > 10 * 10) continue;
+            sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), item == net.minecraft.world.item.Items.SUGAR_CANE ? 3 : 1, planner);
+            sideId = null;
+            sideStarted = bot.body().level().getGameTime();
+            sideBudget = 600;
+            bot.say("on the way: " + ObtainPlanner.name(item) + " for later");
+            bot.interject(sideTask);
+            return;
+        }
         for (Choice c : choices(bot, targetIndex)) {
             if (c.option().cost() < 8) {
                 sideTask = c.option().task().get();

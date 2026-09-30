@@ -35,6 +35,8 @@ public final class BotBenchmark {
     private final Map<String, Integer> reached = new LinkedHashMap<>();
     private final List<String> claims = new ArrayList<>();
     private boolean wasAlive = true;
+    /** Ticks spent per root task (what it set out to do). */
+    private final Map<String, Integer> timeOn = new LinkedHashMap<>();
 
     private BotBenchmark(Bot bot, int length) {
         this.bot = bot;
@@ -63,6 +65,8 @@ public final class BotBenchmark {
         ticks++;
         var body = bot.body();
         if (!body.isAlive() && wasAlive) deaths++;
+        var root = bot.root();
+        timeOn.merge(root == null ? "(nothing)" : root.describe(), 1, Integer::sum);
         wasAlive = body.isAlive();
         if (ticks % 10 == 0) {
             for (Milestone m : MILESTONES) {
@@ -109,6 +113,8 @@ public final class BotBenchmark {
         }
         Integer nether = reached.get("nether");
         BotManager.LOG.info("[BOTBENCH] nether: {}", nether == null ? "-" : nether / 20 + " s");
+        timeOn.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(8)
+                .forEach(e -> BotManager.LOG.info("[BOTBENCH] time on {}: {} s", e.getKey(), e.getValue() / 20));
         BotManager.LOG.info("[BOTBENCH] idle: {} s, failed tasks: {}, deaths: {}", bot.idleTicks / 20, bot.failures, deaths);
     }
 }

@@ -170,6 +170,20 @@ final class BotCommands {
                                         .then(Commands.argument("difficulty", StringArgumentType.word())
                                                 .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.valueOf(
                                                         StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))))))
+                        .then(Commands.literal("estimate").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("item", StringArgumentType.word())
+                                        .executes(ctx -> {
+                                            // Test: what the planner thinks an item costs from here, and its first step.
+                                            Bot bot = bot(ctx);
+                                            if (bot == null) return 0;
+                                            var item = BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.parse(ns(StringArgumentType.getString(ctx, "item"))));
+                                            var planner = new net.kasax.challengecraft.bot.plan.ObtainPlanner();
+                                            double cost = planner.estimate(bot, java.util.Set.of(item), 1);
+                                            var plan = planner.plan(bot, java.util.Set.of(item), 1);
+                                            String first = plan instanceof net.kasax.challengecraft.bot.plan.ObtainPlanner.Step st ? st.task().describe() : plan.toString();
+                                            ok(ctx, String.format("%s: ~%.0f s, first %s", item, cost, first));
+                                            return 1;
+                                        }))))
                         .then(Commands.literal("nether").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     // Test: the way into the Nether the Lockout brain would pick, from scratch.

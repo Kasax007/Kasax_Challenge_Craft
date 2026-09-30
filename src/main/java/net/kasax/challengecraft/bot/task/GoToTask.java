@@ -10,6 +10,7 @@ public final class GoToTask implements BotTask {
     private final BlockPos target;
     private final double range;
     private boolean started;
+    private int ticks, limit = Integer.MAX_VALUE;
 
     public GoToTask(BlockPos target, double range) {
         this.target = target.immutable();
@@ -18,8 +19,11 @@ public final class GoToTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
+        // A walk that takes far longer than its distance says is not going to arrive.
+        if (++ticks > limit) return Result.FAILED;
         if (!started) {
             started = true;
+            limit = 300 + (int) (30 * Math.sqrt(target.distSqr(bot.body().blockPosition())));
             if (range <= 0) bot.navigator().goTo(target);
             else bot.navigator().goStandNear(target, range);
         }

@@ -172,6 +172,14 @@ public final class ObtainPlanner {
         }
     }
 
+    /**
+     * Seconds to get {@code dy} blocks up or down to something and back: down means digging a
+     * staircase and climbing it again (caves may be quicker, but that is luck); up is a climb.
+     */
+    private static double vertical(int dy, double digPerBlock) {
+        return dy < 0 ? -dy * (digPerBlock + 0.6) : dy * 0.8;
+    }
+
     /** Seconds to walk to the nearest block of this kind in sight around the bot, or null if none is. */
     public Double seen(Bot bot, Block block) {
         refresh(bot);
@@ -242,6 +250,8 @@ public final class ObtainPlanner {
         scannedAt = now;
         Map<Block, Double> blocks = new IdentityHashMap<>();
         BlockPos c = bot.body().blockPosition();
+        // Seconds to dig one level of a staircase (two blocks of stone) with what it holds.
+        double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int x = -SCAN_RADIUS; x <= SCAN_RADIUS; x++) {
             for (int z = -SCAN_RADIUS; z <= SCAN_RADIUS; z++) {
@@ -251,7 +261,7 @@ public final class ObtainPlanner {
                     BlockState s = level.getBlockState(m);
                     if (s.isAir()) continue;
                     // Walking ~4 blocks a second; up and down (climbing, digging) is slower.
-                    double reach = 2 + Math.sqrt(x * x + z * z) / 4.0 + Math.abs(y) * 0.8;
+                    double reach = 2 + Math.sqrt(x * x + z * z) / 4.0 + vertical(y, digPerBlock);
                     Double known = blocks.get(s.getBlock());
                     if (known != null && known <= reach) continue;
                     if (BotWorld.exposed(level, m)) blocks.put(s.getBlock(), reach);
@@ -262,7 +272,7 @@ public final class ObtainPlanner {
         for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c).entrySet()) {
             BlockPos p = e.getValue();
             double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
-            double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + Math.abs(p.getY() - c.getY()) * 0.8;
+            double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + vertical(p.getY() - c.getY(), digPerBlock);
             blocks.merge(e.getKey(), reach, Math::min);
         }
         visibleBlocks = blocks;
@@ -318,7 +328,18 @@ public final class ObtainPlanner {
     }
 
     private double rawCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
-        if (assumeHeld.contains(item) || net.kasax.challengecraft.bot.BotInventory.count(bot.body(), item) > 0) return 0;
+        if (assumeHeld.contains(item)) return 0;
+        int held = net.kasax.challengecraft.bot.BotInventory.count(bot.body(), item);
+        // A tool (anything that does not stack) held is free for good; a material only as far as
+        // it goes (one raw iron does not make a block of nine).
+        if (held > 0 && (item.getDefaultMaxStackSize() == 1 || item == Items.CRAFTING_TABLE || item == Items.FURNACE
+                || item == Items.SMOKER || item == Items.BLAST_FURNACE)) return 0;
+        double share = held <= 0 ? 1 : Math.max(0, 1 - held / 9.0);
+        if (share == 0) return 0;
+        return share * acquireCost(bot, k, item, cost);
+    }
+
+    private double acquireCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
         double best = INF;
         for (BotKnowledge.Drop d : k.blocksDropping(item)) {
             double c = blockCost(bot, k, d.block(), cost) / Math.max(0.05, d.count());
