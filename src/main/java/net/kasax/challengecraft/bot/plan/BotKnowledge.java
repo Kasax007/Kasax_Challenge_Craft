@@ -203,8 +203,8 @@ public final class BotKnowledge {
                 || id.equals("ancient_debris") || id.equals("shroomlight") || id.contains("quartz_ore")) return 5000; // the Nether: not yet
         if (id.startsWith("end_") || id.contains("purpur") || id.contains("chorus") || id.contains("shulker")) return 9000;
         if (s.is(BlockTags.LEAVES)) return 5;
-        if (s.is(BlockTags.LOGS)) return id.contains("cherry") || id.contains("mangrove") || id.contains("jungle")
-                || id.contains("acacia") || id.contains("dark_oak") || id.contains("pale") ? 90 : 8;
+        // Trees not in sight: the common kinds are a short walk away, the others need their biome.
+        if (s.is(BlockTags.LOGS)) return id.contains("oak") && !id.contains("dark") || id.contains("birch") || id.contains("spruce") ? 30 : 150;
         if (s.is(BlockTags.SMALL_FLOWERS)) return id.equals("dandelion") || id.equals("poppy") ? 12 : 90;
         return switch (id) {
             case "dirt", "grass_block", "sand", "gravel", "short_grass", "tall_grass", "fern", "large_fern" -> 3;

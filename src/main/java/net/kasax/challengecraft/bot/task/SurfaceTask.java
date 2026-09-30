@@ -23,16 +23,19 @@ public final class SurfaceTask implements BotTask {
 
     /** Deep enough under the ground that walking about on the surface needs a climb first. */
     public static boolean underground(BotPlayer body) {
+        // Little sky light where the head is: a cave or a mine. (Under trees or next to a trunk
+        // there is plenty; up an open shaft too, and that one needs no climbing either.)
         ServerLevel level = (ServerLevel) body.level();
-        BlockPos feet = body.blockPosition();
-        // The ground around is above the feet (more than a hole's depth); its own shaft does not count.
-        int ground = Integer.MIN_VALUE;
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                ground = Math.max(ground, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX() + dx, feet.getZ() + dz));
-            }
+        BlockPos head = body.blockPosition().above();
+        if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, head) < 6
+                && head.getY() < level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, head.getX(), head.getZ())) return true;
+        // Down its own shaft (the sky shines straight in): the ground on all four sides is well above.
+        int lowest = Integer.MAX_VALUE;
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos n = body.blockPosition().relative(d);
+            lowest = Math.min(lowest, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, n.getX(), n.getZ()));
         }
-        return feet.getY() + 1 < ground;
+        return lowest > body.blockPosition().getY() + 1;
     }
 
     @Override
