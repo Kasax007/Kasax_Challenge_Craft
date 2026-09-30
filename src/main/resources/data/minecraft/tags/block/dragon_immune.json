@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "challengecraft:booth_floor",
+    "challengecraft:booth_trim",
+    "challengecraft:booth_carpet",
+    "challengecraft:booth_post",
+    "challengecraft:booth_lantern",
+    "challengecraft:cashier_counter"
+  ]
+}

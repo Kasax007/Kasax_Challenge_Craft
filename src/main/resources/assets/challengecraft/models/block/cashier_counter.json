@@ -1,0 +1,321 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "front": "challengecraft:block/casino/counter_front",
+    "side": "challengecraft:block/casino/counter_side",
+    "marble": "challengecraft:block/casino/marble",
+    "brass": "challengecraft:block/casino/brass",
+    "wood": "challengecraft:block/casino/mahogany",
+    "particle": "challengecraft:block/casino/mahogany"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        2
+      ],
+      "to": [
+        16,
+        13,
+        14
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#front"
+        },
+        "south": {
+          "uv": [
+            0,
+            3,
+            16.0,
+            16
+          ],
+          "texture": "#side"
+        },
+        "east": {
+          "uv": [
+            2,
+            3,
+            14,
+            16
+          ],
+          "texture": "#side"
+        },
+        "west": {
+          "uv": [
+            2,
+            3,
+            14,
+            16
+          ],
+          "texture": "#side"
+        },
+        "up": {
+          "uv": [
+            0,
+            2,
+            16.0,
+            14
+          ],
+          "texture": "#side"
+        },
+        "down": {
+          "uv": [
+            0,
+            2,
+            16.0,
+            14
+          ],
+          "texture": "#wood"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        13,
+        1
+      ],
+      "to": [
+        16,
+        14.5,
+        15
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            1.5,
+            16.0,
+            3.0
+          ],
+          "texture": "#marble"
+        },
+        "south": {
+          "uv": [
+            0,
+            1.5,
+            16.0,
+            3.0
+          ],
+          "texture": "#marble"
+        },
+        "east": {
+          "uv": [
+            1,
+            1.5,
+            15,
+            3.0
+          ],
+          "texture": "#marble"
+        },
+        "west": {
+          "uv": [
+            1,
+            1.5,
+            15,
+            3.0
+          ],
+          "texture": "#marble"
+        },
+        "up": {
+          "uv": [
+            0,
+            1,
+            16.0,
+            15
+          ],
+          "texture": "#marble"
+        },
+        "down": {
+          "uv": [
+            0,
+            1,
+            16.0,
+            15
+          ],
+          "texture": "#marble"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        11,
+        1.2
+      ],
+      "to": [
+        16,
+        12,
+        2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            4,
+            16.0,
+            5
+          ],
+          "texture": "#brass"
+        },
+        "south": {
+          "uv": [
+            0,
+            4,
+            16.0,
+            5
+          ],
+          "texture": "#brass"
+        },
+        "east": {
+          "uv": [
+            1.2,
+            4,
+            2.0,
+            5
+          ],
+          "texture": "#brass"
+        },
+        "west": {
+          "uv": [
+            1.2,
+            4,
+            2.0,
+            5
+          ],
+          "texture": "#brass"
+        },
+        "up": {
+          "uv": [
+            0,
+            1.2,
+            16.0,
+            2.0
+          ],
+          "texture": "#brass"
+        },
+        "down": {
+          "uv": [
+            0,
+            1.2,
+            16.0,
+            2.0
+          ],
+          "texture": "#brass"
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.625,
+        0.625,
+        0.625
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        3,
+        0
+      ],
+      "scale": [
+        0.25,
+        0.25,
+        0.25
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        75,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        2.5,
+        0
+      ],
+      "scale": [
+        0.375,
+        0.375,
+        0.375
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        0,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.4,
+        0.4,
+        0.4
+      ]
+    }
+  }
+}

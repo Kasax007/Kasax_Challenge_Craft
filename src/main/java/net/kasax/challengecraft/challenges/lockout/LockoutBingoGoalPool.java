@@ -301,18 +301,18 @@ public final class LockoutBingoGoalPool {
 
             interact(LockoutBingoGoalCategory.INTERACTION, "milk_cow", LockoutBingoGoalDifficulty.EASY, "minecraft:cow", "minecraft:milk_bucket"),
             interact(LockoutBingoGoalCategory.INTERACTION, "shear_sheep", LockoutBingoGoalDifficulty.EASY, "minecraft:sheep", "minecraft:shears"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "breed_animals", LockoutBingoGoalDifficulty.EASY, "minecraft:animal", "minecraft:wheat"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "breed_cows", LockoutBingoGoalDifficulty.EASY, "minecraft:cow", "minecraft:wheat"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "breed_sheep", LockoutBingoGoalDifficulty.EASY, "minecraft:sheep", "minecraft:wheat"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "breed_pigs", LockoutBingoGoalDifficulty.EASY, "minecraft:pig", "minecraft:carrot"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "breed_chickens", LockoutBingoGoalDifficulty.EASY, "minecraft:chicken", "minecraft:wheat_seeds"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "tame_wolf", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:wolf", "minecraft:bone"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "tame_cat", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:cat", "minecraft:cod"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "tame_horse", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:horse", "minecraft:saddle"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "breed_animals", LockoutBingoGoalDifficulty.EASY, "minecraft:animal", "minecraft:wheat"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "breed_cows", LockoutBingoGoalDifficulty.EASY, "minecraft:cow", "minecraft:wheat"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "breed_sheep", LockoutBingoGoalDifficulty.EASY, "minecraft:sheep", "minecraft:wheat"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "breed_pigs", LockoutBingoGoalDifficulty.EASY, "minecraft:pig", "minecraft:carrot"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "breed_chickens", LockoutBingoGoalDifficulty.EASY, "minecraft:chicken", "minecraft:wheat_seeds"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "tame_wolf", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:wolf", "minecraft:bone"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "tame_cat", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:cat", "minecraft:cod"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "tame_horse", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:horse", "minecraft:saddle"),
             interact(LockoutBingoGoalCategory.INTERACTION, "ride_horse", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:horse", "minecraft:saddle"),
             interact(LockoutBingoGoalCategory.INTERACTION, "ride_pig", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:pig", "minecraft:carrot_on_a_stick"),
             interact(LockoutBingoGoalCategory.INTERACTION, "ride_strider", LockoutBingoGoalDifficulty.HARD, "minecraft:strider", "minecraft:warped_fungus_on_a_stick"),
-            fishingTodo("catch_fish", LockoutBingoGoalDifficulty.EASY, "minecraft:fishing_rod"),
+            fishing("catch_fish", LockoutBingoGoalDifficulty.EASY, "minecraft:fishing_rod"),
             consume("eat_apple", LockoutBingoGoalDifficulty.EASY, "minecraft:apple"),
             consume("eat_bread", LockoutBingoGoalDifficulty.EASY, "minecraft:bread"),
             consume("eat_cooked_beef", LockoutBingoGoalDifficulty.EASY, "minecraft:cooked_beef"),
@@ -332,7 +332,7 @@ public final class LockoutBingoGoalPool {
             consume("eat_dried_kelp", LockoutBingoGoalDifficulty.EASY, "minecraft:dried_kelp"),
             consume("eat_honey_bottle", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:honey_bottle"),
             interact(LockoutBingoGoalCategory.INTERACTION, "sleep_in_bed", LockoutBingoGoalDifficulty.EASY, "minecraft:bed", "minecraft:red_bed"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "set_spawn", LockoutBingoGoalDifficulty.EASY, "minecraft:respawn_anchor", "minecraft:respawn_anchor"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "set_spawn", LockoutBingoGoalDifficulty.EASY, "minecraft:respawn_anchor", "minecraft:respawn_anchor"),
             interact(LockoutBingoGoalCategory.INTERACTION, "use_lectern", LockoutBingoGoalDifficulty.EASY, "minecraft:lectern", "minecraft:lectern"),
             interact(LockoutBingoGoalCategory.INTERACTION, "use_grindstone", LockoutBingoGoalDifficulty.EASY, "minecraft:grindstone", "minecraft:grindstone"),
             interact(LockoutBingoGoalCategory.INTERACTION, "use_stonecutter", LockoutBingoGoalDifficulty.EASY, "minecraft:stonecutter", "minecraft:stonecutter"),
@@ -340,35 +340,35 @@ public final class LockoutBingoGoalPool {
             interact(LockoutBingoGoalCategory.INTERACTION, "use_smithing_table", LockoutBingoGoalDifficulty.EASY, "minecraft:smithing_table", "minecraft:smithing_table"),
             interact(LockoutBingoGoalCategory.INTERACTION, "use_loom", LockoutBingoGoalDifficulty.EASY, "minecraft:loom", "minecraft:loom"),
             interact(LockoutBingoGoalCategory.INTERACTION, "light_campfire", LockoutBingoGoalDifficulty.EASY, "minecraft:campfire", "minecraft:campfire"),
-            interactTodo(LockoutBingoGoalCategory.INTERACTION, "activate_pressure_plate", LockoutBingoGoalDifficulty.EASY, "minecraft:stone_pressure_plate", "minecraft:stone_pressure_plate"),
+            interact(LockoutBingoGoalCategory.INTERACTION, "activate_pressure_plate", LockoutBingoGoalDifficulty.EASY, "minecraft:stone_pressure_plate", "minecraft:stone_pressure_plate"),
             equip(LockoutBingoGoalCategory.INTERACTION, "wear_full_leather", LockoutBingoGoalDifficulty.MEDIUM, LEATHER_ARMOR, 4, "minecraft:leather_chestplate", ""),
             equip(LockoutBingoGoalCategory.INTERACTION, "wear_full_iron", LockoutBingoGoalDifficulty.MEDIUM, IRON_ARMOR, 4, "minecraft:iron_chestplate", ""),
             equip(LockoutBingoGoalCategory.INTERACTION, "wear_full_gold", LockoutBingoGoalDifficulty.MEDIUM, GOLD_ARMOR, 4, "minecraft:golden_chestplate", ""),
             equip(LockoutBingoGoalCategory.INTERACTION, "wear_diamond_piece", LockoutBingoGoalDifficulty.MEDIUM, DIAMOND_ARMOR, 1, "minecraft:diamond_chestplate", ""),
             action(LockoutBingoGoalCategory.INTERACTION, "block_damage_with_shield", LockoutBingoGoalDifficulty.EASY, "minecraft:shield", "minecraft:shield"),
-            actionTodo(LockoutBingoGoalCategory.INTERACTION, "obtain_firework_crossbow", LockoutBingoGoalDifficulty.HARD, "minecraft:crossbow", "minecraft:crossbow"),
+            action(LockoutBingoGoalCategory.INTERACTION, "obtain_firework_crossbow", LockoutBingoGoalDifficulty.HARD, "minecraft:crossbow", "minecraft:crossbow"),
 
             trade("trade_with_villager", LockoutBingoGoalDifficulty.EASY, "minecraft:villager", "minecraft:emerald"),
-            tradeTodo("obtain_emerald_by_trade", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:emerald", "minecraft:emerald"),
-            tradeTodo("trade_with_librarian", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:librarian", "minecraft:book"),
-            tradeTodo("trade_with_armorer", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:armorer", "minecraft:iron_chestplate"),
-            tradeTodo("trade_with_farmer", LockoutBingoGoalDifficulty.EASY, "minecraft:farmer", "minecraft:bread"),
-            tradeTodo("trade_with_cleric", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:cleric", "minecraft:glowstone_dust"),
-            tradeTodo("trade_with_toolsmith", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:toolsmith", "minecraft:iron_pickaxe"),
-            tradeTodo("trade_with_fletcher", LockoutBingoGoalDifficulty.EASY, "minecraft:fletcher", "minecraft:arrow"),
-            tradeTodo("buy_bread", LockoutBingoGoalDifficulty.EASY, "minecraft:bread", "minecraft:bread"),
-            tradeTodo("buy_arrows", LockoutBingoGoalDifficulty.EASY, "minecraft:arrow", "minecraft:arrow"),
-            tradeTodo("buy_lapis", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:lapis_lazuli", "minecraft:lapis_lazuli"),
+            trade("obtain_emerald_by_trade", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:emerald", "minecraft:emerald"),
+            trade("trade_with_librarian", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:librarian", "minecraft:book"),
+            trade("trade_with_armorer", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:armorer", "minecraft:iron_chestplate"),
+            trade("trade_with_farmer", LockoutBingoGoalDifficulty.EASY, "minecraft:farmer", "minecraft:bread"),
+            trade("trade_with_cleric", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:cleric", "minecraft:glowstone_dust"),
+            trade("trade_with_toolsmith", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:toolsmith", "minecraft:iron_pickaxe"),
+            trade("trade_with_fletcher", LockoutBingoGoalDifficulty.EASY, "minecraft:fletcher", "minecraft:arrow"),
+            trade("buy_bread", LockoutBingoGoalDifficulty.EASY, "minecraft:bread", "minecraft:bread"),
+            trade("buy_arrows", LockoutBingoGoalDifficulty.EASY, "minecraft:arrow", "minecraft:arrow"),
+            trade("buy_lapis", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:lapis_lazuli", "minecraft:lapis_lazuli"),
             item(LockoutBingoGoalCategory.VILLAGER, "buy_bell", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:bell"),
             interact(LockoutBingoGoalCategory.VILLAGER, "ring_bell", LockoutBingoGoalDifficulty.EASY, "minecraft:bell", "minecraft:bell"),
-            interactTodo(LockoutBingoGoalCategory.VILLAGER, "sleep_in_village_bed", LockoutBingoGoalDifficulty.EASY, "minecraft:bed", "minecraft:red_bed"),
+            interact(LockoutBingoGoalCategory.VILLAGER, "sleep_in_village_bed", LockoutBingoGoalDifficulty.EASY, "minecraft:bed", "minecraft:red_bed"),
 
             dimension(LockoutBingoGoalCategory.EXPLORATION, "enter_end", LockoutBingoGoalDifficulty.EXPERT, "minecraft:the_end", "minecraft:end_stone", false),
             item(LockoutBingoGoalCategory.EXPLORATION, "obtain_dragon_breath", LockoutBingoGoalDifficulty.EXPERT, "minecraft:dragon_breath", false),
             item(LockoutBingoGoalCategory.EXPLORATION, "obtain_shulker_shell", LockoutBingoGoalDifficulty.EXPERT, "minecraft:shulker_shell", false),
             item(LockoutBingoGoalCategory.EXPLORATION, "obtain_elytra", LockoutBingoGoalDifficulty.EXPERT, "minecraft:elytra", false),
             kill(LockoutBingoGoalCategory.EXPLORATION, "kill_ender_dragon", LockoutBingoGoalDifficulty.EXPERT, "minecraft:ender_dragon", false),
-            locationTodo(LockoutBingoGoalCategory.EXPLORATION, "enter_end_gateway", LockoutBingoGoalDifficulty.EXPERT, "challengecraft:end_gateway", "minecraft:end_portal_frame"),
+            locationIn(LockoutBingoGoalCategory.EXPLORATION, "enter_end_gateway", LockoutBingoGoalDifficulty.EXPERT, "challengecraft:end_gateway", "minecraft:end_portal_frame"),
 
             advancement("advancement_stone_age", LockoutBingoGoalDifficulty.EASY, "minecraft:story/mine_stone", "minecraft:stone_pickaxe"),
             advancement("advancement_acquire_hardware", LockoutBingoGoalDifficulty.EASY, "minecraft:story/smelt_iron", "minecraft:iron_ingot"),
@@ -394,7 +394,7 @@ public final class LockoutBingoGoalPool {
             enchant("enchant_item", LockoutBingoGoalDifficulty.HARD, "minecraft:enchanting_table"),
             enchant("enchant_sword", LockoutBingoGoalDifficulty.HARD, "minecraft:diamond_sword"),
             enchant("enchant_pickaxe", LockoutBingoGoalDifficulty.HARD, "minecraft:diamond_pickaxe"),
-            consumeTodo(LockoutBingoGoalCategory.INTERACTION, "drink_potion", LockoutBingoGoalDifficulty.HARD, "minecraft:potion"),
+            consumeIn(LockoutBingoGoalCategory.INTERACTION, "drink_potion", LockoutBingoGoalDifficulty.HARD, "minecraft:potion"),
             action(LockoutBingoGoalCategory.INTERACTION, "splash_potion", LockoutBingoGoalDifficulty.HARD, "minecraft:splash_potion", "minecraft:splash_potion"),
             action(LockoutBingoGoalCategory.INTERACTION, "place_tnt", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:tnt", "minecraft:tnt"),
             action(LockoutBingoGoalCategory.INTERACTION, "ignite_tnt", LockoutBingoGoalDifficulty.MEDIUM, "minecraft:tnt", "minecraft:flint_and_steel"),
@@ -472,7 +472,7 @@ public final class LockoutBingoGoalPool {
     ) {
         List<LockoutBingoGoal> candidates = selectableGoals().stream()
                 .filter(predicate)
-                .filter(goal -> !usedIds.contains(goal.id()))
+                .filter(goal -> !taken(usedIds, goal))
                 .toList();
 
         List<LockoutBingoGoal> shuffled = new ArrayList<>(candidates);
@@ -482,7 +482,7 @@ public final class LockoutBingoGoalPool {
             if (count <= 0) {
                 return;
             }
-            if (!canUseByType(typeCounts, goal.type())) {
+            if (taken(usedIds, goal) || !canUseByType(typeCounts, goal.type())) {
                 continue;
             }
             addGoal(board, usedIds, typeCounts, goal);
@@ -497,7 +497,7 @@ public final class LockoutBingoGoalPool {
             if (count <= 0) {
                 return;
             }
-            if (usedIds.contains(goal.id())) {
+            if (taken(usedIds, goal)) {
                 continue;
             }
             addGoal(board, usedIds, typeCounts, goal);
@@ -514,8 +514,36 @@ public final class LockoutBingoGoalPool {
         if (!usedIds.add(goal.id())) {
             return;
         }
+        String group = OVERLAP_GROUPS.get(goal.id());
+        if (group != null) {
+            usedIds.add("group:" + group);
+        }
         board.add(goal);
         typeCounts.merge(goal.type(), 1, Integer::sum);
+    }
+
+    /**
+     * Goals one action can claim together (sleeping in a village bed is sleeping in a bed and sets
+     * the spawn point; taming a horse means riding it; any breeding is a breeding): a board gets at
+     * most one of each group, so no tile comes for free with another.
+     */
+    private static final Map<String, String> OVERLAP_GROUPS = Map.ofEntries(
+            Map.entry("sleep_in_bed", "bed"),
+            Map.entry("sleep_in_village_bed", "bed"),
+            Map.entry("set_spawn", "bed"),
+            Map.entry("tame_horse", "horse"),
+            Map.entry("ride_horse", "horse"),
+            Map.entry("breed_animals", "breed"),
+            Map.entry("breed_cows", "breed"),
+            Map.entry("breed_sheep", "breed"),
+            Map.entry("breed_pigs", "breed"),
+            Map.entry("breed_chickens", "breed")
+    );
+
+    /** Whether the goal, or another goal of its overlap group, is already on the board. */
+    private static boolean taken(Set<String> usedIds, LockoutBingoGoal goal) {
+        String group = OVERLAP_GROUPS.get(goal.id());
+        return usedIds.contains(goal.id()) || (group != null && usedIds.contains("group:" + group));
     }
 
     private static List<LockoutBingoGoal> selectableGoals() {
@@ -733,7 +761,7 @@ public final class LockoutBingoGoalPool {
         );
     }
 
-    private static LockoutBingoGoal consumeTodo(LockoutBingoGoalCategory category, String id, LockoutBingoGoalDifficulty difficulty, String targetId) {
+    private static LockoutBingoGoal consumeIn(LockoutBingoGoalCategory category, String id, LockoutBingoGoalDifficulty difficulty, String targetId) {
         return new LockoutBingoGoal(
                 id,
                 category,
@@ -848,58 +876,18 @@ public final class LockoutBingoGoalPool {
                 "",
                 1,
                 iconItemId,
-                LockoutBingoGoalImplementationStatus.TODO,
-                false,
+                LockoutBingoGoalImplementationStatus.IMPLEMENTED,
+                true,
                 "challengecraft.lockout.goal." + id + ".title",
-                ""
-        );
-    }
-
-    private static LockoutBingoGoal interactTodo(
-            LockoutBingoGoalCategory category,
-            String id,
-            LockoutBingoGoalDifficulty difficulty,
-            String targetId,
-            String iconItemId
-    ) {
-        boolean implemented = switch (id) {
-            case "breed_animals", "breed_cows", "breed_sheep", "breed_pigs", "breed_chickens", "activate_pressure_plate" -> true;
-            default -> false;
-        };
-        return new LockoutBingoGoal(
-                id,
-                category,
-                LockoutBingoGoalType.INTERACT,
-                difficulty,
-                List.of(targetId),
-                "",
-                1,
-                iconItemId,
-                implemented ? LockoutBingoGoalImplementationStatus.IMPLEMENTED : LockoutBingoGoalImplementationStatus.TODO,
-                implemented,
-                "challengecraft.lockout.goal." + id + ".title",
-                ""
+                // Goals whose title alone leaves open what counts say it in their description.
+                switch (id) {
+                    case "set_spawn", "sleep_in_village_bed", "barter_with_piglin", "tame_horse" -> "challengecraft.lockout.goal." + id + ".desc";
+                    default -> "";
+                }
         );
     }
 
     private static LockoutBingoGoal trade(String id, LockoutBingoGoalDifficulty difficulty, String targetId, String iconItemId) {
-        return new LockoutBingoGoal(
-                id,
-                LockoutBingoGoalCategory.VILLAGER,
-                LockoutBingoGoalType.TRADE,
-                difficulty,
-                List.of(targetId),
-                "",
-                1,
-                iconItemId,
-                LockoutBingoGoalImplementationStatus.IMPLEMENTED,
-                true,
-                "challengecraft.lockout.goal." + id + ".title",
-                ""
-        );
-    }
-
-    private static LockoutBingoGoal tradeTodo(String id, LockoutBingoGoalDifficulty difficulty, String targetId, String iconItemId) {
         return new LockoutBingoGoal(
                 id,
                 LockoutBingoGoalCategory.VILLAGER,
@@ -1012,7 +1000,7 @@ public final class LockoutBingoGoalPool {
         );
     }
 
-    private static LockoutBingoGoal fishingTodo(String id, LockoutBingoGoalDifficulty difficulty, String iconItemId) {
+    private static LockoutBingoGoal fishing(String id, LockoutBingoGoalDifficulty difficulty, String iconItemId) {
         return new LockoutBingoGoal(
                 id,
                 LockoutBingoGoalCategory.INTERACTION,
@@ -1047,30 +1035,6 @@ public final class LockoutBingoGoalPool {
                 iconItemId,
                 LockoutBingoGoalImplementationStatus.IMPLEMENTED,
                 true,
-                "challengecraft.lockout.goal." + id + ".title",
-                ""
-        );
-    }
-
-    private static LockoutBingoGoal actionTodo(
-            LockoutBingoGoalCategory category,
-            String id,
-            LockoutBingoGoalDifficulty difficulty,
-            String targetId,
-            String iconItemId
-    ) {
-        boolean implemented = "obtain_firework_crossbow".equals(id);
-        return new LockoutBingoGoal(
-                id,
-                category,
-                LockoutBingoGoalType.ACTION,
-                difficulty,
-                List.of(targetId),
-                "",
-                1,
-                iconItemId,
-                implemented ? LockoutBingoGoalImplementationStatus.IMPLEMENTED : LockoutBingoGoalImplementationStatus.TODO,
-                implemented,
                 "challengecraft.lockout.goal." + id + ".title",
                 ""
         );
@@ -1144,8 +1108,7 @@ public final class LockoutBingoGoalPool {
         );
     }
 
-    private static LockoutBingoGoal locationTodo(LockoutBingoGoalCategory category, String id, LockoutBingoGoalDifficulty difficulty, String targetId, String iconItemId) {
-        boolean implemented = "enter_end_gateway".equals(id);
+    private static LockoutBingoGoal locationIn(LockoutBingoGoalCategory category, String id, LockoutBingoGoalDifficulty difficulty, String targetId, String iconItemId) {
         return new LockoutBingoGoal(
                 id,
                 category,
@@ -1155,8 +1118,8 @@ public final class LockoutBingoGoalPool {
                 "",
                 1,
                 iconItemId,
-                implemented ? LockoutBingoGoalImplementationStatus.IMPLEMENTED : LockoutBingoGoalImplementationStatus.TODO,
-                implemented,
+                LockoutBingoGoalImplementationStatus.IMPLEMENTED,
+                true,
                 "challengecraft.lockout.goal." + id + ".title",
                 ""
         );

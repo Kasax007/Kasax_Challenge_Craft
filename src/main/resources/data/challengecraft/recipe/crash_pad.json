@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "F": "minecraft:firework_rocket",
+    "T": "minecraft:tnt",
+    "S": "minecraft:smooth_stone_slab"
+  },
+  "pattern": [
+    "GFG",
+    "GTG",
+    "SSS"
+  ],
+  "result": {
+    "id": "challengecraft:crash_pad"
+  }
+}

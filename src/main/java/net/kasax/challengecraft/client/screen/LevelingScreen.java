@@ -175,7 +175,7 @@ public class LevelingScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (!this.legacyLayoutMode && event.button() == 0 && isMouseOverRadarThumb(event.x(), event.y())) {
+        if (!this.legacyLayoutMode && event.button() == InputConstants.MOUSE_BUTTON_LEFT && isMouseOverRadarThumb(event.x(), event.y())) {
             this.draggingRadarThumb = true;
             updateRadarScroll(event.y());
             return true;
@@ -185,7 +185,7 @@ public class LevelingScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
-        if (this.draggingRadarThumb && event.button() == 0) {
+        if (this.draggingRadarThumb && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             updateRadarScroll(event.y());
             return true;
         }
@@ -194,7 +194,7 @@ public class LevelingScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (this.draggingRadarThumb && event.button() == 0) {
+        if (this.draggingRadarThumb && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             this.draggingRadarThumb = false;
             return true;
         }
@@ -582,7 +582,7 @@ public class LevelingScreen extends Screen {
             }
         }
 
-        for (int challengeId = 1; challengeId <= 49; challengeId++) {
+        for (int challengeId = 1; challengeId <= net.kasax.challengecraft.ChallengeManager.MAX_CHALLENGE_ID; challengeId++) {
             if (LevelManager.getRequiredLevel(challengeId) == level) {
                 rewards.add(Reward.challenge(
                         Component.translatable("challengecraft.worldcreate.challenge" + challengeId),
@@ -1220,7 +1220,9 @@ public class LevelingScreen extends Screen {
 
         @Override
         public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-            if (!this.active || !this.visible || event.button() != 0 || !isMouseOver(event.x(), event.y())) {
+            // 26.3 numbers the mouse buttons the SDL way (left = 1, right = 3); checking for the old
+            // GLFW left button (0) made this toggle ignore every click.
+            if (!this.active || !this.visible || event.button() != InputConstants.MOUSE_BUTTON_LEFT || !isMouseOver(event.x(), event.y())) {
                 return false;
             }
 
@@ -1615,12 +1617,12 @@ public class LevelingScreen extends Screen {
             if (layoutEditMode && clicked != null) {
                 pinnedMilestone = clicked;
                 selectConsumer.accept(clicked);
-                if (event.button() == 1) {
+                if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
                     resetMilestoneOffset(clicked);
                     recomputeGeometry();
                     return true;
                 }
-                if (event.button() == 0) {
+                if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
                     draggedMilestone = clicked;
                     return true;
                 }
@@ -1647,7 +1649,7 @@ public class LevelingScreen extends Screen {
             if (!this.visible) {
                 return false;
             }
-            if (draggedMilestone != null && event.button() == 0) {
+            if (draggedMilestone != null && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
                 saveLayoutOffset(draggedMilestone);
                 draggedMilestone = null;
                 recomputeGeometry();
@@ -1662,7 +1664,7 @@ public class LevelingScreen extends Screen {
             if (!this.visible) {
                 return false;
             }
-            if (layoutEditMode && draggedMilestone != null && event.button() == 0) {
+            if (layoutEditMode && draggedMilestone != null && event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
                 draggedMilestone.offsetArtX += (float) (deltaX / artWidthScale);
                 draggedMilestone.offsetArtY += (float) (deltaY / artScale);
                 applyManualOffset(draggedMilestone);

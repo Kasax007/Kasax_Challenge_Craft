@@ -170,7 +170,7 @@ public class ChallengeRewardOverlay {
                     rewards.add("MASTER");
                 }
 
-                for (int id = 1; id <= 49; id++) {
+                for (int id = 1; id <= net.kasax.challengecraft.ChallengeManager.MAX_CHALLENGE_ID; id++) {
                     if (LevelManager.getRequiredLevel(id) == l) {
                         rewards.add(id);
                     }

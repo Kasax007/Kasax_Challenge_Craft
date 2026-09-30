@@ -17,7 +17,6 @@ import net.kasax.challengecraft.data.LockoutBingoSavedData;
 import net.kasax.challengecraft.data.StatsManager;
 import net.kasax.challengecraft.data.XpManager;
 import net.kasax.challengecraft.item.ModItems;
-import net.kasax.challengecraft.mixin.MerchantScreenHandlerAccessor;
 import net.kasax.challengecraft.network.ChallengeRewardPacket;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoOpenScreenPacket;
@@ -62,8 +61,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.BrewingStandMenu;
-import net.minecraft.world.inventory.MerchantMenu;
-import net.minecraft.world.inventory.MerchantResultSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -107,7 +104,11 @@ public final class Chal_40_LockoutBingo {
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (!active || server.getTickCount() % 20 != 0) {
+            if (!active) {
+                return;
+            }
+            runPendingChecks(server);
+            if (server.getTickCount() % 20 != 0) {
                 return;
             }
 
@@ -152,7 +153,7 @@ public final class Chal_40_LockoutBingo {
                 return InteractionResult.PASS;
             }
 
-            handleBlockInteraction(serverPlayer, player.getItemInHand(hand), world.getBlockState(hit.getBlockPos()));
+            handleBlockInteraction(serverPlayer, player.getItemInHand(hand), hit.getBlockPos(), world.getBlockState(hit.getBlockPos()));
             return InteractionResult.PASS;
         });
 
@@ -300,10 +301,8 @@ public final class Chal_40_LockoutBingo {
             return;
         }
 
-        if (handler instanceof MerchantMenu merchantHandler && slot instanceof MerchantResultSlot) {
-            Merchant merchant = ((MerchantScreenHandlerAccessor) merchantHandler).challengecraft$getMerchant();
-            claimFirstMatchingGoal(server, data, serverPlayer, goal -> matchesTradeGoal(goal, stack, merchant));
-        }
+        // Trades are claimed from the game's trade trigger (onTrade), which only fires for a trade
+        // that went through; a click on the result slot can still fail (full cursor, stock out).
     }
 
     public static void onActivated(ServerLevel world) {
@@ -350,6 +349,14 @@ public final class Chal_40_LockoutBingo {
     }
 
     public static void startSoloDebugRun(ServerPlayer player) {
+        startSoloDebugRun(player, List.of());
+    }
+
+    /**
+     * A solo test board; {@code forcedGoalIds} are placed on it first (unknown ids are skipped), the
+     * rest of the 25 tiles are drawn as usual.
+     */
+    public static void startSoloDebugRun(ServerPlayer player, List<String> forcedGoalIds) {
         MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
@@ -366,7 +373,21 @@ public final class Chal_40_LockoutBingo {
                 ^ server.overworld().getGameTime()
                 ^ player.getUUID().getMostSignificantBits()
                 ^ player.getUUID().getLeastSignificantBits();
-        List<LockoutBingoGoal> goals = LockoutBingoGoalPool.pickBoard(boardSeed);
+        List<LockoutBingoGoal> goals = new ArrayList<>();
+        for (String id : forcedGoalIds) {
+            LockoutBingoGoal forced = LockoutBingoGoalPool.byId(id);
+            if (forced != null && goals.stream().noneMatch(g -> g.id().equals(id)) && goals.size() < BOARD_SIZE) {
+                goals.add(forced);
+            }
+        }
+        for (LockoutBingoGoal drawn : LockoutBingoGoalPool.pickBoard(boardSeed)) {
+            if (goals.size() >= BOARD_SIZE) {
+                break;
+            }
+            if (goals.stream().noneMatch(g -> g.id().equals(drawn.id()))) {
+                goals.add(drawn);
+            }
+        }
         data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.overworld().getGameTime());
         captureGoalStatBaselines(data, List.of(player), goals);
         data.setStarted(true);
@@ -446,7 +467,7 @@ public final class Chal_40_LockoutBingo {
         ServerPlayNetworking.send(player, new LockoutBingoOpenScreenPacket(data.isStarted()));
     }
 
-    private static void handleBlockInteraction(ServerPlayer player, ItemStack heldStack, BlockState state) {
+    private static void handleBlockInteraction(ServerPlayer player, ItemStack heldStack, BlockPos pos, BlockState state) {
         MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
@@ -459,6 +480,18 @@ public final class Chal_40_LockoutBingo {
         }
 
         claimFirstMatchingGoal(server, data, player, goal -> matchesBlockInteraction(goal, player, heldStack, state));
+
+        // A campfire counts once it really burns: flint and steel on a waterlogged or already lit
+        // one does nothing, so look again a tick later.
+        if ((heldStack.is(Items.FLINT_AND_STEEL) || heldStack.is(Items.FIRE_CHARGE)) && CampfireBlock.canLight(state)) {
+            ServerLevel level = (ServerLevel) player.level();
+            later(server, () -> {
+                BlockState now = level.getBlockState(pos);
+                if (now.getBlock() instanceof CampfireBlock && now.getValue(CampfireBlock.LIT)) {
+                    claimForPlayer(player, goal -> "light_campfire".equals(goal.id()));
+                }
+            });
+        }
     }
 
     private static void handleEntityInteraction(ServerPlayer player, ItemStack heldStack, Entity entity) {
@@ -474,6 +507,96 @@ public final class Chal_40_LockoutBingo {
         }
 
         claimFirstMatchingGoal(server, data, player, goal -> matchesEntityInteraction(goal, heldStack, entity));
+
+        // Bartering counts once the piglin has taken the gold: it refuses while busy, hostile or
+        // already admiring something, so look at its off hand a tick later.
+        if (entity instanceof Piglin piglin && heldStack.is(Items.GOLD_INGOT) && !piglin.getOffhandItem().is(Items.GOLD_INGOT)) {
+            later(server, () -> {
+                if (piglin.isAlive() && piglin.getOffhandItem().is(Items.GOLD_INGOT)) {
+                    claimForPlayer(player, goal -> "barter_with_piglin".equals(goal.id()));
+                }
+            });
+        }
+    }
+
+    // ---- events reported by vanilla (see mixin/LockoutTriggerMixins, LockoutRespawnMixin) ----
+
+    /** An animal was tamed (wolf, cat, horse, ...). */
+    public static void onAnimalTamed(ServerPlayer player, net.minecraft.world.entity.animal.Animal animal) {
+        claimForPlayer(player, goal -> switch (goal.id()) {
+            case "tame_wolf" -> animal.getType() == net.minecraft.world.entity.EntityTypes.WOLF;
+            case "tame_cat" -> animal.getType() == net.minecraft.world.entity.EntityTypes.CAT;
+            case "tame_horse" -> animal.getType() == net.minecraft.world.entity.EntityTypes.HORSE;
+            default -> false;
+        });
+    }
+
+    /** Two animals were bred; {@code parent} is one of the pair. */
+    public static void onAnimalsBred(ServerPlayer player, net.minecraft.world.entity.animal.Animal parent) {
+        net.minecraft.world.entity.EntityType<?> type = parent.getType();
+        claimForPlayer(player, goal -> switch (goal.id()) {
+            case "breed_animals" -> true;
+            case "breed_cows" -> type == net.minecraft.world.entity.EntityTypes.COW;
+            case "breed_sheep" -> type == net.minecraft.world.entity.EntityTypes.SHEEP;
+            case "breed_pigs" -> type == net.minecraft.world.entity.EntityTypes.PIG;
+            case "breed_chickens" -> type == net.minecraft.world.entity.EntityTypes.CHICKEN;
+            default -> false;
+        });
+    }
+
+    /** A trade with a villager or a wandering trader went through. */
+    public static void onTrade(ServerPlayer player, net.minecraft.world.entity.npc.villager.AbstractVillager merchant, ItemStack result) {
+        claimForPlayer(player, goal -> matchesTradeGoal(goal, result, merchant));
+    }
+
+    /** The player's respawn point moved to a new bed or respawn anchor. */
+    public static void onRespawnPointSet(ServerPlayer player) {
+        claimForPlayer(player, goal -> "set_spawn".equals(goal.id()));
+    }
+
+    /** Claims the first open goal the player's team can claim that matches. */
+    private static void claimForPlayer(ServerPlayer player, Predicate<LockoutBingoGoal> matcher) {
+        if (!active) {
+            return;
+        }
+        MinecraftServer server = player.level().getServer();
+        if (server == null) {
+            return;
+        }
+        LockoutBingoSavedData data = getData(server);
+        ensureCurrentRun(server, data);
+        if (!data.isStarted() || data.isEnded() || data.getTeam(player.getUUID()) == null) {
+            return;
+        }
+        claimFirstMatchingGoal(server, data, player, matcher);
+    }
+
+    // ---- checks that have to wait a tick -------------------------------------------------------
+
+    private record PendingCheck(long dueTick, Runnable check) {
+    }
+
+    private static final List<PendingCheck> PENDING = new ArrayList<>();
+
+    /** Runs {@code check} on the next server tick (the server's own execute would run it at once). */
+    private static void later(MinecraftServer server, Runnable check) {
+        PENDING.add(new PendingCheck(server.getTickCount() + 1L, check));
+    }
+
+    private static void runPendingChecks(MinecraftServer server) {
+        if (PENDING.isEmpty()) {
+            return;
+        }
+        long now = server.getTickCount();
+        List<PendingCheck> due = new ArrayList<>();
+        PENDING.removeIf(p -> {
+            if (p.dueTick() <= now) {
+                due.add(p);
+                return true;
+            }
+            return false;
+        });
+        due.forEach(p -> p.check().run());
     }
 
     private static void handlePlayerDamage(ServerPlayer player, DamageSource damageSource, float damageTaken) {
@@ -502,11 +625,9 @@ public final class Chal_40_LockoutBingo {
                     && !heldStack.is(ItemTags.CANDLES)
                     && player.canEat(false)
                     && !Chal_39_NoFood.isActive();
-            case "use_lectern", "use_grindstone", "use_stonecutter", "use_cartography_table", "use_smithing_table", "use_loom", "ring_bell" ->
-                    BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals(goal.primaryTarget());
-            case "light_campfire" -> state.getBlock() instanceof CampfireBlock
-                    && !state.getValue(CampfireBlock.LIT)
-                    && (heldStack.is(Items.FLINT_AND_STEEL) || heldStack.is(Items.FIRE_CHARGE));
+            // The work blocks and the bell count through the game's own statistics (see
+            // readInteractStat), which it only awards when the block really opened or rang; the
+            // campfire is checked a tick after the click.
             default -> false;
         };
     }
@@ -517,9 +638,9 @@ public final class Chal_40_LockoutBingo {
         }
 
         return switch (goal.id()) {
-            case "milk_cow" -> entity instanceof Cow && heldStack.is(Items.BUCKET);
-            case "shear_sheep" -> entity instanceof Sheep sheep && heldStack.is(Items.SHEARS) && !sheep.isSheared();
-            case "barter_with_piglin" -> entity instanceof Piglin piglin && !piglin.isBaby() && heldStack.is(Items.GOLD_INGOT);
+            // Calves give no milk, and a shorn or baby sheep has no wool.
+            case "milk_cow" -> entity instanceof Cow cow && !cow.isBaby() && heldStack.is(Items.BUCKET);
+            case "shear_sheep" -> entity instanceof Sheep sheep && heldStack.is(Items.SHEARS) && sheep.readyForShearing();
             default -> false;
         };
     }
@@ -717,7 +838,7 @@ public final class Chal_40_LockoutBingo {
     private static boolean usesStatBaseline(LockoutBingoGoal goal) {
         return switch (goal.type()) {
             case CRAFT, TRADE, FISHING, ACTION, ENCHANT -> true;
-            case INTERACT -> goal.id().startsWith("breed_");
+            case INTERACT -> goal.id().startsWith("use_") || "ring_bell".equals(goal.id()) || "sleep_in_bed".equals(goal.id());
             case CONSUME -> !"eat_cake_slice".equals(goal.id());
             default -> false;
         };
@@ -850,14 +971,20 @@ public final class Chal_40_LockoutBingo {
     }
 
     private static int readInteractStat(ServerPlayer player, LockoutBingoGoal goal) {
-        return switch (goal.id()) {
-            case "breed_animals" -> player.getStats().getValue(Stats.CUSTOM.get(Stats.ANIMALS_BRED));
-            case "breed_cows" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:cow") ? 1 : 0;
-            case "breed_sheep" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:sheep") ? 1 : 0;
-            case "breed_pigs" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:pig") ? 1 : 0;
-            case "breed_chickens" -> hasAdvancementCriterion(player, "minecraft:husbandry/bred_all_animals", "minecraft:chicken") ? 1 : 0;
-            default -> 0;
+        // The game awards these the moment the block's screen opens, the bell rings or the
+        // player lies down — not for a click that did nothing (sneaking with a block in hand).
+        Identifier stat = switch (goal.id()) {
+            case "use_lectern" -> Stats.INTERACT_WITH_LECTERN;
+            case "use_grindstone" -> Stats.INTERACT_WITH_GRINDSTONE;
+            case "use_stonecutter" -> Stats.INTERACT_WITH_STONECUTTER;
+            case "use_cartography_table" -> Stats.INTERACT_WITH_CARTOGRAPHY_TABLE;
+            case "use_smithing_table" -> Stats.INTERACT_WITH_SMITHING_TABLE;
+            case "use_loom" -> Stats.INTERACT_WITH_LOOM;
+            case "ring_bell" -> Stats.BELL_RING;
+            case "sleep_in_bed" -> Stats.SLEEP_IN_BED;
+            default -> null;
         };
+        return stat == null ? 0 : player.getStats().getValue(Stats.CUSTOM.get(stat));
     }
 
     private static int sumItemStats(ServerPlayer player, List<String> itemIds, StatKind kind) {
@@ -960,8 +1087,10 @@ public final class Chal_40_LockoutBingo {
 
     private static boolean matchesPassiveInteractGoal(ServerPlayer player, LockoutBingoGoal goal) {
         return switch (goal.id()) {
-            case "sleep_in_bed" -> player.isSleeping();
-            case "breed_animals", "breed_cows", "breed_sheep", "breed_pigs", "breed_chickens" -> hasAdvancedStat(getData(player.level().getServer()), player, goal);
+            case "sleep_in_bed" -> player.isSleeping() || hasAdvancedStat(getData(player.level().getServer()), player, goal);
+            case "use_lectern", "use_grindstone", "use_stonecutter", "use_cartography_table", "use_smithing_table", "use_loom", "ring_bell" ->
+                    hasAdvancedStat(getData(player.level().getServer()), player, goal);
+            case "sleep_in_village_bed" -> player.isSleeping() && player.getSleepingPos().map(pos -> isInVillage(player, pos)).orElse(false);
             case "ride_horse" -> player.getVehicle() instanceof Horse;
             case "ride_pig" -> player.getVehicle() instanceof Pig;
             case "ride_strider" -> player.getVehicle() instanceof Strider;
@@ -1013,7 +1142,7 @@ public final class Chal_40_LockoutBingo {
         }
 
         return switch (goal.id()) {
-            case "trade_with_villager" -> true;
+            case "trade_with_villager" -> true; // wandering traders too, as the game's own trade statistic counts them
             case "obtain_emerald_by_trade", "buy_bread", "buy_arrows", "buy_lapis" -> itemStackMatchesTarget(stack, goal.primaryTarget());
             case "trade_with_librarian", "trade_with_armorer", "trade_with_farmer", "trade_with_cleric", "trade_with_toolsmith", "trade_with_fletcher" ->
                     merchant instanceof Villager villager && villagerMatchesProfession(villager, goal.primaryTarget());
@@ -1045,25 +1174,6 @@ public final class Chal_40_LockoutBingo {
 
         AdvancementHolder advancement = server.getAdvancements().get(Identifier.parse(advancementId));
         return advancement != null && player.getAdvancements().getOrStartProgress(advancement).isDone();
-    }
-
-    private static boolean hasAdvancementCriterion(ServerPlayer player, String advancementId, String criterionId) {
-        MinecraftServer server = player.level().getServer();
-        if (server == null) {
-            return false;
-        }
-
-        AdvancementHolder advancement = server.getAdvancements().get(Identifier.parse(advancementId));
-        if (advancement == null) {
-            return false;
-        }
-
-        for (String obtainedCriterion : player.getAdvancements().getOrStartProgress(advancement).getCompletedCriteria()) {
-            if (criterionId.equals(obtainedCriterion)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static boolean matchesStatusGoal(ServerPlayer player, LockoutBingoGoal goal) {
@@ -1131,6 +1241,15 @@ public final class Chal_40_LockoutBingo {
                  "minecraft:abandoned_camp" -> true;
             default -> false;
         };
+    }
+
+    /** Whether a position lies in a piece of a village (its houses, farms and paths). */
+    private static boolean isInVillage(ServerPlayer player, BlockPos pos) {
+        if (!(player.level() instanceof ServerLevel world)) {
+            return false;
+        }
+        StructureStart start = world.structureManager().getStructureWithPieceAt(pos, net.minecraft.tags.StructureTags.VILLAGE);
+        return start != null && start != StructureStart.INVALID_START && start.isValid();
     }
 
     private static boolean hasPoweredPressurePlateNear(ServerPlayer player) {

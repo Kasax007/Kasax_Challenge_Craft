@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "challengecraft:block/plinko_board"
+    },
+    "facing=east": {
+      "model": "challengecraft:block/plinko_board",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "challengecraft:block/plinko_board",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "challengecraft:block/plinko_board",
+      "y": 270
+    }
+  }
+}

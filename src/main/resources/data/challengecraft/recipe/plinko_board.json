@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:gold_ingot",
+    "L": "minecraft:lapis_block",
+    "N": "minecraft:iron_nugget",
+    "P": "#minecraft:planks"
+  },
+  "pattern": [
+    "PNP",
+    "NLN",
+    "IGI"
+  ],
+  "result": {
+    "id": "challengecraft:plinko_board"
+  }
+}

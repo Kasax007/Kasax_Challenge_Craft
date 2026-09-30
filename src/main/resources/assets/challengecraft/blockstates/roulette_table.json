@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "challengecraft:block/roulette_table_0_0"
+    },
+    "facing=east": {
+      "model": "challengecraft:block/roulette_table_0_0",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "challengecraft:block/roulette_table_0_0",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "challengecraft:block/roulette_table_0_0",
+      "y": 270
+    }
+  }
+}

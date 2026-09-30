@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.kasax.challengecraft.block.InfiniteChestScreenHandler;
 import net.kasax.challengecraft.network.InfiniteChestClickPayload;
@@ -191,7 +192,10 @@ public class InfiniteChestScreen extends AbstractContainerScreen<InfiniteChestSc
                 // Screen.hasShiftDown() is gone; the modifier now travels on the event itself
                 // (MouseButtonEvent implements InputWithModifiers).
                 boolean shift = event.hasShiftDown();
-                ClientPlayNetworking.send(new InfiniteChestClickPayload(menu.getPos(), entry.stack(), event.button(), shift));
+                // The server reads 1 as "right-click: take one" and anything else as a full stack. 26.3
+                // numbers the buttons the SDL way (left = 1, right = 3), so send the old meaning.
+                int button = event.button() == InputConstants.MOUSE_BUTTON_RIGHT ? 1 : 0;
+                ClientPlayNetworking.send(new InfiniteChestClickPayload(menu.getPos(), entry.stack(), button, shift));
                 return true;
             }
         }
@@ -201,7 +205,7 @@ public class InfiniteChestScreen extends AbstractContainerScreen<InfiniteChestSc
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.button() == 0) {
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
             this.scrolling = false;
         }
         return super.mouseReleased(event);

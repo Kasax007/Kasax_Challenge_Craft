@@ -25,6 +25,8 @@ import java.util.List;
 /** Applies saved challenge settings and keeps server/client challenge flags in sync. */
 public class ChallengeManager {
     public static final Logger LOGGER = LoggerFactory.getLogger(ChallengeCraft.MOD_ID);
+    /** Highest challenge id. Screens that walk every challenge loop up to this, so a new one is one edit. */
+    public static final int MAX_CHALLENGE_ID = 50;
     private static List<Integer> PRE_LOADED_PERKS = new ArrayList<>();
     /** Countdown to the follow-up sync after a join; 0 = idle. */
     private static int resyncDelayTicks = 0;
@@ -171,6 +173,7 @@ public class ChallengeManager {
             case 47 -> 8.0;  // Cushion Only (every move is place + sit; harsher than Dice's budget)
             case 49 -> 12.0; // All Biomes (every Overworld, Nether and End biome; like All Achievements)
             case 48 -> 3.0;  // Red Light, Green Light (lethal, but warned by yellow and fair to knockback)
+            case 50 -> 2.5;  // The House Always Wins (rising fee, loss waves, death tax; bankrupt = run lost)
             default -> 0.0;
         };
     }
@@ -232,7 +235,9 @@ public class ChallengeManager {
             new int[]{47, 45}, // + Force Item Battle (race minigame)
             new int[]{49, 11}, // All Biomes + Skyblock (no terrain to walk to any biome)
             new int[]{49, 40}, // All Biomes + Lockout Bingo (minigame)
-            new int[]{49, 45}  // All Biomes + Force Item Battle (minigame)
+            new int[]{49, 45}, // All Biomes + Force Item Battle (minigame)
+            new int[]{50, 40}, // House Always Wins + Lockout Bingo (minigame)
+            new int[]{50, 45}  // House Always Wins + Force Item Battle (the target item could simply be bought)
     );
 
     public static boolean hasConflict(List<Integer> ids, List<Integer> perks) {
@@ -681,6 +686,7 @@ public class ChallengeManager {
         if (net.kasax.challengecraft.challenges.Chal_47_CushionOnly.isActive()) ids.add(47);
         if (net.kasax.challengecraft.challenges.Chal_48_RedLight.isActive()) ids.add(48);
         if (net.kasax.challengecraft.challenges.Chal_49_AllBiomes.isActive()) ids.add(49);
+        if (net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins.isActive()) ids.add(50);
         return ids;
     }
 
@@ -734,6 +740,7 @@ public class ChallengeManager {
         net.kasax.challengecraft.challenges.Chal_47_CushionOnly.setActive(active);
         net.kasax.challengecraft.challenges.Chal_48_RedLight.setActive(active);
         net.kasax.challengecraft.challenges.Chal_49_AllBiomes.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerLevel world, ChallengeSavedData data) {
@@ -855,6 +862,18 @@ public class ChallengeManager {
                     net.kasax.challengecraft.challenges.Chal_49_AllBiomes.syncToAll(world.getServer());
                 }
                 LOGGER.info("Challenge 49 ON");
+            }
+            case 50 -> {
+                net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins.setActive(true);
+                // Switched on in a running world: wallets, booth and HUD should not wait for a rejoin.
+                if (world != null && world.getServer() != null) {
+                    net.minecraft.server.MinecraftServer server = world.getServer();
+                    server.execute(() -> {
+                        net.kasax.challengecraft.casino.CasinoDevices.syncAll(server);
+                        net.kasax.challengecraft.casino.CasinoEconomy.syncAll(server);
+                    });
+                }
+                LOGGER.info("Challenge 50 ON");
             }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }

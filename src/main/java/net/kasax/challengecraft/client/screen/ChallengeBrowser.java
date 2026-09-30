@@ -53,7 +53,7 @@ public final class ChallengeBrowser {
         return switch (id) {
             case 2, 3, 4, 14, 15, 34, 44 -> Category.DROPS;
             case 5, 7, 21, 23, 24, 27, 28, 29, 32, 35, 39, 41, 42, 43, 46, 47, 48 -> Category.COMBAT;
-            case 10, 13, 16, 17, 18, 19, 20, 33, 36, 37 -> Category.CHAOS;
+            case 10, 13, 16, 17, 18, 19, 20, 33, 36, 37, 50 -> Category.CHAOS;
             default -> Category.WORLD;
         };
     }

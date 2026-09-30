@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "challengecraft:block/cashier_counter"
+    },
+    "facing=east": {
+      "model": "challengecraft:block/cashier_counter",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "challengecraft:block/cashier_counter",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "challengecraft:block/cashier_counter",
+      "y": 270
+    }
+  }
+}
