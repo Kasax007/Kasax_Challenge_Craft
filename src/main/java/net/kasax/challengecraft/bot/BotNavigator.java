@@ -28,6 +28,8 @@ public final class BotNavigator {
     private Predicate<BlockPos> goal;
     private BlockPos target;
     private List<BotPathfinder.Step> path;
+    private BlockPos bankDig;
+    private int bankTicks;
     private int index, stuck, replans;
     private double lastDistance;
     private Status status = Status.IDLE;
@@ -65,12 +67,23 @@ public final class BotNavigator {
     }
 
     public void stop() {
+        bankDig = null;
         // Only abandon a dig the navigator itself started; the caller may be mining on its own.
         if (status == Status.MOVING) actions.reset();
         goal = null;
         path = null;
         status = Status.IDLE;
         bot.stopInputs();
+    }
+
+    /** The current step, for the status command. */
+    public String debug() {
+        if (path == null) return "no path";
+        if (index >= path.size()) return "path done";
+        BotPathfinder.Step st = path.get(index);
+        return "step " + index + "/" + path.size() + " to " + st.to().toShortString() + (st.breaks().isEmpty() ? "" : " breaking " + st.breaks())
+                + (st.place() == null ? "" : " placing") + " y " + String.format("%.2f", bot.getY()) + " water " + bot.isInWater()
+                + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans;
     }
 
     public BlockPos feet() {
@@ -114,6 +127,30 @@ public final class BotNavigator {
             return status;
         }
         BlockPos to = step.to();
+        // Out of the water onto a bank a full block above the water: vanilla's hop only clears it
+        // with luck. After a few tries, dig a step into the bank at water height, as players do.
+        // Bobbing at the bank: in the water or just above it, against the bank, below the step.
+        boolean overWater = bot.isInWater() || !bot.onGround() && !bot.level().getFluidState(feet.below()).isEmpty();
+        if (overWater && bot.horizontalCollision && to.getY() > bot.getY()) bankTicks++;
+        if (bankDig == null && bankTicks > 40) {
+            BlockPos bank = to.below();
+            if (!bot.level().getBlockState(bank).getCollisionShape(bot.level(), bank).isEmpty()
+                    && !bot.level().getBlockState(bank.below()).getCollisionShape(bot.level(), bank.below()).isEmpty()
+                    && actions.inReach(bank) && bot.level().getBlockState(bank).getDestroySpeed(bot.level(), bank) >= 0) {
+                bankDig = bank;
+            }
+        }
+        if (bankDig != null) {
+            bot.stopInputs();
+            bot.jump = true; // stay up at the surface while digging
+            if (!actions.inReach(bankDig) || actions.breakTick(bankDig)) {
+                path.set(index, new BotPathfinder.Step(bankDig, List.of(), null));
+                bankDig = null;
+                bankTicks = 0;
+                stuck = 0;
+            }
+            return status;
+        }
         Vec3 aim = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
         double dx = aim.x - bot.getX(), dz = aim.z - bot.getZ();
         double flat = Math.sqrt(dx * dx + dz * dz);
@@ -146,6 +183,7 @@ public final class BotNavigator {
 
     private void advance() {
         index++;
+        bankTicks = 0;
         stuck = 0;
         lastDistance = Double.MAX_VALUE;
     }

@@ -129,11 +129,50 @@ final class BotCommands {
                                         .suggests((c, b) -> SharedSuggestionProvider.suggest(new String[]{"easy", "normal", "hard"}, b))
                                         .executes(ctx -> lockout(ctx, LockoutBrain.Difficulty.valueOf(
                                                 StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT)))))))
+                        .then(Commands.literal("biome").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("id", StringArgumentType.word()).executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.GoToBiomeTask(Identifier.parse(ns(StringArgumentType.getString(ctx, "id")))));
+                                    return 1;
+                                }))))
+                        .then(Commands.literal("structure").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("id", StringArgumentType.word()).executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.VisitStructureTask(bot.body().level(), ns(StringArgumentType.getString(ctx, "id"))));
+                                    return 1;
+                                }))))
+                        .then(Commands.literal("milk").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.UseOnMobTask(net.minecraft.world.entity.EntityTypes.COW, Items.BUCKET, e -> !e.isBaby()));
+                                    return 1;
+                                })))
+                        .then(Commands.literal("surface").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.SurfaceTask());
+                                    return 1;
+                                })))
+                        .then(Commands.literal("senses").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.senses().refresh();
+                                    bot.senses().tick(bot.body());
+                                    ok(ctx, bot.name + " sees biomes " + bot.senses().biomes().keySet().stream().map(Identifier::getPath).sorted().toList()
+                                            + ", structures " + bot.senses().structures().keySet().stream().map(Identifier::getPath).sorted().toList()
+                                            + ", loot chests " + bot.senses().lootables().size());
+                                    return 1;
+                                })))
                         .then(Commands.literal("status").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     Bot bot = bot(ctx);
                                     if (bot == null) return 0;
-                                    ok(ctx, bot.name + " at " + bot.body().blockPosition().toShortString() + ", nav " + bot.navigator().status() + ":" + bot.status());
+                                    ok(ctx, bot.name + " at " + bot.body().blockPosition().toShortString() + ", nav " + bot.navigator().status() + " (" + bot.navigator().debug() + "):" + bot.status());
                                     return 1;
                                 })))
                         .then(Commands.literal("inv").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
@@ -166,6 +205,11 @@ final class BotCommands {
         bot.setBrain(new LockoutBrain(difficulty));
         ok(ctx, bot.name + " plays Lockout (" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")");
         return 1;
+    }
+
+    /** Ids typed without a namespace are Minecraft's. */
+    private static String ns(String id) {
+        return id.contains(":") ? id : "minecraft:" + id;
     }
 
     private static Bot bot(CommandContext<CommandSourceStack> ctx) {

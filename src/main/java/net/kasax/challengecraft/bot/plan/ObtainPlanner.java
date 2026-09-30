@@ -74,9 +74,12 @@ public final class ObtainPlanner {
     private Map<Block, Double> visibleBlocks = Map.of();
     private Map<EntityType<?>, Double> visibleMobs = Map.of();
     private boolean dark;
+    /** Blocks typical of a biome in view, with the walk there. */
+    private Map<Block, Double> biomeHints = Map.of();
     private long scannedAt = -10_000, costsAt = -1;
     private Map<Item, Double> costs = Map.of();
     private boolean craftOnly;
+    private Set<Item> assumeHeld = Set.of();
     private Set<Item> keep = Set.of();
 
     /**
@@ -124,6 +127,45 @@ public final class ObtainPlanner {
         } finally {
             this.craftOnly = false;
             this.keep = Set.of();
+        }
+    }
+
+    /**
+     * What the bot would hold after getting these, that it does not hold now: the items and
+     * everything made on the way (tools, a furnace, leftovers). Empty if it cannot plan it.
+     */
+    public Set<Item> yields(Bot bot, Collection<Item> items, int count, boolean craftOnly) {
+        refresh(bot);
+        this.craftOnly = craftOnly;
+        try {
+            Sim sim = Sim.of(bot.body());
+            Map<Item, Integer> before = new IdentityHashMap<>(sim.inv);
+            if (expand(bot, sim, Set.copyOf(items), count, 0, new HashSet<>()) != null) return Set.of();
+            Set<Item> out = new HashSet<>();
+            sim.inv.forEach((i, n) -> {
+                if (n > before.getOrDefault(i, 0)) out.add(i);
+            });
+            return out;
+        } finally {
+            this.craftOnly = false;
+        }
+    }
+
+    /**
+     * Runs {@code what} as if the bot also held {@code held} (to weigh what one goal would do for
+     * the next ones).
+     */
+    public <T> T assuming(Bot bot, Set<Item> held, java.util.function.Supplier<T> what) {
+        refresh(bot);
+        Map<Item, Double> saved = costs;
+        Set<Item> savedHeld = assumeHeld;
+        assumeHeld = held;
+        costs = computeCosts(bot);
+        try {
+            return what.get();
+        } finally {
+            assumeHeld = savedHeld;
+            costs = saved;
         }
     }
 
@@ -204,6 +246,16 @@ public final class ObtainPlanner {
         }
         visibleMobs = mobs;
         dark = level.isDarkOutside();
+        // Biomes in view: what they are known for is a walk away.
+        Map<Block, Double> hints = new IdentityHashMap<>();
+        for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
+            double walk = 6 + Math.sqrt(e.getValue().distSqr(c)) / 4.0;
+            for (String id : BotKnowledge.typicalOf(e.getKey().getPath())) {
+                Block b = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id));
+                if (b != net.minecraft.world.level.block.Blocks.AIR) hints.merge(b, walk, Math::min);
+            }
+        }
+        biomeHints = hints;
         costs = computeCosts(bot);
     }
 
@@ -236,7 +288,7 @@ public final class ObtainPlanner {
     }
 
     private double rawCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
-        if (net.kasax.challengecraft.bot.BotInventory.count(bot.body(), item) > 0) return 0;
+        if (assumeHeld.contains(item) || net.kasax.challengecraft.bot.BotInventory.count(bot.body(), item) > 0) return 0;
         double best = INF;
         for (BotKnowledge.Drop d : k.blocksDropping(item)) {
             double c = blockCost(bot, k, d.block(), cost) / Math.max(0.05, d.count());
@@ -252,7 +304,10 @@ public final class ObtainPlanner {
         BlockState s = block.defaultBlockState();
         if (isMissing(block)) return INF;
         Double seen = visibleBlocks.get(block);
-        double find = seen != null ? Math.min(seen, BotKnowledge.rarity(block)) : BotKnowledge.rarity(block);
+        double find = BotKnowledge.rarity(block);
+        if (seen != null) find = Math.min(find, seen);
+        Double hint = biomeHints.get(block);
+        if (hint != null) find = Math.min(find, hint + 10); // + finding it there
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         return find + breakSeconds + toolCost(bot, k, block, cost);
     }
@@ -397,13 +452,28 @@ public final class ObtainPlanner {
                 Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElseThrow();
                 Integer depth = BotKnowledge.depth(common, bot.body().blockPosition().getY());
                 yield new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
-                        countAny(bot.body(), p.accept()) + total, depth);
+                        countAny(bot.body(), p.accept()) + total, depth, lead(bot, blocks));
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);
             case SMELT -> new SmeltTask((BotKnowledge.SmeltRoute) p.data(), total);
             default -> throw new IllegalStateException();
         };
+    }
+
+    /** The nearest biome in view known for one of these blocks, if none of them is in sight. */
+    private BlockPos lead(Bot bot, Set<Block> blocks) {
+        for (Block b : blocks) if (visibleBlocks.containsKey(b)) return null;
+        BlockPos from = bot.body().blockPosition(), best = null;
+        for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
+            boolean known = false;
+            for (String id : BotKnowledge.typicalOf(e.getKey().getPath())) {
+                Block b = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id));
+                if (blocks.contains(b)) known = true;
+            }
+            if (known && (best == null || e.getValue().distSqr(from) < best.distSqr(from))) best = e.getValue();
+        }
+        return best;
     }
 
     /** Plays getting {@code count} of {@code accept} through on {@code sim}; null if it works out, else why not. */

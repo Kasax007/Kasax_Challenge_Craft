@@ -213,6 +213,36 @@ public final class BotKnowledge {
     }
 
     /**
+     * Blocks a biome is known for (by a word in the biome's name): once such a biome is in view,
+     * finding them is a walk there rather than luck.
+     */
+    public static List<String> typicalOf(String biome) {
+        List<String> out = new ArrayList<>();
+        if (biome.contains("desert")) out.addAll(List.of("sand", "cactus", "dead_bush", "sandstone"));
+        if (biome.contains("jungle")) out.addAll(List.of("jungle_log", "cocoa", "melon", "bamboo", "vine"));
+        if (biome.contains("swamp")) out.addAll(List.of("lily_pad", "clay", "vine", "blue_orchid", "mud", "mangrove_log"));
+        if (biome.contains("snowy") || biome.contains("frozen") || biome.contains("ice")) out.addAll(List.of("snow", "snow_block", "ice", "packed_ice"));
+        if (biome.contains("savanna")) out.addAll(List.of("acacia_log"));
+        if (biome.contains("dark_forest")) out.addAll(List.of("dark_oak_log", "brown_mushroom", "red_mushroom"));
+        if (biome.contains("cherry")) out.addAll(List.of("cherry_log", "pink_petals"));
+        if (biome.contains("badlands")) out.addAll(List.of("terracotta", "red_sand", "red_sandstone", "gold_ore"));
+        if (biome.contains("ocean") || biome.contains("river")) out.addAll(List.of("sand", "clay", "kelp_plant", "kelp", "seagrass", "gravel", "sugar_cane"));
+        if (biome.contains("beach")) out.addAll(List.of("sand", "sugar_cane"));
+        if (biome.contains("mushroom")) out.addAll(List.of("brown_mushroom", "red_mushroom", "mycelium"));
+        if (biome.contains("taiga")) out.addAll(List.of("spruce_log", "sweet_berry_bush", "fern", "podzol"));
+        if (biome.contains("birch")) out.addAll(List.of("birch_log"));
+        if (biome.contains("flower")) out.addAll(List.of("allium", "azure_bluet", "cornflower", "lily_of_the_valley", "oxeye_daisy", "orange_tulip", "red_tulip", "white_tulip", "pink_tulip"));
+        if (biome.contains("plains") || biome.contains("meadow")) out.addAll(List.of("oxeye_daisy", "azure_bluet", "cornflower"));
+        if (biome.contains("forest") && !biome.contains("dark")) out.addAll(List.of("lily_of_the_valley", "birch_log"));
+        if (biome.contains("lush")) out.addAll(List.of("moss_block", "azalea", "clay", "spore_blossom"));
+        if (biome.contains("dripstone")) out.addAll(List.of("pointed_dripstone", "dripstone_block"));
+        if (biome.contains("deep_dark")) out.addAll(List.of("sculk", "sculk_vein"));
+        if (biome.contains("peaks") || biome.contains("slopes") || biome.contains("grove")) out.addAll(List.of("snow_block", "ice", "packed_ice", "emerald_ore"));
+        if (biome.contains("dappled")) out.addAll(List.of("poplar_log"));
+        return out;
+    }
+
+    /**
      * The height to dig to for a block found underground (the most common height of an ore),
      * or null for blocks the bot looks for on the surface.
      */

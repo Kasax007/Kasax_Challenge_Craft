@@ -57,7 +57,9 @@ public final class LockoutBrain implements BotBrain {
     private final Map<String, Long> restUntil = new HashMap<>();
     private int targetIndex = -1;
     private String targetId;
-    private BotTask goalTask;
+    private BotTask goalTask, sideTask;
+    private String sideId;
+    private long nextChance;
     private int pause, checkTicks;
     private boolean joined;
 
@@ -78,27 +80,13 @@ public final class LockoutBrain implements BotBrain {
 
         LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bot.id);
         if (team == null) return;
-        record Choice(Chal_40_LockoutBingo.BoardTile tile, LockoutGoals.Option option) {
-        }
-        List<Choice> choices = new ArrayList<>();
-        for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
-            if (tile.claimedBy() != null) continue;
-            if (resting(tile.goal().id(), server.overworld().getGameTime())) continue;
-            if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
-            LockoutGoals.Option o;
-            try {
-                o = LockoutGoals.plan(bot, planner, tile.goal());
-            } catch (RuntimeException e) {
-                o = null;
-            }
-            if (o != null) choices.add(new Choice(tile, o));
-        }
+        List<Choice> choices = choices(bot, -1);
         if (choices.isEmpty()) {
             pause = 200; // nothing it can do now; look again in a while (tiles, time of day change)
             return;
         }
         choices.sort(Comparator.comparingDouble(c -> c.option().cost()));
-        Choice pick = choices.get(0);
+        Choice pick = difficulty == Difficulty.EASY ? choices.get(0) : lookAhead(bot, choices);
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
         }
@@ -110,9 +98,65 @@ public final class LockoutBrain implements BotBrain {
         bot.doNow(goalTask);
     }
 
+    private record Choice(Chal_40_LockoutBingo.BoardTile tile, LockoutGoals.Option option) {
+    }
+
+    /** Every open tile the bot knows how to do, with its way and effort from here. */
+    private List<Choice> choices(Bot bot, int except) {
+        MinecraftServer server = bot.server();
+        long now = server.overworld().getGameTime();
+        List<Choice> out = new ArrayList<>();
+        for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
+            if (tile.claimedBy() != null || tile.index() == except) continue;
+            if (resting(tile.goal().id(), now)) continue;
+            if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
+            LockoutGoals.Option o;
+            try {
+                o = LockoutGoals.plan(bot, planner, tile.goal());
+            } catch (RuntimeException e) {
+                o = null;
+            }
+            if (o != null) out.add(new Choice(tile, o));
+        }
+        return out;
+    }
+
+    /**
+     * Routes rather than single tiles: of the quickest few, the one that leaves the next tile
+     * quickest too (iron ingot first when the bucket and the shears are also on the board: the
+     * furnace and the iron are then already there). Scored as its own time plus half of the
+     * cheapest next tile's time, as if it held what this one leaves it.
+     */
+    private Choice lookAhead(Bot bot, List<Choice> sorted) {
+        Choice best = sorted.get(0);
+        double bestScore = Double.MAX_VALUE;
+        for (Choice c : sorted.subList(0, Math.min(5, sorted.size()))) {
+            Set<net.minecraft.world.item.Item> after = c.option().yields().get();
+            double next = planner.assuming(bot, after, () -> {
+                double min = Double.MAX_VALUE;
+                for (Choice o : sorted) {
+                    if (o == c) continue;
+                    LockoutGoals.Option again = LockoutGoals.plan(bot, planner, o.tile().goal());
+                    if (again != null) min = Math.min(min, again.cost());
+                }
+                return min == Double.MAX_VALUE ? 0 : min;
+            });
+            double score = c.option().cost() + 0.5 * next;
+            if (score < bestScore) {
+                bestScore = score;
+                best = c;
+            }
+        }
+        if (best != sorted.get(0)) {
+            bot.say("route: " + best.tile().goal().id() + " first, it makes the next ones quicker");
+        }
+        return best;
+    }
+
     @Override
     public void tick(Bot bot) {
         if (++checkTicks % 20 != 0 || targetIndex < 0) return;
+        if (checkTicks % 40 == 0 && sideTask == null) takeChances(bot);
         MinecraftServer server = bot.server();
         if (!Chal_40_LockoutBingo.isRunning(server)) {
             drop(bot);
@@ -130,8 +174,43 @@ public final class LockoutBrain implements BotBrain {
         }
     }
 
+    /**
+     * What a player does on the way: a loot chest in a structure it passes (shipwreck, ruined
+     * portal, temple: iron, gold, flint and steel, obsidian, food), or another tile that has become
+     * a matter of seconds right here (the cow for "milk a cow" walking by, the sugar cane at the
+     * river bank). Done in between, then back to the goal.
+     */
+    private void takeChances(Bot bot) {
+        if (bot.current() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        java.util.List<net.minecraft.core.BlockPos> chests = bot.senses().lootables();
+        if (!chests.isEmpty() && chests.get(0).distSqr(bot.body().blockPosition()) < 32 * 32) {
+            sideTask = new net.kasax.challengecraft.bot.task.LootTask(chests.get(0));
+            bot.say("on the way: a loot chest");
+            bot.interject(sideTask);
+            return;
+        }
+        if (bot.body().level().getGameTime() < nextChance) return;
+        nextChance = bot.body().level().getGameTime() + 200;
+        for (Choice c : choices(bot, targetIndex)) {
+            if (c.option().cost() < 12) {
+                sideTask = c.option().task().get();
+                if (sideTask == null) continue;
+                sideId = c.tile().goal().id();
+                bot.say("on the way: " + c.tile().goal().title().getString() + " (~" + Math.round(c.option().cost()) + " s)");
+                bot.interject(sideTask);
+                return;
+            }
+        }
+    }
+
     @Override
     public void finished(Bot bot, BotTask task, boolean success) {
+        if (task == sideTask) {
+            if (!success && sideId != null) restUntil.put(sideId, bot.body().level().getGameTime() + REST_TICKS);
+            sideTask = null;
+            sideId = null;
+            return;
+        }
         if (task != goalTask) return;
         long now = bot.body().level().getGameTime();
         if (success) {
@@ -159,6 +238,7 @@ public final class LockoutBrain implements BotBrain {
     public void respawned(Bot bot) {
         targetIndex = -1;
         goalTask = null;
+        sideTask = null;
     }
 
     private boolean resting(String goalId, long now) {
@@ -169,6 +249,8 @@ public final class LockoutBrain implements BotBrain {
     private void drop(Bot bot) {
         targetIndex = -1;
         goalTask = null;
+        sideTask = null;
+        sideId = null;
         bot.clearTasks();
     }
 

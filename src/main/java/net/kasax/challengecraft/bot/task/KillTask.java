@@ -38,7 +38,7 @@ public final class KillTask implements BotTask {
     private LivingEntity target;
     private BlockPos deathSpot;
     private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
-    private net.minecraft.core.Direction heading;
+    private final Explorer explorer = new Explorer(2400);
     private boolean walking;
 
     /** {@code loot} may be empty when only the kill matters (then {@code kills} counts). */
@@ -88,6 +88,7 @@ public final class KillTask implements BotTask {
             target = nearest(body, level);
             chaseTicks = 0;
             if (target == null) return explore(bot);
+            explorer.pause(bot);
             if (walking) bot.navigator().stop();
             walking = false;
             equipWeapon(bot);
@@ -181,26 +182,11 @@ public final class KillTask implements BotTask {
         return dmg[0];
     }
 
-    /** None in sight: walk out in one direction (turning when blocked) for up to two minutes. */
+    /** None in sight: walk out (up from a mine first) for up to two minutes. */
     private Result explore(Bot bot) {
-        if (++exploreTicks > 2400 || explores > 40) {
-            bot.say("found no " + describeTypes());
-            return Result.FAILED;
-        }
-        if (heading == null) heading = net.minecraft.core.Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
-        if (!walking) {
-            explores++;
-            BlockPos p = bot.body().blockPosition().relative(heading, 40).relative(heading.getClockWise(), bot.body().getRandom().nextInt(21) - 10);
-            bot.navigator().goNear(bot.body().level().getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
-            walking = true;
-        }
-        BotNavigator.Status s = bot.navigator().tick();
-        if (s != BotNavigator.Status.MOVING) {
-            walking = false;
-            if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
-        }
-        // Look for them once a second, not every tick.
-        return Result.RUNNING;
+        Result r = explorer.tick(bot);
+        if (r == Result.FAILED) bot.say("found no " + describeTypes());
+        return r;
     }
 
     private String describeTypes() {

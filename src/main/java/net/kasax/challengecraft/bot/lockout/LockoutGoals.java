@@ -4,6 +4,13 @@ import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.BotWorld;
 import net.kasax.challengecraft.bot.plan.ObtainPlanner;
+import net.kasax.challengecraft.bot.BotSenses;
+import net.kasax.challengecraft.bot.task.GoToBiomeTask;
+import net.kasax.challengecraft.bot.task.MineTask;
+import net.kasax.challengecraft.bot.task.UseOnMobTask;
+import net.kasax.challengecraft.bot.task.VisitStructureTask;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.EntityTypes;
 import net.kasax.challengecraft.bot.task.ConsumeTask;
 import net.kasax.challengecraft.bot.task.EquipTask;
 import net.kasax.challengecraft.bot.task.KillTask;
@@ -41,8 +48,15 @@ public final class LockoutGoals {
     private LockoutGoals() {
     }
 
-    /** A way to do a goal: the estimated effort in seconds and how to make the task when chosen. */
-    public record Option(double cost, Supplier<BotTask> task) {
+    /**
+     * A way to do a goal: the estimated effort in seconds, how to make the task when chosen, and
+     * what the bot will hold afterwards (the goal's items and everything made on the way: the
+     * furnace, the pickaxe, spare iron), for planning which goal to do next.
+     */
+    public record Option(double cost, Supplier<BotTask> task, Supplier<Set<Item>> yields) {
+        Option(double cost, Supplier<BotTask> task) {
+            this(cost, task, Set::of);
+        }
     }
 
     private static final double INF = 1e9;
@@ -66,6 +80,87 @@ public final class LockoutGoals {
                     ? equip(bot, planner, items(goal.targets()), goal.amount()) : null;
             case INVENTORY_SET -> collectDistinct(bot, planner, items(goal.targets()), goal.amount());
             case INTERACT -> interact(bot, planner, goal.id());
+            case BIOME -> biome(bot, goal);
+            case STRUCTURE -> structure(bot, goal);
+            case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
+            case ADVANCEMENT -> advancement(bot, planner, goal.id());
+            default -> null;
+        };
+    }
+
+    // ---- places -------------------------------------------------------------------------------
+
+    private static boolean overworld(Bot bot) {
+        return bot.body().level().dimension() == Level.OVERWORLD;
+    }
+
+    /** Biomes: a walk if one is in view; otherwise exploring, longer the rarer the biome. */
+    private static Option biome(Bot bot, LockoutBingoGoal goal) {
+        Identifier id = Identifier.parse(goal.primaryTarget());
+        boolean nether = goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER;
+        if (nether != (bot.body().level().dimension() == Level.NETHER)) return null;
+        BlockPos seen = bot.senses().biome(id);
+        double cost = seen != null ? 3 + Math.sqrt(seen.distSqr(bot.body().blockPosition())) / 4.0 : unseenEffort(goal);
+        return new Option(cost, () -> new GoToBiomeTask(id));
+    }
+
+    /** Structures: those it has seen are a walk away; surface ones are worth exploring for. */
+    private static Option structure(Bot bot, LockoutBingoGoal goal) {
+        String path = Identifier.parse(goal.primaryTarget()).getPath();
+        boolean netherOrEnd = path.equals("fortress") || path.equals("bastion_remnant") || path.equals("end_city");
+        if (netherOrEnd != !overworld(bot)) return null;
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        Set<Identifier> ids = VisitStructureTask.resolve(level, goal.primaryTarget());
+        if (ids.isEmpty()) return null;
+        BotSenses.SeenStructure seen = VisitStructureTask.nearest(bot, ids);
+        double cost;
+        if (seen != null) cost = 5 + Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4.0;
+        else if (SURFACE_STRUCTURES.contains(path)) cost = unseenEffort(goal);
+        else return null; // underground (mineshaft, stronghold, ancient city): found by chance only
+        return new Option(cost, () -> new VisitStructureTask(level, goal.primaryTarget()));
+    }
+
+    private static final Set<String> SURFACE_STRUCTURES = Set.of("village", "shipwreck", "ruined_portal", "desert_pyramid",
+            "jungle_temple", "pillager_outpost", "abandoned_camp", "ocean_ruin");
+
+    private static double unseenEffort(LockoutBingoGoal goal) {
+        return switch (goal.difficulty()) {
+            case EASY -> 240;
+            case MEDIUM -> 480;
+            default -> 1500;
+        };
+    }
+
+    /** Down to a height: the digging, about a block every second or two. */
+    private static Option descend(Bot bot, int y) {
+        if (!overworld(bot)) return null;
+        int down = bot.body().getBlockY() - y;
+        if (down <= 0) return null; // already there: the game counts it by itself
+        return new Option(20 + down * 0.8, () -> new BotTask() {
+            // Digging for nothing in particular, down to y (and done the moment it is there).
+            private final MineTask dig = new MineTask("the depth", s -> false, Set.of(), 1, y - 2);
+
+            @Override
+            public Result tick(Bot b) {
+                return b.body().getBlockY() <= y ? Result.DONE : dig.tick(b);
+            }
+
+            @Override
+            public String describe() {
+                return "dig down to y " + y;
+            }
+        });
+    }
+
+    private static Option advancement(Bot bot, ObtainPlanner planner, String id) {
+        return switch (id) {
+            case "advancement_stone_age" -> obtain(bot, planner, Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.BLACKSTONE),
+                    ObtainPlanner.countAny(bot.body(), Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.BLACKSTONE)) + 1);
+            case "advancement_acquire_hardware" -> obtain(bot, planner, Set.of(Items.IRON_INGOT),
+                    ObtainPlanner.countAny(bot.body(), Set.of(Items.IRON_INGOT)) + 1);
+            case "advancement_diamonds" -> obtain(bot, planner, Set.of(Items.DIAMOND), ObtainPlanner.countAny(bot.body(), Set.of(Items.DIAMOND)) + 1);
+            case "advancement_suit_up" -> equip(bot, planner, Set.of(Items.IRON_HELMET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS,
+                    Items.IRON_BOOTS), 1);
             default -> null;
         };
     }
@@ -76,7 +171,7 @@ public final class LockoutGoals {
         if (items.isEmpty()) return null;
         double cost = planner.estimate(bot, items, count);
         if (cost >= INF) return null;
-        return new Option(cost, () -> new ObtainTask(items, count, planner));
+        return new Option(cost, () -> new ObtainTask(items, count, planner), () -> planner.yields(bot, items, count, false));
     }
 
     private static Option craft(Bot bot, ObtainPlanner planner, Set<Item> items) {
@@ -84,7 +179,8 @@ public final class LockoutGoals {
         double cost = planner.estimateCraft(bot, items);
         if (cost >= INF) return null;
         // Crafting counts, not having: one more than now, out of a crafting grid.
-        return new Option(cost + 1, () -> new ObtainTask(items, ObtainPlanner.countAny(bot.body(), items) + 1, planner, true));
+        return new Option(cost + 1, () -> new ObtainTask(items, ObtainPlanner.countAny(bot.body(), items) + 1, planner, true),
+                () -> planner.yields(bot, items, ObtainPlanner.countAny(bot.body(), items) + 1, true));
     }
 
     private static Option kill(Bot bot, ObtainPlanner planner, String entityId) {
@@ -130,6 +226,13 @@ public final class LockoutGoals {
     }
 
     private static Option interact(Bot bot, ObtainPlanner planner, String id) {
+        if (id.equals("milk_cow")) {
+            return useOnMob(bot, planner, EntityTypes.COW, Items.BUCKET, e -> !e.isBaby());
+        }
+        if (id.equals("shear_sheep")) {
+            return useOnMob(bot, planner, EntityTypes.SHEEP, Items.SHEARS,
+                    e -> e instanceof net.minecraft.world.entity.animal.sheep.Sheep s && s.readyForShearing());
+        }
         Block block = switch (id) {
             case "use_stonecutter" -> Blocks.STONECUTTER;
             case "use_grindstone" -> Blocks.GRINDSTONE;
@@ -146,6 +249,17 @@ public final class LockoutGoals {
         return new Option(cost + 3, () -> new SequenceTask("use " + block.getName().getString(), List.of(
                 () -> nearby(bot, block) ? null : new ObtainTask(Set.of(item), 1, planner),
                 () -> new UseStationTask(block, item))));
+    }
+
+    private static Option useOnMob(Bot bot, ObtainPlanner planner, EntityType<?> type, Item tool,
+                                   java.util.function.Predicate<net.minecraft.world.entity.LivingEntity> ok) {
+        double toolCost = planner.estimate(bot, Set.of(tool), 1);
+        double mob = planner.mobEffort(bot, type, 40);
+        if (toolCost >= INF || mob >= INF) return null;
+        return new Option(toolCost + mob + 2, () -> new SequenceTask("use " + ObtainPlanner.names(Set.of(tool)) + " on a "
+                + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath(), List.of(
+                () -> new ObtainTask(Set.of(tool), 1, planner),
+                () -> new UseOnMobTask(type, tool, ok))), () -> Set.of(tool));
     }
 
     // ---- helpers ------------------------------------------------------------------------------

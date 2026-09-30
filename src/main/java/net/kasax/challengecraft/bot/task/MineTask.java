@@ -41,6 +41,8 @@ public final class MineTask implements BotTask {
     private int collectTicks, idle, searchTicks, legs, scanCooldown, budget;
     private boolean walking, searching;
     private Direction heading;
+    private Explorer explorer;
+    private BlockPos lead;
 
     /** Mine until the bot holds {@code count} of the {@code items} together. */
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count) {
@@ -48,11 +50,17 @@ public final class MineTask implements BotTask {
     }
 
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count, Integer depth) {
+        this(what, blocks, items, count, depth, null);
+    }
+
+    /** {@code lead}: where to look first when none is in sight (a biome known for these blocks). */
+    public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count, Integer depth, BlockPos lead) {
         this.what = what;
         this.blocks = blocks;
         this.items = Set.copyOf(items);
         this.count = count;
         this.depth = depth;
+        this.lead = lead;
     }
 
     @Override
@@ -87,6 +95,7 @@ public final class MineTask implements BotTask {
             if (target == null) return search(bot);
             if (searching) {
                 bot.navigator().stop();
+                if (explorer != null) explorer.pause(bot);
                 searching = false;
             }
             walking = false;
@@ -146,21 +155,25 @@ public final class MineTask implements BotTask {
         if (heading == null) heading = Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
         BotNavigator nav = bot.navigator();
         if (depth != null) return dig(bot);
-        if (!walking) {
-            legs++;
-            BlockPos feet = nav.feet();
-            BlockPos p = feet.relative(heading, 32).relative(heading.getClockWise(), bot.body().getRandom().nextInt(17) - 8);
-            nav.goNear(bot.body().level().getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
-            walking = true;
-            scanCooldown = 0;
+        // Where they are known to be: go there first.
+        if (lead != null) {
+            if (!walking) {
+                nav.goNear(lead, 4);
+                walking = true;
+            }
+            BotNavigator.Status s = nav.tick();
+            if (s != BotNavigator.Status.MOVING) {
+                walking = false;
+                lead = null; // arrived (or no way): look around there, then explore from there
+                scanCooldown = 0;
+            }
+            return Result.RUNNING;
         }
-        BotNavigator.Status s = nav.tick();
-        if (s != BotNavigator.Status.MOVING) {
-            walking = false;
-            // Blocked (water, lava, bedrock, the world's edge): turn.
-            if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
-        }
-        return Result.RUNNING;
+        // On the surface (climbing up first if it is down in a mine), walking out.
+        if (explorer == null) explorer = new Explorer(budget);
+        Result r = explorer.tick(bot);
+        if (r == Result.FAILED) bot.say("found no " + what);
+        return r;
     }
 
     // ---- digging ------------------------------------------------------------------------------

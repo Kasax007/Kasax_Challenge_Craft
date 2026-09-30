@@ -20,6 +20,8 @@ public final class Bot {
     private BotNavigator navigator;
     private final Deque<BotTask> tasks = new ArrayDeque<>();
     private BotBrain brain;
+    /** What it has noticed around it; kept across deaths. */
+    private final BotSenses senses = new BotSenses();
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 
@@ -48,6 +50,10 @@ public final class Bot {
 
     public BotActions actions() {
         return actions;
+    }
+
+    public BotSenses senses() {
+        return senses;
     }
 
     public BotNavigator navigator() {
@@ -103,6 +109,7 @@ public final class Bot {
 
     void tick() {
         if (!body.isAlive()) return;
+        senses.tick(body);
         reflexes();
         if (brain != null) brain.tick(this);
         BotTask task = tasks.peek();
