@@ -172,6 +172,12 @@ public final class ObtainPlanner {
         }
     }
 
+    /** Seconds to walk to the nearest block of this kind in sight around the bot, or null if none is. */
+    public Double seen(Bot bot, Block block) {
+        refresh(bot);
+        return visibleBlocks.get(block);
+    }
+
     /** Rough effort, in seconds of play, to hold {@code count} of these items (0 if it already does). */
     public double estimate(Bot bot, Collection<Item> items, int count) {
         refresh(bot);

@@ -1,12 +1,15 @@
 package net.kasax.challengecraft.bot.task;
 
 import net.kasax.challengecraft.bot.Bot;
+import net.kasax.challengecraft.bot.BotInventory;
 import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.BotWorld;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 
@@ -14,7 +17,8 @@ import java.util.Set;
 
 /**
  * Back through a portal: walks into the nearest lit portal it knows (the one it came through) and
- * waits in it. Without one nearby, builds a new one if it carries the obsidian.
+ * waits in it. Without one nearby, builds a new one if it carries the obsidian, or casts one at a
+ * lava pool with its buckets.
  */
 public final class ThroughPortalTask implements BotTask {
     private ResourceKey<Level> from;
@@ -42,7 +46,10 @@ public final class ThroughPortalTask implements BotTask {
                     bot.interject(new GoToTask(known, 3));
                     return Result.RUNNING;
                 }
-                build = new PortalTask(level);
+                // Obsidian carried: build the frame; else, with the buckets, cast one at a lava pool.
+                boolean buckets = BotInventory.slotOf(bot.body(), Items.WATER_BUCKET) >= 0 && BotInventory.slotOf(bot.body(), Items.BUCKET) >= 0;
+                build = ObtainPlanner.countAny(bot.body(), Set.of(Items.OBSIDIAN)) < 10 && buckets && level.dimension() == Level.OVERWORLD
+                        ? new CastPortalTask(level) : new PortalTask(level);
                 return Result.RUNNING;
             }
         }

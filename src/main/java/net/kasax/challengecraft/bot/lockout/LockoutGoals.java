@@ -95,6 +95,47 @@ public final class LockoutGoals {
      */
     private static Option nether(Bot bot, ObtainPlanner planner) {
         if (!overworld(bot)) return null;
+        Option built = builtPortal(bot, planner), cast = castPortal(bot, planner);
+        if (built == null) return cast;
+        return cast == null || built.cost() <= cast.cost() ? built : cast;
+    }
+
+    public static Option netherForTest(Bot bot, ObtainPlanner planner) {
+        return nether(bot, planner);
+    }
+
+    /**
+     * The speedrunners' way in, no diamond pickaxe needed: with a lava pool in sight, two buckets
+     * (one of them full of water), flint and steel and ten spare blocks, the portal is cast right
+     * there at the pool (see {@link net.kasax.challengecraft.bot.task.CastPortalTask}).
+     */
+    private static Option castPortal(Bot bot, ObtainPlanner planner) {
+        Double lava = planner.seen(bot, Blocks.LAVA);
+        if (lava == null) return null;
+        Set<Item> blocks = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
+        boolean water = ObtainPlanner.countAny(bot.body(), Set.of(Items.WATER_BUCKET)) > 0;
+        double cost = planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1)
+                // (the water bucket's estimate counts one bucket already, unless one is held)
+                + planner.estimate(bot, Set.of(Items.BUCKET), !water && ObtainPlanner.countAny(bot.body(), Set.of(Items.BUCKET)) > 0 ? 2 : 1)
+                + planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1)
+                + planner.estimate(bot, blocks, 10);
+        if (cost >= INF) return null;
+        Set<Item> bucketKit = Set.of(Items.WATER_BUCKET, Items.BUCKET, Items.FLINT_AND_STEEL);
+        return new Option(cost + lava + 75, () -> {
+            // The pool in sight now: the gathering may lead away from it.
+            BlockPos pool = BotWorld.nearest((ServerLevel) bot.body().level(), bot.body().blockPosition(), 32, 16,
+                    st -> st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && st.getFluidState().isSource(), true, Set.of());
+            return new SequenceTask("cast a portal to the Nether", List.of(
+                () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner).keeping(Set.of(Items.FLINT_AND_STEEL)),
+                () -> new ObtainTask(Set.of(Items.BUCKET), 1, planner).keeping(Set.of(Items.WATER_BUCKET, Items.FLINT_AND_STEEL)),
+                () -> new ObtainTask(Set.of(Items.FLINT_AND_STEEL), 1, planner).keeping(bucketKit),
+                () -> new ObtainTask(blocks, 10, planner).keeping(bucketKit),
+                () -> new net.kasax.challengecraft.bot.task.CastPortalTask(bot.body().level(), pool)));
+        });
+    }
+
+    /** Ten obsidian mined (a diamond pickaxe), flint and steel, then the frame built block by block. */
+    private static Option builtPortal(Bot bot, ObtainPlanner planner) {
         Set<Item> kit = Set.of(Items.OBSIDIAN, Items.FLINT_AND_STEEL, Items.COBBLESTONE);
         double obsidian = planner.estimate(bot, Set.of(Items.OBSIDIAN), 10);
         double flint = planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1);

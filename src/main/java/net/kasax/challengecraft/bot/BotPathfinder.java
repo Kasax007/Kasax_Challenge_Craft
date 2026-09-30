@@ -139,7 +139,8 @@ public final class BotPathfinder {
 
     private List<Step> moves(BlockPos p) {
         List<Step> out = new ArrayList<>(12);
-        boolean swimming = inWater(p);
+        // Water with ground right under the feet (a shallow stream) is walked through, not swum.
+        boolean swimming = inWater(p) && !solid(p.below());
         for (int[] d : DIRS) {
             boolean diagonal = d[0] != 0 && d[1] != 0;
             BlockPos t = p.offset(d[0], 0, d[1]);

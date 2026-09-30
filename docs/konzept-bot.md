@@ -121,7 +121,7 @@ Ablauf:
    | Kuh melken, Schaf scheren | Eimer bzw. Schere besorgen, Tier suchen, benutzen |
    | Biom besuchen | hingehen, wenn in Sicht; sonst erkunden, länger je seltener |
    | Struktur besuchen | Dorf, Schiffswrack, Ruinenportal, Tempel, Außenposten, Lager, Ozeanruine: hingehen, wenn gesehen |
-   | Nether betreten | 10 Obsidian, Feuerzeug, Portal bauen, durchgehen; im Nether dann Nether-Ziele, danach zurück |
+   | Nether betreten | Portal gießen (Lavapool in Sicht, 2 Eimer, Feuerzeug, 10 Blöcke) oder 10 Obsidian abbauen und bauen – das Günstigere; im Nether dann Nether-Ziele, danach zurück |
    | Tiefe Y ≤ −50, einfache Advancements | hinuntergraben; Steinzeit, Eisen, Rüstung, Diamanten |
 
 2. **Routen statt Einzelziele:** Von den schnellsten fünf Kacheln nimmt er die, nach der die
@@ -162,12 +162,38 @@ Ablauf:
 /challengecraft_bot mine|kill|goto|follow|eat|stop <name> …
 /challengecraft_bot biome|structure <name> <id>  Biom / Struktur aufsuchen
 /challengecraft_bot milk|portal|surface <name>   Kuh melken / Portal bauen / aufsteigen
+/challengecraft_bot cast <name>                 Portal am nächsten Lavapool gießen
+/challengecraft_bot nether <name>               den Weg in den Nether gehen, den Lockout wählen würde
 /challengecraft_bot senses <name>               was er gerade wahrnimmt
 /challengecraft_bot status|inv <name>          was er gerade tut / was er dabei hat
 ```
 
 Solange er für OPs `verbose` ist, schreibt er seine Gedanken in den Chat, z. B.
 „goal: Iron Ingot (~95 s)“, „mine raw_iron (3) at y 14“, „craft stone_pickaxe x2“.
+
+## Portal gießen (Speedrunner-Methode)
+
+Ohne Diamantspitzhacke: Ein Lavaquellblock, der Wasser neben oder über sich hat, wird sofort zu
+Obsidian. Das gilt auch für fließendes Wasser. Lava, die man in fließendes Wasser gießt, ersetzt
+es. Solange die Wasserquelle bleibt, fließt das Wasser weiter. Man braucht also nur so viele
+Wasserquellen, dass jede Rahmenstelle einmal nass ist. Die Form aus Hilfsblöcken lenkt das Wasser
+dorthin und gibt gleichzeitig die Flächen, gegen die man Lava gießt. Bob macht alles vom Boden aus,
+mit einem Lava- und einem Wassereimer:
+
+```
+  y4   W2 L   L  W3     1. Eckblöcke c0, c3; Wasser W1 auf c0 läuft über x1 und x2 → Lava x1, x2
+  y3   L  M   M  L      2. Form M: zwei Säulen innen, bis oben (am liebsten Erde, schnell wieder weg)
+  y2   L  M   M  L      3. Wasser W2 oben links fällt die linke Säule hinunter → Lava hinein, jeweils
+  y1   L  M   M  L         gegen den Formblock daneben; den Formblock oben links abbauen, W2 läuft
+  y0   c0 L   L  c3        hinein → Lava dort; W2 zurück in den Eimer
+       x0 x1  x2 x3     4. rechts genauso mit W3; 5. Form abbauen, anzünden, hineingehen
+```
+
+Drei Mal Wasser für zehn Obsidian. Zwischen den Lava-Güssen holt er jeweils einen Eimer aus dem
+Pool, der 9–13 Blöcke entfernt ist, damit das Wasser ihn nicht erreicht. Beim Gießen zielt er wie
+ein Spieler auf eine Blockfläche, die er wirklich sieht und erreicht. Seinen Standplatz wählt er
+danach und nicht im Rahmen, wo das Wasser fällt. Setzt eine Lava nicht (das Wasser war noch nicht
+da), nimmt er sie wieder auf.
 
 ## Stand und nächste Schritte
 
@@ -184,6 +210,8 @@ Im Test funktioniert Folgendes:
 - Eine Kuh melken.
 - Aus einem Lavapool 3 Obsidian herstellen.
 - Ein Portal bauen, anzünden und in den Nether gehen.
+- Ein Portal an einem Lavapool gießen (Speedrunner-Methode) in etwa 70 s; von 7 Eisenbarren,
+  Holz und Feuerstein bis in den Nether in 83 s.
 
 Offen:
 - **Im Nether bewegen:** Lava-Seen, Ghasts, Festungen und Bastionen finden. Er kann hin und zurück,

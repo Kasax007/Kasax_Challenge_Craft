@@ -157,6 +157,21 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("nether").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    // Test: the way into the Nether the Lockout brain would pick, from scratch.
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    var option = net.kasax.challengecraft.bot.lockout.LockoutGoals.netherForTest(bot, new net.kasax.challengecraft.bot.plan.ObtainPlanner());
+                                    if (option == null) {
+                                        ok(ctx, "no way to the Nether from here");
+                                        return 0;
+                                    }
+                                    net.kasax.challengecraft.bot.BotTask task = option.task().get();
+                                    bot.doNow(task);
+                                    ok(ctx, String.format("%s (~%.0f s)", task.describe(), option.cost()));
+                                    return 1;
+                                })))
                         .then(Commands.literal("cast").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     Bot bot = bot(ctx);

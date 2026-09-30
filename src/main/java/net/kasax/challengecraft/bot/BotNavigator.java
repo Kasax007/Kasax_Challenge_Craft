@@ -31,6 +31,8 @@ public final class BotNavigator {
     private BlockPos bankDig;
     private int bankTicks;
     private int index, stuck, replans;
+    /** Whether the block being broken is one the navigator is digging through. */
+    private boolean digging;
     private double lastDistance;
     private Status status = Status.IDLE;
     /** Allow digging and building on the way. */
@@ -69,7 +71,8 @@ public final class BotNavigator {
     public void stop() {
         bankDig = null;
         // Only abandon a dig the navigator itself started; the caller may be mining on its own.
-        if (status == Status.MOVING) actions.reset();
+        if (digging) actions.reset();
+        digging = false;
         goal = null;
         path = null;
         status = Status.IDLE;
@@ -110,6 +113,7 @@ public final class BotNavigator {
                     return fail("block out of reach");
                 }
                 actions.breakTick(b);
+                digging = true;
                 stuck = 0;
                 return status;
             }
@@ -139,10 +143,12 @@ public final class BotNavigator {
             bot.strafe = 0;
             centreOn(step.place());
             bot.jump = true;
-            if (bot.getY() > step.place().getY() + 1.0 && bot.level().getBlockState(step.place()).isAir()) {
+            // (Open means air, or water it stood in: a block goes in there as well.)
+            boolean open = bot.level().getBlockState(step.place()).getCollisionShape(bot.level(), step.place()).isEmpty();
+            if (bot.getY() > step.place().getY() + 1.0 && open) {
                 if (!actions.placeThrowaway(step.place())) return fail("no block to pillar with");
             }
-            if (!bot.level().getBlockState(step.place()).isAir() && bot.onGround()) advance();
+            if (!open && bot.onGround()) advance();
             return status;
         }
         BlockPos to = step.to();
@@ -162,6 +168,7 @@ public final class BotNavigator {
         if (bankDig != null) {
             bot.stopInputs();
             bot.jump = true; // stay up at the surface while digging
+            digging = true;
             if (!actions.inReach(bankDig) || actions.breakTick(bankDig)) {
                 path.set(index, new BotPathfinder.Step(bankDig, List.of(), null));
                 bankDig = null;
