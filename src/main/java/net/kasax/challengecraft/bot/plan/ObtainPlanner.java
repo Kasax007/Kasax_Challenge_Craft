@@ -73,7 +73,7 @@ public final class ObtainPlanner {
     /** What the bot saw at the last look around, with the effort (seconds) to get to the nearest one. */
     private Map<Block, Double> visibleBlocks = Map.of();
     private Map<EntityType<?>, Double> visibleMobs = Map.of();
-    private boolean dark;
+    private boolean dark, nether;
     /** Blocks typical of a biome in view, with the walk there. */
     private Map<Block, Double> biomeHints = Map.of();
     private long scannedAt = -10_000, costsAt = -1;
@@ -203,6 +203,8 @@ public final class ObtainPlanner {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return INF;
         if (seen != null) return seen;
+        // Nether mobs only in the Nether, and the Overworld's not there.
+        if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return INF;
         boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
         return monster && !dark ? effort * 4 : effort;
     }
@@ -246,6 +248,7 @@ public final class ObtainPlanner {
         }
         visibleMobs = mobs;
         dark = level.isDarkOutside();
+        nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
         // Biomes in view: what they are known for is a walk away.
         Map<Block, Double> hints = new IdentityHashMap<>();
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
@@ -268,6 +271,8 @@ public final class ObtainPlanner {
         for (Item item : BuiltInRegistries.ITEM) {
             if (!k.blocksDropping(item).isEmpty() || !k.mobsDropping(item).isEmpty()) all.add(item);
         }
+        // Made neither by a recipe nor dropped (see specialCost).
+        all.addAll(List.of(Items.WATER_BUCKET, Items.LAVA_BUCKET, Items.OBSIDIAN));
         for (Item item : all) cost.put(item, rawCost(bot, k, item, cost));
         // Relax over the recipes until nothing gets cheaper (a few rounds: recipe chains are short).
         for (int round = 0; round < 10; round++) {
@@ -297,14 +302,30 @@ public final class ObtainPlanner {
         for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
             best = Math.min(best, mobCost(d.type(), d.effort()) / d.count());
         }
-        return best;
+        return Math.min(best, specialCost(bot, k, item, cost));
+    }
+
+    /** Things not made by a recipe nor dropped: filled buckets, obsidian from a lava pool. */
+    private double specialCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
+        if (item == Items.WATER_BUCKET || item == Items.LAVA_BUCKET) {
+            Double seen = visibleBlocks.get(item == Items.WATER_BUCKET ? Blocks.WATER : Blocks.LAVA);
+            return seen == null ? INF : seen + 3 + cost.getOrDefault(Items.BUCKET, INF);
+        }
+        if (item == Items.OBSIDIAN) {
+            Double lava = visibleBlocks.get(Blocks.LAVA);
+            if (lava == null) return INF;
+            double tool = toolCost(bot, k, Blocks.OBSIDIAN, cost);
+            double water = cost.getOrDefault(Items.WATER_BUCKET, INF);
+            return lava + 14 + Math.min(tool, INF) / 10 + water / 10; // tools once for all ten
+        }
+        return INF;
     }
 
     private double blockCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         BlockState s = block.defaultBlockState();
         if (isMissing(block)) return INF;
         Double seen = visibleBlocks.get(block);
-        double find = BotKnowledge.rarity(block);
+        double find = BotKnowledge.rarity(block, nether);
         if (seen != null) find = Math.min(find, seen);
         Double hint = biomeHints.get(block);
         if (hint != null) find = Math.min(find, hint + 10); // + finding it there
@@ -347,7 +368,7 @@ public final class ObtainPlanner {
     // only the first step, but sized for the whole plan (all the logs the pickaxe, the sticks and
     // the table will need, in one go instead of one trip per log).
 
-    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT }
+    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST }
 
     private record Way(String key, double cost, Kind kind, Object data) {
     }
@@ -457,6 +478,9 @@ public final class ObtainPlanner {
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);
             case SMELT -> new SmeltTask((BotKnowledge.SmeltRoute) p.data(), total);
+            case FILL -> new net.kasax.challengecraft.bot.task.FillBucketTask(p.data() == Items.LAVA_BUCKET
+                    ? net.minecraft.tags.FluidTags.LAVA : net.minecraft.tags.FluidTags.WATER);
+            case CAST -> new net.kasax.challengecraft.bot.task.MakeObsidianTask(countAny(bot.body(), Set.of(Items.OBSIDIAN)) + total);
             default -> throw new IllegalStateException();
         };
     }
@@ -509,6 +533,17 @@ public final class ObtainPlanner {
             double c = mobs.values().stream().min(Double::compare).orElse(INF);
             if (!isFailed(key, now)) ways.add(new Way(key, c, Kind.KILL, mobs.keySet()));
         }
+        if (!onlyCraft) {
+            for (Item item : accept) {
+                Block source = item == Items.WATER_BUCKET ? Blocks.WATER : item == Items.LAVA_BUCKET ? Blocks.LAVA : null;
+                if (source != null && visibleBlocks.containsKey(source) && !visiting.contains(Items.BUCKET) && !isFailed("fill:" + name(item), now)) {
+                    ways.add(new Way("fill:" + name(item), visibleBlocks.get(source) + 3 + cost(Items.BUCKET), Kind.FILL, item));
+                }
+            }
+            if (accept.contains(Items.OBSIDIAN) && visibleBlocks.containsKey(Blocks.LAVA) && !isFailed("cast:obsidian", now)) {
+                ways.add(new Way("cast:obsidian", specialCost(bot, k, Items.OBSIDIAN, costs), Kind.CAST, null));
+            }
+        }
         for (Item item : accept) {
             if (visiting.contains(item)) continue;
             for (BotKnowledge.Route r : k.routesTo(item)) {
@@ -530,6 +565,8 @@ public final class ObtainPlanner {
             String why = switch (w.kind()) {
                 case MINE -> mine(bot, k, sim, accept, count, w, depth, visiting);
                 case KILL -> kill(sim, accept, count, w);
+                case FILL -> fill(bot, sim, (Item) w.data(), count - sim.count(accept), depth, visiting, w.key());
+                case CAST -> cast(bot, k, sim, count - sim.count(accept), depth, visiting, w.key());
                 default -> route(bot, k, sim, (BotKnowledge.Route) w.data(), accept, count, depth, visiting);
             };
             if (why == null) return null;
@@ -581,6 +618,40 @@ public final class ObtainPlanner {
     private static Item representative(BotKnowledge k, Set<Item> accept, Set<Block> blocks) {
         for (Item i : accept) for (BotKnowledge.Drop d : k.blocksDropping(i)) if (blocks.contains(d.block())) return i;
         return accept.iterator().next();
+    }
+
+    private String fill(Bot bot, Sim sim, Item filled, int need, int depth, Set<Item> visiting, String key) {
+        Set<Item> v = new HashSet<>(visiting);
+        v.add(filled);
+        for (int i = 0; i < need; i++) {
+            if (sim.count(Set.of(Items.BUCKET)) < 1) {
+                String why = expand(bot, sim, Set.of(Items.BUCKET), 1, depth + 1, v);
+                if (why != null) return why;
+            }
+            sim.take(Set.of(Items.BUCKET), 1);
+            sim.add(filled, 1);
+            sim.steps.add(new Pending(Kind.FILL, key, Set.of(filled), 1, filled));
+        }
+        return null;
+    }
+
+    private String cast(Bot bot, BotKnowledge k, Sim sim, int need, int depth, Set<Item> visiting, String key) {
+        Set<Item> v = new HashSet<>(visiting);
+        v.add(Items.OBSIDIAN);
+        if (sim.count(Set.of(Items.WATER_BUCKET)) == 0) {
+            String why = expand(bot, sim, Set.of(Items.WATER_BUCKET), 1, depth + 1, v);
+            if (why != null) return why;
+        }
+        if (!sim.canHarvest(Blocks.OBSIDIAN.defaultBlockState())) {
+            List<Item> tools = k.harvestTools(Blocks.OBSIDIAN).stream().filter(t -> !v.contains(t)).toList();
+            if (tools.isEmpty()) return "nothing to mine obsidian with";
+            Item tool = tools.stream().min(Comparator.comparingDouble(this::cost)).orElseThrow();
+            String why = expand(bot, sim, Set.of(tool), 1, depth + 1, v);
+            if (why != null) return why;
+        }
+        sim.add(Items.OBSIDIAN, need);
+        sim.steps.add(new Pending(Kind.CAST, key, Set.of(Items.OBSIDIAN), need, null));
+        return null;
     }
 
     @SuppressWarnings("unchecked")

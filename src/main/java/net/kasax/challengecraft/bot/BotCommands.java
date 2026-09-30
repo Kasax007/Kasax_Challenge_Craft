@@ -150,6 +150,13 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.UseOnMobTask(net.minecraft.world.entity.EntityTypes.COW, Items.BUCKET, e -> !e.isBaby()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("portal").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
+                                    return 1;
+                                })))
                         .then(Commands.literal("surface").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     Bot bot = bot(ctx);

@@ -80,12 +80,30 @@ public final class LockoutGoals {
                     ? equip(bot, planner, items(goal.targets()), goal.amount()) : null;
             case INVENTORY_SET -> collectDistinct(bot, planner, items(goal.targets()), goal.amount());
             case INTERACT -> interact(bot, planner, goal.id());
+            case DIMENSION -> "minecraft:the_nether".equals(goal.primaryTarget()) ? nether(bot, planner) : null;
             case BIOME -> biome(bot, goal);
             case STRUCTURE -> structure(bot, goal);
             case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
             case ADVANCEMENT -> advancement(bot, planner, goal.id());
             default -> null;
         };
+    }
+
+    /**
+     * Into the Nether: ten obsidian (made from a lava pool with a water bucket, or mined), flint and
+     * steel, a few blocks for the frame's corners, then a portal built and walked through.
+     */
+    private static Option nether(Bot bot, ObtainPlanner planner) {
+        if (!overworld(bot)) return null;
+        Set<Item> kit = Set.of(Items.OBSIDIAN, Items.FLINT_AND_STEEL, Items.COBBLESTONE);
+        double obsidian = planner.estimate(bot, Set.of(Items.OBSIDIAN), 10);
+        double flint = planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1);
+        if (obsidian >= INF || flint >= INF) return null;
+        return new Option(obsidian + flint + 40, () -> new SequenceTask("go to the Nether", List.of(
+                () -> new ObtainTask(Set.of(Items.OBSIDIAN), 10, planner).keeping(kit),
+                () -> new ObtainTask(Set.of(Items.FLINT_AND_STEEL), 1, planner).keeping(kit),
+                () -> new ObtainTask(Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.DIRT), 4, planner).keeping(kit),
+                () -> new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()))));
     }
 
     // ---- places -------------------------------------------------------------------------------
@@ -159,6 +177,7 @@ public final class LockoutGoals {
             case "advancement_acquire_hardware" -> obtain(bot, planner, Set.of(Items.IRON_INGOT),
                     ObtainPlanner.countAny(bot.body(), Set.of(Items.IRON_INGOT)) + 1);
             case "advancement_diamonds" -> obtain(bot, planner, Set.of(Items.DIAMOND), ObtainPlanner.countAny(bot.body(), Set.of(Items.DIAMOND)) + 1);
+            case "advancement_we_need_to_go_deeper" -> nether(bot, planner);
             case "advancement_suit_up" -> equip(bot, planner, Set.of(Items.IRON_HELMET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS,
                     Items.IRON_BOOTS), 1);
             default -> null;

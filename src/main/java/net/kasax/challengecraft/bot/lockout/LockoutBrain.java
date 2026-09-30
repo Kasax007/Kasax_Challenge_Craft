@@ -81,6 +81,12 @@ public final class LockoutBrain implements BotBrain {
         LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bot.id);
         if (team == null) return;
         List<Choice> choices = choices(bot, -1);
+        // Nothing (more) to do down here: back to the Overworld, where most goals are.
+        if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+            bot.say("nothing left for me here, going back");
+            bot.doNow(new net.kasax.challengecraft.bot.task.ThroughPortalTask());
+            return;
+        }
         if (choices.isEmpty()) {
             pause = 200; // nothing it can do now; look again in a while (tiles, time of day change)
             return;

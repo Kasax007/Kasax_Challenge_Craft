@@ -178,8 +178,26 @@ public final class BotKnowledge {
      * of play). Things the bot can see right now cost almost nothing instead; the planner handles that.
      */
     public static double rarity(Block block) {
-        BlockState s = block.defaultBlockState();
+        return rarity(block, false);
+    }
+
+    /** As {@link #rarity(Block)}, for the dimension the bot is in: in the Nether it is the Nether's blocks that are around. */
+    public static double rarity(Block block, boolean nether) {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+        if (nether) {
+            return switch (id) {
+                case "netherrack" -> 3;
+                case "soul_sand", "soul_soil", "nether_quartz_ore", "nether_gold_ore", "gravel", "magma_block" -> 25;
+                case "basalt", "blackstone", "crimson_stem", "warped_stem", "crimson_nylium", "warped_nylium",
+                     "crimson_fungus", "warped_fungus", "nether_wart_block", "warped_wart_block", "weeping_vines", "twisting_vines" -> 50;
+                case "glowstone", "shroomlight", "gilded_blackstone" -> 90;
+                case "obsidian", "crying_obsidian" -> 200;
+                case "nether_wart", "nether_bricks", "nether_brick_fence" -> 500; // fortresses
+                case "ancient_debris" -> 1500;
+                default -> 9000;
+            };
+        }
+        BlockState s = block.defaultBlockState();
         if (id.contains("nether") || id.startsWith("soul_") || id.contains("basalt") || id.contains("blackstone")
                 || id.contains("crimson") || id.contains("warped") || id.equals("glowstone") || id.equals("magma_block")
                 || id.equals("ancient_debris") || id.equals("shroomlight") || id.contains("quartz_ore")) return 5000; // the Nether: not yet
@@ -293,6 +311,15 @@ public final class BotKnowledge {
         mob(EntityTypes.DROWNED, 120, Items.ROTTEN_FLESH, 1.0);
         mob(EntityTypes.HORSE, 90, Items.LEATHER, 1.0);
         mob(EntityTypes.WITCH, 300, Items.GLOWSTONE_DUST, 0.7, Items.REDSTONE, 0.7);
+        // The Nether (only counted there, see ObtainPlanner#mobCost).
+        mob(EntityTypes.ZOMBIFIED_PIGLIN, 20, Items.GOLD_NUGGET, 1.0, Items.ROTTEN_FLESH, 1.0);
+        mob(EntityTypes.PIGLIN, 40, Items.GOLD_INGOT, 0.1);
+        mob(EntityTypes.MAGMA_CUBE, 80, Items.MAGMA_CREAM, 0.25);
+        mob(EntityTypes.GHAST, 200, Items.GHAST_TEAR, 0.5, Items.GUNPOWDER, 1.0);
+        mob(EntityTypes.HOGLIN, 90, Items.PORKCHOP, 3.0, Items.LEATHER, 0.5);
+        mob(EntityTypes.STRIDER, 90, Items.STRING, 3.0);
+        mob(EntityTypes.BLAZE, 600, Items.BLAZE_ROD, 0.5);
+        mob(EntityTypes.WITHER_SKELETON, 700, Items.COAL, 0.33, Items.BONE, 1.0);
     }
 
     private void mob(EntityType<?> type, double effort, Object... itemsAndCounts) {
@@ -304,6 +331,11 @@ public final class BotKnowledge {
     }
 
     /** The effort to find and kill one of these mobs, from the drop table; {@code unknown} for others. */
+    /** Mobs that live in the Nether (and nowhere else). */
+    public static final java.util.Set<EntityType<?>> NETHER_MOBS = java.util.Set.of(EntityTypes.ZOMBIFIED_PIGLIN, EntityTypes.PIGLIN,
+            EntityTypes.MAGMA_CUBE, EntityTypes.GHAST, EntityTypes.HOGLIN, EntityTypes.STRIDER, EntityTypes.BLAZE,
+            EntityTypes.WITHER_SKELETON, EntityTypes.PIGLIN_BRUTE);
+
     public double mobEffort(EntityType<?> type, double unknown) {
         for (List<MobDrop> l : mobDrops.values()) for (MobDrop d : l) if (d.type() == type) return d.effort();
         return unknown;
