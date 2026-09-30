@@ -22,6 +22,8 @@ public final class Bot {
     private BotBrain brain;
     /** What it has noticed around it; kept across deaths. */
     private final BotSenses senses = new BotSenses();
+    /** Where things are, as read from the world around it; kept across deaths. */
+    private final BotMemory memory = new BotMemory();
     /** For benchmarks: ticks with nothing to do, tasks that failed. */
     public int idleTicks, failures;
     /** Chat what it is doing (for testing). */
@@ -56,6 +58,10 @@ public final class Bot {
 
     public BotSenses senses() {
         return senses;
+    }
+
+    public BotMemory memory() {
+        return memory;
     }
 
     public BotNavigator navigator() {
@@ -112,6 +118,7 @@ public final class Bot {
     void tick() {
         if (!body.isAlive()) return;
         senses.tick(body);
+        memory.tick(body);
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
         reflexes();
         if (brain != null) brain.tick(this);
@@ -197,7 +204,9 @@ public final class Bot {
         for (int i = 0; i < 4; i++) {
             net.minecraft.core.BlockPos below = p.below(i + 1);
             if (!level.getBlockState(below).getCollisionShape(level, below).isEmpty()) {
-                if (body.getY() - (below.getY() + 1) > 3.2 || !level.getFluidState(below).isEmpty()) return;
+                double above = body.getY() - (below.getY() + 1);
+                // Only a fall that hurts (a few blocks off a pillar costs a heart at most).
+                if (above > 3.2 || body.fallDistance + above < 6 || !level.getFluidState(below).isEmpty()) return;
                 tools.select(slot);
                 body.setXRot(90f);
                 body.gameMode.useItem(body, level, body.getMainHandItem(), net.minecraft.world.InteractionHand.MAIN_HAND);

@@ -91,6 +91,8 @@ public final class MineTask implements BotTask {
             if (!searching || --scanCooldown <= 0) {
                 scanCooldown = 20;
                 target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
+                // Nothing right here: somewhere it has been past (or seen from afar).
+                if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
             }
             if (target == null) return search(bot);
             if (searching) {

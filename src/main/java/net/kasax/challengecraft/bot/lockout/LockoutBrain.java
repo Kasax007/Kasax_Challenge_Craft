@@ -83,6 +83,9 @@ public final class LockoutBrain implements BotBrain {
         if (team == null) return;
         // Keep something to eat: a player who is starving loses more time than bread costs.
         if (needsFood(bot)) return;
+        // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
+        // anything else. They make every later goal quicker.
+        if (opening(bot)) return;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
@@ -119,6 +122,35 @@ public final class LockoutBrain implements BotBrain {
      * Low on food: stock up if it is cheap right now (hay bales in a village make bread, animals
      * around make steak). Returns whether it went for food.
      */
+    private int openingStep;
+
+    private static final List<Set<net.minecraft.world.item.Item>> OPENING = List.of(
+            Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE),
+            Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE));
+
+    /** Works through the opening; returns whether it started a step of it. */
+    private boolean opening(Bot bot) {
+        if (bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        while (openingStep < OPENING.size()) {
+            Set<net.minecraft.world.item.Item> want = OPENING.get(openingStep);
+            if (ObtainPlanner.countAny(bot.body(), want) > 0) {
+                openingStep++;
+                continue;
+            }
+            if (openingTries++ > 2) { // could not (no stone anywhere?): play on without
+                openingStep++;
+                openingTries = 0;
+                continue;
+            }
+            bot.say("opening: " + ObtainPlanner.names(want));
+            bot.doNow(new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner));
+            return true;
+        }
+        return false;
+    }
+
+    private int openingTries;
+
     private boolean needsFood(Bot bot) {
         long now = bot.body().level().getGameTime();
         if (now < nextFoodCheck) return false;
@@ -128,7 +160,8 @@ public final class LockoutBrain implements BotBrain {
             var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
             if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
         }
-        if (points >= 16) return false;
+        // Nobody hunts for food with a full stomach: only once hunger has started to bite.
+        if (points >= 16 || bot.body().getFoodData().getFoodLevel() >= 17) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = planner.estimate(bot, FOODS, have + 4);
         if (cost > 90) return false;
@@ -285,6 +318,8 @@ public final class LockoutBrain implements BotBrain {
 
     @Override
     public void respawned(Bot bot) {
+        openingStep = 0; // the tools are gone with the rest
+        openingTries = 0;
         targetIndex = -1;
         goalTask = null;
         sideTask = null;

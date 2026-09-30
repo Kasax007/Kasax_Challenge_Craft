@@ -43,9 +43,17 @@ public final class BotPathfinder {
     private final Abilities abilities;
     private final Map<Long, BlockState> cache = new HashMap<>();
 
+    /** Spots where a step already failed: kept out of the search (as Baritone blacklists them). */
+    private final java.util.Set<Long> avoid;
+
     public BotPathfinder(ServerLevel level, Abilities abilities) {
+        this(level, abilities, java.util.Set.of());
+    }
+
+    public BotPathfinder(ServerLevel level, Abilities abilities, java.util.Set<Long> avoid) {
         this.level = level;
         this.abilities = abilities;
+        this.avoid = avoid;
     }
 
     private static final class Node implements Comparable<Node> {
@@ -91,7 +99,7 @@ public final class BotPathfinder {
                 best = n;
             }
             for (Step s : moves(n.pos, n.step != null && n.step.place() != null && n.step.place().equals(n.pos.below()))) {
-                double cost = cost(n.pos, s);
+                double cost = cost(n.pos, s) + (avoid.contains(s.to().asLong()) ? 400 : 0);
                 Node m = nodes.computeIfAbsent(s.to().asLong(), k -> new Node(s.to()));
                 if (m.closed) continue;
                 double g = n.g + cost;
@@ -237,7 +245,8 @@ public final class BotPathfinder {
         if (swimming && clear(p.above())) out.add(new Step(p.above(), List.of(), null));
         if (swimming && inWater(below)) out.add(new Step(below, List.of(), null));
         // Pillar up: jump and put a block where the feet were.
-        if (abilities.mayPillar() && !swimming && floor) {
+        // (Not standing in water: a jump from there does not get high enough to set a block.)
+        if (abilities.mayPillar() && !swimming && floor && (placedBelow || !inWater(p))) {
             List<BlockPos> head = breaksFor(p.above(2));
             if (head != null) out.add(new Step(p.above(), head, p));
         }

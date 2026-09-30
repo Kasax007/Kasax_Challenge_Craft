@@ -34,6 +34,7 @@ public final class BotNavigator {
     /** Whether the block being broken is one the navigator is digging through. */
     private boolean digging;
     private int stepTicks;
+    private final java.util.Set<Long> avoid = new java.util.HashSet<>();
     private double lastDistance;
     private Status status = Status.IDLE;
     /** Allow digging and building on the way. */
@@ -75,6 +76,7 @@ public final class BotNavigator {
         this.target = steer.immutable();
         this.path = null;
         this.replans = 0;
+        this.avoid.clear();
         this.status = Status.MOVING;
     }
 
@@ -118,6 +120,7 @@ public final class BotNavigator {
         // A step taking far longer than it should (jumping at a wall it cannot get up, pushed back
         // by water again and again): give it up and look for another way, as Baritone does.
         if (++stepTicks > stepLimit(step)) {
+            avoid.add(step.to().asLong());
             stepTicks = 0;
             path = null;
             bankDig = null;
@@ -290,7 +293,7 @@ public final class BotNavigator {
             return false;
         }
         BotPathfinder finder = new BotPathfinder((ServerLevel) bot.level(),
-                new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(), tools));
+                new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(), tools), avoid);
         path = finder.find(feet, goal, target, BUDGET);
         index = 0;
         stepTicks = 0;

@@ -39,6 +39,7 @@ public final class KillTask implements BotTask {
     private BlockPos deathSpot;
     private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
     private final Explorer explorer = new Explorer(2400);
+    private boolean triedMemory;
     private boolean walking;
 
     /** {@code loot} may be empty when only the kill matters (then {@code kills} counts). */
@@ -184,6 +185,20 @@ public final class KillTask implements BotTask {
 
     /** None in sight: walk out (up from a mine first) for up to two minutes. */
     private Result explore(Bot bot) {
+        // Where it last saw one: the herd is likely still about there.
+        if (!triedMemory) {
+            net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            BlockPos seen = null;
+            for (EntityType<?> t : types) {
+                BlockPos p = bot.memory().lastSeen(level, t, bot.body().blockPosition());
+                if (p != null && (seen == null || p.distSqr(bot.body().blockPosition()) < seen.distSqr(bot.body().blockPosition()))) seen = p;
+            }
+            triedMemory = true;
+            if (seen != null && seen.distSqr(bot.body().blockPosition()) > 16 * 16) {
+                bot.interject(new GoToTask(seen, 6));
+                return Result.RUNNING;
+            }
+        }
         Result r = explorer.tick(bot);
         if (r == Result.FAILED) bot.say("found no " + describeTypes());
         return r;

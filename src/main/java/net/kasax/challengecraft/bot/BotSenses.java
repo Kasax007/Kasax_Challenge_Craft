@@ -110,8 +110,7 @@ public final class BotSenses {
                         if (distance(box, c) > view) continue;
                         BlockPos centre = box.getCenter();
                         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centre.getX(), centre.getZ());
-                        boolean visible = box.isInside(c) || distance(box, c) < NEAR || inSight(level, body, eye, box);
-                        if (!visible) continue;
+                        // Within view distance it is known (as a player would spot it; no line of sight needed).
                         BlockPos spot = new BlockPos(centre.getX(), Math.max(box.minY(), Math.min(box.maxY(), surface)), centre.getZ());
                         SeenStructure known = structures.get(id);
                         if (known == null || spot.distSqr(c) < known.spot().distSqr(c)) structures.put(id, new SeenStructure(id, spot, box));
@@ -120,8 +119,8 @@ public final class BotSenses {
             }
         }
         // Loot chests in what it sees (or right next to it) that nobody opened yet.
-        for (int cx = (c.getX() >> 4) - 5; cx <= (c.getX() >> 4) + 5; cx++) {
-            for (int cz = (c.getZ() >> 4) - 5; cz <= (c.getZ() >> 4) + 5; cz++) {
+        for (int cx = (c.getX() >> 4) - r; cx <= (c.getX() >> 4) + r; cx++) {
+            for (int cz = (c.getZ() >> 4) - r; cz <= (c.getZ() >> 4) + r; cz++) {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
                 if (chunk == null) continue;
                 for (BlockEntity be : chunk.getBlockEntities().values()) {

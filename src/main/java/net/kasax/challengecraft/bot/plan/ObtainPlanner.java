@@ -249,6 +249,13 @@ public final class ObtainPlanner {
                 }
             }
         }
+        // And what it remembers from further away (read from the chunks it has been near).
+        for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c).entrySet()) {
+            BlockPos p = e.getValue();
+            double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
+            double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + Math.abs(p.getY() - c.getY()) * 0.8;
+            blocks.merge(e.getKey(), reach, Math::min);
+        }
         visibleBlocks = blocks;
         Map<EntityType<?>, Double> mobs = new HashMap<>();
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(c).inflate(48),

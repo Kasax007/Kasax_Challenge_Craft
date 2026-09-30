@@ -159,10 +159,10 @@ public final class CastPortalTask implements BotTask {
                     wait = 0;
                     return next();
                 }
-                if (!inReach(bot, source)) return walkNear(bot, source);
+                if (!canScoop(level, body, body.getEyePosition(), source, 4.4)) return walkToScoop(bot, source);
                 bot.navigator().stop();
                 use(bot, level, Items.BUCKET, Vec3.atCenterOf(source));
-                return ++tries > 60 ? Result.FAILED : Result.RUNNING;
+                return ++tries > 200 ? Result.FAILED : Result.RUNNING;
             }
             case BREAK -> {
                 if (level.getBlockState(p).getCollisionShape(level, p).isEmpty()) return next();
@@ -422,6 +422,31 @@ public final class CastPortalTask implements BotTask {
         if (s != BotNavigator.Status.MOVING) walking = false;
         if (s == BotNavigator.Status.FAILED && ++walkFails > 8) {
             bot.say("can't get to pour into " + p.toShortString());
+            return Result.FAILED;
+        }
+        return Result.RUNNING;
+    }
+
+    /** Whether an empty bucket used from {@code eye} would take up the water source at {@code source}. */
+    private static boolean canScoop(ServerLevel level, BotPlayer body, Vec3 eye, BlockPos source, double reach) {
+        Vec3 at = Vec3.atCenterOf(source);
+        if (eye.distanceTo(at) > reach) return false;
+        BlockHitResult hit = level.clip(new ClipContext(eye, at, ClipContext.Block.OUTLINE, ClipContext.Fluid.SOURCE_ONLY, body));
+        return hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(source);
+    }
+
+    private Result walkToScoop(Bot bot, BlockPos source) {
+        if (!walking) {
+            BotPlayer body = bot.body();
+            ServerLevel level = (ServerLevel) body.level();
+            bot.navigator().setGoal(f -> !footprint.contains(f.asLong()) && !level.getFluidState(f).isSource()
+                    && canScoop(level, body, new Vec3(f.getX() + 0.5, f.getY() + body.getEyeHeight(), f.getZ() + 0.5), source, 3.9), source);
+            walking = true;
+        }
+        BotNavigator.Status s = bot.navigator().tick();
+        if (s != BotNavigator.Status.MOVING) walking = false;
+        if (s == BotNavigator.Status.FAILED && ++walkFails > 8) {
+            bot.say("can't get to the water at " + source.toShortString());
             return Result.FAILED;
         }
         return Result.RUNNING;
