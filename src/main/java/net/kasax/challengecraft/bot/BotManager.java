@@ -94,6 +94,7 @@ public final class BotManager {
             }
             bot.tick();
         }
+        BotBenchmark.tickAll();
     }
 
     /** A line in chat and log about what a bot is up to (for testing). */

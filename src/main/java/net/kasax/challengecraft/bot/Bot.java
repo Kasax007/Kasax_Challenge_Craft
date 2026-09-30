@@ -22,6 +22,8 @@ public final class Bot {
     private BotBrain brain;
     /** What it has noticed around it; kept across deaths. */
     private final BotSenses senses = new BotSenses();
+    /** For benchmarks: ticks with nothing to do, tasks that failed. */
+    public int idleTicks, failures;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 
@@ -118,6 +120,7 @@ public final class Bot {
             if (brain != null) brain.think(this);
             task = tasks.peek();
             if (task == null) {
+                idleTicks++;
                 body.stopInputs();
                 return;
             }
@@ -134,6 +137,7 @@ public final class Bot {
         if (r != BotTask.Result.RUNNING) {
             tasks.remove(task);
             navigator.stop();
+            if (r == BotTask.Result.FAILED) failures++;
             say((r == BotTask.Result.FAILED ? "x " : "done: ") + task.describe());
             if (brain != null) brain.finished(this, task, r == BotTask.Result.DONE);
         }

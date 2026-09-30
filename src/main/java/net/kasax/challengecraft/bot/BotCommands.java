@@ -48,9 +48,16 @@ final class BotCommands {
                         .requires(ModPermissions::isOp)
                         .then(Commands.literal("spawn").then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> {
-                                    ServerPlayer me = ctx.getSource().getPlayerOrException();
+                                    // Where the command comes from (the console: the world spawn, on the ground).
+                                    var level = ctx.getSource().getLevel();
+                                    var at = ctx.getSource().getPosition();
+                                    if (ctx.getSource().getEntity() == null) {
+                                        level.getChunk((int) Math.floor(at.x) >> 4, (int) Math.floor(at.z) >> 4); // generated, so the ground is known
+                                        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, (int) Math.floor(at.x), (int) Math.floor(at.z));
+                                        at = new net.minecraft.world.phys.Vec3(Math.floor(at.x) + 0.5, y, Math.floor(at.z) + 0.5);
+                                    }
                                     String name = StringArgumentType.getString(ctx, "name");
-                                    Bot bot = BotManager.spawn(ctx.getSource().getServer(), name, me.level(), me.position());
+                                    Bot bot = BotManager.spawn(ctx.getSource().getServer(), name, level, at);
                                     ok(ctx, "Bot " + bot.name + " joined");
                                     return 1;
                                 })))
@@ -157,6 +164,12 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("bench").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))
+                                        .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.HARD))
+                                        .then(Commands.argument("difficulty", StringArgumentType.word())
+                                                .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.valueOf(
+                                                        StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))))))
                         .then(Commands.literal("nether").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     // Test: the way into the Nether the Lockout brain would pick, from scratch.
@@ -243,6 +256,16 @@ final class BotCommands {
         }
         bot.setBrain(new LockoutBrain(difficulty));
         ok(ctx, bot.name + " plays Lockout (" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")");
+        return 1;
+    }
+
+    /** A solo Lockout game for the bot alone, measured, with a report at the end (see {@link BotBenchmark}). */
+    private static int bench(CommandContext<CommandSourceStack> ctx, LockoutBrain.Difficulty difficulty) {
+        Bot bot = bot(ctx);
+        if (bot == null) return 0;
+        int seconds = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "seconds");
+        BotBenchmark.start(bot, seconds * 20, difficulty);
+        ok(ctx, bot.name + " benchmark: " + seconds + " s of Lockout (" + difficulty.name().toLowerCase(java.util.Locale.ROOT) + ")");
         return 1;
     }
 
