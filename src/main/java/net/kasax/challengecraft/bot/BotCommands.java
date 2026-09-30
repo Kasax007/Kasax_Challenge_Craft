@@ -157,6 +157,23 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("cast").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.CastPortalTask(bot.body().level()));
+                                    return 1;
+                                })))
+                        .then(Commands.literal("pour").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("pos", BlockPosArgument.blockPos()).executes(ctx -> {
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    // Test: pour the first filled bucket into this spot (against a solid neighbour).
+                                    BlockPos pos = BlockPosArgument.getBlockPos(ctx, "pos");
+                                    Item bucket = BotInventory.slotOf(bot.body(), Items.LAVA_BUCKET) >= 0 ? Items.LAVA_BUCKET : Items.WATER_BUCKET;
+                                    ok(ctx, "poured " + bucket + ": " + net.kasax.challengecraft.bot.task.CastPortalTask.pourIntoForTest(bot, bot.body().level(), bucket, pos));
+                                    return 1;
+                                }))))
                         .then(Commands.literal("surface").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     Bot bot = bot(ctx);
