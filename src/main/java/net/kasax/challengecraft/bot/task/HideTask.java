@@ -35,13 +35,34 @@ public final class HideTask implements BotTask {
         return true;
     }
 
+    /** Up instead of down: three blocks on a pillar, out of reach of zombies (they hit on while one digs). */
+    private boolean up;
+    private int placed;
+
+    public static HideTask upward() {
+        HideTask t = new HideTask();
+        t.up = true;
+        return t;
+    }
+
+    /** Whether a pillar works here: room above the head for two more blocks, something to build with. */
+    public static boolean pillarPossible(Bot bot) {
+        BotPlayer body = bot.body();
+        if (!body.onGround() || body.isInWater() || !bot.actions().hasThrowaway()) return false;
+        ServerLevel level = (ServerLevel) body.level();
+        BlockPos head = body.blockPosition().above();
+        for (int i = 1; i <= 4; i++) if (!level.getBlockState(head.above(i)).getCollisionShape(level, head.above(i)).isEmpty()) return false;
+        return true;
+    }
+
     @Override
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (++ticks > MAX_TICKS || !body.isAlive()) return Result.DONE;
-        body.stopInputs();
         if (top == null) top = body.blockPosition();
+        if (up) return pillar(bot, body, level);
+        body.stopInputs();
         // Down: the block under the feet, three times (it drops into the gap), so the lid goes in
         // at ground level, held by the ground round it.
         dug = top.getY() - body.blockPosition().getY();
@@ -68,6 +89,31 @@ public final class HideTask implements BotTask {
             return Result.RUNNING;
         }
         if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 200) return Result.DONE;
+        return Result.RUNNING;
+    }
+
+    private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {
+        int height = body.blockPosition().getY() - top.getY();
+        // Knocked off (a hit sends it flying): start a new pillar from where it landed.
+        if (body.onGround() && placed > 0 && height < placed && (body.blockPosition().getX() != top.getX() || body.blockPosition().getZ() != top.getZ())) {
+            top = body.blockPosition();
+            placed = 0;
+            height = 0;
+        }
+        if (placed < 3 && height < 3) {
+            // Jump, and at the top of the jump put a block where the feet were.
+            body.jump = true;
+            BlockPos below = body.blockPosition().below();
+            if (!body.onGround() && level.getBlockState(below).canBeReplaced() && body.getY() - body.blockPosition().getY() < 0.6
+                    && bot.actions().placeThrowaway(below)) placed++;
+            return Result.RUNNING;
+        }
+        body.stopInputs();
+        if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0) {
+            bot.interject(new EatTask());
+            return Result.RUNNING;
+        }
+        if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 300) return Result.DONE;
         return Result.RUNNING;
     }
 

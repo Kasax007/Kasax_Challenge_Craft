@@ -246,10 +246,15 @@ public final class Bot {
         boolean aimedAt = body.getHealth() <= 10 && !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16),
                 m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob).isEmpty();
         if ((body.getHealth() <= (shot ? 10 : 6) && (cornered || shot) && body.tickCount - body.getLastHurtByMobTimestamp() < 60 || aimedAt)
-                && net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+                && (net.kasax.challengecraft.bot.task.HideTask.possible(this) || net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this))) {
             actions.reset();
             navigator.stop();
-            interject(new net.kasax.challengecraft.bot.task.HideTask());
+            // Arrows: into the ground. Zombies and the like close by: up a pillar, out of their reach
+            // (they would hit on while it digs).
+            boolean melee = !shot && !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(3),
+                    net.minecraft.world.entity.LivingEntity::isAlive).isEmpty();
+            boolean upward = melee && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this) || !net.kasax.challengecraft.bot.task.HideTask.possible(this);
+            interject(upward ? net.kasax.challengecraft.bot.task.HideTask.upward() : new net.kasax.challengecraft.bot.task.HideTask());
             return;
         }
         if (fighting) return;

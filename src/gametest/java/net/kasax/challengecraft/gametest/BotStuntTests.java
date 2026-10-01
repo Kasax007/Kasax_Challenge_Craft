@@ -345,4 +345,23 @@ public class BotStuntTests {
                         && st.getValue(net.minecraft.world.level.block.BeehiveBlock.HONEY_LEVEL) >= 5).with(Items.SHEARS, java.util.Set.of(Items.HONEYCOMB)), 400,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.HONEYCOMB)) > 0);
     }
+
+    /** Low on health with zombies close: up a three-block pillar, out of their reach, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void pillarFromZombies(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "pillar_up");
+        a.spawn(20, FEET, 20, new ItemStack(Items.DIRT, 8));
+        a.bot().body().setHealth(8f);
+        boolean[] died = {false};
+        h.onEachTick(() -> { if (!a.bot().body().isAlive()) died[0] = true; });
+        h.runAfterDelay(30, () -> {
+            for (int i = 0; i < 2; i++) {
+                var z = EntityTypes.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+                z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26 - 12 * i, FEET, 20)));
+                h.getLevel().addFreshEntity(z);
+                z.setTarget(a.bot().body());
+            }
+        });
+        a.run(net.kasax.challengecraft.bot.task.HideTask.upward(), 400, () -> h.getTick() > 350 && !died[0] && a.feet().getY() >= FEET + 2);
+    }
 }
