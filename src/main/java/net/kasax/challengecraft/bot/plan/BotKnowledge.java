@@ -221,7 +221,10 @@ public final class BotKnowledge {
             case "melon", "ice", "moss_block", "dripstone_block", "pointed_dripstone",
                  "sweet_berry_bush", "cobweb", "bamboo", "mud", "podzol", "mycelium", "terracotta", "red_sandstone",
                  "vine", "lily_pad", "cocoa" -> 140;
-            case "obsidian" -> 200;
+            // Rarely just lying about (a ruined portal): poured from lava and water instead.
+            case "obsidian" -> 600;
+            // Only deep in the big ore veins, and nine of the raw ore each: never worth a search.
+            case "raw_iron_block", "raw_copper_block", "raw_gold_block" -> 9000;
             case "packed_ice", "amethyst_cluster", "blue_ice", "sculk", "hay_block", "bell" -> 320;
             case "diamond_ore", "deepslate_diamond_ore" -> 600;
             case "emerald_ore", "deepslate_emerald_ore" -> 600;

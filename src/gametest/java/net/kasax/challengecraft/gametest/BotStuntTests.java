@@ -208,4 +208,32 @@ public class BotStuntTests {
         h.onEachTick(() -> { if (!a.bot().body().isAlive()) died[0] = true; });
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(400), 400, () -> h.getTick() > 360 && !died[0]);
     }
+
+    /** Three chickens about to lay: an egg picked up. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void egg(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "egg");
+        for (int i = 0; i < 3; i++) {
+            var c = EntityTypes.CHICKEN.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            c.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28 + i, FEET, 28)));
+            c.eggTime = 200 + 100 * i;
+            h.getLevel().addFreshEntity(c);
+        }
+        a.spawn(8, FEET, 8);
+        a.run(new net.kasax.challengecraft.bot.task.EggTask(), 600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.EGG)) > 0);
+    }
+
+    /** A cod in a pool, a water bucket in hand: the fish in the bucket. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void bucketFish(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "bucket_fish");
+        a.fill(24, BotArena.GROUND - 2, 24, 30, BotArena.GROUND, 30, Blocks.WATER);
+        var cod = EntityTypes.COD.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        cod.setPos(net.minecraft.world.phys.Vec3.atCenterOf(a.abs(27, BotArena.GROUND - 1, 27)));
+        h.getLevel().addFreshEntity(cod);
+        a.spawn(20, FEET, 20, new ItemStack(Items.WATER_BUCKET));
+        a.run(new UseOnMobTask(EntityTypes.COD, Items.WATER_BUCKET, e -> true), 600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.COD_BUCKET)) > 0);
+    }
 }

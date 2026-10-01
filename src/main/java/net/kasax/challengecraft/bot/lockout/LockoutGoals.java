@@ -88,6 +88,20 @@ public final class LockoutGoals {
             Option trip = nether(bot, planner);
             return trip == null ? null : new Option(trip.cost() + 90, trip.task(), trip.yields());
         }
+        Option here = basic(bot, planner, goal);
+        if (here != null || !overworld(bot)) return here;
+        // Not to be had up here, but made from something the Nether has (quartz, blaze rods, soul
+        // sand): the trip there, then the rest planned there.
+        var t = goal.type();
+        if (t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM_AMOUNT
+                && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.CRAFT) return null;
+        Option there = planner.inNether(bot, () -> basic(bot, planner, goal));
+        if (there == null) return null;
+        Option trip = nether(bot, planner);
+        return trip == null ? null : new Option(trip.cost() + there.cost() + 60, trip.task(), trip.yields());
+    }
+
+    private static Option basic(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         Option stunt = stunt(bot, planner, goal.id());
         if (stunt != null) return stunt;
         return switch (goal.type()) {
@@ -223,6 +237,15 @@ public final class LockoutGoals {
                 }
                 yield best;
             }
+            case "advancement_best_friends_forever" -> {
+                // Any animal tamed: whichever is quickest (a wolf with bones, a cat with fish, a horse).
+                Option best = null;
+                for (String other : List.of("tame_wolf", "tame_cat", "tame_horse")) {
+                    Option o = stunt(bot, planner, other);
+                    if (o != null && (best == null || o.cost() < best.cost())) best = o;
+                }
+                yield best;
+            }
             case "ride_horse" -> mount(bot, planner, EntityTypes.HORSE, 1);
             case "tame_horse" -> mount(bot, planner, EntityTypes.HORSE, 12);
             case "get_poisoned" -> consume(bot, planner, Set.of(Items.SPIDER_EYE, Items.POISONOUS_POTATO, Items.PUFFERFISH));
@@ -231,6 +254,30 @@ public final class LockoutGoals {
                 yield c >= INF ? null : new Option(c + 2, () -> new SequenceTask("throw an ender pearl", List.of(
                         () -> new ObtainTask(Set.of(Items.ENDER_PEARL), 1, planner),
                         () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f))));
+            }
+            case "craft_cake" -> withEgg(bot, planner, Items.CAKE, null);
+            case "eat_cake_slice" -> withEgg(bot, planner, Items.CAKE, () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.CAKE,
+                    net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0));
+            case "craft_pumpkin_pie" -> withEgg(bot, planner, Items.PUMPKIN_PIE, null);
+            case "eat_pumpkin_pie" -> withEgg(bot, planner, Items.PUMPKIN_PIE, () -> new ConsumeTask(Set.of(Items.PUMPKIN_PIE)));
+            case "advancement_tactical_fishing" -> {
+                // A fish caught in a bucket of water: a water bucket, then into the water at a fish.
+                double bucket = planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1);
+                if (bucket >= INF) yield null;
+                var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+                EntityType<?> kind = EntityTypes.COD;
+                double near = INF;
+                for (EntityType<?> t : List.of(EntityTypes.COD, EntityTypes.SALMON, EntityTypes.TROPICAL_FISH, EntityTypes.PUFFERFISH)) {
+                    var seen = bot.memory().lastSeen(level, t, bot.body().blockPosition());
+                    if (seen != null && Math.sqrt(seen.distSqr(bot.body().blockPosition())) < near) {
+                        near = Math.sqrt(seen.distSqr(bot.body().blockPosition()));
+                        kind = t;
+                    }
+                }
+                EntityType<?> fish = kind;
+                yield new Option(bucket + (near >= INF ? 150 : near / 4 + 15), () -> new SequenceTask("catch a fish in a bucket", List.of(
+                        () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner),
+                        () -> new UseOnMobTask(fish, Items.WATER_BUCKET, e -> true))));
             }
             case "catch_fish", "advancement_fishy_business" -> {
                 double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
@@ -369,6 +416,15 @@ public final class LockoutGoals {
         };
         if (wanted == null) return null;
         var body = bot.body();
+        // No villager about: to the nearest village known, then the trade is planned there.
+        if (body.level().getEntitiesOfClass(net.minecraft.world.entity.npc.villager.AbstractVillager.class,
+                new net.minecraft.world.phys.AABB(body.blockPosition()).inflate(96), v -> v.isAlive() && !v.isBaby()).isEmpty()) {
+            if (!overworld(bot)) return null;
+            var level = (net.minecraft.server.level.ServerLevel) body.level();
+            var village = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot, net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "village"));
+            double dist = village == null ? 400 : Math.sqrt(village.spot().distSqr(body.blockPosition()));
+            return new Option(dist / 4 + 90 + (village == null ? 300 : 0), () -> new net.kasax.challengecraft.bot.task.VisitStructureTask(level, "village"));
+        }
         double best = INF;
         net.minecraft.world.item.trading.MerchantOffer bestOffer = null;
         net.minecraft.world.entity.npc.villager.AbstractVillager bestVillager = null;
@@ -507,6 +563,27 @@ public final class LockoutGoals {
             cost = bot.body().level().isDarkOutside() ? 150 : 420;
         }
         return new Option(cost, () -> new KillTask(Set.of(type), Set.of(), 0, 1));
+    }
+
+    /**
+     * Something with an egg in it (cake, pumpkin pie): the egg from a flock of chickens (they lay
+     * every few minutes), the rest as usual; then {@code after} (eat it, put it down), if any.
+     */
+    private static Option withEgg(Bot bot, ObtainPlanner planner, Item item, Supplier<BotTask> after) {
+        boolean haveEgg = ObtainPlanner.countAny(bot.body(), Set.of(Items.EGG)) > 0;
+        double rest = haveEgg ? planner.estimate(bot, Set.of(item), 1) : planner.assuming(bot, Set.of(Items.EGG), () -> planner.estimate(bot, Set.of(item), 1));
+        if (rest >= INF) return null;
+        double egg = 0;
+        if (!haveEgg && ObtainPlanner.countAny(bot.body(), Set.of(item)) == 0) {
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            var chickens = bot.memory().lastSeen(level, EntityTypes.CHICKEN, bot.body().blockPosition());
+            egg = (chickens == null ? 200 : Math.sqrt(chickens.distSqr(bot.body().blockPosition())) / 4) + 150;
+        }
+        List<Supplier<BotTask>> steps = new ArrayList<>();
+        if (egg > 0) steps.add(net.kasax.challengecraft.bot.task.EggTask::new);
+        steps.add(() -> new ObtainTask(Set.of(item), 1, planner));
+        if (after != null) steps.add(after);
+        return new Option(rest + egg + 3, () -> new SequenceTask("make " + ObtainPlanner.name(item), steps));
     }
 
     private static Option consume(Bot bot, ObtainPlanner planner, Set<Item> items) {

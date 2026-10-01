@@ -155,6 +155,32 @@ public final class ObtainPlanner {
     }
 
     /**
+     * Runs {@code what} as if the bot stood in the Nether (with what it holds now, none of what is
+     * about it here): what a trip there would make possible (quartz for a comparator, say).
+     */
+    public <T> T inNether(Bot bot, java.util.function.Supplier<T> what) {
+        refresh(bot);
+        boolean savedNether = nether;
+        Map<Block, Double> savedVisible = visibleBlocks, savedHints = biomeHints;
+        Map<EntityType<?>, Double> savedMobs = visibleMobs;
+        Map<Item, Double> saved = costs;
+        nether = true;
+        visibleBlocks = new IdentityHashMap<>();
+        biomeHints = new IdentityHashMap<>();
+        visibleMobs = new HashMap<>();
+        costs = computeCosts(bot);
+        try {
+            return what.get();
+        } finally {
+            nether = savedNether;
+            visibleBlocks = savedVisible;
+            biomeHints = savedHints;
+            visibleMobs = savedMobs;
+            costs = saved;
+        }
+    }
+
+    /**
      * Runs {@code what} as if the bot also held {@code held} (to weigh what one goal would do for
      * the next ones).
      */
