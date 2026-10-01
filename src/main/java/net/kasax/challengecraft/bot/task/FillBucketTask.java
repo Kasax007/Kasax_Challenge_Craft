@@ -68,10 +68,23 @@ public final class FillBucketTask implements BotTask {
         }
         if (!bot.actions().inReach(source)) {
             if (!walking) {
-                bot.navigator().goNear(source, 3.2);
+                boolean far = source.distSqr(body.blockPosition()) > 24 * 24;
+                // Far off (a lake it remembers): up out of a mine first, then over the surface in legs.
+                if (far && SurfaceTask.underground(body)) {
+                    bot.interject(new SurfaceTask());
+                    return Result.RUNNING;
+                }
+                if (far) bot.navigator().goNear(Explorer.legToward(level, bot.navigator().feet(), source, 40), 4);
+                else bot.navigator().goNear(source, 3.2);
                 walking = true;
             }
             BotNavigator.Status s = bot.navigator().tick();
+            // (A leg of a long way done: the next leg.)
+            if (s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source) && source.distSqr(body.blockPosition()) > 24 * 24) {
+                walking = false;
+                return Result.RUNNING;
+            }
+            if (s == BotNavigator.Status.IDLE) walking = false;
             if (s == BotNavigator.Status.FAILED || s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source)) {
                 skip.add(source);
                 source = null;

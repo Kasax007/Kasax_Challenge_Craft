@@ -89,7 +89,8 @@ public final class ObtainPlanner {
      * found none, count those as not around here for ten (every estimate then goes around them).
      */
     public void markFailed(Step step, long gameTime) {
-        failed.put(step.key(), gameTime + 2400);
+        // (Water: another source is never far; only a short pause before the next try.)
+        failed.put(step.key(), gameTime + (step.key().startsWith("fill:water") ? 300 : 2400));
         // (Water is everywhere: one failed fill says nothing about water at large.)
         // (Ores and other things found deep down: not there where it looked; elsewhere, soon.)
         for (Object source : step.sources()) if (source != Blocks.WATER) missing.put(source, gameTime + (oreLike(source) ? 2400 : 12000));
