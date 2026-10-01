@@ -324,3 +324,42 @@ Zeitbremse.
 Eisen und Eimer kommen meist früh. Der Engpass ist jetzt das Portalgießen im echten Gelände: Platz,
 Erreichbarkeit, Lava unter Tage. Die Fehlermeldungen nennen inzwischen den genauen Grund, und jede
 Runde behebt einen weiteren. Bisher hat Bob den Nether einmal selbst erreicht.
+
+## 9. Lange Komplett-Bretter (bis 3 Stunden, ganzes Brett ausgespielt)
+
+Die Runden laufen jetzt ohne Mehrheits-Sieg (`CHALLENGECRAFT_FULL_BOARD=1` in `scripts/bot/bench.sh`):
+vorher endete das Spiel bei 13 von 25 Feldern, und Bob stand danach im Wartebereich.
+
+### Was die langen Runden aufgedeckt haben (behoben, jeweils mit GameTest wo möglich)
+
+| Befund in der Runde | Ursache | Behebung |
+|---|---|---|
+| Nie wieder aus dem Nether zurück | Fake-Spieler bestätigte den Dimensionswechsel nie | Bestätigung wie ein Client; Portal-Hin-und-zurück-Test |
+| 11 558 Mal „go back through the portal“ | Portal nicht gemerkt, Rückweg ohne Kosten | Portal-Gedächtnis beider Enden, echte Rückweg-Kosten, Pause nach Fehlschlag |
+| 22 Min. in Grubenwasser | Navigator plante „Säule im Wasser“ ohne Halt | Wandsprung aus dem Wasser, Stützblock, Fortschritts-Wächter; zwei Grubentests |
+| Hochklettern aus y −30: 2 Blöcke/Min. | eine Wegsuche über 90 Blöcke | Etappen zu 16 Blöcken; Test 55 Blöcke Stein |
+| Verlorene Höhlen-Rückwege | nur ein „Höhleneingang“, nur beim Bergbau | Brotkrumen-Spur alle 6 Blöcke, Rückweg entlang der Spur |
+| Spitzhacke bei 3/131 im Diamantenbergbau | Werkzeug-Reserve nur zwischen Zielen; abgenutzte Werkzeuge wurden geschont | Ersatz auch mitten im Ziel; Werkzeuge der Reihe nach aufbrauchen |
+| 40 Min. „mine birch_log“ | Rucksack voll | Ballast abwerfen (nie was das Brett/der Plan braucht) |
+| Ofen-Suche über 1000 Blöcke | Abbau-Weg für Dinge, die nirgends herumliegen | Seltenes nur abbauen, wenn gesehen; sonst herstellen |
+| Pferde im Schnee gesucht | Mob-Suche ohne Lebensraum | Lebensräume aus den Spawn-Listen des Spiels; Weg zum bekannten Biom |
+| Nachtjagd auf Hexen/Schleim/Höhlenspinnen | „überall“ falsch bestimmt | nur häufige Monster oder solche, deren Lebensraum man betritt |
+| Portal gießen: „no lava left“ | kleine Lava-Pfützen, Suche zu eng | Pool mit ≥ 6 Quellen, Rückfall auf bekannte Lava, gescheiterte Pools gemieden, nur Pools unter freiem Himmel |
+| Wasser unter dem Berg: 2 Min. „Etappen“ am Ort | „weit weg“ in 3D statt über Grund | horizontale Entfernung, näher herantreten, Fehlversuche zulassen |
+| Schreiter auf Lava: 8× gescheitert | Nahkampf erreicht ihn nicht | Bogen/Armbrust als Rückfall |
+| Nether: zwei Spitzhacken in einer Minute | Erkundung zielte auf die Bedrock-Decke | `Explorer.ground()`: unter einer Decke nahe der eigenen Höhe |
+
+### Neue Fähigkeiten in diesem Abschnitt
+
+Zielgerichtetes Handeln mit Dorfbewohnern (Leveln, Reroll, Arbeitsplatz-Konkurrenz, Nitwits, zweite Station),
+Weltkarte (Atlas pro Dimension) und Langstrecken-Lauf, nächtliche Jagdrunde, Monster in Sicht mitnehmen,
+Werkzeug- und Block-Reserve, Armbrust mit Feuerwerk laden, Nether-Zutaten holen und zu Hause herstellen
+(Komparator), getippte Pfeile von Streunern/Sumpfskeletten. Abdeckung: 55 von 312 Zielen ohne bekannten Weg (vorher 72).
+
+### Offener Punkt der Testumgebung
+
+In der Benchmark-Welt kommt Bob im Nether an genau den Oberwelt-Koordinaten an, ohne Ausgangsportal
+(„crossed from overworld at 1382, 73, -2535 … to the_nether at 1382, 73, -2535, portal here: none“).
+In der GameTest-Welt (auch mit `tick sprint`) teilt das Spiel korrekt durch 8 und baut ein Portal.
+Bob ist abgesichert (merkt sich die Ankunftsstelle, besorgt notfalls Obsidian), die Ursache in der
+Welt-Erzeugung der Challenge ist noch nicht gefunden.
