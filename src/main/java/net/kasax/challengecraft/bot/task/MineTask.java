@@ -54,6 +54,22 @@ public final class MineTask implements BotTask {
         this(what, blocks, items, count, depth, null);
     }
 
+    /** What is needed now; {@code count} may be more (for later, taken while here). */
+    private int needed = Integer.MAX_VALUE;
+
+    /** Mine at least {@code needed}, and on up to the full count while more is close by. */
+    public MineTask atLeast(int needed) {
+        this.needed = Math.min(needed, count);
+        return this;
+    }
+
+    private boolean nearbyMore(ServerLevel level, Bot bot) {
+        BlockPos at = bot.body().blockPosition();
+        BlockPos near = BotWorld.nearest(level, at, 12, 8, blocks, true, skip);
+        if (near == null) near = bot.memory().nearest(level, at, blocks, skip);
+        return near != null && near.distSqr(at) <= 12 * 12;
+    }
+
     /** {@code lead}: where to look first when none is in sight (a biome known for these blocks). */
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count, Integer depth, BlockPos lead) {
         this.what = what;
@@ -67,7 +83,10 @@ public final class MineTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
-        if (ObtainPlanner.countAny(bot.body(), items) >= count) return Result.DONE;
+        int have = ObtainPlanner.countAny(bot.body(), items);
+        if (have >= count) return Result.DONE;
+        // Enough for now, more only for later (other tiles want it too): while it is right here.
+        if (have >= needed && collectTicks <= 0 && (target == null ? !nearbyMore(level, bot) : target.distSqr(bot.body().blockPosition()) > 12 * 12)) return Result.DONE;
 
         // Pick up what fell.
         if (collectTicks > 0) {

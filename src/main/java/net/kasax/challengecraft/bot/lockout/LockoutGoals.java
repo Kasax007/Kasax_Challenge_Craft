@@ -80,6 +80,14 @@ public final class LockoutGoals {
     }
 
     private static Option option(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
+        // A Nether tile from up here: the way in first (a portal cast and walked through); once
+        // there, the tile is planned for what it is. (Without this, no Nether tile ever looks doable
+        // from the Overworld, and the bot never goes.)
+        if (goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER && overworld(bot)
+                && goal.type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) {
+            Option trip = nether(bot, planner);
+            return trip == null ? null : new Option(trip.cost() + 90, trip.task(), trip.yields());
+        }
         Option stunt = stunt(bot, planner, goal.id());
         if (stunt != null) return stunt;
         return switch (goal.type()) {

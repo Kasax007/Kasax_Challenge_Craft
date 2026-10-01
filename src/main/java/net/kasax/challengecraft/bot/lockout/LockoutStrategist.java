@@ -129,6 +129,20 @@ final class LockoutStrategist {
             }
         }
 
+        // The shopping list: raw materials all open tiles want together, mined in one trip.
+        planner.boardDemand.clear();
+        net.kasax.challengecraft.bot.plan.BotKnowledge k = net.kasax.challengecraft.bot.plan.BotKnowledge.get(bot.server());
+        for (LockoutBingoGoal g : open) {
+            if (!now.containsKey(g.id())) continue;
+            Set<Item> targets = LockoutGoals.items(g.targets());
+            if (targets.isEmpty() || ObtainPlanner.countAny(bot.body(), targets) > 0) continue;
+            Item first = targets.iterator().next();
+            int amount = g.type() == LockoutBingoGoalType.ITEM_AMOUNT ? Math.max(1, g.amount()) : 1;
+            demand(k, first, amount, 0, planner.boardDemand);
+        }
+        if (!planner.boardDemand.isEmpty()) notes.add("shopping list " + planner.boardDemand.entrySet().stream()
+                .map(e -> e.getValue() + " " + ObtainPlanner.name(e.getKey())).toList());
+
         // The Nether trip: worth more than its own tile when the Nether holds several.
         long nether = open.stream().filter(g -> g.category() == LockoutBingoGoalCategory.NETHER).count();
         if (nether >= 2) {
@@ -179,6 +193,32 @@ final class LockoutStrategist {
         if (!notes.isEmpty()) sb.append(" | ").append(String.join("; ", notes));
         sb.append(" | ").append(order.size()).append(" of ").append(open.size()).append(" open tiles doable");
         bot.say(sb.toString());
+    }
+
+    /** What a raw material is called once made: the ingot is smelted from the raw ore. */
+    private static final Map<Item, Item> RAW = Map.of(Items.IRON_INGOT, Items.RAW_IRON, Items.GOLD_INGOT, Items.RAW_GOLD,
+            Items.COPPER_INGOT, Items.RAW_COPPER, Items.RAW_IRON, Items.RAW_IRON, Items.RAW_GOLD, Items.RAW_GOLD,
+            Items.RAW_COPPER, Items.RAW_COPPER, Items.DIAMOND, Items.DIAMOND, Items.REDSTONE, Items.REDSTONE,
+            Items.LAPIS_LAZULI, Items.LAPIS_LAZULI, Items.COAL, Items.COAL);
+
+    /** Adds the raw materials {@code n} of {@code item} take (along the first recipe, a few levels deep). */
+    private static void demand(net.kasax.challengecraft.bot.plan.BotKnowledge k, Item item, int n, int depth, Map<Item, Integer> out) {
+        Item raw = RAW.get(item);
+        if (raw != null) {
+            out.merge(raw, n, Integer::sum);
+            return;
+        }
+        if (depth > 3) return;
+        for (var r : k.routesTo(item)) {
+            if (!(r instanceof net.kasax.challengecraft.bot.plan.BotKnowledge.CraftRoute c)) continue;
+            int crafts = (n + c.yield() - 1) / c.yield();
+            for (var ing : c.ingredients()) {
+                List<Item> options = net.kasax.challengecraft.bot.plan.BotKnowledge.items(ing);
+                Item pick = options.stream().filter(RAW::containsKey).findFirst().orElse(options.isEmpty() ? null : options.get(0));
+                if (pick != null && pick != item) demand(k, pick, crafts, depth + 1, out);
+            }
+            return; // (the first recipe: the usual one)
+        }
     }
 
     /** A kit item is made from this tile's item (the iron ingot for the iron kit, say). */

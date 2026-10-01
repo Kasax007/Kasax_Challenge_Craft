@@ -185,8 +185,12 @@ public class BotStuntTests {
         h.getLevel().addFreshEntity(z);
         a.spawn(20, FEET, 20);
         a.bot().body().setHealth(6f);
-        a.run(new net.kasax.challengecraft.bot.task.WaitTask(300), 300,
-                () -> h.getTick() > 100 && a.bot().body().isAlive() && a.bot().body().distanceTo(z) > 7);
+        boolean[] away = {false}, died = {false};
+        h.onEachTick(() -> {
+            if (a.bot().body().isAlive() && a.bot().body().distanceTo(z) > 7) away[0] = true;
+            if (!a.bot().body().isAlive()) died[0] = true;
+        });
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(300), 300, () -> h.getTick() > 250 && away[0] && !died[0]);
     }
 
     /** Five hearts... no, two and a half, and a skeleton shooting from afar: into the ground, alive. */

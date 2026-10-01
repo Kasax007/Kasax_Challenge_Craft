@@ -562,8 +562,13 @@ public final class ObtainPlanner {
                 // If it has to dig for them: to the height of the most common of these blocks.
                 Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElseThrow();
                 Integer depth = BotKnowledge.depth(common, bot.body().blockPosition().getY());
+                int have = countAny(bot.body(), p.accept());
+                // More of it wanted by other tiles on the board (iron for the bucket, the shears and
+                // the compass): taken in the same trip while the vein is right there.
+                int extra = 0;
+                for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) - have - total);
                 yield new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
-                        countAny(bot.body(), p.accept()) + total, depth, lead(bot, blocks));
+                        have + total + Math.max(0, Math.min(extra, 16)), depth, lead(bot, blocks)).atLeast(have + total);
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);
@@ -592,6 +597,9 @@ public final class ObtainPlanner {
         if (best == null) best = farLead(bot, blocks);
         return best;
     }
+
+    /** Raw materials the open tiles want in all (set by the game plan): mined in bulk when in a vein. */
+    public final Map<Item, Integer> boardDemand = new HashMap<>();
 
     /** A far lead only if one was found before (no new biome search for blocks that are in sight). */
     private static BlockPos farLeadStandBy(Bot bot, Set<Block> blocks) {

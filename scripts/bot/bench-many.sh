@@ -10,6 +10,6 @@ for SEED in "$@"; do
   v() { grep "\[BOTBENCH\] $1:" $L | tail -1 | sed "s/.*$1: //; s/ s$//; s/ (.*//"; }
   TILES=$(grep "\[BOTBENCH\] tiles claimed:" $L | sed 's/.*claimed: //; s/ (.*//')
   CLAIMED=$(grep "\[BOTBENCH\] tiles claimed:" $L | sed 's/.*(//; s/)$//')
-  IDLE=$(grep "\[BOTBENCH\] idle:" $L | sed 's/.*idle: \([0-9]*\) s, failed tasks: \([0-9]*\), deaths: \([0-9]*\)/\1 \2 \3/')
+  IDLE=$(grep "\[BOTBENCH\] idle:" $L | sed 's/.*idle: \([0-9]*\) s, failed tasks: \([0-9]*\), deaths: \([0-9]*\).*/\1 \2 \3/')
   printf "%-8s %5s %6s %6s %6s %6s %5s %5s %5s  %s\n" $SEED "$TILES" "$(v 'stone pickaxe')" "$(v 'iron ingot')" "$(v bucket)" "$(v nether)" $IDLE "$CLAIMED"
 done
