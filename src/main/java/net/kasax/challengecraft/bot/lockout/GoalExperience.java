@@ -17,7 +17,9 @@ import java.util.Properties;
  */
 final class GoalExperience {
     private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("challengecraft-bob-experience.properties");
-    private static final double MIN = 0.4, MAX = 5, WEIGHT = 0.3;
+    // (Kept to a narrow band: an estimate already knows what Bob holds and knows about the world;
+    // experience only corrects its habitual bias, it must not drown it.)
+    private static final double MIN = 0.6, MAX = 2.0, WEIGHT = 0.25;
     private static Properties data;
 
     private GoalExperience() {
