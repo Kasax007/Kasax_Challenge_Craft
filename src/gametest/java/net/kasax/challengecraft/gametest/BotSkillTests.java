@@ -188,6 +188,21 @@ public class BotSkillTests {
         }, 3000, () -> stage[0] == 2 && a.bot().body().level().dimension() == Level.OVERWORLD);
     }
 
+    /** Where mobs live, from the game's spawn lists: horses in plains not snow, zombies anywhere, drowned in rivers. */
+    @GameTest(structure = STRUCTURE, maxTicks = 20, padding = 8)
+    public void mobHabitats(GameTestHelper h) {
+        var level = h.getLevel();
+        var horse = net.kasax.challengecraft.bot.plan.MobHabitats.of(level, net.minecraft.world.entity.EntityTypes.HORSE);
+        var zombie = net.kasax.challengecraft.bot.plan.MobHabitats.of(level, net.minecraft.world.entity.EntityTypes.ZOMBIE);
+        var drowned = net.kasax.challengecraft.bot.plan.MobHabitats.of(level, net.minecraft.world.entity.EntityTypes.DROWNED);
+        org.slf4j.LoggerFactory.getLogger("ChallengeCraft-BotTest").info("[BOTTEST] habitats: horse {}, zombie {}, drowned {}", horse, zombie, drowned);
+        h.assertTrue(horse.contains(net.minecraft.resources.Identifier.parse("minecraft:plains")), "horses in plains");
+        h.assertFalse(horse.contains(net.minecraft.resources.Identifier.parse("minecraft:snowy_plains")), "no horses in the snow");
+        h.assertTrue(zombie.isEmpty(), "zombies anywhere");
+        h.assertTrue(drowned.contains(net.minecraft.resources.Identifier.parse("minecraft:river")), "drowned in rivers");
+        h.succeed();
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {

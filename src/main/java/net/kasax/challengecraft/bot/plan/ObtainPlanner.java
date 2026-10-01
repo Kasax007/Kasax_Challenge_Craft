@@ -74,6 +74,7 @@ public final class ObtainPlanner {
     private Map<Block, Double> visibleBlocks = Map.of();
     private Map<EntityType<?>, Double> visibleMobs = Map.of();
     private boolean dark, nether, underground;
+    private net.kasax.challengecraft.bot.Bot habitatBot;
     /** Seconds until morning (villagers take no new job at night). */
     private double nightLeft;
     /** Blocks typical of a biome in view, with the walk there. */
@@ -266,6 +267,12 @@ public final class ObtainPlanner {
         if (seen != null) return seen;
         // Nether mobs only in the Nether, and the Overworld's not there.
         if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return INF;
+        // One that lives somewhere in particular: the walk to the nearest such place it knows,
+        // then the search there; not knowing any is a long search (horses are not in the snow).
+        if (habitatBot != null && !MobHabitats.inHabitat(habitatBot, type)) {
+            BlockPos home = MobHabitats.nearestKnown(habitatBot, type);
+            effort = home != null ? effort + Math.sqrt(home.distSqr(habitatBot.body().blockPosition())) / 4.0 : effort * 2.5;
+        }
         boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
         // (In the Nether monsters are about at any hour.)
         // (Nor down in a cave: dark there at noon, monsters about at any hour.)
@@ -321,6 +328,7 @@ public final class ObtainPlanner {
         visibleMobs = mobs;
         dark = level.isDarkOutside();
         underground = net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
+        habitatBot = bot;
         long clock = level.getOverworldClockTime() % 24000;
         nightLeft = dark && clock >= 12000 ? (24000 - clock) / 20.0 : 0;
         nether = level.dimension() == net.minecraft.world.level.Level.NETHER;

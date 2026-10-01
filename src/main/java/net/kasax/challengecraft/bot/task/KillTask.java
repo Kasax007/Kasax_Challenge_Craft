@@ -45,6 +45,7 @@ public final class KillTask implements BotTask {
     /** {@code loot} may be empty when only the kill matters (then {@code kills} counts). */
     public KillTask(Set<EntityType<?>> types, Set<Item> loot, int count, int kills) {
         this.types = Set.copyOf(types);
+        explorer.lookingFor(this.types);
         this.loot = Set.copyOf(loot);
         this.count = count;
         this.kills = kills;

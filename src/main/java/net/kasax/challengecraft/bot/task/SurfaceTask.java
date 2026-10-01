@@ -83,6 +83,15 @@ public final class SurfaceTask implements BotTask {
             Result r = retrace(bot, feet);
             if (r != null) return r;
         }
+        // Out of blocks (spent on a pillar, say): a stack from the rock round about first; every
+        // way up from a ledge or a pillar top wants some.
+        if (!fetchedBlocks && !bot.actions().hasThrowaway() && hasPickaxe(bot.body())) {
+            fetchedBlocks = true;
+            navigating = false;
+            bot.interject(new ObtainTask(java.util.Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE), 16,
+                    new net.kasax.challengecraft.bot.plan.ObtainPlanner()));
+            return Result.RUNNING;
+        }
         if (navFails < 4) {
             if (!navigating) {
                 // Deep down (ninety blocks of deepslate overhead) one search cannot see the whole
@@ -175,7 +184,12 @@ public final class SurfaceTask implements BotTask {
         return Result.RUNNING;
     }
 
-    private boolean retraced;
+    private boolean retraced, fetchedBlocks;
+
+    private static boolean hasPickaxe(BotPlayer body) {
+        for (var st : body.getInventory().getNonEquipmentItems()) if (st.is(net.minecraft.tags.ItemTags.PICKAXES)) return true;
+        return false;
+    }
     private int trailIndex = -1, trailFails;
 
     /**

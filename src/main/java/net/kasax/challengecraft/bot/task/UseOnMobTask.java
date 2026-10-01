@@ -37,6 +37,7 @@ public final class UseOnMobTask implements BotTask {
 
     public UseOnMobTask(EntityType<?> type, Item tool, Predicate<LivingEntity> suitable) {
         this.type = type;
+        explorer.lookingFor(java.util.Set.of(type));
         this.tool = tool;
         this.suitable = suitable;
     }

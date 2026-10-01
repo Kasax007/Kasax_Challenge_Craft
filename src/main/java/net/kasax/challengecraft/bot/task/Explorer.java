@@ -22,6 +22,16 @@ final class Explorer {
         this.budget = budgetTicks;
     }
 
+    private java.util.Set<net.minecraft.world.entity.EntityType<?>> habitat;
+    private boolean habitatGiveUp;
+    private final FarWalk toHabitat = new FarWalk();
+
+    /** Exploring for these kinds of mob: their habitat first, when one is known. */
+    Explorer lookingFor(java.util.Set<net.minecraft.world.entity.EntityType<?>> types) {
+        this.habitat = types;
+        return this;
+    }
+
     /** One tick of exploring; FAILED once the time is up. */
     BotTask.Result tick(Bot bot) {
         if (++ticks > budget || legs > 60) return BotTask.Result.FAILED;
@@ -29,6 +39,26 @@ final class Explorer {
             climbed = true;
             if (SurfaceTask.underground(bot.body())) {
                 bot.interject(new SurfaceTask());
+                return BotTask.Result.RUNNING;
+            }
+        }
+        // Looking for a kind of mob that lives somewhere in particular: to the nearest place of
+        // that kind it knows (horses: the plains seen on the way), not off into the snow.
+        if (habitat != null && !habitatGiveUp) {
+            boolean in = false;
+            BlockPos home = null;
+            for (var t : habitat) {
+                if (net.kasax.challengecraft.bot.plan.MobHabitats.inHabitat(bot, t)) in = true;
+                BlockPos h = net.kasax.challengecraft.bot.plan.MobHabitats.nearestKnown(bot, t);
+                if (h != null && (home == null || h.distSqr(bot.body().blockPosition()) < home.distSqr(bot.body().blockPosition()))) home = h;
+            }
+            if (!in && home != null) {
+                if (walking) {
+                    bot.navigator().stop();
+                    walking = false;
+                }
+                FarWalk.Status fs = toHabitat.tick(bot, home, 6);
+                if (fs == FarWalk.Status.FAILED) habitatGiveUp = true;
                 return BotTask.Result.RUNNING;
             }
         }
