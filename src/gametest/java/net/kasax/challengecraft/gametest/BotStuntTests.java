@@ -423,4 +423,21 @@ public class BotStuntTests {
         a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 3000,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
     }
+
+    /** A free composter beside the only jobless villager: taken up (or the new farmer's taken away), so it becomes a fletcher. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 72)
+    public void jobSiteRival(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "job_site_rival");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set 1000");
+        a.fill(30, FEET, 21, 30, FEET, 21, Blocks.COMPOSTER);
+        var v = EntityTypes.VILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
+        level.addFreshEntity(v);
+        a.spawn(20, FEET, 20, new ItemStack(Items.FLETCHING_TABLE), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64),
+                new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.WOODEN_AXE));
+        var bowTrade = net.kasax.challengecraft.bot.plan.TradeKnowledge.get(level.getServer()).selling(Items.BOW).get(0);
+        a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 3600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
+    }
 }

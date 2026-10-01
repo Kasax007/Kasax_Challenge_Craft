@@ -33,7 +33,11 @@ public final class VillagerTradeTask implements BotTask {
     private final ObtainPlanner planner = new ObtainPlanner();
     private Villager merchant;
     private int ticks, waitTicks, offerWait, steps, nightTicks;
-    private boolean triedVillage, placedSite;
+    private boolean triedVillage, placedSite, clearedRivals;
+    /** The job site put down (or found free) for a villager to take. */
+    private BlockPos siteAt;
+    private int claimedTicks, sitesTried, rivalsBroken, hires, hiredBefore;
+    private boolean hiring;
     private static final int MAX_REROLLS = 8;
     private int rerolls;
 
@@ -63,30 +67,17 @@ public final class VillagerTradeTask implements BotTask {
                     .max(Comparator.comparingInt(v -> v.getVillagerData().level())).orElse(null);
         }
         // Nobody does that job: a jobless one gets the job site block put down beside it.
-        if (merchant == null) {
-            if (waitTicks > 0) {
-                // (At night they rest and look for no work: the wait starts with the morning.)
-                if (!level.isDarkOutside()) waitTicks--;
-                else if (++nightTicks > 13000) return Result.FAILED;
+        if (merchant == null) return employ(bot, body, level, villagers, trade.profession());
+        // Another one being given the job (more emeralds to be had).
+        if (hiring) {
+            if (villagers.stream().filter(v -> profession(v).equals(trade.profession())).count() > hiredBefore) {
+                hiring = false;
+                siteAt = null;
+            } else {
+                Result r = employ(bot, body, level, villagers, trade.profession());
+                if (r == Result.FAILED) return r;
                 return Result.RUNNING;
             }
-            if (placedSite) return fail(bot, "no villager took the " + trade.profession() + "'s job");
-            Villager jobless = villagers.stream().filter(v -> profession(v).equals("none"))
-                    .min(Comparator.comparingDouble(v -> v.distanceToSqr(body))).orElse(null);
-            if (jobless == null && villagers.stream().anyMatch(VillagerTradeTask::losingJob) && ++offerWait < 600) return Result.RUNNING;
-            if (jobless == null) return fail(bot, "no " + trade.profession() + " and no jobless villager here");
-            Item site = TradeKnowledge.JOB_SITES.get(trade.profession()).asItem();
-            if (ObtainPlanner.countAny(body, Set.of(site)) == 0) {
-                interject(bot, new ObtainTask(Set.of(site), 1, planner));
-                return Result.RUNNING;
-            }
-            if (body.distanceTo(jobless) > 3) return walkTo(bot, jobless.blockPosition());
-            BlockPos at = bot.actions().placeNearby(site);
-            if (at == null) return fail(bot, "no room for the job site");
-            bot.say("a " + trade.profession() + " is needed: job site put down at " + at.toShortString());
-            placedSite = true;
-            waitTicks = 2400; // (it takes the job when it next looks for one: up to a couple of minutes)
-            return Result.RUNNING;
         }
         // Its level: the goods are sold from this level on.
         MerchantOffer offer = offer(merchant, trade.gives());
@@ -144,6 +135,20 @@ public final class VillagerTradeTask implements BotTask {
         // Without anything that pays emeralds, levelling up leads nowhere: new trades, then.
         if (best == null || bestCost >= 1e8 || !emeralds) {
             if (++offerWait <= 200) return Result.RUNNING; // (just given its job: the trades come a moment later)
+            // Emeralds wanted, but all who pay for things are sold out: another villager given
+            // the same job (a second station), as players do when trading a lot.
+            if (!levelUp && hires < 3 && about.stream().anyMatch(v -> profession(v).equals("none"))) {
+                hires++;
+                hiring = true;
+                hiredBefore = (int) about.stream().filter(v -> profession(v).equals(trade.profession())).count();
+                siteAt = null;
+                offerWait = 0;
+                waitTicks = 0;
+                claimedTicks = 0;
+                sitesTried = 0;
+                bot.say("everyone's trades are used up: a second " + trade.profession() + " for more emeralds");
+                return Result.RUNNING;
+            }
             if (canReroll()) return reroll(bot, body);
             StringBuilder offers = new StringBuilder();
             for (MerchantOffer o : merchant.getOffers()) offers.append(' ').append(o.getCostA().getCount()).append(' ').append(ObtainPlanner.name(o.getCostA().getItem()))
@@ -161,6 +166,115 @@ public final class VillagerTradeTask implements BotTask {
                 + " for " + ObtainPlanner.name(deal.getResult().getItem()), (v, o) -> v == with && o == deal));
         offerWait = 0;
         return Result.RUNNING;
+    }
+
+    /**
+     * A jobless villager given a {@code profession}: the job site block put down beside it, any
+     * other free job site about taken up first (it would take the nearest free one, whatever the
+     * job), then waited for. It may take a while, or one from further off claims it and walks
+     * over: as long as somebody has claimed it, the wait goes on. Nitwits take no job at all.
+     */
+    private Result employ(Bot bot, BotPlayer body, ServerLevel level, List<Villager> villagers, String profession) {
+        if (siteAt != null) {
+            // The block gone (broken, burnt): put down again.
+            if (!level.getBlockState(siteAt).is(TradeKnowledge.JOB_SITES.get(profession))) {
+                siteAt = null;
+                return Result.RUNNING;
+            }
+            // (At night they rest and look for no work: the wait starts with the morning.)
+            if (level.isDarkOutside()) {
+                if (++nightTicks > 13000) return fail(bot, "the night is too long to wait for a " + profession);
+                return Result.RUNNING;
+            }
+            boolean claimed = occupied(level, siteAt);
+            if (claimed) claimedTicks++;
+            else waitTicks++;
+            if (claimedTicks > 4800) return fail(bot, "the " + profession + " who claimed the job site never came");
+            if (waitTicks > 2400) {
+                if (++sitesTried > 2) return fail(bot, "no villager takes the " + profession + "'s job");
+                // Nobody wanted it: other free job sites about may be drawing them off; again.
+                waitTicks = 0;
+                clearedRivals = false;
+            }
+            if (!clearedRivals) return clearRivals(bot, level, siteAt, profession);
+            return Result.RUNNING;
+        }
+        Villager jobless = villagers.stream().filter(v -> profession(v).equals("none"))
+                .min(Comparator.comparingDouble(v -> v.distanceToSqr(body))).orElse(null);
+        if (jobless == null && villagers.stream().anyMatch(VillagerTradeTask::losingJob) && ++offerWait < 600) return Result.RUNNING;
+        // None jobless, but a fresh one (never traded with) in another job: its job site taken up,
+        // and it is jobless again.
+        if (jobless == null && rivalsBroken < 6) {
+            Villager fresh = villagers.stream().filter(v -> !profession(v).equals(profession) && !profession(v).equals("nitwit") && !profession(v).equals("none")
+                            && v.getVillagerData().level() <= 1 && v.getVillagerXp() == 0 && v.getBrain().getMemory(MemoryModuleType.JOB_SITE).isPresent())
+                    .min(Comparator.comparingDouble(v -> v.distanceToSqr(body))).orElse(null);
+            if (fresh != null) {
+                BlockPos its = fresh.getBrain().getMemory(MemoryModuleType.JOB_SITE).get().pos();
+                if (!bot.actions().inReach(its)) return walkTo(bot, its);
+                bot.tools().equipFor(level.getBlockState(its));
+                if (bot.actions().breakTick(its)) {
+                    rivalsBroken++;
+                    bot.say("the new " + profession(fresh) + " gives up its job site, to be a " + profession + " instead");
+                }
+                return Result.RUNNING;
+            }
+        }
+        if (jobless == null) {
+            boolean nitwits = villagers.stream().anyMatch(v -> profession(v).equals("nitwit"));
+            return fail(bot, "no " + profession + " and no jobless villager here" + (nitwits ? " (nitwits only: they never work)" : ""));
+        }
+        Item site = TradeKnowledge.JOB_SITES.get(profession).asItem();
+        // A free one of that job about already: it will be taken; nothing to put down.
+        BlockPos free = freeSite(level, jobless.blockPosition(), 32, profession, true);
+        if (free != null) {
+            siteAt = free;
+            bot.say("a free " + profession + "'s job site at " + free.toShortString() + ": waiting for a villager to take it");
+            return Result.RUNNING;
+        }
+        if (ObtainPlanner.countAny(body, Set.of(site)) == 0) {
+            interject(bot, new ObtainTask(Set.of(site), 1, planner));
+            return Result.RUNNING;
+        }
+        if (body.distanceTo(jobless) > 3) return walkTo(bot, jobless.blockPosition());
+        BlockPos at = bot.actions().placeNearby(site);
+        if (at == null) return fail(bot, "no room for the job site");
+        bot.say("a " + profession + " is needed: job site put down at " + at.toShortString());
+        siteAt = at;
+        placedSite = true;
+        waitTicks = 0;
+        claimedTicks = 0;
+        clearedRivals = false;
+        return Result.RUNNING;
+    }
+
+    /** Free job sites of other jobs near ours taken up, one at a time (they would draw the villager off). */
+    private Result clearRivals(Bot bot, ServerLevel level, BlockPos ours, String profession) {
+        BlockPos rival = freeSite(level, ours, 24, profession, false);
+        if (rival == null || rivalsBroken >= 6) {
+            clearedRivals = true;
+            return Result.RUNNING;
+        }
+        if (!bot.actions().inReach(rival)) return walkTo(bot, rival);
+        bot.tools().equipFor(level.getBlockState(rival));
+        String name = level.getBlockState(rival).getBlock().getName().getString();
+        if (bot.actions().breakTick(rival)) {
+            rivalsBroken++;
+            bot.say("took up a free " + name + " so the villager takes my job site");
+        }
+        return Result.RUNNING;
+    }
+
+    /** The nearest unclaimed job site within {@code r}: of {@code profession} ({@code same}), or of any other job. */
+    private static BlockPos freeSite(ServerLevel level, BlockPos center, int r, String profession, boolean same) {
+        net.minecraft.world.level.block.Block block = TradeKnowledge.JOB_SITES.get(profession);
+        return level.getPoiManager().findAll(h -> h.is(net.minecraft.tags.PoiTypeTags.ACQUIRABLE_JOB_SITE), p -> level.getBlockState(p).is(block) == same,
+                        center, r, net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.HAS_SPACE)
+                .min(Comparator.comparingDouble(p -> p.distSqr(center))).orElse(null);
+    }
+
+    /** Whether some villager has claimed the job site at {@code p} (and may be on its way). */
+    private static boolean occupied(ServerLevel level, BlockPos p) {
+        return level.getPoiManager().findAll(h -> true, q -> q.equals(p), p, 1, net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.IS_OCCUPIED).findAny().isPresent();
     }
 
     /** A fresh one (first level, never traded with) whose job site is known draws new trades when it is put down again. */
@@ -182,6 +296,7 @@ public final class VillagerTradeTask implements BotTask {
             interject(bot, new CollectDropsTask(site, 8, 200));
             merchant = null;
             placedSite = false;
+            siteAt = null;
             waitTicks = 0;
             offerWait = 0;
         }
