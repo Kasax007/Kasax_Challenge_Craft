@@ -280,6 +280,8 @@ public final class MineTask implements BotTask {
         }
         if (depth != null) return true;
         if (Math.abs(p.getY() - bot.body().getBlockY()) <= 8) return true;
+        // (Under a roof there is no surface to be near: the Nether's blocks are all "inside".)
+        if (level.dimensionType().hasCeiling()) return Math.abs(p.getY() - bot.body().getBlockY()) <= 24;
         return p.getY() >= level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ()) - 6;
     }
 
@@ -386,7 +388,7 @@ public final class MineTask implements BotTask {
                         return Result.FAILED;
                     }
                     BlockPos away = feet.offset(bot.body().getRandom().nextInt(13) - 6, 0, bot.body().getRandom().nextInt(13) - 6);
-                    bot.interject(new GoToTask(level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, away), 2));
+                    bot.interject(new GoToTask(Explorer.ground(level, away, feet.getY()), 2));
                 }
                 return Result.RUNNING;
             }

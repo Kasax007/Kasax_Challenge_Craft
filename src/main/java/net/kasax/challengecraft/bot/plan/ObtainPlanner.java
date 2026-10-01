@@ -754,7 +754,7 @@ public final class ObtainPlanner {
         if (found == null) return null;
         BlockPos at = found.getFirst();
         // (Not generated yet the ground there reads as the bottom of the world: sea level instead.)
-        BlockPos lead = level.hasChunkAt(at) ? level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at)
+        BlockPos lead = level.hasChunkAt(at) ? net.kasax.challengecraft.bot.task.Explorer.ground(level, at, Math.max(from.getY(), level.getSeaLevel()))
                 : new BlockPos(at.getX(), level.getSeaLevel(), at.getZ());
         String biome = found.getSecond().unwrapKey().map(k -> k.identifier().getPath()).orElse("");
         bot.farLeads.put(new Bot.FarLead(level.dimension().identifier().toString(), lead), BotKnowledge.typicalOf(biome));

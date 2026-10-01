@@ -12,7 +12,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * surface first if underground, then in legs of about 40 blocks in one direction (a player keeps
  * a direction rather than circling), turning when blocked. Each leg makes the bot look around again.
  */
-final class Explorer {
+public final class Explorer {
     private final int budget;
     private Direction heading;
     private boolean walking, climbed;
@@ -70,7 +70,12 @@ final class Explorer {
         if (!walking) {
             legs++;
             BlockPos p = nav.feet().relative(heading, 40).relative(heading.getClockWise(), bot.body().getRandom().nextInt(21) - 10);
-            nav.goNear(bot.body().level().getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
+            // Under a roof (the Nether) the height map is the bedrock ceiling: legs at about the
+            // height it is at instead, on something to stand on (else it tunnels through the
+            // netherrack under the roof, a pickaxe a minute).
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            nav.goNear(level.dimensionType().hasCeiling() ? legToward(level, nav.feet(), new BlockPos(p.getX(), nav.feet().getY(), p.getZ()), 40)
+                    : level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
             walking = true;
         }
         BotNavigator.Status s = nav.tick();
@@ -81,6 +86,22 @@ final class Explorer {
             if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
         }
         return BotTask.Result.RUNNING;
+    }
+
+    /**
+     * Where to stand at the column of {@code p}: the surface there, or under a roof (the Nether,
+     * where the height map is the bedrock ceiling) a spot to stand on near the height {@code nearY}.
+     */
+    public static BlockPos ground(net.minecraft.server.level.ServerLevel level, BlockPos p, int nearY) {
+        if (!level.dimensionType().hasCeiling()) return level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
+        for (int i = 0; i <= 24; i++) {
+            for (int sign : new int[] {1, -1}) {
+                BlockPos q = new BlockPos(p.getX(), nearY + i * sign, p.getZ());
+                if (level.getBlockState(q).isAir() && level.getBlockState(q.above()).isAir()
+                        && level.getBlockState(q.below()).isSolidRender() && level.getFluidState(q.below()).isEmpty()) return q;
+            }
+        }
+        return new BlockPos(p.getX(), nearY, p.getZ());
     }
 
     /** The next leg toward {@code target}: at most {@code leg} blocks on, on the surface there. */

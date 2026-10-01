@@ -56,7 +56,7 @@ public final class PortalTask implements BotTask {
                 // Nowhere flat enough right here: walk a bit and look again.
                 if (ticks > 3000) return Result.FAILED;
                 BlockPos p = body.blockPosition().offset(body.getRandom().nextInt(17) - 8, 0, body.getRandom().nextInt(17) - 8);
-                bot.interject(new GoToTask(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 2));
+                bot.interject(new GoToTask(Explorer.ground(level, p, body.getBlockY()), 2));
                 return Result.RUNNING;
             }
         }
