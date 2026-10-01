@@ -53,6 +53,8 @@ public final class Bot {
      * is that trail backwards, as a player retraces his steps.
      */
     public final java.util.ArrayList<net.minecraft.core.BlockPos> trail = new java.util.ArrayList<>();
+    /** Lava pools where casting a portal failed (no room, no way there): not chosen again. */
+    public final java.util.Set<net.minecraft.core.BlockPos> badCastPools = new java.util.HashSet<>();
     private net.minecraft.core.BlockPos lastSurface;
     private Object trailDimension;
     /** Set by the brain while an explosion survived would claim a tile: a creeper is then welcome. */

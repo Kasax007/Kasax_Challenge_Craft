@@ -95,6 +95,8 @@ public final class CastPortalTask implements BotTask {
         }
         if (ops == null && !plan(bot, level)) {
             bot.say("no spot to cast a portal by a lava pool");
+            if (near != null) bot.badCastPools.add(near);
+            if (planLava != null) bot.badCastPools.add(planLava);
             return Result.FAILED;
         }
         Result r = index < ops.size() ? step(bot, level, ops.get(index)) : lightAndEnter(bot, level);
@@ -113,6 +115,9 @@ public final class CastPortalTask implements BotTask {
             return Result.RUNNING;
         }
         if (r == Result.FAILED) {
+            // (This pool does not work out: the next try another.)
+            if (planLava != null) bot.badCastPools.add(planLava);
+            if (near != null) bot.badCastPools.add(near);
             var b = bot.body();
             Op op = index < ops.size() ? ops.get(index) : null;
             bot.say("casting stopped at " + status() + " (tries " + tries + ", walk fails " + walkFails
@@ -368,7 +373,7 @@ public final class CastPortalTask implements BotTask {
         // put a floor where there is none. The one with the least work, with nothing liquid in it.
         BlockPos best = null;
         Direction bestDir = null;
-        int bestWork = 40;
+        int bestWork = 60;
         for (int r = 7; r <= 14; r++) {
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {

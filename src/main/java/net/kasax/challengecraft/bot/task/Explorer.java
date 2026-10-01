@@ -58,7 +58,9 @@ final class Explorer {
                     walking = false;
                 }
                 FarWalk.Status fs = toHabitat.tick(bot, home, 6);
-                if (fs == FarWalk.Status.FAILED) habitatGiveUp = true;
+                // There (or no way there): on from here the usual way; the spot it remembered
+                // may lie just off the edge of that country (a hilltop of another biome).
+                if (fs != FarWalk.Status.MOVING) habitatGiveUp = true;
                 return BotTask.Result.RUNNING;
             }
         }

@@ -212,6 +212,11 @@ public final class LockoutGoals {
         for (int i = 0; i < 24; i++) {
             BlockPos p = bot.memory().nearest(level, bot.body().blockPosition(), lava, skip);
             if (p == null) break;
+            // (Not one where casting already failed: no room, no way to it.)
+            if (bot.badCastPools.stream().anyMatch(b -> b.distSqr(p) < 24 * 24)) {
+                skip.add(p);
+                continue;
+            }
             if (first == null) first = p;
             if (p.distSqr(bot.body().blockPosition()) > 256 * 256) break;
             if (level.canSeeSky(p.above())) return p;

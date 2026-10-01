@@ -24,6 +24,9 @@ import java.util.Set;
  * up, then mine the obsidian (a diamond pickaxe, ten seconds a block).
  */
 public final class MakeObsidianTask implements BotTask {
+    private final FarWalk far = new FarWalk();
+    private boolean triedWater;
+    private int farFails;
     private enum Phase { FIND, POUR, WAIT, TAKE_BACK, MINE }
 
     private final int target;
@@ -51,10 +54,26 @@ public final class MakeObsidianTask implements BotTask {
                     phase = Phase.MINE;
                     return Result.RUNNING;
                 }
-                if (BotInventory.slotOf(body, Items.WATER_BUCKET) < 0) return Result.FAILED;
+                // Water first (a bucket of it from the nearest lake), if there is a bucket to fill.
+                if (BotInventory.slotOf(body, Items.WATER_BUCKET) < 0) {
+                    if (BotInventory.slotOf(body, Items.BUCKET) < 0 || triedWater) return Result.FAILED;
+                    triedWater = true;
+                    bot.interject(new FillBucketTask(FluidTags.WATER));
+                    return Result.RUNNING;
+                }
                 lava = BotWorld.nearest(level, body.blockPosition(), 32, 12,
                         s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, skip);
-                if (lava == null) return Result.FAILED;
+                // None in sight: to the nearest lava it remembers, however far.
+                if (lava == null) {
+                    BlockPos known = bot.memory().nearest(level, body.blockPosition(), s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), skip);
+                    if (known == null || farFails > 2 || known.distSqr(body.blockPosition()) > 400 * 400) return Result.FAILED;
+                    FarWalk.Status fs = far.tick(bot, known, 8);
+                    if (fs == FarWalk.Status.FAILED) {
+                        farFails++;
+                        skip.add(known);
+                    }
+                    return Result.RUNNING;
+                }
                 bank = null;
                 for (Direction d : Direction.Plane.HORIZONTAL) {
                     BlockPos n = lava.relative(d);
