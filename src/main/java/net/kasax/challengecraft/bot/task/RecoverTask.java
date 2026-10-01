@@ -45,6 +45,9 @@ public final class RecoverTask implements BotTask {
                 }
                 BotNavigator.Status s = nav.tick();
                 if (s != BotNavigator.Status.MOVING) walking = false;
+                // Arrived as near as there is a way to: look about from here (the drops may lie
+                // a little below or above).
+                if (s == BotNavigator.Status.ARRIVED && dx * dx + dz * dz < 100) there = true;
                 if (s == BotNavigator.Status.FAILED && ++fails > 6) return Result.FAILED;
                 return Result.RUNNING;
             }

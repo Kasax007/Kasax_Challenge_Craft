@@ -191,6 +191,8 @@ public final class KillTask implements BotTask {
             BlockPos seen = null;
             for (EntityType<?> t : types) {
                 BlockPos p = bot.memory().lastSeen(level, t, bot.body().blockPosition());
+                // (Not one seen far down in a cave or under a lake: no quick way there.)
+                if (p != null && (Math.abs(p.getY() - bot.body().getBlockY()) > 24 || !level.getFluidState(p).isEmpty())) p = null;
                 if (p != null && (seen == null || p.distSqr(bot.body().blockPosition()) < seen.distSqr(bot.body().blockPosition()))) seen = p;
             }
             triedMemory = true;
