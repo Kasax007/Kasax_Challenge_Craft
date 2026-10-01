@@ -17,7 +17,8 @@ set_prop level-seed $SEED
 set_prop online-mode false
 set_prop enable-rcon true
 set_prop rcon.password test
-set_prop rcon.port 25575
+set_prop rcon.port ${RCON_PORT:-25575}
+set_prop server-port ${SERVER_PORT:-25565}
 set_prop spawn-protection 0
 # Bob plays with a player's sight: 24 chunks to see, the same to simulate.
 set_prop view-distance 24

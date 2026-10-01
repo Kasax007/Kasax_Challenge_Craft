@@ -43,6 +43,9 @@ public final class Bot {
         return unreachable.keySet();
     }
 
+    /** Where two eyes of ender said the stronghold is (triangulated), once worked out. */
+    public net.minecraft.core.BlockPos knownStronghold;
+
     /** Work blocks (tables, furnaces) it could not get to: not counted on again. */
     public final java.util.Set<net.minecraft.core.BlockPos> unreachableStations = new java.util.HashSet<>();
     /** For benchmarks: ticks with nothing to do, tasks that failed. */

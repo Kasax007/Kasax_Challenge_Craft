@@ -123,6 +123,40 @@ public class BotSkillTests {
         a.fill(x, FEET, z, x + width - 1, FEET + height - 2, z + width - 1, Blocks.SPRUCE_LOG);
     }
 
+    /**
+     * Two eyes of ender, thrown forty blocks apart, read the way the bot reads them (where each
+     * set out, where it is a moment later): the two lines cross at the stronghold, to the block.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
+    public void eyeTriangulation(GameTestHelper h) {
+        var level = h.getLevel();
+        net.minecraft.world.phys.Vec3 stronghold = net.minecraft.world.phys.Vec3.atCenterOf(h.absolutePos(new net.minecraft.core.BlockPos(1730, 0, -1210))).multiply(1, 0, 1).add(0, 32, 0);
+        net.minecraft.world.entity.projectile.EyeOfEnder[] eyes = new net.minecraft.world.entity.projectile.EyeOfEnder[2];
+        net.minecraft.world.phys.Vec3[] from = new net.minecraft.world.phys.Vec3[2];
+        int[][] at = {{4, 20}, {36, 24}};
+        for (int i = 0; i < 2; i++) {
+            var p = net.minecraft.world.phys.Vec3.atBottomCenterOf(h.absolutePos(new net.minecraft.core.BlockPos(at[i][0], FEET + 1, at[i][1])));
+            eyes[i] = new net.minecraft.world.entity.projectile.EyeOfEnder(level, p.x, p.y, p.z);
+            eyes[i].signalTo(stronghold);
+            level.addFreshEntity(eyes[i]);
+            from[i] = eyes[i].position();
+        }
+        h.runAfterDelay(30, () -> {
+            var readings = new net.kasax.challengecraft.bot.task.EyeTrackTask.Reading[2];
+            for (int i = 0; i < 2; i++) {
+                var now = eyes[i].position();
+                double dx = now.x - from[i].x, dz = now.z - from[i].z, m = Math.sqrt(dx * dx + dz * dz);
+                readings[i] = new net.kasax.challengecraft.bot.task.EyeTrackTask.Reading(from[i], new net.minecraft.world.phys.Vec3(dx / m, 0, dz / m));
+            }
+            var cross = net.kasax.challengecraft.bot.task.EyeTrackTask.intersect(readings[0], readings[1]);
+            if (cross == null) h.fail("the lines did not cross");
+            double off = Math.hypot(cross.x - stronghold.x, cross.z - stronghold.z);
+            BotArena.LOG.info("[BOTTEST] eye_triangulation: estimate {}, {} for {}, {} ({} blocks off)", cross.x, cross.z, stronghold.x, stronghold.z, off);
+            if (off > 1.5) h.fail("estimate " + Math.round(off) + " blocks off");
+            h.succeed();
+        });
+    }
+
     /** The portal cast at a lava pool, then through it (see {@link BotPortalTests} for the pool shapes). */
     @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
     public void castPortal(GameTestHelper h) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Minimal RCON client: rcon.py CMD [CMD ...] (server on 127.0.0.1:25575, password 'test')."""
-import socket, struct, sys
+"""Minimal RCON client: rcon.py CMD [CMD ...] (server on 127.0.0.1:$RCON_PORT or 25575, password 'test')."""
+import os, socket, struct, sys
 
 
 def pkt(i, t, body):
@@ -16,7 +16,7 @@ def recv(s):
     return d[8:-2].decode(errors='replace')
 
 
-s = socket.create_connection(('127.0.0.1', 25575), timeout=30)
+s = socket.create_connection(('127.0.0.1', int(os.environ.get('RCON_PORT', '25575'))), timeout=30)
 s.send(pkt(1, 3, 'test'))
 recv(s)
 for c in sys.argv[1:]:
