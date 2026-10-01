@@ -114,6 +114,19 @@ public class BotSkillTests {
         a.run(new CastPortalTask(h.getLevel()), 3600, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
 
+    /** The pool in a cave, no flat room anywhere near: room dug out, then the portal cast. */
+    @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 8, maxAttempts = 2, requiredSuccesses = 1)
+    public void castPortalDug(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "cast_portal_dug");
+        a.fill(0, FEET, 0, 39, FEET + 6, 39, Blocks.STONE);
+        a.fill(22, FEET, 2, 29, FEET + 6, 9, Blocks.AIR);
+        a.fill(19, FEET, 9, 21, FEET + 2, 21, Blocks.AIR);
+        a.fill(24, GROUND, 4, 27, GROUND, 7, Blocks.LAVA);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET), new ItemStack(Items.WATER_BUCKET), new ItemStack(Items.IRON_PICKAXE),
+                new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 16), new ItemStack(Items.COBBLESTONE, 8));
+        a.run(new CastPortalTask(h.getLevel()), 6000, () -> a.bot().body().level().dimension() == Level.NETHER);
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {

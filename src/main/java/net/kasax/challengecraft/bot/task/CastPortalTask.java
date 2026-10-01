@@ -309,7 +309,82 @@ public final class CastPortalTask implements BotTask {
                 }
             }
         }
-        return false;
+        // No ready spot (a cave, a hillside): make one, as a player does - dig the room out and
+        // put a floor where there is none. The one with the least work, with nothing liquid in it.
+        BlockPos best = null;
+        Direction bestDir = null;
+        int bestWork = 40;
+        for (int r = 7; r <= 14; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    // (Not below the pool: from down in a pit there is no pouring.)
+                    for (int dy = 1; dy <= 3; dy++) {
+                        for (Direction dir : new Direction[]{Direction.EAST, Direction.SOUTH}) {
+                            BlockPos o = lava.offset(dx, dy, dz);
+                            int work = work(bot, level, o, dir);
+                            if (work < bestWork) {
+                                bestWork = work;
+                                best = o;
+                                bestDir = dir;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (best == null) return false;
+        bot.say("making room to cast a portal (" + bestWork + " blocks to dig or place)");
+        ops = new ArrayList<>();
+        Direction side = bestDir.getClockWise();
+        for (int i = 0; i < 4; i++) {
+            BlockPos col = best.relative(bestDir, i);
+            for (int j = 5; j >= 0; j--) {
+                BlockPos p = col.above(j);
+                if (!level.getBlockState(p).canBeReplaced()) add(Kind.BREAK, p);
+            }
+            if (level.getBlockState(col.below()).getCollisionShape(level, col.below()).isEmpty()) add(Kind.BLOCK, col.below());
+            // And a row to stand in in front of it, to pour from (high enough to pillar up in for
+            // the top of the frame).
+            for (int j = 4; j >= 0; j--) {
+                BlockPos p = col.relative(side).above(j);
+                if (!level.getBlockState(p).canBeReplaced()) add(Kind.BREAK, p);
+            }
+        }
+        List<Op> prep = ops;
+        build(best, bestDir);
+        prep.addAll(ops);
+        ops = prep;
+        return true;
+    }
+
+    /** Blocks to dig or put down to make a casting spot at {@code o}; 99 when it cannot be made (liquid, bedrock, too hard). */
+    private static int work(Bot bot, ServerLevel level, BlockPos o, Direction along) {
+        int work = 0;
+        for (int i = 0; i < 4; i++) {
+            BlockPos col = o.relative(along, i);
+            // The row in front to stand in: two high, on ground.
+            BlockPos stand = col.relative(along.getClockWise());
+            if (level.getBlockState(stand.below()).getCollisionShape(level, stand.below()).isEmpty()) return 99;
+            for (int j = 0; j < 5; j++) {
+                var st = level.getBlockState(stand.above(j));
+                if (!st.getFluidState().isEmpty() || st.getDestroySpeed(level, stand.above(j)) < 0) return 99;
+                if (!st.canBeReplaced()) work++;
+            }
+            BlockPos under = col.below();
+            if (!level.getFluidState(under).isEmpty()) return 99;
+            if (level.getBlockState(under).getCollisionShape(level, under).isEmpty()) work++;
+            for (int j = 0; j < 6; j++) {
+                BlockPos p = col.above(j);
+                var st = level.getBlockState(p);
+                if (!st.getFluidState().isEmpty()) return 99;
+                for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) return 99;
+                if (st.canBeReplaced()) continue;
+                if (st.getDestroySpeed(level, p) < 0 || bot.tools().breakTicks(st) > 40) return 99;
+                work++;
+            }
+        }
+        return work;
     }
 
     private static boolean fits(ServerLevel level, BlockPos o, Direction along) {
@@ -412,12 +487,20 @@ public final class CastPortalTask implements BotTask {
         }
         BotNavigator.Status s = bot.navigator().tick();
         if (s != BotNavigator.Status.MOVING) walking = false;
+        // "There" by the walk's measure, but not by the step's (in the way, a little short):
+        // again and again from the same spot means: another spot.
+        if (s == BotNavigator.Status.ARRIVED && ++arrivals > 10) {
+            badScoops.add(bot.navigator().feet().asLong());
+            arrivals = 0;
+        }
         if (s == BotNavigator.Status.FAILED && ++walkFails > 8) {
             bot.say("can't get near " + p.toShortString());
             return Result.FAILED;
         }
         return Result.RUNNING;
     }
+
+    private int arrivals;
 
     /** Like {@link #walkNear}, to a spot from where a bucket can be poured into {@code p} (up a pillar if need be). */
     private Result walkToPour(Bot bot, BlockPos p) {
