@@ -182,6 +182,7 @@ public final class LockoutBrain implements BotBrain {
         goalStarted = bot.body().level().getGameTime();
         goalBudget = budget(pick.option().cost(), 1200, 9000);
         goalEstimate = pick.option().cost();
+        goalFirstEstimate = pick.option().cost() / GoalExperience.factor(pick.tile().goal().id());
         goalGoal = pick.tile().goal();
         extensions = 0;
         String reason = strategist.why(pick.tile().goal().id());
@@ -278,6 +279,11 @@ public final class LockoutBrain implements BotBrain {
                 o = null;
             }
             // Harder than it looked last time (it ran over its time): believed less now.
+            // What earlier games taught about this tile (it always takes three times as long...).
+            if (o != null) {
+                double f = GoalExperience.factor(tile.goal().id());
+                if (f != 1) o = new LockoutGoals.Option(o.cost() * f, o.task(), o.yields());
+            }
             int over = overruns.getOrDefault(tile.goal().id(), 0);
             if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + over) + 30 * over, o.task(), o.yields());
             if (o != null) out.add(new Choice(tile, o));
@@ -326,7 +332,7 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long goalStarted, goalBudget, sideStarted, sideBudget;
-    private double goalEstimate;
+    private double goalEstimate, goalFirstEstimate;
     private net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal goalGoal;
     private int extensions;
     /** How often each goal ran over its time: its estimates are trusted that much less. */
@@ -400,6 +406,8 @@ public final class LockoutBrain implements BotBrain {
             }
             bot.say(targetId + " takes too long, something else first");
             overruns.merge(targetId, 1, Integer::sum);
+            // (For next games too: at least this long, and it was not even done.)
+            GoalExperience.record(targetId, goalFirstEstimate, 1.5 * (now - goalStarted) / 20.0);
             restUntil.put(targetId, now + REST_TICKS);
             drop(bot);
             return;
@@ -515,6 +523,8 @@ public final class LockoutBrain implements BotBrain {
         if (task != goalTask) return;
         long now = bot.body().level().getGameTime();
         if (success) {
+            // Learnt for next time: how long it really took against the plain estimate.
+            if (targetId != null && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, (now - goalStarted) / 20.0);
             // The game counts it within a second (it checks inventories once a second): wait for
             // that instead of starting on the same tile again.
             // If it never counts (the goal wants something else than the bot thought), give up on it.
