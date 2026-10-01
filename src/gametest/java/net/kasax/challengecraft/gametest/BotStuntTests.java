@@ -323,4 +323,15 @@ public class BotStuntTests {
         });
         a.run(new net.kasax.challengecraft.bot.task.GetShotTask(), 500, () -> a.bot().current() == null && a.bot().body().getHealth() < 20);
     }
+
+    /** A glass bottle by a pond: filled and drunk (a water bottle counts as a potion). */
+    @GameTest(structure = STRUCTURE, maxTicks = 500, skyAccess = true, padding = 8)
+    public void drinkWater(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drink_water");
+        a.fill(26, BotArena.GROUND - 1, 18, 29, BotArena.GROUND, 21, Blocks.WATER);
+        a.spawn(20, FEET, 20, new ItemStack(Items.GLASS_BOTTLE));
+        a.run(new net.kasax.challengecraft.bot.task.SequenceTask("drink", java.util.List.of(net.kasax.challengecraft.bot.task.FillBucketTask::bottle,
+                        () -> new net.kasax.challengecraft.bot.task.ConsumeTask(java.util.Set.of(Items.POTION)))), 500,
+                () -> a.bot().body().getStats().getValue(net.minecraft.stats.Stats.ITEM_USED.get(Items.POTION)) > 0);
+    }
 }

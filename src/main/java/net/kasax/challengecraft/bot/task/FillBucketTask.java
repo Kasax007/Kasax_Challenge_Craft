@@ -22,7 +22,7 @@ import java.util.Set;
 /** Fills an empty bucket at a water or lava source it can see: walk up, look at it, use the bucket. */
 public final class FillBucketTask implements BotTask {
     private final TagKey<Fluid> fluid;
-    private final Item filled;
+    private final Item filled, empty;
     private final Set<BlockPos> skip = new HashSet<>();
     private BlockPos source;
     private boolean walking;
@@ -31,6 +31,18 @@ public final class FillBucketTask implements BotTask {
     public FillBucketTask(TagKey<Fluid> fluid) {
         this.fluid = fluid;
         this.filled = fluid == FluidTags.LAVA ? Items.LAVA_BUCKET : Items.WATER_BUCKET;
+        this.empty = Items.BUCKET;
+    }
+
+    /** A glass bottle filled with water (a water bottle: a potion, as far as drinking one goes). */
+    public static FillBucketTask bottle() {
+        return new FillBucketTask(FluidTags.WATER, Items.POTION, Items.GLASS_BOTTLE);
+    }
+
+    private FillBucketTask(TagKey<Fluid> fluid, Item filled, Item empty) {
+        this.fluid = fluid;
+        this.filled = filled;
+        this.empty = empty;
     }
 
     @Override
@@ -38,7 +50,7 @@ public final class FillBucketTask implements BotTask {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (BotInventory.slotOf(body, filled) >= 0) return Result.DONE;
-        if (BotInventory.slotOf(body, Items.BUCKET) < 0 || ++tries > 3000) return Result.FAILED;
+        if (BotInventory.slotOf(body, empty) < 0 || ++tries > 3000) return Result.FAILED;
         if (source == null || !level.getFluidState(source).isSource()) {
             // A source with open air above, so the bot can look at it from the side or above.
             source = BotWorld.nearest(level, body.blockPosition(), 32, 12,
@@ -61,7 +73,7 @@ public final class FillBucketTask implements BotTask {
             return Result.RUNNING;
         }
         bot.navigator().stop();
-        bot.tools().select(BotInventory.slotOf(body, Items.BUCKET));
+        bot.tools().select(BotInventory.slotOf(body, empty));
         body.lookAt(Vec3.atCenterOf(source).add(0, 0.4, 0));
         body.gameMode.useItem(body, level, body.getMainHandItem(), InteractionHand.MAIN_HAND);
         if (BotInventory.slotOf(body, filled) >= 0) return Result.DONE;
@@ -72,6 +84,6 @@ public final class FillBucketTask implements BotTask {
 
     @Override
     public String describe() {
-        return "fill a bucket with " + (fluid == FluidTags.LAVA ? "lava" : "water");
+        return "fill a " + (empty == Items.GLASS_BOTTLE ? "bottle" : "bucket") + " with " + (fluid == FluidTags.LAVA ? "lava" : "water");
     }
 }

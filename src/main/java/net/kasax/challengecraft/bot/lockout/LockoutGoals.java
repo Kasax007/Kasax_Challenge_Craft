@@ -265,6 +265,15 @@ public final class LockoutGoals {
                         () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.TARGET, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.NOTHING, null, 6),
                         () -> net.kasax.challengecraft.bot.task.ShootTask.atBlock(Items.BOW, st -> st.is(Blocks.TARGET), 2))));
             }
+            case "drink_potion" -> {
+                // A water bottle is a potion too: a glass bottle filled at the water, and drunk.
+                double bottle = planner.estimate(bot, Set.of(Items.GLASS_BOTTLE), 1);
+                Double water = planner.seen(bot, Blocks.WATER);
+                yield bottle >= INF || water == null ? null : new Option(bottle + water + 6, () -> new SequenceTask("drink a water bottle", List.of(
+                        () -> new ObtainTask(Set.of(Items.GLASS_BOTTLE), 1, planner),
+                        net.kasax.challengecraft.bot.task.FillBucketTask::bottle,
+                        () -> new ConsumeTask(Set.of(Items.POTION)))));
+            }
             case "get_shot_by_skeleton" -> body.getHealth() >= 16 ? new Option(body.level().isDarkOutside() ? 45 : 400,
                     net.kasax.challengecraft.bot.task.GetShotTask::new) : null;
             case "block_damage_with_shield" -> {
