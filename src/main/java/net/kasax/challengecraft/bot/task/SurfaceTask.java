@@ -32,6 +32,8 @@ public final class SurfaceTask implements BotTask {
 
     /** {@link #underground(BotPlayer)} for feet at {@code feet}. */
     public static boolean underground(ServerLevel level, BlockPos feet) {
+        // The Nether and the End have no sky and no surface to climb to.
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
         // Little sky light where the head is: a cave or a mine. (Under trees or next to a trunk
         // there is plenty; up an open shaft too, and that one needs no climbing either.)
         BlockPos head = feet.above();

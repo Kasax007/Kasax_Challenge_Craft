@@ -88,6 +88,13 @@ public final class LockoutGoals {
             Option trip = nether(bot, planner);
             return trip == null ? null : new Option(trip.cost() + 90, trip.task(), trip.yields());
         }
+        // An Overworld tile from down in the Nether: back through the portal first (the tile is
+        // planned for real once up there). Nether tiles come first that way, then home.
+        if (bot.body().level().dimension() == Level.NETHER
+                && goal.category() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) {
+            if (goal.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) return null;
+            return new Option(240, net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
+        }
         Option here = basic(bot, planner, goal);
         if (here != null || !overworld(bot)) return here;
         // Not to be had up here, but made from something the Nether has (quartz, blaze rods, soul
