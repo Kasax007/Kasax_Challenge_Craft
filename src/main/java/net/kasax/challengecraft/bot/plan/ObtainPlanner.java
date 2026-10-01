@@ -678,8 +678,13 @@ public final class ObtainPlanner {
                 // the compass): taken in the same trip while the vein is right there.
                 int extra = 0;
                 for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) - have - total);
-                yield new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
+                MineTask mine = new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
                         have + total + Math.max(0, Math.min(extra, 16)), depth, lead(bot, blocks)).atLeast(have + total);
+                // Not lying about anywhere (a furnace, bricks): taken where seen, never searched
+                // for (that walk can be a thousand blocks long); otherwise made.
+                boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
+                if (BotKnowledge.rarity(common, nether) >= 1000) mine.knownOnly();
+                yield mine;
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);

@@ -193,8 +193,20 @@ public final class MineTask implements BotTask {
         return Result.RUNNING;
     }
 
+    private boolean knownOnly;
+
+    /** Only where it is seen or remembered: no searching for it. */
+    public MineTask knownOnly() {
+        this.knownOnly = true;
+        return this;
+    }
+
     /** Nothing in sight: walk out on the surface, or dig for it. */
     private Result search(Bot bot) {
+        if (knownOnly && lead == null) {
+            bot.say("no " + what + " in sight, and not worth a search");
+            return Result.FAILED;
+        }
         // Digging: time to get down there, plus five minutes of tunnel.
         if (budget == 0) budget = depth == null ? SEARCH_TICKS : 6000 + 50 * Math.max(0, bot.body().blockPosition().getY() - depth);
         // (Walking to where they are known to be is not searching: only the looking about counts.)

@@ -38,7 +38,7 @@ public final class MobHabitats {
 
     private static Set<Identifier> compute(ServerLevel level, EntityType<?> type) {
         Set<Identifier> out = new HashSet<>();
-        int total = 0;
+        int total = 0, maxWeight = 0;
         var biomes = level.registryAccess().lookupOrThrow(Registries.BIOME);
         for (var holder : biomes.listElements().toList()) {
             total++;
@@ -47,12 +47,18 @@ public final class MobHabitats {
             if (spawns == null) continue;
             boolean here = false;
             for (MobCategory cat : MobCategory.values()) {
-                for (var w : spawns.getMobsToSpawn(cat).unwrap()) if (w.value().type() == type) here = true;
+                for (var w : spawns.getMobsToSpawn(cat).unwrap()) {
+                    if (w.value().type() != type) continue;
+                    here = true;
+                    maxWeight = Math.max(maxWeight, w.weight());
+                }
             }
             if (here) out.add(holder.key().identifier());
         }
-        // (Almost everywhere is no habitat to walk to.)
-        ANYWHERE.put(type, out.size() * 2 > total);
+        // (Almost everywhere is no habitat to walk to. "Anywhere" for a hunt only if common there
+        // too: a witch is one in twenty of the night's monsters, and slimes keep to their own
+        // chunks deep down and to swamps whatever the list says.)
+        ANYWHERE.put(type, out.size() * 2 > total && maxWeight >= 50 && type != net.minecraft.world.entity.EntityTypes.SLIME);
         if (out.size() * 2 > total) return Set.of();
         return out;
     }

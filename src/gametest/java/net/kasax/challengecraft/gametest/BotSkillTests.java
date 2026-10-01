@@ -202,6 +202,8 @@ public class BotSkillTests {
         h.assertTrue(drowned.contains(net.minecraft.resources.Identifier.parse("minecraft:river")), "drowned in rivers");
         h.assertTrue(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.ZOMBIE), "zombies turn up anywhere");
         h.assertFalse(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.CAVE_SPIDER), "cave spiders only from spawners");
+        h.assertFalse(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.WITCH), "witches are rare");
+        h.assertTrue(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.CREEPER), "creepers anywhere");
         h.succeed();
     }
 
