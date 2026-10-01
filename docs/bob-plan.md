@@ -185,6 +185,10 @@ Gemessen mit `scripts/bot/bench-many.sh 600 hard 11 22 33 44 55 66 77 88 99 1010
 | 2 | 2,2 | 2 | 7 | Chunk-Tickets folgen dem Bot |
 | 3 | 2,5 | 0 | 8 | Fernziele (Biome), Unterwasser-/Tiefziele überspringen |
 | 4 | 3,0 | 0 | 7 | Verstecken vor Schützen, Rückzug im Kampf |
+| 5 | 2,3 | 0 | 7 | Sachen nach dem Tod zurückholen (Eröffnungszeit 2519 → 1240 s) |
+
+Die Streuung zwischen Runden ist groß (gleiche Welten, aber Mobs und Zufall): ±0,5 Felder im
+Schnitt sind Rauschen. Für belastbare Vergleiche braucht es mehr Welten (20+).
 
 ### Gefundene und behobene Ursachen
 
@@ -207,7 +211,7 @@ Gemessen mit `scripts/bot/bench-many.sh 600 hard 11 22 33 44 55 66 77 88 99 1010
 
 ### Offen (nächste Hebel)
 
-- Die Eröffnung nach einem Tod kostet weiter viel. Tode senken (Creeper, Ertrinken, Tropfstein) und
-  nach dem Tod die eigenen Sachen zurückholen.
+- Tode senken (Creeper, Ertrinken, Tropfstein, Zombies in Gruppen); Rüstung/Schild früh.
+- Teure Erz-Ziele (Gold, 9 Roheisen, Redstone) scheitern oft: Strip-Mining-Tempo und Schätzung.
 - Wüsten- und Ozeanstarts: Der Weg zum Wald ist lang; Dorf- oder Schiffswrack-Holz wäre schneller.
 - Teure Kettenziele (Bogen, Item Frame, Feuerwerk) genauer schätzen.
