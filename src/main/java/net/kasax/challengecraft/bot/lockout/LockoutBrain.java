@@ -198,6 +198,19 @@ public final class LockoutBrain implements BotBrain {
             bot.doNow(new net.kasax.challengecraft.bot.task.ThroughPortalTask());
             return;
         }
+        // Down in the Nether with no way back known: obsidian for a frame of its own (a ruined
+        // portal's, mined with a diamond pickaxe), rather than standing about.
+        if (choices.isEmpty() && bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER
+                && LockoutGoals.wayBack(bot) == null && bot.body().level().getGameTime() >= strandedRetryAt) {
+            strandedRetryAt = bot.body().level().getGameTime() + 6000;
+            bot.say("no way back known: obsidian for a portal of my own");
+            start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("a way back home", List.of(
+                    () -> new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.OBSIDIAN), 10, planner),
+                    () -> new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.FLINT_AND_STEEL), 1, planner)
+                            .keeping(Set.of(net.minecraft.world.item.Items.OBSIDIAN)),
+                    net.kasax.challengecraft.bot.task.ThroughPortalTask::new)), 9000);
+            return;
+        }
         if (choices.isEmpty()) {
             pause = 200; // nothing it can do now; look again in a while (tiles, time of day change)
             return;
@@ -256,7 +269,7 @@ public final class LockoutBrain implements BotBrain {
             net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE);
     private long kitCheckAt;
 
-    private long huntRetryAt;
+    private long huntRetryAt, strandedRetryAt;
 
     /** The kinds of monster wanted for open kill tiles that can be met where Bob is now. */
     private Set<net.minecraft.world.entity.EntityType<?>> wantedMonsters(Bot bot) {

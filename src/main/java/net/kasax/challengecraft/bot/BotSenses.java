@@ -63,6 +63,14 @@ public final class BotSenses {
             if (dimension != null && lastPos != null) {
                 BlockPos here = net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 6, 4,
                         st -> st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), false, java.util.Set.of());
+                // (Not found about, odd as that is: where it came out is where the portal is.)
+                // (Only a portal crossing, whose ends lie an eighth apart: not a respawn at home.)
+                double scale = level.dimension() == net.minecraft.world.level.Level.NETHER ? 1 / 8.0 : 8.0;
+                double ex = lastPos.getX() * scale - body.getX(), ez = lastPos.getZ() * scale - body.getZ();
+                if (here == null && level.dimension() != net.minecraft.world.level.Level.END && ex * ex + ez * ez < 256 * 256) {
+                    here = body.blockPosition();
+                    BotManager.LOG.info("[Bot] came out at {} but saw no portal there; remembering the spot", here.toShortString());
+                }
                 if (here != null) {
                     remember(dim, here);
                     ServerLevel old = level.getServer().getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, dimension));
@@ -232,7 +240,10 @@ public final class BotSenses {
 
     private void remember(Identifier dim, BlockPos p) {
         List<BlockPos> list = portals.computeIfAbsent(dim, k -> new ArrayList<>());
-        if (list.stream().noneMatch(q -> q.distSqr(p) < 16)) list.add(p.immutable());
+        if (list.stream().noneMatch(q -> q.distSqr(p) < 16)) {
+            list.add(p.immutable());
+            BotManager.LOG.info("[Bot] remembered a portal in {} at {}", dim.getPath(), p.toShortString());
+        }
     }
 
     /** The nearest portal it knows of in the dimension it is in (it went through it), or null. */
