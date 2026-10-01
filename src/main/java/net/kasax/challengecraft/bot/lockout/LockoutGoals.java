@@ -265,6 +265,14 @@ public final class LockoutGoals {
                         () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.TARGET, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.NOTHING, null, 6),
                         () -> net.kasax.challengecraft.bot.task.ShootTask.atBlock(Items.BOW, st -> st.is(Blocks.TARGET), 2))));
             }
+            case "get_shot_by_skeleton" -> body.getHealth() >= 16 ? new Option(body.level().isDarkOutside() ? 45 : 400,
+                    net.kasax.challengecraft.bot.task.GetShotTask::new) : null;
+            case "block_damage_with_shield" -> {
+                double shield = planner.estimate(bot, Set.of(Items.SHIELD), 1);
+                yield shield >= INF ? null : new Option(shield + (body.level().isDarkOutside() ? 40 : 200), () -> new SequenceTask("block with a shield", List.of(
+                        () -> new ObtainTask(Set.of(Items.SHIELD), 1, planner),
+                        net.kasax.challengecraft.bot.task.ShieldTask::new)));
+            }
             case "advancement_monster_hunter" -> {
                 // Any monster killed: whichever is nearest or quickest.
                 Option best = null;

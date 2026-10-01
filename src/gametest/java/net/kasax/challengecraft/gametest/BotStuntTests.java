@@ -293,4 +293,34 @@ public class BotStuntTests {
                 () -> !h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.projectile.arrow.AbstractArrow.class,
                         new net.minecraft.world.phys.AABB(a.abs(20, FEET, 30)).inflate(0.6)).isEmpty());
     }
+
+    /** A shield and a zombie: a hit blocked. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void shieldBlock(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "shield");
+        a.spawn(20, FEET, 20, new ItemStack(Items.SHIELD));
+        var z = EntityTypes.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        h.runAfterDelay(80, () -> {
+            h.getLevel().addFreshEntity(z);
+            z.setTarget(a.bot().body());
+        });
+        a.run(new net.kasax.challengecraft.bot.task.ShieldTask(), 600,
+                () -> a.bot().body().getStats().getValue(net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.DAMAGE_BLOCKED_BY_SHIELD)) > 0);
+    }
+
+    /** A skeleton about, full health: shot by it on purpose. */
+    @GameTest(structure = STRUCTURE, maxTicks = 500, skyAccess = true, padding = 8)
+    public void getShot(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "get_shot");
+        a.spawn(20, FEET, 20);
+        var sk = EntityTypes.SKELETON.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET, 30)));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        h.runAfterDelay(80, () -> {
+            h.getLevel().addFreshEntity(sk);
+            sk.setTarget(a.bot().body());
+        });
+        a.run(new net.kasax.challengecraft.bot.task.GetShotTask(), 500, () -> a.bot().current() == null && a.bot().body().getHealth() < 20);
+    }
 }
