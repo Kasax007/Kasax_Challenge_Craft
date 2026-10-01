@@ -442,7 +442,7 @@ public final class LockoutBrain implements BotBrain {
             overruns.merge(targetId, 1, Integer::sum);
             overrunEstimate.put(targetId, goalFirstEstimate);
             // (For next games too: at least this long, and it was not even done.)
-            GoalExperience.record(targetId, goalFirstEstimate, 1.5 * (now - goalStarted) / 20.0);
+            GoalExperience.record(targetId, goalFirstEstimate, 1.5 * (now - goalStarted) / 20.0, 0.5);
             restUntil.put(targetId, now + REST_TICKS);
             drop(bot);
             return;
