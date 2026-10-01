@@ -55,6 +55,27 @@ public final class LockoutBrain implements BotBrain {
     private final ObtainPlanner planner = new ObtainPlanner();
     private final Map<String, Integer> tries = new HashMap<>();
     private final Map<String, Long> restUntil = new HashMap<>();
+    /** Per goal, for the report: how often it was set out on, how often that failed, ticks spent. */
+    private final Map<String, Integer> starts = new HashMap<>(), fails = new HashMap<>(), spent = new HashMap<>();
+
+    /** One line per open tile: why it is still open (no way known, or tried and how). */
+    public List<String> openTileReport(Bot bot) {
+        List<String> out = new ArrayList<>();
+        for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(bot.server())) {
+            if (tile.claimedBy() != null) continue;
+            String id = tile.goal().id();
+            LockoutGoals.Option o;
+            try {
+                o = LockoutGoals.plan(bot, planner, tile.goal());
+            } catch (RuntimeException e) {
+                o = null;
+            }
+            out.add(id + ": " + (o == null ? "NO WAY KNOWN" : "plan ~" + Math.round(o.cost()) + " s")
+                    + ", started " + starts.getOrDefault(id, 0) + ", failed " + fails.getOrDefault(id, 0)
+                    + ", overran " + overruns.getOrDefault(id, 0) + ", spent " + spent.getOrDefault(id, 0) / 20 + " s");
+        }
+        return out;
+    }
     private int targetIndex = -1;
     private String targetId;
     private BotTask goalTask, sideTask;
@@ -146,6 +167,7 @@ public final class LockoutBrain implements BotBrain {
         targetIndex = pick.tile().index();
         targetId = pick.tile().goal().id();
         goalTask = pick.option().task().get();
+        starts.merge(pick.tile().goal().id(), 1, Integer::sum);
         goalStarted = bot.body().level().getGameTime();
         goalBudget = budget(pick.option().cost(), 1200, 9000);
         goalEstimate = pick.option().cost();
@@ -371,6 +393,7 @@ public final class LockoutBrain implements BotBrain {
             drop(bot);
             return;
         }
+        if (goalTask != null && targetId != null) spent.merge(targetId, 1, Integer::sum);
         if (++checkTicks % 20 != 0 || targetIndex < 0) return;
         if (checkTicks % 40 == 0 && sideTask == null) takeChances(bot);
         MinecraftServer server = bot.server();
@@ -490,6 +513,7 @@ public final class LockoutBrain implements BotBrain {
             goalTask = null;
             return;
         }
+        fails.merge(targetId, 1, Integer::sum);
         // Failed: try it again later, but not forever.
         if (tries.merge(targetId, 1, Integer::sum) >= MAX_TRIES) {
             // Leave it alone for a while: things change (night brings mobs, the world is explored further).

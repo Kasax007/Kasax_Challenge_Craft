@@ -99,7 +99,9 @@ public final class BotBenchmark {
                     body.level().getBlockState(feet).getBlock().getName().getString(), body.level().getBlockState(feet.below()).getBlock().getName().getString(),
                     bot.navigator().status() + " " + bot.navigator().debug());
         }
-        if (ticks < length) return false;
+        // The whole board done (playing for all of it): no need to wait out the clock.
+        boolean all = ticks % 10 == 0 && claimed > 0 && Chal_40_LockoutBingo.board(bot.server()).stream().allMatch(t -> t.claimedBy() != null);
+        if (ticks < length && !all) return false;
         report();
         bot.setBrain(null);
         bot.clearTasks();
@@ -118,6 +120,9 @@ public final class BotBenchmark {
         BotManager.LOG.info("[BOTBENCH] nether: {}", nether == null ? "-" : nether / 20 + " s");
         timeOn.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(8)
                 .forEach(e -> BotManager.LOG.info("[BOTBENCH] time on {}: {} s", e.getKey(), e.getValue() / 20));
-        BotManager.LOG.info("[BOTBENCH] idle: {} s, failed tasks: {}, deaths: {}", bot.idleTicks / 20, bot.failures, deaths);
+        if (bot.brain() instanceof LockoutBrain brain) {
+            for (String line : brain.openTileReport(bot)) BotManager.LOG.info("[BOTBENCH] open {}", line);
+        }
+        BotManager.LOG.info("[BOTBENCH] idle: {} s, failed tasks: {}, deaths: {}, played {} s", bot.idleTicks / 20, bot.failures, deaths, ticks / 20);
     }
 }

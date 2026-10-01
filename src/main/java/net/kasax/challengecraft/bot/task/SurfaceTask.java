@@ -23,7 +23,7 @@ public final class SurfaceTask implements BotTask {
     private int ticks, stepTicks, bestY = Integer.MIN_VALUE, sinceBest, switches;
     private boolean stairs, navigating;
     private int navFails;
-    private boolean failedPlace;
+    private boolean failedPlace, triedEntry;
 
     /** Deep enough under the ground that walking about on the surface needs a climb first. */
     public static boolean underground(BotPlayer body) {
@@ -71,6 +71,22 @@ public final class SurfaceTask implements BotTask {
         // First choice: let the path search find the way up (cave passages, a staircase dug
         // through whatever is cheapest, pillars where there are blocks). The hand-made climb
         // below is only for when it finds nothing.
+        // Came in through a cave: out the way it came, if that is not far.
+        if (bot.caveEntry != null && !triedEntry) {
+            if (bot.caveEntry.distSqr(feet) > 96 * 96) bot.caveEntry = null;
+            else {
+                if (!navigating) {
+                    bot.navigator().goStandNear(bot.caveEntry, 2);
+                    navigating = true;
+                }
+                BotNavigator.Status s = bot.navigator().tick();
+                if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
+                navigating = false;
+                triedEntry = true;
+                if (s == BotNavigator.Status.ARRIVED) bot.caveEntry = null;
+                return Result.RUNNING;
+            }
+        }
         if (navFails < 4) {
             if (!navigating) {
                 bot.navigator().setGoal(p -> !underground(level, p),

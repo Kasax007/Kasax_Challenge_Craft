@@ -45,6 +45,8 @@ public final class Bot {
     }
 
     public Death lastDeath;
+    /** Where it last went down into a cave from the surface: the way back out. */
+    public net.minecraft.core.BlockPos caveEntry;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 

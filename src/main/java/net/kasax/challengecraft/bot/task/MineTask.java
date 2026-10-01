@@ -190,6 +190,9 @@ public final class MineTask implements BotTask {
         }
         if (heading == null) heading = Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
         BotNavigator nav = bot.navigator();
+        // Ores: a cave first (walk through it and see what its walls show), a tunnel only when
+        // there is no cave about or the caves had nothing.
+        if (depth != null && !cavesDone) return explore(bot);
         if (depth != null) return dig(bot);
         // Where they are known to be: go there first.
         if (lead != null) {
@@ -256,6 +259,58 @@ public final class MineTask implements BotTask {
     private static double horizontal(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    // ---- caves --------------------------------------------------------------------------------
+
+    /**
+     * The memory has already "walked" every cave about (it knows each ore showing in a cave wall),
+     * so a cave is only still worth it as the quick way down: walking down a cave beats digging a
+     * staircase. Two spots, nearer the wanted height each, then the tunnel from there.
+     */
+    private static final int MAX_CAVE_SPOTS = 2;
+    private final List<BlockPos> caveVisited = new java.util.ArrayList<>();
+    private BlockPos caveSpot;
+    private boolean cavesDone;
+    private int caveTicks;
+
+    /**
+     * Down a cave towards the wanted height (each spot reached also shows more of the world: the
+     * target search looks again), then the tunnel from there. No cave about that goes lower: the
+     * tunnel from here.
+     */
+    private Result explore(Bot bot) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        BotNavigator nav = bot.navigator();
+        if (caveSpot == null) {
+            if (caveVisited.size() >= MAX_CAVE_SPOTS) return caveGiveUp(bot, "deep enough by cave");
+            caveSpot = bot.memory().cave(level, nav.feet(), depth, caveVisited.isEmpty() ? 96 : 48, caveVisited);
+            if (caveSpot == null) return caveGiveUp(bot, "no cave about");
+            // Only a cave that gets it nearer the height it wants (not one up a hill).
+            if (Math.abs(caveSpot.getY() - depth) + 6 >= Math.abs(nav.feet().getY() - depth)) {
+                caveSpot = null;
+                return caveGiveUp(bot, "no cave lower down");
+            }
+            bot.say("down through a cave for " + what + " (to " + caveSpot.toShortString() + ")");
+            // Remember the way in: the spot it went underground from, to get out the same way.
+            if (bot.caveEntry == null && !SurfaceTask.underground(bot.body())) bot.caveEntry = nav.feet();
+            nav.goStandNear(caveSpot, 2);
+            caveTicks = 0;
+        }
+        BotNavigator.Status st = nav.tick();
+        if (st != BotNavigator.Status.MOVING || ++caveTicks > 400 + 20 * (int) Math.sqrt(caveSpot.distSqr(nav.feet()))) {
+            caveVisited.add(caveSpot);
+            caveSpot = null;
+            scanCooldown = 0; // look about: what does this part of the cave show?
+            nav.stop();
+        }
+        return Result.RUNNING;
+    }
+
+    private Result caveGiveUp(Bot bot, String why) {
+        bot.say(why + ": tunnelling for " + what);
+        cavesDone = true;
+        return Result.RUNNING;
     }
 
     // ---- digging ------------------------------------------------------------------------------

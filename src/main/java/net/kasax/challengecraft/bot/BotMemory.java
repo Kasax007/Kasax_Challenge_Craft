@@ -110,6 +110,7 @@ public final class BotMemory {
             if (chunk == null) continue;
             done.put(key, now);
             scan(level, chunk, at);
+            scanCaves(level, chunk, at);
             return;
         }
     }
@@ -129,11 +130,84 @@ public final class BotMemory {
                     for (int x = 0; x < 16; x++) {
                         BlockState s = section.getBlockState(x, y, z);
                         if (!interesting(s)) continue;
-                        add(known, s.getBlock(), new BlockPos(x0 + x, y0 + y, z0 + z), at);
+                        BlockPos p = new BlockPos(x0 + x, y0 + y, z0 + z);
+                        // Only what can be seen: next to air or water (a cave wall, the ground),
+                        // not ore buried in the rock - that is what caves and tunnels are for.
+                        if (!exposed(level, chunk, p)) continue;
+                        add(known, s.getBlock(), p, at);
                     }
                 }
             }
         }
+    }
+
+    private static boolean exposed(ServerLevel level, LevelChunk chunk, BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = p.relative(d);
+            BlockState ns;
+            if ((n.getX() >> 4) == chunk.getPos().x() && (n.getZ() >> 4) == chunk.getPos().z()) ns = chunk.getBlockState(n);
+            else {
+                LevelChunk other = level.getChunkSource().getChunkNow(n.getX() >> 4, n.getZ() >> 4);
+                if (other == null) continue;
+                ns = other.getBlockState(n);
+            }
+            if (ns.isAir() || !ns.getFluidState().isEmpty() || ns.is(BlockTags.LEAVES)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Caves it knows of: air under the ground (a few blocks below the surface there), one point per
+     * 4 x 4 x 4 cell, per dimension. Where to look for ores before digging a tunnel.
+     */
+    private final Map<ResourceKey<Level>, List<BlockPos>> caves = new HashMap<>();
+    private static final int CAVE_CAP = 1200;
+
+    private void scanCaves(ServerLevel level, LevelChunk chunk, BlockPos at) {
+        List<BlockPos> list = caves.computeIfAbsent(level.dimension(), k -> new ArrayList<>());
+        int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
+        list.removeIf(p -> (p.getX() >> 4) == (x0 >> 4) && (p.getZ() >> 4) == (z0 >> 4));
+        boolean nether = level.dimension() == Level.NETHER;
+        for (int x = 1; x < 16; x += 4) {
+            for (int z = 1; z < 16; z += 4) {
+                int top = nether ? level.getMaxY() : chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z) - 6;
+                for (int y = level.getMinY() + 6; y < top; y += 4) {
+                    BlockPos p = new BlockPos(x0 + x, y, z0 + z);
+                    BlockState st = chunk.getBlockState(p);
+                    // Room to stand: air here and above, something under it.
+                    if (!st.isAir() || !chunk.getBlockState(p.above()).isAir()) continue;
+                    if (nether) continue; // (the Nether is one big cave: no use)
+                    list.add(p);
+                }
+            }
+        }
+        if (list.size() > CAVE_CAP * 2) {
+            list.sort((a, b) -> Double.compare(a.distSqr(at), b.distSqr(at)));
+            list.subList(CAVE_CAP, list.size()).clear();
+        }
+    }
+
+    /**
+     * The best cave point to look in next: near, and near the height {@code wantY} (where the ore
+     * is common), none of {@code visited} within 10 blocks. Null when it knows of no such cave.
+     */
+    public BlockPos cave(ServerLevel level, BlockPos from, int wantY, double maxDistance, List<BlockPos> visited) {
+        List<BlockPos> list = caves.get(level.dimension());
+        if (list == null) return null;
+        BlockPos best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (BlockPos p : list) {
+            double d = Math.sqrt(p.distSqr(from));
+            if (d > maxDistance) continue;
+            double score = d + 0.7 * Math.abs(p.getY() - wantY);
+            if (score >= bestScore) continue;
+            boolean seen = false;
+            for (BlockPos v : visited) if (v.distSqr(p) < 100) { seen = true; break; }
+            if (seen) continue;
+            best = p;
+            bestScore = score;
+        }
+        return best;
     }
 
     private static void add(Map<Block, List<BlockPos>> known, Block block, BlockPos p, BlockPos at) {
@@ -233,6 +307,8 @@ public final class BotMemory {
     public String summary(ResourceKey<Level> dimension) {
         Map<Block, List<BlockPos>> known = blocks.get(dimension);
         Map<Long, Long> done = scanned.get(dimension);
-        return (done == null ? 0 : done.size()) + " chunks read, " + (known == null ? 0 : known.size()) + " kinds of block remembered";
+        List<BlockPos> c = caves.get(dimension);
+        return (done == null ? 0 : done.size()) + " chunks read, " + (known == null ? 0 : known.size()) + " kinds of block remembered, "
+                + (c == null ? 0 : c.size()) + " cave spots";
     }
 }
