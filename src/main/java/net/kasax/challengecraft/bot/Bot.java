@@ -123,7 +123,8 @@ public final class Bot {
 
     /** Runs {@code task} first, then returns to what was going on. */
     public void interject(BotTask task) {
-        navigator.stop();
+        // (The walk of what was on top is kept, and taken up again once this is done.)
+        navigator.suspend(tasks.peek());
         tasks.push(task);
     }
 
@@ -172,6 +173,7 @@ public final class Bot {
         if (r != BotTask.Result.RUNNING) {
             tasks.remove(task);
             navigator.stop();
+            navigator.resumeFor(tasks.peek());
             if (r == BotTask.Result.FAILED) failures++;
             if (task == retreat) {
                 body.hurry = false;

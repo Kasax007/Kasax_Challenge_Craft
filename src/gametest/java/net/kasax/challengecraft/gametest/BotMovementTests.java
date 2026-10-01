@@ -112,4 +112,13 @@ public class BotMovementTests {
         a.spawn(8, FEET, 20, new ItemStack(Items.COBBLESTONE, 32));
         a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 600, () -> a.near(30, FEET, 20, 1.6));
     }
+
+    /** Walking, interrupted by something in between (a reflex): the walk goes on afterwards. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void walkResumes(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "walk_resumes");
+        a.spawn(4, FEET, 4);
+        h.runAfterDelay(30, () -> a.bot().interject(new net.kasax.challengecraft.bot.task.WaitTask(1)));
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(34, FEET, 34), 1), 400, () -> a.near(34, FEET, 34, 1.6));
+    }
 }

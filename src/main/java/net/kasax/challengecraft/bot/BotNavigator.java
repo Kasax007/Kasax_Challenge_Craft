@@ -89,6 +89,32 @@ public final class BotNavigator {
         this.status = Status.MOVING;
     }
 
+    private Predicate<BlockPos> savedGoal;
+    private BlockPos savedTarget;
+    private BotTask savedFor;
+
+    /**
+     * Stops for something that comes in between (a fight, food): the walk of {@code owner} is
+     * kept and taken up again by {@link #resumeFor} once that task is back on top.
+     */
+    public void suspend(BotTask owner) {
+        if (status == Status.MOVING && goal != null) {
+            savedGoal = goal;
+            savedTarget = target;
+            savedFor = owner;
+        }
+        stop();
+    }
+
+    /** {@code task} is on top again: the walk it was on when interrupted goes on. */
+    public void resumeFor(BotTask task) {
+        if (task != null && task == savedFor && savedGoal != null && status != Status.MOVING) {
+            setGoal(savedGoal, savedTarget);
+        }
+        savedGoal = null;
+        savedFor = null;
+    }
+
     public void stop() {
         bankDig = null;
         // Only abandon a dig the navigator itself started; the caller may be mining on its own.
