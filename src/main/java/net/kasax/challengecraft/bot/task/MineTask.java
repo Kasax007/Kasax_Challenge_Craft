@@ -96,6 +96,9 @@ public final class MineTask implements BotTask {
                 if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
             }
             if (target == null) return search(bot);
+            // A trunk (or any column of them) is taken from the bottom: that one is in reach from
+            // the ground, the top ones only from a pillar.
+            for (int i = 0; i < 12 && blocks.test(level.getBlockState(target.below())) && !skip.contains(target.below()); i++) target = target.below();
             if (searching) {
                 bot.navigator().stop();
                 if (explorer != null) explorer.pause(bot);
@@ -107,7 +110,9 @@ public final class MineTask implements BotTask {
                 return Result.FAILED;
             }
         }
-        if (!bot.actions().inReach(target)) {
+        // In reach only mid-jump does not count: breaking in the air is five times slower.
+        boolean footing = bot.body().onGround() || bot.body().isInWater() || bot.body().onClimbable();
+        if (!bot.actions().inReach(target) || !footing && walking) {
             // Far above from down in a mine: up to the surface first (a straight climb beats
             // picking a way through the rock bit by bit).
             if (!walking && target.getY() > bot.body().getY() + 12 && SurfaceTask.underground(bot.body())) {
@@ -178,15 +183,18 @@ public final class MineTask implements BotTask {
         if (depth != null) return dig(bot);
         // Where they are known to be: go there first.
         if (lead != null) {
+            // Far off: over the surface in legs (a path search straight there would dig through
+            // the hills in between, and go underground where it ran out of budget).
             if (!walking) {
-                nav.goNear(lead, 4);
+                nav.goNear(Explorer.legToward(level(bot), nav.feet(), lead, 40), 4);
                 walking = true;
             }
             BotNavigator.Status s = nav.tick();
             if (s != BotNavigator.Status.MOVING) {
                 walking = false;
-                lead = null; // arrived (or no way): look around there, then explore from there
                 scanCooldown = 0;
+                // There (or no way on): look around there, then explore from there.
+                if (s == BotNavigator.Status.FAILED || horizontal(nav.feet(), lead) < 8) lead = null;
             }
             return Result.RUNNING;
         }
@@ -195,6 +203,15 @@ public final class MineTask implements BotTask {
         Result r = explorer.tick(bot);
         if (r == Result.FAILED) bot.say("found no " + what);
         return r;
+    }
+
+    private static ServerLevel level(Bot bot) {
+        return (ServerLevel) bot.body().level();
+    }
+
+    private static double horizontal(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     // ---- digging ------------------------------------------------------------------------------

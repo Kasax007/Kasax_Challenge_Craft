@@ -32,6 +32,8 @@ public final class Bot {
     public int idleTicks, failures;
     /** Off while a fall is meant to hurt (a Lockout goal wants the damage). */
     public boolean waterLandingAllowed = true;
+    /** The way it last walked out exploring: kept, so a fresh search does not turn back on itself. */
+    public net.minecraft.core.Direction exploreHeading;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 

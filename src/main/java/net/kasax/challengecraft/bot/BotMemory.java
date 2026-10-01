@@ -38,7 +38,7 @@ public final class BotMemory {
     /** Blocks everywhere (or of no use): not worth remembering. */
     private static final Set<Block> BORING = Set.of(Blocks.AIR, Blocks.CAVE_AIR, Blocks.VOID_AIR, Blocks.STONE, Blocks.DEEPSLATE,
             Blocks.DIRT, Blocks.GRASS_BLOCK, Blocks.BEDROCK, Blocks.ANDESITE, Blocks.DIORITE, Blocks.GRANITE, Blocks.TUFF,
-            Blocks.NETHERRACK, Blocks.SHORT_GRASS, Blocks.TALL_GRASS, Blocks.FERN, Blocks.LARGE_FERN, Blocks.SNOW,
+            Blocks.NETHERRACK, Blocks.SHORT_GRASS, Blocks.TALL_GRASS, Blocks.FERN, Blocks.LARGE_FERN,
             Blocks.WATER, Blocks.SEAGRASS, Blocks.TALL_SEAGRASS, Blocks.END_STONE, Blocks.KELP_PLANT, Blocks.BUBBLE_COLUMN);
 
     private static boolean interesting(BlockState s) {

@@ -59,6 +59,9 @@ public final class LockoutBrain implements BotBrain {
     private String targetId;
     private BotTask goalTask, sideTask;
     private String sideId;
+    /** The picked-up-on-the-way item a side task is for, and when each may be tried again. */
+    private net.minecraft.world.item.Item sideWant;
+    private final java.util.Map<net.minecraft.world.item.Item, Long> wantRest = new java.util.HashMap<>();
     private long nextChance;
     private final Set<net.minecraft.core.BlockPos> treasureTried = new java.util.HashSet<>();
     private int pause, checkTicks;
@@ -131,6 +134,9 @@ public final class LockoutBrain implements BotBrain {
         goalTask = pick.option().task().get();
         goalStarted = bot.body().level().getGameTime();
         goalBudget = budget(pick.option().cost(), 1200, 9000);
+        goalEstimate = pick.option().cost();
+        goalGoal = pick.tile().goal();
+        extensions = 0;
         String reason = strategist.why(pick.tile().goal().id());
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
                 + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
@@ -194,10 +200,13 @@ public final class LockoutBrain implements BotBrain {
             if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
         }
         // Nobody hunts for food with a full stomach: only once hunger has started to bite.
-        if (points >= 16 || bot.body().getFoodData().getFoodLevel() >= 17) return false;
+        int level = bot.body().getFoodData().getFoodLevel();
+        if (points >= 16 || level >= 17) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = planner.estimate(bot, FOODS, have + 4);
-        if (cost > 90) return false;
+        // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
+        // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
+        if (level >= 12 && cost > 25 || cost > 90) return false;
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));
         return true;
@@ -267,6 +276,20 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long goalStarted, goalBudget, sideStarted, sideBudget;
+    private double goalEstimate;
+    private net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal goalGoal;
+    private int extensions;
+
+    /** What the current goal would still take from here (seconds), or infinity if it cannot be told. */
+    private double remaining(Bot bot) {
+        if (goalGoal == null) return Double.MAX_VALUE;
+        try {
+            LockoutGoals.Option o = LockoutGoals.plan(bot, planner, goalGoal);
+            return o == null ? Double.MAX_VALUE : o.cost();
+        } catch (RuntimeException e) {
+            return Double.MAX_VALUE;
+        }
+    }
     /** Whatever the brain set going last (a goal, food, the opening), and its time allowance. */
     private BotTask running;
     private long runningSince, runningBudget;
@@ -284,6 +307,7 @@ public final class LockoutBrain implements BotBrain {
         if (sideTask != null && now - sideStarted > sideBudget) {
             bot.say("that takes too long, back to the goal");
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
+            if (sideWant != null) wantRest.put(sideWant, now + 6000);
             drop(bot);
             return;
         }
@@ -296,6 +320,15 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (goalTask != null && targetId != null && now - goalStarted > goalBudget) {
+            // Well on the way (half way down to the ore, say): what is left is worth finishing.
+            double left = remaining(bot);
+            if (extensions < 2 && left < goalEstimate * 0.7) {
+                extensions++;
+                goalEstimate = left;
+                goalBudget = now - goalStarted + budget(left, 600, 6000);
+                bot.say("still on " + targetId + ", ~" + Math.round(left) + " s left");
+                return;
+            }
             bot.say(targetId + " takes too long, something else first");
             restUntil.put(targetId, now + REST_TICKS);
             drop(bot);
@@ -368,6 +401,7 @@ public final class LockoutBrain implements BotBrain {
         for (var want : strategist.wants().entrySet()) {
             net.minecraft.world.item.Item item = want.getKey();
             if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
+            if (wantRest.getOrDefault(item, 0L) > bot.body().level().getGameTime()) continue;
             if (item == net.minecraft.world.item.Items.FLINT && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.FLINT_AND_STEEL)) > 0) continue;
             net.minecraft.world.level.block.Block source = want.getValue();
             net.minecraft.core.BlockPos at = bot.memory().nearest((net.minecraft.server.level.ServerLevel) bot.body().level(),
@@ -375,6 +409,7 @@ public final class LockoutBrain implements BotBrain {
             if (at == null || at.distSqr(bot.body().blockPosition()) > 10 * 10) continue;
             sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), item == net.minecraft.world.item.Items.SUGAR_CANE ? 3 : 1, planner);
             sideId = null;
+            sideWant = item;
             sideStarted = bot.body().level().getGameTime();
             sideBudget = 600;
             bot.say("on the way: " + ObtainPlanner.name(item) + " for later");
@@ -386,6 +421,7 @@ public final class LockoutBrain implements BotBrain {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
                 sideId = c.tile().goal().id();
+                sideWant = null;
                 sideStarted = bot.body().level().getGameTime();
                 sideBudget = budget(c.option().cost(), 400, 1200);
                 bot.say("on the way: " + c.tile().goal().title().getString() + " (~" + Math.round(c.option().cost()) + " s)");
@@ -399,7 +435,9 @@ public final class LockoutBrain implements BotBrain {
     public void finished(Bot bot, BotTask task, boolean success) {
         if (task == sideTask) {
             if (!success && sideId != null) restUntil.put(sideId, bot.body().level().getGameTime() + REST_TICKS);
+            if (!success && sideWant != null) wantRest.put(sideWant, bot.body().level().getGameTime() + 6000);
             sideTask = null;
+            sideWant = null;
             sideId = null;
             return;
         }
@@ -446,6 +484,7 @@ public final class LockoutBrain implements BotBrain {
         goalTask = null;
         sideTask = null;
         sideId = null;
+        sideWant = null;
         bot.clearTasks();
     }
 

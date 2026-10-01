@@ -93,8 +93,11 @@ public final class BotBenchmark {
             claimed = now;
         }
         if (ticks % 1200 == 0) {
-            BotManager.LOG.info("[BOTBENCH] {} minute {}: {} tiles, at {}, doing{}", bot.name, ticks / 1200, claimed,
-                    body.blockPosition().toShortString(), bot.status());
+            var feet = body.blockPosition();
+            BotManager.LOG.info("[BOTBENCH] {} minute {}: {} tiles, at {}, doing{} | body {} ground {} water {} in {} on {} | nav {}", bot.name, ticks / 1200, claimed,
+                    feet.toShortString(), bot.status(), String.format("%.2f %.2f %.2f", body.getX(), body.getY(), body.getZ()), body.onGround(), body.isInWater(),
+                    body.level().getBlockState(feet).getBlock().getName().getString(), body.level().getBlockState(feet.below()).getBlock().getName().getString(),
+                    bot.navigator().status() + " " + bot.navigator().debug());
         }
         if (ticks < length) return false;
         report();

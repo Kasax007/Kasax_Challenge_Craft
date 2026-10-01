@@ -63,11 +63,11 @@ public final class SurfaceTask implements BotTask {
         ServerLevel level = (ServerLevel) body.level();
         BlockPos feet = bot.navigator().feet();
         // (Only judged standing: mid-jump the body is a block higher than where it stands.)
-        if (body.onGround() && jumpedFrom == null && !underground(body)) {
+        if ((body.onGround() || body.isInWater()) && jumpedFrom == null && !underground(body)) {
             body.stopInputs();
             return Result.DONE;
         }
-        if (++ticks > 6000) return Result.FAILED;
+        if (++ticks > 2400) return Result.FAILED;
         // First choice: let the path search find the way up (cave passages, a staircase dug
         // through whatever is cheapest, pillars where there are blocks). The hand-made climb
         // below is only for when it finds nothing.

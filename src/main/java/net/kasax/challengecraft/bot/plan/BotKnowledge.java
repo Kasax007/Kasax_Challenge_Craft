@@ -251,7 +251,9 @@ public final class BotKnowledge {
         if (biome.contains("birch")) out.addAll(List.of("birch_log"));
         if (biome.contains("flower")) out.addAll(List.of("allium", "azure_bluet", "cornflower", "lily_of_the_valley", "oxeye_daisy", "orange_tulip", "red_tulip", "white_tulip", "pink_tulip"));
         if (biome.contains("plains") || biome.contains("meadow")) out.addAll(List.of("oxeye_daisy", "azure_bluet", "cornflower"));
-        if (biome.contains("forest") && !biome.contains("dark")) out.addAll(List.of("lily_of_the_valley", "birch_log"));
+        if (biome.contains("forest") && !biome.contains("dark")) out.addAll(List.of("lily_of_the_valley", "birch_log", "oak_log"));
+        if (biome.contains("dark_forest") || biome.contains("swamp") || biome.contains("windswept_forest")) out.add("oak_log");
+        if (biome.contains("taiga") || biome.contains("grove") || biome.contains("windswept")) out.add("spruce_log");
         if (biome.contains("lush")) out.addAll(List.of("moss_block", "azalea", "clay", "spore_blossom"));
         if (biome.contains("dripstone")) out.addAll(List.of("pointed_dripstone", "dripstone_block"));
         if (biome.contains("deep_dark")) out.addAll(List.of("sculk", "sculk_vein"));

@@ -577,7 +577,23 @@ public final class ObtainPlanner {
             }
             if (known && (best == null || e.getValue().distSqr(from) < best.distSqr(from))) best = e.getValue();
         }
+        if (best == null) best = farLead(bot, blocks);
         return best;
+    }
+
+    /**
+     * None in view either: the nearest biome known for them further out (a forest on the horizon),
+     * from the world's biome layout. Only for blocks some biome is known for.
+     */
+    private static BlockPos farLead(Bot bot, Set<Block> blocks) {
+        if (!(bot.body().level() instanceof net.minecraft.server.level.ServerLevel level)) return null;
+        java.util.function.Predicate<net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome>> typical = h -> h.unwrapKey()
+                .map(k -> BotKnowledge.typicalOf(k.identifier().getPath()).stream()
+                        .anyMatch(id -> blocks.contains(BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id)))))
+                .orElse(false);
+        BlockPos from = bot.body().blockPosition();
+        var found = level.findClosestBiome3d(typical, new BlockPos(from.getX(), Math.max(from.getY(), level.getSeaLevel()), from.getZ()), 480, 24, 64);
+        return found == null ? null : level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, found.getFirst());
     }
 
     /** Plays getting {@code count} of {@code accept} through on {@code sim}; null if it works out, else why not. */

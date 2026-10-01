@@ -143,7 +143,14 @@ public final class BotPathfinder {
         else c = dx != 0 && dz != 0 ? DIAGONAL : WALK;
         // Digging while afloat is five times slower (not on the ground).
         double digFactor = inWater(from) && !solid(from.below()) ? 5 : 1;
-        for (BlockPos b : s.breaks()) c += abilities.tools().breakTicks(state(b)) * digFactor + DIG_EXTRA;
+        for (BlockPos b : s.breaks()) {
+            c += abilities.tools().breakTicks(state(b)) * digFactor + DIG_EXTRA;
+            // Sand or gravel on top falls into the gap: every block of the column is dug too.
+            BlockPos up = b.above();
+            for (int i = 0; i < 12 && state(up).getBlock() instanceof net.minecraft.world.level.block.FallingBlock; i++, up = up.above()) {
+                c += abilities.tools().breakTicks(state(up)) * digFactor + DIG_EXTRA + 4;
+            }
+        }
         return c;
     }
 

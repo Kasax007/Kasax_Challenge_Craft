@@ -55,6 +55,10 @@ public class BotPlayer extends ServerPlayer {
         super.tick();
         // A client player is ticked by its network handler; a bot has none, so tick it here.
         this.doTick();
+        // What the network handler does after each movement packet: the chunk tickets follow the
+        // player. Without it the world around a bot that walked off stays unloaded and frozen
+        // (drops that never fall or get picked up, animals that never move, nothing to see).
+        if (!isRemoved()) level().getChunkSource().move(this);
     }
 
     /** The server simulates this player's movement; there is no client to trust. */

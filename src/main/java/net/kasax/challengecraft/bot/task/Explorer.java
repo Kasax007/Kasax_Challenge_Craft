@@ -32,7 +32,8 @@ final class Explorer {
                 return BotTask.Result.RUNNING;
             }
         }
-        if (heading == null) heading = Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
+        if (heading == null) heading = bot.exploreHeading != null ? bot.exploreHeading : Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
+        bot.exploreHeading = heading;
         BotNavigator nav = bot.navigator();
         if (!walking) {
             legs++;
@@ -43,10 +44,19 @@ final class Explorer {
         BotNavigator.Status s = nav.tick();
         if (s != BotNavigator.Status.MOVING) {
             walking = false;
+            climbed = false; // (a leg that went into a cave: back up before the next one)
             bot.senses().refresh();
             if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
         }
         return BotTask.Result.RUNNING;
+    }
+
+    /** The next leg toward {@code target}: at most {@code leg} blocks on, on the surface there. */
+    static BlockPos legToward(net.minecraft.server.level.ServerLevel level, BlockPos from, BlockPos target, int leg) {
+        double dx = target.getX() - from.getX(), dz = target.getZ() - from.getZ(), d = Math.sqrt(dx * dx + dz * dz);
+        if (d <= leg) return target;
+        BlockPos p = BlockPos.containing(from.getX() + dx / d * leg, from.getY(), from.getZ() + dz / d * leg);
+        return level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
     }
 
     void pause(Bot bot) {

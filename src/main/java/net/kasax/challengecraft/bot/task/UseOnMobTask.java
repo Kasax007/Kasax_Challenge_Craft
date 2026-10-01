@@ -89,6 +89,9 @@ public final class UseOnMobTask implements BotTask {
         if (r == InteractionResult.PASS) r = body.interactOn(target, InteractionHand.MAIN_HAND, target.getEyePosition());
         if (r.consumesAction()) {
             body.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+            // An empty-handed click on a mount is about getting on: a horse rearing up takes the
+            // click without letting it on. Again, then.
+            if (emptyHand && body.getVehicle() == null && target instanceof net.minecraft.world.entity.animal.equine.AbstractHorse) return Result.RUNNING;
             return Result.DONE;
         }
         failed.add(target.getUUID());

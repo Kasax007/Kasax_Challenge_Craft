@@ -32,6 +32,27 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /** Taiga: a big spruce (2 x 2) and a slim one, leaves down to head height. Six logs. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void spruceLogs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "spruce_logs");
+        spruce(a, 10, 10, 2, 16);
+        spruce(a, 26, 24, 1, 10);
+        a.spawn(20, FEET, 20);
+        a.run(new ObtainTask(Set.of(Items.SPRUCE_LOG), 6), 2400,
+                () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.SPRUCE_LOG)) >= 6);
+    }
+
+    private static void spruce(BotArena a, int x, int z, int width, int height) {
+        var leaves = Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true);
+        for (int y = 2; y <= height; y++) {
+            int r = Math.max(1, (height - y) / 3 + 1) + (width - 1);
+            if (y % 2 == 1 && y < height - 1) r--;
+            a.fill(x - r, FEET + y, z - r, x + width - 1 + r, FEET + y, z + width - 1 + r, leaves);
+        }
+        a.fill(x, FEET, z, x + width - 1, FEET + height - 2, z + width - 1, Blocks.SPRUCE_LOG);
+    }
+
     /** The speedrunners' portal at a lava pool, then through it. (Flaky about one run in three: open.) */
     @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8, maxAttempts = 3, requiredSuccesses = 1)
     public void castPortal(GameTestHelper h) {
