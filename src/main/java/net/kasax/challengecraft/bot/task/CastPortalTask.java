@@ -98,7 +98,14 @@ public final class CastPortalTask implements BotTask {
             return Result.FAILED;
         }
         Result r = index < ops.size() ? step(bot, level, ops.get(index)) : lightAndEnter(bot, level);
-        if (r == Result.FAILED) bot.say("casting stopped at " + status());
+        if (r == Result.FAILED) {
+            var b = bot.body();
+            Op op = index < ops.size() ? ops.get(index) : null;
+            bot.say("casting stopped at " + status() + " (tries " + tries + ", walk fails " + walkFails
+                    + ", standing " + b.blockPosition().toShortString() + (op == null ? "" : ", op " + Math.round(Math.sqrt(op.pos().distSqr(b.blockPosition()))) + " blocks off")
+                    + ", water " + BotInventory.slotOf(b, Items.WATER_BUCKET) + ", lava " + BotInventory.slotOf(b, Items.LAVA_BUCKET)
+                    + ", bucket " + BotInventory.slotOf(b, Items.BUCKET) + ", pool " + (pool == null ? "-" : pool.toShortString()) + ")");
+        }
         return r;
     }
 
