@@ -32,6 +32,22 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /** Its things lying where it died, 20 blocks off: all picked up again. */
+    @GameTest(structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 8)
+    public void recoverThings(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "recover");
+        var level = h.getLevel();
+        var spot = a.abs(30, FEET, 30);
+        for (ItemStack st : new ItemStack[]{new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 20), new ItemStack(Items.IRON_INGOT, 3), new ItemStack(Items.OAK_PLANKS, 7)}) {
+            var e = new net.minecraft.world.entity.item.ItemEntity(level, spot.getX() + level.getRandom().nextDouble() * 3, spot.getY() + 0.5,
+                    spot.getZ() + level.getRandom().nextDouble() * 3, st);
+            level.addFreshEntity(e);
+        }
+        a.spawn(8, FEET, 8);
+        a.run(new net.kasax.challengecraft.bot.task.RecoverTask(spot), 800, () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0
+                && ObtainPlanner.countAny(a.bot().body(), Set.of(Items.IRON_INGOT)) >= 3 && ObtainPlanner.countAny(a.bot().body(), Set.of(Items.OAK_PLANKS)) >= 7);
+    }
+
     /** Taiga: a big spruce (2 x 2) and a slim one, leaves down to head height. Six logs. */
     @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
     public void spruceLogs(GameTestHelper h) {

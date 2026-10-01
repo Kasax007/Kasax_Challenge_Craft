@@ -39,6 +39,12 @@ public final class Bot {
     }
 
     public final java.util.Map<FarLead, java.util.List<String>> farLeads = new java.util.HashMap<>();
+
+    /** Where and when it last died, and whether its things can still be there (not in lava, not in the void). */
+    public record Death(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, net.minecraft.core.BlockPos pos, long time, boolean recoverable) {
+    }
+
+    public Death lastDeath;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 

@@ -84,6 +84,20 @@ public final class LockoutBrain implements BotBrain {
 
         LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bot.id);
         if (team == null) return;
+        // Died: the things are still lying there for a few minutes. Fetching them beats making
+        // everything again (if it is not too far and they did not burn).
+        if (bot.lastDeath != null) {
+            Bot.Death d = bot.lastDeath;
+            bot.lastDeath = null;
+            long age = bot.body().level().getGameTime() - d.time();
+            double dist = Math.sqrt(d.pos().distSqr(bot.body().blockPosition()));
+            if (d.recoverable() && d.dimension() == bot.body().level().dimension() && age < 3600 && dist < 350
+                    && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE)) == 0) {
+                bot.say("back for my things at " + d.pos().toShortString() + " (" + Math.round(dist) + " blocks)");
+                start(bot, new net.kasax.challengecraft.bot.task.RecoverTask(d.pos()), 600 + (long) (dist * 8));
+                return;
+            }
+        }
         // Keep something to eat: a player who is starving loses more time than bread costs.
         if (needsFood(bot)) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before

@@ -85,6 +85,12 @@ public final class BotManager {
             if (body != bot.body()) bot.attach(body);
             if (body.isDeadOrDying()) {
                 body.stopInputs();
+                if (bot.lastDeath == null || body.level().getGameTime() - bot.lastDeath.time() > 100) {
+                    var src = body.getLastDamageSource();
+                    boolean gone = body.isInLava() || src != null && (src.is(net.minecraft.tags.DamageTypeTags.IS_FIRE) && body.isInLava()
+                            || src.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD));
+                    bot.lastDeath = new Bot.Death(body.level().dimension(), body.blockPosition(), body.level().getGameTime(), !gone);
+                }
                 if (body.deathTime >= RESPAWN_DELAY) {
                     ServerPlayer reborn = server.getPlayerList().respawn(body, false, Entity.RemovalReason.KILLED);
                     if (reborn instanceof BotPlayer b) bot.attach(b);
