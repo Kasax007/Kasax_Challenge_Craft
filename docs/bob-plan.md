@@ -399,3 +399,16 @@ Welt-Erzeugung der Challenge ist noch nicht gefunden.
 8. **Bündel** für die Inventarverwaltung: Kleinkram ins Bündel statt wegwerfen.
 9. **Restliche Ziele** einzeln mit GameTest, wo es geht.
 10. **Komplett-Bretter** als Benchmark (aus einer eigenen Kopie, damit Entwickeln weiterläuft).
+
+### Nachtrag zum Plan (Hinweise vom Spieler)
+
+11. **Sicht wie ein Spieler auf 24 Chunks**: Bob fordert 24 Chunks Sichtweite an; die
+    Benchmark-Server laufen mit Sicht- und Simulationsdistanz 24. Landschaft, Atlas, Strukturen und
+    Gedächtnis reichen bis zur Renderdistanz. Mobs sieht er bis 128 Blöcke in Sichtlinie, so weit,
+    wie der Server sie einem Spieler zeigt.
+12. **Festung triangulieren**: zwei Enderaugen von zwei Standorten, die Flugrichtungen schneiden
+    sich an der Festung (wie bei Ninjabrain Bot); dorthin, ein Kontrollauge, dann hinab.
+13. **Portal gießen zu 100 %**: die Speedrunner-Methode an einer geraden Kante des Lavasees, mit
+    Form, Wasserrinne und Auffangmulde; Platz wird notfalls freigegraben; GameTests für viele
+    Seeformen.
+14. **Abschluss**: Abdeckung aller Ziele prüfen, mindestens zehn Komplett-Bretter, Auswertung.

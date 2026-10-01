@@ -78,7 +78,7 @@ public final class KillTask implements BotTask {
         }
         if (done(bot)) return Result.DONE;
 
-        if (target == null || !target.isAlive() || target.distanceTo(body) > 64) {
+        if (target == null || !target.isAlive() || target.distanceTo(body) > BotWorld.MOB_SIGHT) {
             if (target != null && !target.isAlive() && target.getLastHurtByMob() == body) {
                 killed++;
                 deathSpot = target.blockPosition();
@@ -99,6 +99,10 @@ public final class KillTask implements BotTask {
         // On lava (a strider), or long out of reach: shot at, if there is a bow and arrows.
         if ((target.isInLava() || target.level().getBlockState(target.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LAVA)
                 || chaseTicks > 600) && shoot(bot, target)) return Result.RUNNING;
+        // Deep down in the water (a squid, a glow squid far below): not one to chase from the
+        // surface for long.
+        boolean deep = target.isInWater() && target.getY() < body.getY() - 5 && body.isInWater();
+        if (deep && chaseTicks > 240) chaseTicks = 1200;
         if (++chaseTicks > 1200) {
             // Could not get at this one (behind water, up a cliff): try another.
             unreachable.add(target.getUUID());
@@ -223,8 +227,8 @@ public final class KillTask implements BotTask {
     }
 
     private LivingEntity nearest(BotPlayer body, ServerLevel level) {
-        return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(48),
-                        e -> e.isAlive() && types.contains(e.getType()) && e != body && !unreachable.contains(e.getUUID()))
+        return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(BotWorld.MOB_SIGHT),
+                        e -> e.isAlive() && types.contains(e.getType()) && e != body && !unreachable.contains(e.getUUID()) && BotWorld.seesMob(body, e))
                 .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
     }
 

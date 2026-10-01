@@ -49,11 +49,11 @@ public class BotPlayer extends ServerPlayer {
     /**
      * What a player's client tells the server about itself, the view distance above all: the
      * default (2 chunks) would have the server load and run only a patch of 32 blocks round the
-     * bot. It sees as far as the server lets anyone see (a player's client asks for 12).
+     * bot. It asks for 24 chunks, and sees as far as the server allows.
      */
     static ClientInformation clientInformation(MinecraftServer server) {
         ClientInformation d = ClientInformation.createDefault();
-        int view = Math.max(2, Math.min(12, server.getPlayerList().getViewDistance()));
+        int view = BotWorld.VIEW_CHUNKS;
         return new ClientInformation(d.language(), view, d.chatVisibility(), d.chatColors(), d.modelCustomisation(), d.mainHand(),
                 d.textFilteringEnabled(), d.allowsListing(), d.particleStatus());
     }

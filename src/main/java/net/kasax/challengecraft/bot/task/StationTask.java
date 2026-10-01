@@ -58,6 +58,15 @@ abstract class StationTask implements BotTask {
                 station = bot.actions().placeNearby(item);
                 placedHere = station;
                 if (block == Blocks.CRAFTING_TABLE && station != null) bot.ownTable = station;
+                if (station == null && bot.body().isInWater()) {
+                    // Swimming: ashore first (nothing stands on water).
+                    if (++placeTries > 4) return Result.FAILED;
+                    bot.interject(new NavGoalTask("ashore to put down a " + block.getName().getString(),
+                            (lv, p) -> lv.getFluidState(p).isEmpty() && lv.getFluidState(p.below()).isEmpty()
+                                    && !lv.getBlockState(p.below()).getCollisionShape(lv, p.below()).isEmpty(),
+                            b -> b.body().blockPosition(), 1200));
+                    return Result.RUNNING;
+                }
                 if (station == null) {
                     // Nowhere to put it here (down a narrow shaft, say): a block out of the wall
                     // beside the feet, as a player makes room; else a step aside and again.

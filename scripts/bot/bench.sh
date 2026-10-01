@@ -20,6 +20,9 @@ set_prop enable-rcon true
 set_prop rcon.password test
 set_prop rcon.port 25575
 set_prop spawn-protection 0
+# Bob plays with a player's sight: 24 chunks to see, the same to simulate.
+set_prop view-distance 24
+set_prop simulation-distance 24
 rm -rf $RUN/bench_$SEED
 cd $ROOT
 # A JDK 25 (the one on PATH, or JAVA_HOME if set).

@@ -33,7 +33,7 @@ import java.util.function.Predicate;
  * a walk, not a search.
  */
 public final class BotMemory {
-    private static final int RADIUS_CHUNKS = 8, CAP = 160, RESCAN_TICKS = 6000, ANIMAL_TTL = 6000;
+    private static final int CAP = 160, RESCAN_TICKS = 6000, ANIMAL_TTL = 6000;
 
     /** Blocks everywhere (or of no use): not worth remembering. */
     private static final Set<Block> BORING = Set.of(Blocks.AIR, Blocks.CAVE_AIR, Blocks.VOID_AIR, Blocks.STONE, Blocks.DEEPSLATE,
@@ -120,7 +120,7 @@ public final class BotMemory {
         Map<Long, Long> done = scanned.computeIfAbsent(level.dimension(), k -> new HashMap<>());
         int cx = at.getX() >> 4, cz = at.getZ() >> 4;
         for (int tries = 0; tries < 64; tries++) {
-            if (ring > RADIUS_CHUNKS) {
+            if (ring > BotWorld.viewChunks(level)) {
                 ring = 0;
                 index = 0;
             }
@@ -347,8 +347,8 @@ public final class BotMemory {
     private void lookAtMobs(ServerLevel level, BotPlayer body, long now) {
         Map<EntityType<?>, List<Seen>> known = animals.computeIfAbsent(level.dimension(), k -> new HashMap<>());
         for (List<Seen> list : known.values()) list.removeIf(s -> now - s.time() > ANIMAL_TTL);
-        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(64),
-                e -> e.isAlive() && !(e instanceof Player))) {
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(BotWorld.MOB_SIGHT),
+                e -> e.isAlive() && !(e instanceof Player) && BotWorld.seesMob(body, e))) {
             List<Seen> list = known.computeIfAbsent(e.getType(), k -> new ArrayList<>());
             BlockPos p = e.blockPosition();
             list.removeIf(s -> s.pos().distSqr(p) < 64);

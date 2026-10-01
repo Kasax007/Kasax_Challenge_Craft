@@ -330,8 +330,8 @@ public final class ObtainPlanner {
         }
         visibleBlocks = blocks;
         Map<EntityType<?>, Double> mobs = new HashMap<>();
-        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(c).inflate(48),
-                e -> e.isAlive() && !(e instanceof Player))) {
+        for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(c).inflate(BotWorld.MOB_SIGHT),
+                e -> e.isAlive() && !(e instanceof Player) && BotWorld.seesMob(bot.body(), e))) {
             mobs.merge(e.getType(), 5 + e.distanceTo(bot.body()) / 3.0, Math::min);
         }
         visibleMobs = mobs;

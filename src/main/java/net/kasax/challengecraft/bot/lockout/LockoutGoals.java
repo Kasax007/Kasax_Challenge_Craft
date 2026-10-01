@@ -117,8 +117,12 @@ public final class LockoutGoals {
         // sand): the trip there, then the rest planned there.
         var t = goal.type();
         switch (t) {
-            case DIMENSION, BIOME, STRUCTURE, LOCATION, KILL -> {
+            case DIMENSION, BIOME, LOCATION, KILL -> {
                 return null;
+            }
+            // (Of the places, only the stronghold: found with eyes made from blaze powder.)
+            case STRUCTURE -> {
+                if (!goal.primaryTarget().endsWith("stronghold")) return null;
             }
             default -> {
             }
@@ -960,6 +964,17 @@ public final class LockoutGoals {
     /** Structures: those it has seen are a walk away; surface ones are worth exploring for. */
     private static Option structure(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         String path = Identifier.parse(goal.primaryTarget()).getPath();
+        // The stronghold: eyes of ender (pearls and blaze powder), thrown and followed.
+        if (path.equals("stronghold") && overworld(bot)) {
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            var seen = VisitStructureTask.nearest(bot, VisitStructureTask.resolve(level, goal.primaryTarget()));
+            if (seen != null) return new Option(5 + Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4.0, () -> new VisitStructureTask(level, goal.primaryTarget()));
+            double eyes = planner.estimate(bot, Set.of(Items.ENDER_EYE), 6);
+            if (eyes >= INF) return null;
+            return new Option(eyes + 700, () -> new SequenceTask("find the stronghold", List.of(
+                    () -> new ObtainTask(Set.of(Items.ENDER_EYE), 6, planner),
+                    net.kasax.challengecraft.bot.task.EyeTrackTask::new)));
+        }
         boolean netherOrEnd = path.equals("fortress") || path.equals("bastion_remnant") || path.equals("end_city");
         boolean netherOnly = path.equals("fortress") || path.equals("bastion_remnant");
         // A fortress or a bastion from up here: the way into the Nether first.

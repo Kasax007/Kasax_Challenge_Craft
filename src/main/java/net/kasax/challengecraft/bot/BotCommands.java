@@ -164,6 +164,22 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("stronghold").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    // Test: to the stronghold with the eyes of ender it carries.
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.EyeTrackTask());
+                                    return 1;
+                                })))
+                        .then(Commands.literal("barter").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    // Test: a few trades with a piglin (gold and a gold piece in hand).
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    bot.doNow(new net.kasax.challengecraft.bot.task.BarterTask(java.util.Set.of(), 0, 5));
+                                    return 1;
+                                })))
                         .then(Commands.literal("bench").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))
                                         .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.HARD))

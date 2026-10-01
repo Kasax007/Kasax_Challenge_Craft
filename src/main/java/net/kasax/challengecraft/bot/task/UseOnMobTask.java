@@ -55,8 +55,9 @@ public final class UseOnMobTask implements BotTask {
         boolean emptyHand = tool == net.minecraft.world.item.Items.AIR;
         if (!emptyHand && BotInventory.slotOf(body, tool) < 0) return Result.FAILED;
         if (target == null || !target.isAlive() || !suitable.test(target)) {
-            target = body.level().getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(48),
-                            e -> types.contains(e.getType()) && e.isAlive() && suitable.test(e) && !failed.contains(e.getUUID()))
+            target = body.level().getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(net.kasax.challengecraft.bot.BotWorld.MOB_SIGHT),
+                            e -> types.contains(e.getType()) && e.isAlive() && suitable.test(e) && !failed.contains(e.getUUID())
+                                    && net.kasax.challengecraft.bot.BotWorld.seesMob(body, e))
                     .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
             walking = false;
             chase = 0;

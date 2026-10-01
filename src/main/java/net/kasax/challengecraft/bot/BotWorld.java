@@ -65,7 +65,29 @@ public final class BotWorld {
             net.minecraft.world.level.block.Blocks.BASALT, net.minecraft.world.level.block.Blocks.SOUL_SAND, net.minecraft.world.level.block.Blocks.SOUL_SOIL);
 
     /** How far it makes out a block in a cave around it (a torch-less player sees about that far). */
-    public static final double SIGHT = 24;
+    public static final double SIGHT = 32;
+
+    /** The view distance it plays with, in chunks: what it asks for (24), as far as the server allows. */
+    public static final int VIEW_CHUNKS = 24;
+
+    public static int viewChunks(ServerLevel level) {
+        return Math.max(2, Math.min(VIEW_CHUNKS, level.getServer().getPlayerList().getViewDistance()));
+    }
+
+    /** How far it sees across open country (the render distance), in blocks. */
+    public static int viewBlocks(ServerLevel level) {
+        return viewChunks(level) * 16;
+    }
+
+    /** How far it makes out a mob: as far as the server shows one to a player (about eight chunks). */
+    public static final double MOB_SIGHT = 128;
+
+    /** A mob it can see: close by, or in a clear line from its eyes within {@link #MOB_SIGHT}. */
+    public static boolean seesMob(net.minecraft.world.entity.player.Player body, net.minecraft.world.entity.Entity e) {
+        double d = e.distanceTo(body);
+        if (d > MOB_SIGHT) return false;
+        return d < 24 || body.hasLineOfSight(e);
+    }
 
     /**
      * Whether a player standing with its eyes at {@code eye} could have seen this block: on view
@@ -80,7 +102,7 @@ public final class BotWorld {
         return skyVisible(level, p) || eye != null && inSight(level, eye, p, SIGHT);
     }
 
-    private static final double NETHER_SIGHT = 48;
+    private static final double NETHER_SIGHT = 96;
 
     /** An open side (air, water) lit by the sky: in view from the surface, a ravine, a cave mouth. */
     public static boolean skyVisible(ServerLevel level, BlockPos p) {

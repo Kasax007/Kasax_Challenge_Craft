@@ -32,7 +32,7 @@ public final class BotSenses {
     public record SeenStructure(Identifier id, BlockPos spot, BoundingBox box) {
     }
 
-    private static final int VIEW = 96, STEP = 8, NEAR = 20, STRUCTURE_VIEW = 160;
+    private static final int STEP = 12, NEAR = 20;
 
     /** The nearest known spot of each biome and structure in this dimension (from the atlas, as of the last look). */
     private final Map<Identifier, BlockPos> biomes = new HashMap<>();
@@ -98,7 +98,8 @@ public final class BotSenses {
 
     private void look(BotPlayer body, ServerLevel level) {
         BlockPos c = body.blockPosition();
-        // The landscape: the surface around, as far as one sees.
+        // The landscape: the surface around, as far as one sees (the render distance).
+        int VIEW = BotWorld.viewBlocks(level);
         for (int dx = -VIEW; dx <= VIEW; dx += STEP) {
             for (int dz = -VIEW; dz <= VIEW; dz += STEP) {
                 int x = c.getX() + dx, z = c.getZ() + dz;
@@ -121,7 +122,7 @@ public final class BotSenses {
         lootables.clear();
         var registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
         net.minecraft.world.phys.Vec3 eye = body.getEyePosition();
-        int view = Math.min(STRUCTURE_VIEW, level.getServer().getPlayerList().getViewDistance() * 16);
+        int view = BotWorld.viewBlocks(level);
         boolean overworld = level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
         int r = view >> 4;
         for (int cx = (c.getX() >> 4) - r; cx <= (c.getX() >> 4) + r; cx++) {
