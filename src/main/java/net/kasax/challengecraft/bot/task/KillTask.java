@@ -41,6 +41,7 @@ public final class KillTask implements BotTask {
     private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
     private final Explorer explorer = new Explorer(2400);
     private boolean triedMemory;
+    private final java.util.Set<Integer> unreachableDrops = new java.util.HashSet<>();
     private boolean walking;
 
     /** {@code loot} may be empty when only the kill matters (then {@code kills} counts). */
@@ -88,6 +89,20 @@ public final class KillTask implements BotTask {
             }
             if (--lookCooldown > 0) return explore(bot);
             lookCooldown = 20;
+            // What it is after already lying about (killed in the same sweep, or by something else):
+            // picked up first, before hunting for more.
+            if (!loot.isEmpty()) {
+                ItemEntity lying = BotWorld.drops(level, body.blockPosition(), 16, loot).stream()
+                        .filter(e -> !unreachableDrops.contains(e.getId())).findFirst().orElse(null);
+                if (lying != null) {
+                    if (walking) bot.navigator().stop();
+                    walking = false;
+                    deathSpot = lying.blockPosition();
+                    collectTicks = 60;
+                    unreachableDrops.add(lying.getId()); // (once: if it cannot be had, not again)
+                    return Result.RUNNING;
+                }
+            }
             target = nearest(body, level);
             chaseTicks = 0;
             if (target == null) return explore(bot);

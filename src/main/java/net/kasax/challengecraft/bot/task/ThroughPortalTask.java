@@ -46,10 +46,20 @@ public final class ThroughPortalTask implements BotTask {
             if (portal == null) {
                 // The one it came through, however far away: it remembers where that was.
                 BlockPos known = bot.senses().knownPortal(bot.body().blockPosition());
-                if (known != null && legFails < 8) {
-                    // Over there in legs (far off, the path search cannot see it all at once).
+                if (known != null && legFails < 16) {
+                    // Over there in legs (far off, the path search cannot see it all at once). Far
+                    // above or below (down a cliff, by the lava sea), or the legs getting nowhere:
+                    // straight at it instead, through the rock (steps dug, blocks put under).
                     if (!legging) {
-                        bot.navigator().goStandNear(Explorer.legToward(level, bot.navigator().feet(), known, 40), 3);
+                        BlockPos feet = bot.navigator().feet();
+                        if (legFails >= 3 || Math.abs(known.getY() - feet.getY()) > 12) {
+                            BlockPos target = known;
+                            BlockPos aim = feet.distSqr(known) > 40 * 40
+                                    ? feet.offset((known.getX() - feet.getX()) / 3, (known.getY() - feet.getY()) / 2, (known.getZ() - feet.getZ()) / 3) : known;
+                            bot.navigator().setGoal(p -> p.distSqr(aim) < 6 * 6 || p.distSqr(target) < 6 * 6, aim);
+                        } else {
+                            bot.navigator().goStandNear(Explorer.legToward(level, feet, known, 40), 3);
+                        }
                         legging = true;
                     }
                     BotNavigator.Status s = bot.navigator().tick();
