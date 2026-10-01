@@ -413,6 +413,13 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (goalTask != null && targetId != null) spent.merge(targetId, 1, Integer::sum);
+        if (checkTicks % 100 == 0) {
+            boolean open = false;
+            for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+                if (t.claimedBy() == null && t.goal().id().equals("survive_explosion")) open = true;
+            }
+            bot.welcomeExplosion = open;
+        }
         if (++checkTicks % 20 != 0 || targetIndex < 0) return;
         if (checkTicks % 40 == 0 && sideTask == null) takeChances(bot);
         MinecraftServer server = bot.server();

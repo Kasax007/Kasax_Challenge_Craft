@@ -47,6 +47,8 @@ public final class Bot {
     public Death lastDeath;
     /** Where it last went down into a cave from the surface: the way back out. */
     public net.minecraft.core.BlockPos caveEntry;
+    /** Set by the brain while an explosion survived would claim a tile: a creeper is then welcome. */
+    public boolean welcomeExplosion;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 
@@ -209,6 +211,20 @@ public final class Bot {
         if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask) && !cornered) {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(6), net.minecraft.world.entity.LivingEntity::isAlive)) {
                 boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0;
+                // A tile wants an explosion survived: at full health, let it go off a few blocks away
+                // (about four blocks off: on hard some seven hearts, survived at full health).
+                if (creeper && welcomeExplosion && body.getHealth() >= 18) {
+                    double d = m.distanceTo(body);
+                    if (d < 3.7) {
+                        net.minecraft.world.phys.Vec3 back = body.position().subtract(m.position()).normalize().scale(4.3 - d);
+                        actions.reset();
+                        interject(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(back)), 0.8).sprinting());
+                    } else {
+                        navigator.stop();
+                        body.stopInputs();
+                    }
+                    return;
+                }
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7)) {
                     net.minecraft.world.phys.Vec3 away = body.position().subtract(m.position()).normalize().scale(16);
                     // (That way was blocked last time: off to the side instead.)

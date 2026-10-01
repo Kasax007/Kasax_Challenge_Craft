@@ -236,4 +236,27 @@ public class BotStuntTests {
         a.run(new UseOnMobTask(EntityTypes.COD, Items.WATER_BUCKET, e -> true), 600,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.COD_BUCKET)) > 0);
     }
+
+    /** "Survive an explosion" open: a creeper going off at a distance, taken at full health. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void creeperWelcome(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "creeper_welcome");
+        a.spawn(20, FEET, 20);
+        var bot = a.bot();
+        bot.welcomeExplosion = true;
+        // (After the spawn protection has worn off.)
+        var creeper = EntityTypes.CREEPER.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        creeper.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(22, FEET, 20)));
+        h.runAfterDelay(80, () -> {
+            h.getLevel().addFreshEntity(creeper);
+            creeper.setTarget(bot.body());
+        });
+        boolean[] blast = {false}, died = {false};
+        h.onEachTick(() -> {
+            var src = bot.body().getLastDamageSource();
+            if (src != null && src.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION)) blast[0] = true;
+            if (!bot.body().isAlive()) died[0] = true;
+        });
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(400), 400, () -> blast[0] && !died[0] && h.getTick() > 140);
+    }
 }
