@@ -154,7 +154,11 @@ final class LockoutStrategist {
                 for (LockoutBingoGoal g : open) {
                     if (g.category() == LockoutBingoGoalCategory.NETHER && g.type() != LockoutBingoGoalType.DIMENSION) add(g.id(), share, "the way in is shared by " + nether + " Nether tiles");
                 }
-                notes.add("way into the Nether ~" + Math.round(trip.cost()) + " s");
+                Double lava = planner.seen(bot, net.minecraft.world.level.block.Blocks.LAVA);
+                notes.add("way into the Nether ~" + Math.round(trip.cost()) + " s (lava " + (lava == null ? "-" : Math.round(lava))
+                        + ", water bucket " + Math.round(planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1))
+                        + ", flint and steel " + Math.round(planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1))
+                        + ", obsidian " + Math.round(planner.estimate(bot, Set.of(Items.OBSIDIAN), 10)) + ")");
             } else notes.add("no way into the Nether known");
         }
         if (nether >= 2) {
