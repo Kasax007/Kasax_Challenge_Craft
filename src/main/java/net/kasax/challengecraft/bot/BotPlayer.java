@@ -48,6 +48,9 @@ public class BotPlayer extends ServerPlayer {
 
     @Override
     public void tick() {
+        // Through a portal: a real client confirms it has arrived; without that the game counts
+        // the player as still on the way (and takes it through no further portal).
+        if (isChangingDimension()) hasChangedDimension();
         // The inputs drive the vanilla movement code (LivingEntity#travel) during doTick.
         this.xxa = strafe;
         this.zza = forward;

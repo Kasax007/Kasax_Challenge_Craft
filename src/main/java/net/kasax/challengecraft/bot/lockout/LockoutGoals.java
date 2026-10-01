@@ -93,7 +93,8 @@ public final class LockoutGoals {
         if (bot.body().level().dimension() == Level.NETHER
                 && goal.category() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) {
             if (goal.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) return null;
-            return new Option(240, net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
+            Double back = wayBack(bot);
+            return back == null ? null : new Option(back + 150, net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
         }
         Option here = basic(bot, planner, goal);
         if (here != null || !overworld(bot)) return here;
@@ -135,6 +136,24 @@ public final class LockoutGoals {
      * Into the Nether: ten obsidian (made from a lava pool with a water bucket, or mined), flint and
      * steel, a few blocks for the frame's corners, then a portal built and walked through.
      */
+    /**
+     * Seconds back to the Overworld from the Nether: the walk to the portal it came through (it
+     * remembers it), or building one from obsidian it carries; null without a way (or when that
+     * just failed: not again at once).
+     */
+    static Double wayBack(Bot bot) {
+        if (bot.body().level().getGameTime() - bot.portalBackFailedAt < 2400) return null;
+        BlockPos at = bot.body().blockPosition();
+        BlockPos portal = net.kasax.challengecraft.bot.BotWorld.nearest((net.minecraft.server.level.ServerLevel) bot.body().level(), at, 32, 16,
+                s -> s.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), false, Set.of());
+        if (portal == null) portal = bot.senses().knownPortal(at);
+        // (A Nether walk is slower than its straight line: up and down, round the lava.)
+        if (portal != null) return 10 + Math.sqrt(portal.distSqr(at)) / 4.3 * 1.6;
+        boolean frame = ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.OBSIDIAN)) >= 10
+                && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.FLINT_AND_STEEL, net.minecraft.world.item.Items.FIRE_CHARGE)) > 0;
+        return frame ? 60.0 : null;
+    }
+
     private static Option nether(Bot bot, ObtainPlanner planner) {
         if (!overworld(bot)) return null;
         // The speedrunners' way is the way in: cast a portal at a lava pool. Mining obsidian only

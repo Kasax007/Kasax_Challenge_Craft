@@ -49,6 +49,8 @@ public final class Bot {
     public net.minecraft.core.BlockPos caveEntry;
     /** Set by the brain while an explosion survived would claim a tile: a creeper is then welcome. */
     public boolean welcomeExplosion;
+    /** When the way back through a portal last failed (game time). */
+    public long portalBackFailedAt = -100_000;
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 

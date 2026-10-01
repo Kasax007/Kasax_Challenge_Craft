@@ -127,6 +127,67 @@ public class BotSkillTests {
         a.run(new CastPortalTask(h.getLevel()), 6000, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
 
+    /**
+     * Through a lit portal, then far off in the Nether (beyond where it would see the portal), and
+     * back home through the same portal: it remembers where it came out.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    public void portalRoundTrip(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "portal_round_trip");
+        var level = h.getLevel();
+        a.fill(24, FEET, 20, 27, FEET + 4, 20, Blocks.OBSIDIAN);
+        a.fill(25, FEET + 1, 20, 26, FEET + 3, 20, Blocks.AIR);
+        net.minecraft.world.level.portal.PortalShape.findEmptyPortalShape(level, a.abs(25, FEET + 1, 20), net.minecraft.core.Direction.Axis.X)
+                .ifPresent(sh -> sh.createPortalBlocks(level));
+        a.spawn(20, FEET, 22, new ItemStack(Items.COBBLESTONE, 32));
+        int[] stage = {0};
+        long[] arrived = {0};
+        a.run(new net.kasax.challengecraft.bot.BotTask() {
+            final net.kasax.challengecraft.bot.task.ThroughPortalTask in = new net.kasax.challengecraft.bot.task.ThroughPortalTask(), out = new net.kasax.challengecraft.bot.task.ThroughPortalTask();
+
+            @Override
+            public Result tick(net.kasax.challengecraft.bot.Bot bot) {
+                var body = bot.body();
+                if (stage[0] == 0) {
+                    in.tick(bot);
+                    if (body.level().dimension() == Level.NETHER) stage[0] = 1;
+                    return Result.RUNNING;
+                }
+                if (stage[0] == 1) {
+                    // A corridor ninety blocks long out of the portal, and over to its far end.
+                    var nether = (net.minecraft.server.level.ServerLevel) body.level();
+                    if (arrived[0] == 0) arrived[0] = nether.getGameTime();
+                    if (nether.getGameTime() - arrived[0] < 20) return Result.RUNNING; // (out of the frame first)
+                    var start = body.blockPosition();
+                    for (int i = -2; i <= 92; i++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            nether.setBlockAndUpdate(start.offset(i, -1, dz), Blocks.OBSIDIAN.defaultBlockState());
+                            for (int y = 0; y < 3; y++) {
+                                var q = start.offset(i, y, dz);
+                                if (!nether.getBlockState(q).is(Blocks.NETHER_PORTAL) && !nether.getBlockState(q).is(Blocks.OBSIDIAN)) nether.setBlockAndUpdate(q, Blocks.AIR.defaultBlockState());
+                            }
+                            nether.setBlockAndUpdate(start.offset(i, 3, dz), Blocks.OBSIDIAN.defaultBlockState());
+                        }
+                    }
+                    body.teleportTo(start.getX() + 90.5, start.getY(), start.getZ() + 0.5);
+                    stage[0] = 2;
+                    return Result.RUNNING;
+                }
+                return out.tick(bot);
+            }
+
+            @Override
+            public String describe() {
+                return "there and back";
+            }
+
+            @Override
+            public String status() {
+                return "there and back (stage " + stage[0] + ") " + (stage[0] == 2 ? out.status() : in.status());
+            }
+        }, 3000, () -> stage[0] == 2 && a.bot().body().level().dimension() == Level.OVERWORLD);
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {

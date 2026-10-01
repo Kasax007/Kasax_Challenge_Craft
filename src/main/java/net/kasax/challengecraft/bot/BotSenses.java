@@ -50,9 +50,17 @@ public final class BotSenses {
         Identifier dim = level.dimension().identifier();
         if (!dim.equals(dimension)) {
             // Through a portal (or respawned): remember both ends if it was a portal.
-            if (dimension != null && lastPos != null && level.getBlockState(body.blockPosition()).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) {
-                remember(dimension, lastPos);
-                remember(dim, body.blockPosition());
+            // (It may already have stepped out of the frame: the nearest portal block about.)
+            if (dimension != null && lastPos != null) {
+                BlockPos here = net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 6, 4,
+                        st -> st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), false, java.util.Set.of());
+                if (here != null) {
+                    remember(dim, here);
+                    ServerLevel old = level.getServer().getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, dimension));
+                    BlockPos there = old == null ? null : net.kasax.challengecraft.bot.BotWorld.nearest(old, lastPos, 6, 4,
+                            st -> st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), false, java.util.Set.of());
+                    remember(dimension, there != null ? there : lastPos);
+                }
             }
             dimension = dim;
             biomes.clear();
@@ -61,6 +69,9 @@ public final class BotSenses {
             lookedAt = -10_000;
         }
         lastPos = body.blockPosition();
+        // Standing in a portal (on the way in, and again on coming out at the other end): both
+        // ends remembered that way, whatever tick the game moves it on.
+        if (level.getBlockState(lastPos).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) remember(dim, lastPos);
         if (now - lookedAt < 100) return;
         lookedAt = now;
         look(body, level);

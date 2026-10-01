@@ -26,24 +26,35 @@ public final class ThroughPortalTask implements BotTask {
     private boolean walking;
     private int ticks;
     private BotTask build;
-    private BlockPos lastKnown;
+    private boolean legging;
+    private BlockPos lastFeet;
+    private int legFails;
 
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         if (from == null) from = level.dimension();
         if (level.dimension() != from) return Result.DONE;
-        if (++ticks > 4800) return Result.FAILED;
-        if (build != null) return build.tick(bot);
+        if (++ticks > 4800) return failed(bot);
+        if (build != null) {
+            Result r = build.tick(bot);
+            return r == Result.FAILED ? failed(bot) : r;
+        }
         if (portal == null || !level.getBlockState(portal).is(Blocks.NETHER_PORTAL)) {
             portal = BotWorld.nearest(level, bot.body().blockPosition(), 64, 24, s -> s.is(Blocks.NETHER_PORTAL), false, Set.of());
             walking = false;
             if (portal == null) {
                 // The one it came through, however far away: it remembers where that was.
                 BlockPos known = bot.senses().knownPortal(bot.body().blockPosition());
-                if (known != null && !known.equals(lastKnown)) {
-                    lastKnown = known;
-                    bot.interject(new GoToTask(known, 3));
+                if (known != null && legFails < 8) {
+                    // Over there in legs (far off, the path search cannot see it all at once).
+                    if (!legging) {
+                        bot.navigator().goStandNear(Explorer.legToward(level, bot.navigator().feet(), known, 40), 3);
+                        legging = true;
+                    }
+                    BotNavigator.Status s = bot.navigator().tick();
+                    if (s != BotNavigator.Status.MOVING) legging = false;
+                    if (s == BotNavigator.Status.FAILED) legFails++;
                     return Result.RUNNING;
                 }
                 // Obsidian carried: build the frame; else, with the buckets, cast one at a lava pool.
@@ -53,10 +64,18 @@ public final class ThroughPortalTask implements BotTask {
                 return Result.RUNNING;
             }
         }
+        lastFeet = bot.body().blockPosition();
         if (bot.body().blockPosition().equals(portal)) {
             bot.navigator().stop();
             bot.body().stopInputs();
-            return Result.RUNNING; // standing in it: the game takes it through after a moment
+            // Into the middle of it: the portal is only a thin sheet down the middle of the block,
+            // and the game takes along only who touches it (after a moment).
+            double dx = portal.getX() + 0.5 - bot.body().getX(), dz = portal.getZ() + 0.5 - bot.body().getZ();
+            if (dx * dx + dz * dz > 0.01) {
+                bot.body().setYRot((float) (Math.atan2(dz, dx) * 180 / Math.PI) - 90f);
+                bot.body().forward = 0.3f;
+            }
+            return Result.RUNNING;
         }
         if (!walking) {
             bot.navigator().goTo(portal);
@@ -65,6 +84,18 @@ public final class ThroughPortalTask implements BotTask {
         BotNavigator.Status s = bot.navigator().tick();
         if (s != BotNavigator.Status.MOVING) walking = false;
         return Result.RUNNING;
+    }
+
+    /** Remembered for a while, so the Overworld tiles are not tried (and failed) again at once. */
+    private Result failed(Bot bot) {
+        bot.portalBackFailedAt = bot.body().level().getGameTime();
+        return Result.FAILED;
+    }
+
+    @Override
+    public String status() {
+ return describe() + " [portal " + (portal == null ? "-" : portal.toShortString()) + " from " + (lastFeet == null ? "-" : lastFeet.toShortString()) + ", walking " + walking + ", legs failed " + legFails
+                + (build != null ? ", " + build.status() : "") + "]";
     }
 
     @Override

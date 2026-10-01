@@ -181,7 +181,8 @@ public final class LockoutBrain implements BotBrain {
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
-        if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+        if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD
+                && LockoutGoals.wayBack(bot) != null) {
             bot.say("nothing left for me here, going back");
             bot.doNow(new net.kasax.challengecraft.bot.task.ThroughPortalTask());
             return;

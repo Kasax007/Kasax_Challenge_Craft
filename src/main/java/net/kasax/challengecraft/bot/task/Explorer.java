@@ -56,6 +56,19 @@ final class Explorer {
         double dx = target.getX() - from.getX(), dz = target.getZ() - from.getZ(), d = Math.sqrt(dx * dx + dz * dz);
         BlockPos p = d <= leg ? target : BlockPos.containing(from.getX() + dx / d * leg, from.getY(), from.getZ() + dz / d * leg);
         if (!level.hasChunkAt(p)) return new BlockPos(p.getX(), Math.max(level.getSeaLevel(), from.getY()), p.getZ());
+        // Under a roof (the Nether): no surface to aim at; a spot to stand on near the height on
+        // the line from here to there, else that height itself (the path search digs its way).
+        if (level.dimensionType().hasCeiling()) {
+            int y = d <= leg ? target.getY() : (int) Math.round(from.getY() + (target.getY() - from.getY()) * leg / d);
+            for (int i = 0; i <= 24; i++) {
+                for (int sign : new int[] {1, -1}) {
+                    BlockPos q = new BlockPos(p.getX(), y + i * sign, p.getZ());
+                    if (level.getBlockState(q).isAir() && level.getBlockState(q.above()).isAir()
+                            && level.getBlockState(q.below()).isSolidRender() && level.getFluidState(q.below()).isEmpty()) return q;
+                }
+            }
+            return new BlockPos(p.getX(), y, p.getZ());
+        }
         return level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
     }
 
