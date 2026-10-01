@@ -188,4 +188,20 @@ public class BotStuntTests {
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(300), 300,
                 () -> h.getTick() > 100 && a.bot().body().isAlive() && a.bot().body().distanceTo(z) > 7);
     }
+
+    /** Five hearts... no, two and a half, and a skeleton shooting from afar: into the ground, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void hideFromSkeleton(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hide");
+        var sk = EntityTypes.SKELETON.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET, 32)));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        h.getLevel().addFreshEntity(sk);
+        a.spawn(20, FEET, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.DIRT, 8));
+        a.bot().body().setHealth(5f);
+        sk.setTarget(a.bot().body());
+        boolean[] died = {false};
+        h.onEachTick(() -> { if (!a.bot().body().isAlive()) died[0] = true; });
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(400), 400, () -> h.getTick() > 360 && !died[0]);
+    }
 }

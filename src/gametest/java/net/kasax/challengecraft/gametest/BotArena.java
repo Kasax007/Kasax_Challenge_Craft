@@ -47,6 +47,8 @@ public final class BotArena {
         rules.set(net.minecraft.world.level.gamerules.GameRules.BLOCK_DROPS, true, server);
         rules.set(net.minecraft.world.level.gamerules.GameRules.MOB_DROPS, true, server);
         rules.set(net.minecraft.world.level.gamerules.GameRules.ENTITY_DROPS, true, server);
+        // Only the monsters a scenario puts there (no zombie wandering in at night).
+        rules.set(net.minecraft.world.level.gamerules.GameRules.SPAWN_MONSTERS, false, server);
         a.fill(0, 0, 0, SIZE - 1, GROUND - 1, SIZE - 1, Blocks.STONE);
         a.fill(0, GROUND, 0, SIZE - 1, GROUND, SIZE - 1, Blocks.GRASS_BLOCK);
         return a;

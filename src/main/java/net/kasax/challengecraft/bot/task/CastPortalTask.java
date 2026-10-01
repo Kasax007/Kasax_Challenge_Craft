@@ -159,7 +159,19 @@ public final class CastPortalTask implements BotTask {
                     wait = 0;
                     return next();
                 }
-                if (!canScoop(level, body, body.getEyePosition(), source, 4.4)) return walkToScoop(bot, source);
+                // (Arrived where the path search thought it could, but off the middle of the block it
+                // cannot quite: try anyway, and if that does not work, not from there again.)
+                if (!canScoop(level, body, body.getEyePosition(), source, 4.4)) {
+                    if (scoopArrived && ++scoopTries < 30) {
+                        bot.navigator().stop();
+                        use(bot, level, Items.BUCKET, Vec3.atCenterOf(source));
+                        return Result.RUNNING;
+                    }
+                    if (scoopArrived) badScoops.add(body.blockPosition().asLong());
+                    scoopArrived = false;
+                    scoopTries = 0;
+                    return walkToScoop(bot, source);
+                }
                 bot.navigator().stop();
                 use(bot, level, Items.BUCKET, Vec3.atCenterOf(source));
                 return ++tries > 200 ? Result.FAILED : Result.RUNNING;
@@ -394,7 +406,7 @@ public final class CastPortalTask implements BotTask {
         if (!walking) {
             Vec3 at = Vec3.atCenterOf(p);
             ServerLevel level = (ServerLevel) bot.body().level();
-            bot.navigator().setGoal(f -> !footprint.contains(f.asLong()) && !level.getFluidState(f).isSource()
+            bot.navigator().setGoal(f -> !footprint.contains(f.asLong()) && !badScoops.contains(f.asLong()) && !level.getFluidState(f).isSource()
                     && Vec3.atCenterOf(f).add(0, 1.12, 0).distanceTo(at) <= 3.8, p);
             walking = true;
         }
@@ -435,16 +447,21 @@ public final class CastPortalTask implements BotTask {
         return hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(source);
     }
 
+    private boolean scoopArrived;
+    private int scoopTries;
+    private final java.util.Set<Long> badScoops = new java.util.HashSet<>();
+
     private Result walkToScoop(Bot bot, BlockPos source) {
         if (!walking) {
             BotPlayer body = bot.body();
             ServerLevel level = (ServerLevel) body.level();
-            bot.navigator().setGoal(f -> !footprint.contains(f.asLong()) && !level.getFluidState(f).isSource()
+            bot.navigator().setGoal(f -> !footprint.contains(f.asLong()) && !badScoops.contains(f.asLong()) && !level.getFluidState(f).isSource()
                     && canScoop(level, body, new Vec3(f.getX() + 0.5, f.getY() + body.getEyeHeight(), f.getZ() + 0.5), source, 3.9), source);
             walking = true;
         }
         BotNavigator.Status s = bot.navigator().tick();
         if (s != BotNavigator.Status.MOVING) walking = false;
+        if (s == BotNavigator.Status.ARRIVED) scoopArrived = true;
         if (s == BotNavigator.Status.FAILED && ++walkFails > 8) {
             bot.say("can't get to the water at " + source.toShortString());
             return Result.FAILED;

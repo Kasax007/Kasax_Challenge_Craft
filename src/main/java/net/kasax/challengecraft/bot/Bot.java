@@ -190,7 +190,7 @@ public final class Bot {
         reflexCooldown = 10;
         tidyInventory();
         BotTask top = tasks.peek();
-        if (top instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
         // Low on health with a monster close: get away first (and eat on the way), as a player
         // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
@@ -211,6 +211,20 @@ public final class Bot {
                     return;
                 }
             }
+        }
+        // Hurt badly by something (an arrow from afar counts), and running did not or would not
+        // help: into the ground until the hearts are back.
+        var shooter = body.getLastHurtByMob();
+        boolean shot = shooter != null && shooter.isAlive() && shooter.distanceTo(body) > 6 && body.tickCount - body.getLastHurtByMobTimestamp() < 60;
+        // A bow drawn on it (skeleton, pillager) with few hearts left: before the arrow, not after.
+        boolean aimedAt = body.getHealth() <= 10 && !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob).isEmpty();
+        if ((body.getHealth() <= (shot ? 10 : 6) && (cornered || shot) && body.tickCount - body.getLastHurtByMobTimestamp() < 60 || aimedAt)
+                && net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+            actions.reset();
+            navigator.stop();
+            interject(new net.kasax.challengecraft.bot.task.HideTask());
+            return;
         }
         if (fighting) return;
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();

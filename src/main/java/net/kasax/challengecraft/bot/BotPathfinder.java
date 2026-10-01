@@ -144,7 +144,10 @@ public final class BotPathfinder {
         // Digging while afloat is five times slower (not on the ground).
         double digFactor = inWater(from) && !solid(from.below()) ? 5 : 1;
         for (BlockPos b : s.breaks()) {
-            c += abilities.tools().breakTicks(state(b)) * digFactor + DIG_EXTRA;
+            double ticks = abilities.tools().breakTicks(state(b));
+            // Stone by hand (seven seconds a block, and nothing to show for it): only if there is
+            // no other way at all.
+            c += ticks * digFactor * (ticks > 100 ? 4 : 1) + DIG_EXTRA;
             // Sand or gravel on top falls into the gap: every block of the column is dug too.
             BlockPos up = b.above();
             for (int i = 0; i < 12 && state(up).getBlock() instanceof net.minecraft.world.level.block.FallingBlock; i++, up = up.above()) {
@@ -266,8 +269,6 @@ public final class BotPathfinder {
         for (BlockPos c : cells) {
             if (clear(c)) continue;
             if (!abilities.mayBreak() || !breakable(c) || liquidAround(c)) return null;
-            // Stone by hand (seven seconds a block, and nothing to show for it): no way through.
-            if (abilities.tools().breakTicks(state(c)) > 100) return null;
             if (out == null) out = new ArrayList<>(2);
             out.add(c);
         }
