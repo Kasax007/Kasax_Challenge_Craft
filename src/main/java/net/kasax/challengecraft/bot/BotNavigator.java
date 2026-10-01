@@ -449,7 +449,11 @@ public final class BotNavigator {
         return true;
     }
 
+    /** Searches that found no way at all, since the bot joined (for the benchmarks). */
+    public int failures;
+
     private Status fail(String why) {
+        failures++;
         BotManager.debug(bot, "navigation failed: " + why);
         bot.stopInputs();
         actions.reset();

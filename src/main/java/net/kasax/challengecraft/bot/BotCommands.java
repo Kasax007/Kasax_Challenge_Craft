@@ -164,6 +164,19 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("navbench").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("count", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 200))
+                                        .then(Commands.argument("min", com.mojang.brigadier.arguments.IntegerArgumentType.integer(5, 2000))
+                                                .then(Commands.argument("max", com.mojang.brigadier.arguments.IntegerArgumentType.integer(5, 2000)).executes(ctx -> {
+                                                    // Test: walks to random spots around ([NAVBENCH] in the log).
+                                                    Bot bot = bot(ctx);
+                                                    if (bot == null) return 0;
+                                                    bot.doNow(new net.kasax.challengecraft.bot.task.NavBenchTask(
+                                                            com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "count"),
+                                                            com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "min"),
+                                                            com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "max")));
+                                                    return 1;
+                                                }))))))
                         .then(Commands.literal("coverage").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     // Which goals of the whole pool it knows a way for, here and now ([COVERAGE] in the log).
