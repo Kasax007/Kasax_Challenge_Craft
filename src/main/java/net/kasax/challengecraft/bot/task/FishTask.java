@@ -25,19 +25,38 @@ public final class FishTask implements BotTask {
     private BlockPos water;
     private boolean walking;
     private int ticks, castTicks, caught = -1;
+    /** Fish on until one of these is caught (a pufferfish, say); null: any catch will do. */
+    private final Set<net.minecraft.world.item.Item> until;
+    private final int limit;
+
+    public FishTask() {
+        this(null, 6000);
+    }
+
+    public FishTask(Set<net.minecraft.world.item.Item> until, int limitTicks) {
+        this.until = until;
+        this.limit = limitTicks;
+    }
 
     @Override
     public Result tick(Bot bot) {
         var body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
-        if (++ticks > 6000) return Result.FAILED;
+        if (++ticks > limit) return Result.FAILED;
+        if (until != null && net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, until) > 0) {
+            bot.navigator().stop();
+            return Result.DONE;
+        }
         int rod = BotInventory.slotOf(body, Items.FISHING_ROD);
         if (rod < 0) return Result.FAILED;
         int fish = countFish(bot);
         if (caught < 0) caught = fish;
         if (fish > caught) {
-            bot.navigator().stop();
-            return Result.DONE;
+            if (until != null) caught = fish; // (not that one: again)
+            else {
+                bot.navigator().stop();
+                return Result.DONE;
+            }
         }
         if (water == null || !open(level, water)) {
             water = BotWorld.nearest(level, body.blockPosition(), 24, 8, s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), true, skip);

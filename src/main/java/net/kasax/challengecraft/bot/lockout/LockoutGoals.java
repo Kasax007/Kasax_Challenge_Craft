@@ -279,6 +279,16 @@ public final class LockoutGoals {
                         () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner),
                         () -> new UseOnMobTask(fish, Items.WATER_BUCKET, e -> true))));
             }
+            case "obtain_pufferfish" -> {
+                // One catch in eight is a pufferfish: fishing beats searching a warm ocean.
+                Option plain = obtain(bot, planner, Set.of(Items.PUFFERFISH), 1);
+                double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
+                Double water = planner.seen(bot, Blocks.WATER);
+                Option fishing = rod >= INF || water == null ? null : new Option(rod + water + 8 * 25, () -> new SequenceTask("fish for a pufferfish", List.of(
+                        () -> new ObtainTask(Set.of(Items.FISHING_ROD), 1, planner),
+                        () -> new net.kasax.challengecraft.bot.task.FishTask(Set.of(Items.PUFFERFISH), 12000))));
+                yield fishing == null || plain != null && plain.cost() < fishing.cost() ? plain : fishing;
+            }
             case "catch_fish", "advancement_fishy_business" -> {
                 double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
                 Double water = planner.seen(bot, Blocks.WATER);
