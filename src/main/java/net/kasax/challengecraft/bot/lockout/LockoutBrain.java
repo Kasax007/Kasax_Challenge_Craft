@@ -541,7 +541,11 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         for (Choice c : choices(bot, targetIndex)) {
-            if (c.option().cost() < 8) {
+            // A few seconds' work, or a monster wanted for a tile right there in sight (the spider
+            // in the cave it is mining in, the creeper met on a night walk): taken along.
+            boolean quick = c.option().cost() < 8;
+            boolean prey = !quick && c.option().cost() < 25 && c.tile().goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL;
+            if (quick || prey) {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
                 sideId = c.tile().goal().id();
