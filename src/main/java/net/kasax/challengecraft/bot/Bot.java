@@ -214,11 +214,11 @@ public final class Bot {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(6), net.minecraft.world.entity.LivingEntity::isAlive)) {
                 boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0;
                 // A tile wants an explosion survived: at full health, let it go off a few blocks away
-                // (about four blocks off: on hard some seven hearts, survived at full health).
-                if (creeper && welcomeExplosion && body.getHealth() >= 18) {
+                // (about five blocks off: on hard some four hearts, at full health only).
+                if (creeper && welcomeExplosion && body.getHealth() >= 20) {
                     double d = m.distanceTo(body);
-                    if (d < 3.7) {
-                        net.minecraft.world.phys.Vec3 back = body.position().subtract(m.position()).normalize().scale(4.3 - d);
+                    if (d < 4.4) {
+                        net.minecraft.world.phys.Vec3 back = body.position().subtract(m.position()).normalize().scale(5.1 - d);
                         actions.reset();
                         interject(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(back)), 0.8).sprinting());
                     } else {

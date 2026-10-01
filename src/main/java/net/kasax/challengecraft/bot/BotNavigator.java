@@ -350,7 +350,35 @@ public final class BotNavigator {
         }
     }
 
+    /**
+     * Where the bot really stands: on the edge of a block it is over air by its middle; then the
+     * neighbouring spot whose ground holds it (else the path search finds no moves from "mid-air").
+     */
+    private BlockPos standing(BlockPos feet) {
+        var level = bot.level();
+        if (!bot.onGround() || !level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) return feet;
+        var box = bot.getBoundingBox();
+        BlockPos best = feet;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos p = feet.offset(dx, 0, dz);
+                if (level.getBlockState(p.below()).getCollisionShape(level, p.below()).isEmpty()) continue;
+                if (!level.getBlockState(p).getCollisionShape(level, p).isEmpty()) continue;
+                // (Only a block the body overlaps.)
+                if (box.maxX <= p.getX() || box.minX >= p.getX() + 1 || box.maxZ <= p.getZ() || box.minZ >= p.getZ() + 1) continue;
+                double d = Vec3.atBottomCenterOf(p).distanceToSqr(bot.position());
+                if (d < bestD) {
+                    bestD = d;
+                    best = p;
+                }
+            }
+        }
+        return best;
+    }
+
     private boolean replan(BlockPos feet) {
+        feet = standing(feet);
         if (++replans > MAX_REPLANS) {
             fail("no way found");
             return false;
