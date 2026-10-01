@@ -350,6 +350,8 @@ public final class BotPathfinder {
         return s.is(BlockTags.FIRE) || s.is(Blocks.CACTUS) || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.COBWEB)
                 || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.WITHER_ROSE) || s.is(Blocks.MAGMA_BLOCK)
                 || s.is(BlockTags.CAMPFIRES) || s.is(Blocks.LAVA)
+                // Stalagmites: a fall onto one hurts double and more (dug away instead).
+                || s.is(Blocks.POINTED_DRIPSTONE)
                 // Traps: the desert temple's plate over the TNT, the jungle temple's tripwires.
                 || s.is(BlockTags.PRESSURE_PLATES) || s.is(Blocks.TRIPWIRE);
     }

@@ -43,6 +43,9 @@ public final class Bot {
         return unreachable.keySet();
     }
 
+    /** Set by a task for the tick: under water, not swimming up (digging out from the bottom). */
+    public boolean sinkToDig;
+
     /** Where two eyes of ender said the stronghold is (triangulated), once worked out. */
     public net.minecraft.core.BlockPos knownStronghold;
 
@@ -201,9 +204,11 @@ public final class Bot {
         }
         BotTask.Result r;
         try {
+            sinkToDig = false;
             r = task.tick(this);
-            // Head under water: hold jump to swim up, whatever the task does (a player never forgets that).
-            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) body.jump = true;
+            // Head under water: hold jump to swim up, whatever the task does (a player never forgets
+            // that). Unless it is digging its way out from the bottom (afloat, it digs five times slower).
+            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig) body.jump = true;
         } catch (RuntimeException e) {
             BotManager.LOG.warn("[Bot] {} task {} crashed", name, task.describe(), e);
             r = BotTask.Result.FAILED;
@@ -270,7 +275,10 @@ public final class Bot {
         BotTask top = tasks.peek();
         // Running out of air with water over the head that swimming up does not get out of: to
         // the nearest air first, whatever else is going on.
-        if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < body.getMaxAirSupply() * 2 / 5
+        // (A lid over the head, no water above it to swim up through: at once, while there is air.)
+        net.minecraft.core.BlockPos overHead = net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ()).above();
+        boolean lid = !body.level().getBlockState(overHead).getCollisionShape(body.level(), overHead).isEmpty();
+        if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < body.getMaxAirSupply() * (lid ? 4 : 2) / 5
                 && !(top instanceof net.kasax.challengecraft.bot.task.AirTask)) {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.AirTask());

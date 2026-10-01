@@ -76,6 +76,22 @@ public class BotStuntTests {
         });
     }
 
+    /** Standing in a pit a block deep: the only spots for the plate are a step up; jumped onto. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void pressurePlateStepUp(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "plate_step_up");
+        a.fill(17, FEET, 17, 23, FEET, 23, Blocks.STONE);
+        a.fill(20, FEET, 20, 20, FEET, 20, Blocks.AIR);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PRESSURE_PLATE));
+        a.run(new PlaceAndUseTask(Items.STONE_PRESSURE_PLATE, PlaceAndUseTask.Then.STEP_ON, null, 0), 300, () -> {
+            for (BlockPos p : BlockPos.betweenClosed(a.abs(15, FEET, 15), a.abs(25, FEET + 2, 25))) {
+                var st = h.getLevel().getBlockState(p);
+                if (st.is(Blocks.STONE_PRESSURE_PLATE) && st.getValue(PressurePlateBlock.POWERED)) return true;
+            }
+            return false;
+        });
+    }
+
     /** A bed put down and clicked: the spawn is set there. */
     @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
     public void setSpawnAtBed(GameTestHelper h) {

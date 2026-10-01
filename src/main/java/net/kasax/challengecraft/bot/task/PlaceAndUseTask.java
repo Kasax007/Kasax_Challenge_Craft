@@ -77,6 +77,8 @@ public final class PlaceAndUseTask implements BotTask {
                     }
                     body.setYRot((float) (Math.atan2(dz, dx) * 180 / Math.PI) - 90f);
                     body.forward = 0.5f;
+                    // Put down a step up (or something in the way): a jump onto it.
+                    if ((placed.getY() > body.getBlockY() || body.horizontalCollision) && body.onGround()) body.jump = true;
                     return Result.RUNNING;
                 }
             }

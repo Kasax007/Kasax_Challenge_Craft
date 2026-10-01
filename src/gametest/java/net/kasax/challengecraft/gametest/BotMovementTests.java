@@ -226,4 +226,20 @@ public class BotMovementTests {
             }
         }, 6000, () -> there[0] && a.bot().body().blockPosition().closerThan(home, 8));
     }
+
+    /** Under water in a shaft with a lid of dirt (swimming up gets nowhere): dug out, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void drowningUnderLid(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drowning_under_lid");
+        a.fill(19, FEET, 19, 21, FEET, 21, Blocks.STONE);
+        a.fill(19, FEET + 1, 19, 21, FEET + 2, 21, Blocks.DIRT);
+        a.fill(20, GROUND, 20, 20, FEET, 20, Blocks.WATER);
+        a.spawn(20, GROUND, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 900, () -> {
+            // (The same body all along: drowned and respawned does not count.)
+            if (a.bot().body() != body || body.getHealth() <= 10) h.fail("drowned or nearly: " + body.getHealth());
+            return h.getTick() > 600 && !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+        });
+    }
 }

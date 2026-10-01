@@ -13,7 +13,9 @@ import net.minecraft.tags.FluidTags;
  */
 public final class AirTask implements BotTask {
     private boolean started;
-    private int ticks, fails;
+    private int ticks, fails, stuck;
+    private boolean digging;
+    private net.minecraft.world.phys.Vec3 last;
 
     /** The head would be out of the water standing (or swimming) here. */
     public static boolean breathable(ServerLevel level, BlockPos feet) {
@@ -25,8 +27,30 @@ public final class AirTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         if (!bot.body().isEyeInFluid(FluidTags.WATER)) return Result.DONE;
-        if (++ticks > 400) return Result.FAILED;
+        if (++ticks > (digging ? 1600 : 400)) return Result.FAILED;
         ServerLevel level = (ServerLevel) bot.body().level();
+        // Not getting anywhere (a flooded gap one block high, a block on top): straight up,
+        // digging out what is over the head, as a player would.
+        var body = bot.body();
+        if (ticks % 20 == 1) {
+            // (Measured over a second: swimming is slow, but not this slow.)
+            stuck = last != null && body.position().distanceToSqr(last) < 0.25 ? stuck + 1 : 0;
+            last = body.position();
+        }
+        if (stuck >= 1 || fails > 1) {
+            BlockPos head = BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
+            for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) {
+                if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() && level.getFluidState(q).isEmpty()) {
+                    // Standing on the bottom while at it: afloat, digging is five times slower.
+                    bot.navigator().stop();
+                    body.stopInputs();
+                    bot.sinkToDig = true;
+                    digging = true;
+                    bot.actions().breakTick(q);
+                    return Result.RUNNING;
+                }
+            }
+        }
         if (!started) {
             bot.navigator().setGoal(p -> breathable(level, p), bot.body().blockPosition().above(8));
             started = true;

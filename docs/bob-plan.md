@@ -412,3 +412,72 @@ Welt-Erzeugung der Challenge ist noch nicht gefunden.
     Form, Wasserrinne und Auffangmulde; Platz wird notfalls freigegraben; GameTests für viele
     Seeformen.
 14. **Abschluss**: Abdeckung aller Ziele prüfen, mindestens zehn Komplett-Bretter, Auswertung.
+
+## 11. Runde 3: Umsetzung
+
+### Portal gießen, das nicht schiefgeht (`LavaPortalTask`)
+
+Grundlage ist das Verhalten des Spiels (aus dem Spielcode geprüft): Eine Lava-**Quelle** wird in dem
+Moment zu Obsidian, in dem Wasser über oder neben ihr ist. Wasser beginnt erst nach 5 Ticks zu
+fließen. Daraus folgt ein Ablauf, bei dem kein Wasser je den Lavasee erreicht:
+
+1. **Platz wählen**: ein Standplatz am See, von dem aus Lava im Eimer-Bereich liegt. Zwei Blöcke
+   davor liegt die Portalebene (4 breit, 5 hoch, um einen Block abgesenkt). Sie wird so gewählt, dass
+   neben keinem ausgehobenen Block Flüssigkeit liegt. Bewertet wird nach Grabaufwand, fehlender
+   Rückwand und Lava in Reichweite. Erde, Stein oder ein Hang werden dafür ausgehoben, auch in einer
+   Höhle.
+2. **Ausheben**: die Ebene und der Raum davor, von oben nach unten. Die unteren Ecken bleiben stehen
+   und dienen als Zielfläche.
+3. **Form**: hinter jede Zelle der Ebene ein Block. Das ist die Gussform, gegen die jeder Eimer
+   gegossen wird.
+4. **Gießen, Rahmenblock für Rahmenblock** (unten, oben über die Eckzellen, dann die Seiten von oben
+   nach unten):
+   - Wasser in die Nachbarzelle;
+   - im nächsten Tick Lava in die Rahmenzelle, die sofort zu Obsidian wird;
+   - im selben Tick das Wasser zurück in den Eimer.
+
+   Vor dem Wasser prüft Bob drei Sichtlinien: die für das Wasser, die für die Lava und die zum
+   Zurückschöpfen, auch am gleich entstehenden Obsidian vorbei. Klappt das Schöpfen trotzdem nicht,
+   kommt ein Block in das Wasser.
+5. Anzünden, hindurch.
+
+GameTests: Wiese, kleiner 2×5-See (genau 10 Lava), Hang, Höhle ohne Platz, zerfranster See mit Fluss
+daneben, überlaufender See. **36 von 36 Läufen** sind bestanden, dazu die zwei alten Portal-Tests.
+
+Das ist nicht wörtlich die Speedrunner-Methode an der Seekante. Das Prinzip ist aber dasselbe:
+Wasser an der richtigen Stelle, Lava hinein, Wasser zurück. Der Unterschied: Das Wasser fließt hier
+nie und berührt den See nie. So ist das Ergebnis unabhängig von der Form des Sees.
+
+### Festung triangulieren (`EyeTrackTask`)
+
+- Erstes Auge: Startpunkt und Flugrichtung werden gemessen. Das Auge fliegt im Spiel exakt geradlinig
+  auf den Festungs-Chunk zu.
+- 40 Blöcke seitlich: zweites Auge.
+- Schnittpunkt der beiden Linien, dorthin, hinabgraben.
+- Liegen die Linien zu parallel, macht Bob einen größeren Seitenschritt. Danach wie früher: dem Auge
+  nach.
+- Überlebende Augen hebt Bob auf. Die Koordinaten merkt er sich für später.
+
+Ergebnisse:
+- GameTest: Schätzung 0,00002 Blöcke neben dem Ziel.
+- Echte Welt (Seed 4242): Bob berechnet 1008, 912; `/locate` sagt [1008, ~, 912]. Nach 1360
+  Blöcken Weg steht Bob in der Festung.
+
+### Weitere Befunde aus den Läufen (behoben)
+
+- **Holz am Spawn**: Bob lief zu einem 970 Blöcke entfernten Fichtenwald, weil die Holzart vorab
+  feststand. Jetzt geht es zum nächsten Wald gleich welcher Art, und Bob wechselt den Plan, sobald
+  anderes Holz in Sicht ist.
+- **Unerreichbares**: Bäume oben auf einem Tafelberg führten zu 40 Minuten Schleife (0 Felder).
+  Unerreichbare Ziele samt ihrem Baum oder ihrer Ader gelten jetzt 5 Minuten lang für alle Aufgaben
+  und den Planer als "nicht zu haben".
+- **Ertrinken** in einem gefluteten Tunnel: Bei Luftnot sucht Bob jetzt zuerst die nächste Stelle
+  mit Luft.
+- **Creeper**: Kommt einer auf Bob zu und zischt noch nicht, tötet Bob ihn (mit Waffe) oder geht
+  weg.
+- **Äpfel**: Laub-Drops werden so oft gewürfelt, bis die seltenen sichtbar sind (Apfel aus
+  Eichenlaub).
+- **Zurück zum Portal**: Bob fiel im Nether einen Abhang hinunter und gab den Rückweg auf. Jetzt
+  geht er bei großem Höhenunterschied direkt auf das Portal zu und gräbt oder baut sich hinauf.
+- **Benchmark-Skripte**: `SERVER_PORT`/`RCON_PORT` erlauben zwei Läufe parallel. Am Ende jedes
+  Laufs steht eine Abdeckungsliste (`[COVERAGE]`).

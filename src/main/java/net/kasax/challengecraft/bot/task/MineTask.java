@@ -406,7 +406,8 @@ public final class MineTask implements BotTask {
                         return Result.FAILED;
                     }
                     BlockPos away = feet.offset(bot.body().getRandom().nextInt(13) - 6, 0, bot.body().getRandom().nextInt(13) - 6);
-                    bot.interject(new GoToTask(Explorer.ground(level, away, feet.getY()), 2));
+                    // (Down here: a few blocks away down here, not up on the surface above them.)
+                    bot.interject(new GoToTask(SurfaceTask.underground(bot.body()) ? away : Explorer.ground(level, away, feet.getY()), 2));
                 }
                 return Result.RUNNING;
             }
