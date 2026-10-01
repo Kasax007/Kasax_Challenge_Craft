@@ -145,6 +145,18 @@ final class LockoutStrategist {
 
         // The Nether trip: worth more than its own tile when the Nether holds several.
         long nether = open.stream().filter(g -> g.category() == LockoutBingoGoalCategory.NETHER).count();
+        // From up here each Nether tile is planned with the whole way in; the way in is shared by
+        // all of them, though: each carries only its part of it.
+        if (nether >= 2 && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
+            if (trip != null) {
+                double share = trip.cost() * (1 - 1.0 / nether);
+                for (LockoutBingoGoal g : open) {
+                    if (g.category() == LockoutBingoGoalCategory.NETHER && g.type() != LockoutBingoGoalType.DIMENSION) add(g.id(), share, "the way in is shared by " + nether + " Nether tiles");
+                }
+                notes.add("way into the Nether ~" + Math.round(trip.cost()) + " s");
+            } else notes.add("no way into the Nether known");
+        }
         if (nether >= 2) {
             for (LockoutBingoGoal g : open) {
                 if ("minecraft:the_nether".equals(g.primaryTarget()) || g.id().equals("advancement_we_need_to_go_deeper")) {

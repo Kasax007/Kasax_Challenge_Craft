@@ -258,7 +258,8 @@ public final class ObtainPlanner {
         // Nether mobs only in the Nether, and the Overworld's not there.
         if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return INF;
         boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
-        return monster && !dark ? effort * 4 : effort;
+        // (In the Nether monsters are about at any hour.)
+        return monster && !dark && !nether ? effort * 4 : effort;
     }
 
     // ---- looking around -----------------------------------------------------------------------
