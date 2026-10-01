@@ -113,6 +113,41 @@ public class BotMovementTests {
         a.run(new SurfaceTask(), 7200, () -> a.feet().getY() >= GROUND + 40 && a.bot().body().onGround());
     }
 
+    /**
+     * Down a winding tunnel (thirty-six blocks of stairs, then along) with no pickaxe at all, and
+     * back out the way it came: it retraces its steps.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void retraceTunnel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "retrace_tunnel");
+        a.fill(0, GROUND, 0, 39, GROUND + 40, 39, Blocks.STONE);
+        a.fill(0, GROUND + 41, 0, 39, GROUND + 41, 39, Blocks.GRASS_BLOCK);
+        for (int i = 0; i < 36; i++) a.fill(2 + i, GROUND + 41 - i, 20, 2 + i, GROUND + 44 - i, 20, Blocks.AIR);
+        a.fill(37, GROUND + 6, 4, 37, GROUND + 8, 20, Blocks.AIR);
+        a.spawn(1, GROUND + 42, 20);
+        int[] stage = {0};
+        a.run(new net.kasax.challengecraft.bot.BotTask() {
+            final net.kasax.challengecraft.bot.task.GoToTask down = new net.kasax.challengecraft.bot.task.GoToTask(a.abs(37, GROUND + 6, 5), 1.5);
+            final SurfaceTask up = new SurfaceTask();
+
+            @Override
+            public Result tick(net.kasax.challengecraft.bot.Bot bot) {
+                if (stage[0] == 0) {
+                    Result r = down.tick(bot);
+                    if (r == Result.FAILED) return r;
+                    if (r == Result.DONE) stage[0] = 1;
+                    return Result.RUNNING;
+                }
+                return up.tick(bot);
+            }
+
+            @Override
+            public String describe() {
+                return stage[0] == 0 ? "down the tunnel" : "back out";
+            }
+        }, 2400, () -> stage[0] == 1 && a.feet().getY() >= GROUND + 41 && a.bot().body().onGround());
+    }
+
     /** Out of a closed cave twenty below the grass (gravel and dirt on the way), wooden pickaxe only. */
     @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
     public void caveEscape(GameTestHelper h) {

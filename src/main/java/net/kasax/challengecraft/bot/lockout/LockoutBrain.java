@@ -124,6 +124,9 @@ public final class LockoutBrain implements BotBrain {
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
         if (opening(bot)) return;
+        // The kit a player never goes without: a pickaxe (a new one before the old one breaks)
+        // and a stack of blocks to build with (out of a hole, over a gap, a pillar from mobs).
+        if (keepKit(bot)) return;
         // Iron the quick way: a shipwreck's chests (or a village's) when one is near and the plan
         // wants iron. Once per structure.
         if (strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3
@@ -238,6 +241,42 @@ public final class LockoutBrain implements BotBrain {
             Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE));
 
     /** Works through the opening; returns whether it started a step of it. */
+    private static final Set<net.minecraft.world.item.Item> PICKAXES = Set.of(net.minecraft.world.item.Items.WOODEN_PICKAXE, net.minecraft.world.item.Items.STONE_PICKAXE,
+            net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.GOLDEN_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
+            net.minecraft.world.item.Items.NETHERITE_PICKAXE);
+    private static final Set<net.minecraft.world.item.Item> GOOD_PICKAXES = Set.of(net.minecraft.world.item.Items.STONE_PICKAXE,
+            net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE);
+    private long kitCheckAt;
+
+    private boolean keepKit(Bot bot) {
+        long now = bot.body().level().getGameTime();
+        if (now < kitCheckAt) return false;
+        kitCheckAt = now + 600; // (a try now and then, not again at once if it fails)
+        var body = bot.body();
+        int picks = 0, worn = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (!PICKAXES.contains(st.getItem())) continue;
+            picks++;
+            if (st.isDamageableItem() && st.getDamageValue() > st.getMaxDamage() * 0.85) worn++;
+        }
+        if (picks == 0 || picks == worn) {
+            int have = ObtainPlanner.countAny(body, GOOD_PICKAXES);
+            bot.say(picks == 0 ? "no pickaxe: making one first" : "the pickaxe is nearly worn out: a spare one");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(GOOD_PICKAXES, have + 1, planner), 2400);
+            return true;
+        }
+        int blocks = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) if (net.kasax.challengecraft.bot.BotActions.THROWAWAY.contains(st.getItem())) blocks += st.getCount();
+        if (blocks < 12) {
+            var stone = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER
+                    ? Set.of(net.minecraft.world.item.Items.NETHERRACK) : Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE, net.minecraft.world.item.Items.DIRT);
+            bot.say("few blocks left (" + blocks + "): a stack to build with");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
+            return true;
+        }
+        return false;
+    }
+
     private boolean opening(Bot bot) {
         if (bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
         while (openingStep < OPENING.size()) {

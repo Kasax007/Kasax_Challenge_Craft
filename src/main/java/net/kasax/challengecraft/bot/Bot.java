@@ -47,6 +47,14 @@ public final class Bot {
     public Death lastDeath;
     /** Where it last went down into a cave from the surface: the way back out. */
     public net.minecraft.core.BlockPos caveEntry;
+    /**
+     * The way it came down, whatever brought it there (a mine, a hunt through the caves): a spot
+     * every few blocks since it left the surface, the first being where it left it. The way out
+     * is that trail backwards, as a player retraces his steps.
+     */
+    public final java.util.ArrayList<net.minecraft.core.BlockPos> trail = new java.util.ArrayList<>();
+    private net.minecraft.core.BlockPos lastSurface;
+    private Object trailDimension;
     /** Set by the brain while an explosion survived would claim a tile: a creeper is then welcome. */
     public boolean welcomeExplosion;
     /** When the way back through a portal last failed (game time). */
@@ -150,6 +158,7 @@ public final class Bot {
         if (!body.isAlive()) return;
         senses.tick(body);
         memory.tick(body);
+        if (body.tickCount % 10 == 0) layTrail();
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
         reflexes();
         if (brain != null) brain.tick(this);
@@ -190,6 +199,27 @@ public final class Bot {
             say((r == BotTask.Result.FAILED ? "x " : "done: ") + task.describe());
             if (brain != null) brain.finished(this, task, r == BotTask.Result.DONE);
         }
+    }
+
+    private static final int TRAIL_STEP = 6, TRAIL_CAP = 400;
+
+    private void layTrail() {
+        var feet = navigator.feet();
+        if (trailDimension != body.level().dimension()) {
+            trailDimension = body.level().dimension();
+            trail.clear();
+            lastSurface = null;
+        }
+        if (!body.onGround() && !body.isInWater()) return;
+        if (!net.kasax.challengecraft.bot.task.SurfaceTask.underground(body)) {
+            lastSurface = feet;
+            trail.clear();
+            return;
+        }
+        if (trail.isEmpty() && lastSurface != null) trail.add(lastSurface);
+        if (trail.isEmpty() || trail.get(trail.size() - 1).distSqr(feet) >= TRAIL_STEP * TRAIL_STEP) trail.add(feet);
+        // Long: every other crumb in the middle dropped (the ends matter most).
+        if (trail.size() > TRAIL_CAP) for (int i = trail.size() - 2; i > 0; i -= 2) trail.remove(i);
     }
 
     private int reflexCooldown;

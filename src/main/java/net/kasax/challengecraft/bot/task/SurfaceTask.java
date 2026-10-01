@@ -79,20 +79,9 @@ public final class SurfaceTask implements BotTask {
         // through whatever is cheapest, pillars where there are blocks). The hand-made climb
         // below is only for when it finds nothing.
         // Came in through a cave: out the way it came, if that is not far.
-        if (bot.caveEntry != null && !triedEntry) {
-            if (bot.caveEntry.distSqr(feet) > 96 * 96) bot.caveEntry = null;
-            else {
-                if (!navigating) {
-                    bot.navigator().goStandNear(bot.caveEntry, 2);
-                    navigating = true;
-                }
-                BotNavigator.Status s = bot.navigator().tick();
-                if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
-                navigating = false;
-                triedEntry = true;
-                if (s == BotNavigator.Status.ARRIVED) bot.caveEntry = null;
-                return Result.RUNNING;
-            }
+        if (!retraced) {
+            Result r = retrace(bot, feet);
+            if (r != null) return r;
         }
         if (navFails < 4) {
             if (!navigating) {
@@ -183,6 +172,50 @@ public final class SurfaceTask implements BotTask {
         }
         stepTo = ahead.above();
         stepTicks = 0;
+        return Result.RUNNING;
+    }
+
+    private boolean retraced;
+    private int trailIndex = -1, trailFails;
+
+    /**
+     * Back the way it came: along its trail of crumbs in short stretches, when that is not much
+     * longer than digging straight up. Null when that is over (out, or not worth it, or blocked).
+     */
+    private Result retrace(Bot bot, BlockPos feet) {
+        var trail = bot.trail;
+        if (trail.size() < 2) {
+            retraced = true;
+            return null;
+        }
+        if (trailIndex < 0) {
+            int near = 0;
+            for (int i = 1; i < trail.size(); i++) if (trail.get(i).distSqr(feet) < trail.get(near).distSqr(feet)) near = i;
+            double walk = Math.sqrt(trail.get(near).distSqr(feet));
+            for (int i = near; i > 0; i--) walk += Math.sqrt(trail.get(i).distSqr(trail.get(i - 1)));
+            int depth = Math.max(8, trail.get(0).getY() - feet.getY());
+            // (Digging up costs about three blocks of walking per block of height.)
+            if (walk > depth * 4 + 60 || walk > 600) {
+                retraced = true;
+                return null;
+            }
+            trailIndex = near;
+            navigating = false;
+        }
+        if (!navigating) {
+            trailIndex = Math.max(0, trailIndex - 3);
+            bot.navigator().goStandNear(trail.get(trailIndex), 2);
+            navigating = true;
+        }
+        BotNavigator.Status s = bot.navigator().tick();
+        if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
+        navigating = false;
+        if (s == BotNavigator.Status.FAILED && ++trailFails > 3) {
+            retraced = true;
+            return null;
+        }
+        if (s == BotNavigator.Status.ARRIVED) ticks = Math.min(ticks, 600); // (getting on: time again)
+        if (trailIndex == 0 && s == BotNavigator.Status.ARRIVED) retraced = true;
         return Result.RUNNING;
     }
 
