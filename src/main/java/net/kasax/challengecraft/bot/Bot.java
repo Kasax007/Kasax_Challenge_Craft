@@ -243,6 +243,9 @@ public final class Bot {
         // Better armour on as soon as it has some (and gold in the Nether); not while a task puts
         // on something in particular (a tile wants leather worn).
         if (++armorCheck % 5 == 0 && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.EquipTask)) BotArmor.wearBest(this);
+        // Bundled things the plan wants again: out, while there is room.
+        if (armorCheck % 10 == 0 && !keepItems.isEmpty() && BotBundles.freeSlots(body) >= 3
+                && BotBundles.countInside(body, keepItems) > 0) BotBundles.unpack(this, keepItems);
         BotTask top = tasks.peek();
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
@@ -390,7 +393,11 @@ public final class Bot {
         free = 0;
         for (var st : inv) if (st.isEmpty()) free++;
         if (free >= 2) return;
-        // Still full (a pack of odds and ends): what is no use to anything on the board goes.
+        // Still full (a pack of odds and ends): into the bundle with them, if it has one.
+        BotBundles.stash(this, keepItems, 3);
+        free = BotBundles.freeSlots(body);
+        if (free >= 2) return;
+        // Still full: what is no use to anything on the board goes.
         for (int i = 0; i < inv.size() && free < 3; i++) {
             var st = inv.get(i);
             if (st.isEmpty() || !clutter(st)) continue;

@@ -464,6 +464,8 @@ public final class LockoutGoals {
             case "splash_potion" -> ObtainPlanner.countAny(body, Set.of(Items.SPLASH_POTION)) > 0
                     ? new Option(3, () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f))
                     : brew(bot, planner, List.of(Items.GUNPOWDER), () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f));
+            case "kill_slime" -> slime(bot, planner, false);
+            case "obtain_slime_ball" -> slime(bot, planner, true);
             case "ride_pig" -> ride(bot, planner, EntityTypes.PIG);
             case "ride_strider" -> planner.planningNether() ? ride(bot, planner, EntityTypes.STRIDER) : null;
             // Withered: a wither skeleton's hit (they live in fortresses), taken at good health.
@@ -575,6 +577,61 @@ public final class LockoutGoals {
                 () -> armour ? null : new ObtainTask(piece, 1, planner),
                 () -> new ObtainTask(Set.of(Items.GOLD_INGOT), 2, planner).keeping(GOLD_PIECES),
                 net.kasax.challengecraft.bot.task.BarterTask::once)));
+    }
+
+    /**
+     * The chance slimes spawn on a swamp's surface tonight: from the moon (full: the most, new:
+     * none), as the game's moon timeline has it (eight days, 0.5 down to 0 and up again).
+     */
+    static double swampSlimeChance(net.minecraft.world.level.Level level) {
+        long day = Math.floorMod(level.getOverworldClockTime(), 192000L) / 24000L;
+        return new double[]{0.5, 0.375, 0.25, 0.125, 0.0, 0.125, 0.25, 0.375}[(int) day];
+    }
+
+    private static final List<String> SWAMPS = List.of("swamp", "mangrove_swamp");
+
+    /**
+     * A slime (or a slime ball, from the small ones): one in sight or seen lately, else a swamp
+     * at night (not at the new moon: none come then). Underground they live in particular
+     * chunks no player knows of beforehand: only where it has seen some. By day, with none seen,
+     * not now.
+     */
+    private static Option slime(Bot bot, ObtainPlanner planner, boolean ball) {
+        if (!overworld(bot)) return null;
+        var body = bot.body();
+        var level = (net.minecraft.server.level.ServerLevel) body.level();
+        BlockPos at = body.blockPosition();
+        Supplier<BotTask> kill = () -> new KillTask(Set.of(EntityTypes.SLIME), ball ? Set.of(Items.SLIME_BALL) : Set.of(),
+                ball ? ObtainPlanner.countAny(bot.body(), Set.of(Items.SLIME_BALL)) + 1 : 0, ball ? 0 : 1);
+        var near = level.getEntitiesOfClass(net.minecraft.world.entity.monster.cubemob.Slime.class, new net.minecraft.world.phys.AABB(at).inflate(48), e -> e.isAlive());
+        if (!near.isEmpty()) {
+            double d = near.stream().mapToDouble(e -> e.distanceTo(body)).min().orElse(48);
+            return new Option(10 + d / 3 + (ball ? 15 : 0), kill);
+        }
+        BlockPos seen = bot.memory().lastSeen(level, EntityTypes.SLIME, at);
+        if (seen != null && seen.distSqr(at) < 200 * 200) return new Option(30 + Math.sqrt(seen.distSqr(at)) / 4 + (ball ? 20 : 0), kill);
+        double moon = swampSlimeChance(level);
+        if (moon <= 0) return null;
+        BlockPos swamp = null;
+        String which = null;
+        for (String name : SWAMPS) {
+            BlockPos p = bot.senses().biome(net.minecraft.resources.Identifier.withDefaultNamespace(name));
+            if (p != null && (swamp == null || p.distSqr(at) < swamp.distSqr(at))) {
+                swamp = p;
+                which = name;
+            }
+        }
+        if (swamp == null) return null;
+        // Night now, or soon: the walk there, then the wait for one (fewer the darker the moon).
+        long clock = Math.floorMod(level.getOverworldClockTime(), 24000L);
+        long untilNight = level.isDarkOutside() ? 0 : clock < 13000 ? (13000 - clock) / 20 : 0;
+        double walk = Math.sqrt(swamp.distSqr(at)) / 4;
+        if (untilNight > Math.max(60, walk)) return null; // (later: the plan looks again tonight)
+        double cost = Math.max(walk, untilNight) + 60 / moon + (ball ? 20 : 0);
+        String biome = which;
+        return new Option(cost, () -> new SequenceTask("slime in the " + biome.replace('_', ' ') + " at night", List.of(
+                () -> new GoToBiomeTask(net.minecraft.resources.Identifier.withDefaultNamespace(biome)),
+                kill)));
     }
 
     /** Onto a pig or a strider: a saddle (made: leather and iron) unless one wears one already. */

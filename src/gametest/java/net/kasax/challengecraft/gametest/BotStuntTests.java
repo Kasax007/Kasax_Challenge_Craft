@@ -11,6 +11,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -325,7 +326,8 @@ public class BotStuntTests {
     }
 
     /** A ghast in the sky: its fireball hit back at it, and it dies of it. */
-    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 30)
+    // (A batch of its own: it turns the difficulty up, and wants room for the ghast.)
+    @GameTest(environment = "challengecraft:ghast", structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 30)
     public void returnToSender(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "return_to_sender");
         var level = h.getLevel();
@@ -343,6 +345,48 @@ public class BotStuntTests {
             var src = ghast.getLastDamageSource();
             h.assertTrue(src != null && src.is(net.minecraft.world.damagesource.DamageTypes.FIREBALL), "the ghast died of " + src + " removed " + ghast.getRemovalReason() + " hp " + ghast.getHealth());
             return true;
+        });
+    }
+
+    /** Three zombies, a stone sword and a shield: all three killed (critical hits, the shield up between blows), alive at the end. */
+    // (A batch of its own: it sets the difficulty.)
+    @GameTest(environment = "challengecraft:melee", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void fightZombies(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "fight_zombies");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty normal");
+        java.util.List<net.minecraft.world.entity.monster.zombie.Zombie> zombies = new java.util.ArrayList<>();
+        for (int[] p : new int[][]{{28, 20}, {28, 24}, {24, 28}}) {
+            var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(p[0], FEET, p[1])));
+            z.setPersistenceRequired();
+            level.addFreshEntity(z);
+            zombies.add(z);
+        }
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_AXE), new ItemStack(Items.SHIELD));
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.ZOMBIE), java.util.Set.of(), 0, 3), 1600, () -> {
+            BotArena.LOG.info("[BOTTEST] fight_zombies hp {} zombies {}", a.bot().body().getHealth(), zombies.stream().filter(z -> z.isAlive()).count());
+            return zombies.stream().noneMatch(z -> z.isAlive());
+        });
+    }
+
+    /** A full pack of odds and ends and a bundle: room made by bundling them up, nothing thrown away. */
+    @GameTest(structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
+    public void bundleOddsAndEnds(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "bundle_odds_and_ends");
+        Item[] odds = {Items.DANDELION, Items.POPPY, Items.WHEAT_SEEDS, Items.OAK_SAPLING, Items.BIRCH_SAPLING, Items.BONE, Items.FEATHER,
+                Items.FLINT, Items.CLAY_BALL, Items.PAPER, Items.SUGAR, Items.EGG, Items.ARROW, Items.STRING, Items.GUNPOWDER, Items.REDSTONE,
+                Items.LAPIS_LAZULI, Items.QUARTZ, Items.GLOWSTONE_DUST, Items.BLUE_ORCHID, Items.ALLIUM, Items.AZURE_BLUET, Items.CORNFLOWER,
+                Items.SPRUCE_SAPLING, Items.PUMPKIN_SEEDS, Items.MELON_SEEDS, Items.BEETROOT_SEEDS, Items.COCOA_BEANS, Items.INK_SAC,
+                Items.SLIME_BALL, Items.LEATHER, Items.RABBIT_HIDE, Items.SNOWBALL, Items.KELP, Items.SEAGRASS};
+        java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
+        stacks.add(new ItemStack(Items.BUNDLE));
+        for (Item i : odds) stacks.add(new ItemStack(i, 2));
+        a.spawn(20, FEET, 20, stacks.toArray(new ItemStack[0]));
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(150), 200, () -> {
+            var body = a.bot().body();
+            h.assertTrue(net.kasax.challengecraft.bot.BotWorld.drops(h.getLevel(), body.blockPosition(), 8, (java.util.Set<Item>) null).isEmpty(), "threw something away");
+            return net.kasax.challengecraft.bot.BotBundles.freeSlots(body) >= 2 && net.kasax.challengecraft.bot.BotBundles.countInside(body, java.util.Set.of(odds)) > 0;
         });
     }
 

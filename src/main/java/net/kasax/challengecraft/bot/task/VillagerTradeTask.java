@@ -34,6 +34,7 @@ public final class VillagerTradeTask implements BotTask {
     private Villager merchant;
     private int ticks, waitTicks, offerWait, steps, nightTicks;
     private boolean triedVillage, placedSite, clearedRivals;
+    private int placeTries;
     /** The job site put down (or found free) for a villager to take. */
     private BlockPos siteAt;
     private int claimedTicks, sitesTried, rivalsBroken, hires, hiredBefore;
@@ -237,7 +238,13 @@ public final class VillagerTradeTask implements BotTask {
         }
         if (body.distanceTo(jobless) > 3) return walkTo(bot, jobless.blockPosition());
         BlockPos at = bot.actions().placeNearby(site);
-        if (at == null) return fail(bot, "no room for the job site");
+        if (at == null) {
+            // (The villager, a crop, a fence in the way: a step aside and again.)
+            if (++placeTries > 4) return fail(bot, "no room for the job site");
+            BlockPos p = body.blockPosition().offset(body.getRandom().nextInt(7) - 3, 0, body.getRandom().nextInt(7) - 3);
+            bot.interject(new GoToTask(p, 1));
+            return Result.RUNNING;
+        }
         bot.say("a " + profession + " is needed: job site put down at " + at.toShortString());
         siteAt = at;
         placedSite = true;

@@ -71,6 +71,16 @@ public final class BotArmor {
                 return true;
             }
         }
+        // A shield in the off hand (raised against arrows and blows in a fight).
+        if (body.getOffhandItem().isEmpty()) {
+            for (int i = 0; i < inv.size(); i++) {
+                if (!inv.get(i).is(net.minecraft.world.item.Items.SHIELD)) continue;
+                body.setItemSlot(EquipmentSlot.OFFHAND, inv.get(i).split(1));
+                body.getInventory().setChanged();
+                bot.say("shield in the off hand");
+                return true;
+            }
+        }
         for (int i = 0; i < inv.size(); i++) {
             ItemStack s = inv.get(i);
             if (s.isEmpty()) continue;

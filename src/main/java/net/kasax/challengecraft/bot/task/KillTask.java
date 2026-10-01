@@ -107,25 +107,74 @@ public final class KillTask implements BotTask {
         }
 
         double dist = body.distanceTo(target);
+        // Up in the air (a phantom, a ghast, a blaze over the lava): arrows, if it has a bow.
+        if (target.getY() - body.getY() > 3.5 && dist > REACH && shoot(bot, target)) return Result.RUNNING;
         if (dist <= REACH) {
             if (walking) {
                 bot.navigator().stop();
                 walking = false;
             }
             body.lookAt(target.getEyePosition());
+            boolean creeper = target instanceof net.minecraft.world.entity.monster.Creeper;
             body.forward = dist > 2.0 ? 0.4f : 0f;
-            if (body.getAttackStrengthScale(0.5f) >= 1f) {
-                body.attack(target);
-                body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
-                if (!target.isAlive()) {
-                    killed++;
-                    deathSpot = target.blockPosition();
-                    collectTicks = 40;
-                    target = null;
+            boolean ready = body.getAttackStrengthScale(0.5f) >= 1f;
+            boolean shield = body.getOffhandItem().is(Items.SHIELD);
+            // How many are on it close by: more than one, and it gives ground between blows (they
+            // line up in front instead of closing round it).
+            int pack = level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(4.5),
+                    m -> m.isAlive() && (m.getTarget() == body || m instanceof net.minecraft.world.entity.monster.Enemy && m.distanceTo(body) < 3)).size();
+            if (!ready) {
+                // Recharging: a creeper is kept at arm's length (it goes off close up); against
+                // anything else the shield goes up meanwhile.
+                if (creeper) body.forward = dist < 2.6 ? -1f : 0f;
+                else {
+                    if (pack >= 2) body.forward = -1f;
+                    if (shield && !body.isUsingItem() && threatens(target, body)) {
+                        body.gameMode.useItem(body, level, body.getOffhandItem(), InteractionHand.OFF_HAND);
+                    }
                 }
+                return Result.RUNNING;
+            }
+            // Ready: shield down, then the blow; a jump first for a critical hit (half again as
+            // hard) when there is time for one (not at a creeper: it would close in).
+            if (body.isUsingItem()) {
+                body.releaseUsingItem();
+                return Result.RUNNING;
+            }
+            if (!creeper && pack <= 1 && crit == 0 && body.onGround() && !body.isInWater() && dist < REACH - 0.4) {
+                body.jump = true;
+                crit = 1;
+                return Result.RUNNING;
+            }
+            if (crit == 1) {
+                body.jump = false;
+                // (On the way down: that is the critical hit. Landed again: hit anyway.)
+                if (!body.onGround() && body.getDeltaMovement().y >= 0 && ++critWait < 12) return Result.RUNNING;
+            }
+            // More than one at it: a sprinting blow instead (it knocks the mob well back, time
+            // for the next): a step forward at a run, then the hit.
+            if (!creeper && pack >= 2 && crit == 0 && !body.isSprinting() && body.getFoodData().getFoodLevel() > 6) {
+                body.sprintNow = true;
+                body.forward = 1f;
+                crit = 2;
+                return Result.RUNNING;
+            }
+            body.sprintNow = false;
+            crit = 0;
+            critWait = 0;
+            if (pack <= 1) body.setSprinting(false);
+            body.attack(target);
+            body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
+            if (!target.isAlive()) {
+                killed++;
+                deathSpot = target.blockPosition();
+                collectTicks = 40;
+                target = null;
             }
             return Result.RUNNING;
         }
+        if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD)) body.releaseUsingItem();
+        crit = 0;
         // Close and on about the same level: just run at it. Otherwise path there.
         if (dist < 6 && Math.abs(target.getY() - body.getY()) < 1.5 || direct > 0) {
             direct--;
@@ -179,31 +228,41 @@ public final class KillTask implements BotTask {
                 .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
     }
 
-    /** Best melee weapon into the hand: the item with the highest attack damage. */
+    private int crit, critWait;
+
+    /** Whether it is out to hurt the bot (so the shield is worth raising). */
+    private static boolean threatens(LivingEntity target, BotPlayer body) {
+        return target instanceof net.minecraft.world.entity.Mob m && m.getTarget() == body
+                || target instanceof net.minecraft.world.entity.monster.Enemy;
+    }
+
+    /** Best melee weapon into the hand: the most damage per second (a sword beats an axe). */
     private static void equipWeapon(Bot bot) {
         var inv = bot.body().getInventory().getNonEquipmentItems();
         int best = -1;
-        double bestDamage = 1;
+        double bestDps = 4; // a fist: 1 damage, 4 blows a second
         for (int i = 0; i < inv.size(); i++) {
             ItemStack s = inv.get(i);
             if (s.isEmpty()) continue;
-            double d = attackDamage(s);
-            if (d > bestDamage) {
-                bestDamage = d;
+            double d = dps(s);
+            if (d > bestDps) {
+                bestDps = d;
                 best = i;
             }
         }
         if (best >= 0) bot.tools().select(best);
     }
 
-    private static double attackDamage(ItemStack s) {
+    /** Damage a second of full-strength blows: damage times attacks a second. */
+    static double dps(ItemStack s) {
         var mods = s.get(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS);
-        if (mods == null) return 1;
-        double[] dmg = {1};
+        if (mods == null) return 4;
+        double[] dmg = {1}, speed = {4};
         mods.forEach(net.minecraft.world.entity.EquipmentSlot.MAINHAND, (attr, mod) -> {
             if (attr.is(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) dmg[0] += mod.amount();
+            if (attr.is(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED)) speed[0] += mod.amount();
         });
-        return dmg[0];
+        return dmg[0] * Math.max(0.5, speed[0]);
     }
 
     /** None in sight: walk out (up from a mine first) for up to two minutes. */

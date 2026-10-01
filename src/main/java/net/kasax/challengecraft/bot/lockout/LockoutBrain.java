@@ -131,16 +131,25 @@ public final class LockoutBrain implements BotBrain {
         if (keepKit(bot)) return;
         // Iron the quick way: a shipwreck's chests (or a village's) when one is near and the plan
         // wants iron. Once per structure.
-        if (strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3
-                && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+        // And whatever the plan: a shipwreck (or a ruined portal) not far off is looted the moment
+        // it is seen. Iron, gold, emeralds, food, a treasure map: things that make every later
+        // tile quicker, wanted now or not.
+        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-            for (String kind : List.of("shipwreck", "village")) {
+            boolean ironWanted = strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
+            for (String kind : List.of("shipwreck", "ruined_portal", "village")) {
+                int radius = switch (kind) {
+                    case "shipwreck" -> ironWanted ? 160 : 120;
+                    case "ruined_portal" -> 64;
+                    default -> ironWanted ? 160 : 0;
+                };
+                if (radius == 0) continue;
                 var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
                         net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, kind));
-                if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > 160 * 160) continue;
+                if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > (long) radius * radius) continue;
                 String key = kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
                 if (!raided.add(key)) continue;
-                bot.say("iron from the " + kind + " at " + seen.spot().toShortString());
+                bot.say("loot from the " + kind.replace('_', ' ') + " at " + seen.spot().toShortString());
                 start(bot, new net.kasax.challengecraft.bot.task.RaidTask(level, kind), 3600);
                 return;
             }
@@ -419,6 +428,20 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
             return true;
         }
+        // The pack filling up and no bundle yet: one (string and leather), for the odds and ends.
+        if (net.kasax.challengecraft.bot.BotBundles.bundle(body) == null && net.kasax.challengecraft.bot.BotBundles.freeSlots(body) <= 8
+                && now >= bundleRetryAt) {
+            bundleRetryAt = now + 6000;
+            double cost = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.BUNDLE), 1);
+            if (cost < 120) {
+                bot.say("the pack fills up: a bundle for the odds and ends (~" + Math.round(cost) + " s)");
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.BUNDLE), 1, planner), 2400);
+                return true;
+            }
+        }
+        // Iron to spare (a shipwreck's, beyond what the board wants): better tools first, then a
+        // sword, a shield and armour; each makes every later tile quicker or safer.
+        if (upgrade(bot)) return true;
         // Spare cobblestone (a furnace, stone tools, a wall against a creeper or a ghast) and spare
         // wood (a crafting table, sticks, a boat, a chest) on the way, as a player keeps them.
         boolean overworld = body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
@@ -435,6 +458,40 @@ public final class LockoutBrain implements BotBrain {
             int logs = ObtainPlanner.countAny(body, LOGS);
             bot.say("spare wood (" + woodPlanks(body) + " planks' worth)");
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + 6, planner), 1800);
+            return true;
+        }
+        return false;
+    }
+
+    private long upgradeRetryAt, bundleRetryAt;
+
+    private boolean upgrade(Bot bot) {
+        var body = bot.body();
+        long now = body.level().getGameTime();
+        if (now < upgradeRetryAt) return false;
+        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT));
+        int spare = iron - planner.boardDemand.getOrDefault(net.minecraft.world.item.Items.IRON_INGOT, 0);
+        if (spare < 1) return false;
+        record Step(net.minecraft.world.item.Item item, int iron, Set<net.minecraft.world.item.Item> better) {}
+        var steps = List.of(
+                new Step(net.minecraft.world.item.Items.IRON_PICKAXE, 3, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE)),
+                new Step(net.minecraft.world.item.Items.IRON_SWORD, 2, Set.of(net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD)),
+                new Step(net.minecraft.world.item.Items.SHIELD, 1, Set.of(net.minecraft.world.item.Items.SHIELD)),
+                new Step(net.minecraft.world.item.Items.IRON_HELMET, 5, Set.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.DIAMOND_HELMET)),
+                new Step(net.minecraft.world.item.Items.IRON_BOOTS, 4, Set.of(net.minecraft.world.item.Items.IRON_BOOTS, net.minecraft.world.item.Items.DIAMOND_BOOTS)),
+                new Step(net.minecraft.world.item.Items.IRON_CHESTPLATE, 8, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)),
+                new Step(net.minecraft.world.item.Items.IRON_LEGGINGS, 7, Set.of(net.minecraft.world.item.Items.IRON_LEGGINGS, net.minecraft.world.item.Items.DIAMOND_LEGGINGS)));
+        for (Step st : steps) {
+            boolean has = ObtainPlanner.countAny(body, st.better()) > 0;
+            for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+                    net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET, net.minecraft.world.entity.EquipmentSlot.OFFHAND}) {
+                if (st.better().contains(body.getItemBySlot(slot).getItem())) has = true;
+            }
+            if (has) continue;
+            if (spare < st.iron()) return false; // (in this order: not armour before the pickaxe)
+            upgradeRetryAt = now + 2400;
+            bot.say("iron to spare (" + spare + "): " + ObtainPlanner.name(st.item()));
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(st.item()), 1, planner), 1200);
             return true;
         }
         return false;
