@@ -8,7 +8,8 @@
     "fabric-gametest": [
       "net.kasax.challengecraft.gametest.BotMovementTests",
       "net.kasax.challengecraft.gametest.BotSkillTests",
-      "net.kasax.challengecraft.gametest.BotStuntTests"
+      "net.kasax.challengecraft.gametest.BotStuntTests",
+      "net.kasax.challengecraft.gametest.BotLobbyTests"
     ]
   },
   "depends": {

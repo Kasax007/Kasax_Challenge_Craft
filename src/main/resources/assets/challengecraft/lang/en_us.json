@@ -1148,5 +1148,13 @@
   "challengecraft.casino.hint.counter": "Right-click with items: lay them on the counter · empty hand: buy",
   "challengecraft.casino.hint.bell": "Right-click: ring the bell - sell everything for %s Jetons",
   "challengecraft.casino.hint.bell_empty": "The bell: lay items on the counter first",
-  "challengecraft.casino.hint.take_item": "Right-click: take %s back"
+  "challengecraft.casino.hint.take_item": "Right-click: take %s back",
+  "challengecraft.lockout.bot.joined": "%s joined the lobby (%s)",
+  "challengecraft.lockout.bot.difficulty.easy": "Easy",
+  "challengecraft.lockout.bot.difficulty.normal": "Normal",
+  "challengecraft.lockout.bot.difficulty.hard": "Hard",
+  "challengecraft.lockout.bot.difficulty_button": "Bob: %s",
+  "challengecraft.lockout.bot.add": "Play against Bob",
+  "challengecraft.lockout.bot.remove": "Remove Bob",
+  "challengecraft.lockout.bot.badge": "(Bot)"
 }

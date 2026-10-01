@@ -1148,5 +1148,13 @@
   "challengecraft.casino.hint.counter": "Rechtsklick mit Items: auf den Tresen legen · leere Hand: kaufen",
   "challengecraft.casino.hint.bell": "Rechtsklick: Glocke läuten - alles für %s Jetons verkaufen",
   "challengecraft.casino.hint.bell_empty": "Die Glocke: leg zuerst Items auf den Tresen",
-  "challengecraft.casino.hint.take_item": "Rechtsklick: %s zurücknehmen"
+  "challengecraft.casino.hint.take_item": "Rechtsklick: %s zurücknehmen",
+  "challengecraft.lockout.bot.joined": "%s ist in der Lobby (%s)",
+  "challengecraft.lockout.bot.difficulty.easy": "Leicht",
+  "challengecraft.lockout.bot.difficulty.normal": "Normal",
+  "challengecraft.lockout.bot.difficulty.hard": "Schwer",
+  "challengecraft.lockout.bot.difficulty_button": "Bob: %s",
+  "challengecraft.lockout.bot.add": "Gegen Bob spielen",
+  "challengecraft.lockout.bot.remove": "Bob entfernen",
+  "challengecraft.lockout.bot.badge": "(Bot)"
 }

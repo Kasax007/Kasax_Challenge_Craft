@@ -243,12 +243,60 @@ public final class Chal_40_LockoutBingo {
                     data.setReady(player.getUUID(), false);
                 }
             }
+            case ADD_BOT -> {
+                if (data.isStarted()) {
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.started").withStyle(ChatFormatting.RED));
+                    syncToPlayer(player);
+                    return;
+                }
+                addLockoutBot(server, player, packet.teamId());
+            }
+            case REMOVE_BOT -> {
+                if (data.isStarted()) {
+                    player.sendOverlayMessage(Component.translatable("challengecraft.lockout.error.started").withStyle(ChatFormatting.RED));
+                    syncToPlayer(player);
+                    return;
+                }
+                removeLockoutBots(server, data);
+            }
         }
 
         maybeStartGame(server, data);
         if (!data.isStarted()) {
             syncToAll(server);
         }
+    }
+
+    /** The name the Lockout opponent plays under. */
+    public static final String BOT_NAME = "Bob";
+
+    /**
+     * Bob as an opponent: spawned next to the player who asked, given the Lockout brain at the
+     * chosen difficulty; he takes a free team himself and says ready (see LockoutBrain#joinLobby).
+     * One Bob at a time.
+     */
+    private static void addLockoutBot(MinecraftServer server, ServerPlayer player, int difficultyIndex) {
+        var difficulties = net.kasax.challengecraft.bot.lockout.LockoutBrain.Difficulty.values();
+        var difficulty = difficulties[Math.max(0, Math.min(difficulties.length - 1, difficultyIndex))];
+        net.kasax.challengecraft.bot.Bot bot = net.kasax.challengecraft.bot.BotManager.byName(BOT_NAME);
+        if (bot == null) {
+            ServerLevel level = player.level();
+            var at = player.position();
+            bot = net.kasax.challengecraft.bot.BotManager.spawn(server, BOT_NAME, level, at);
+        }
+        bot.setBrain(new net.kasax.challengecraft.bot.lockout.LockoutBrain(difficulty));
+        server.getPlayerList().broadcastSystemMessage(Component.translatable("challengecraft.lockout.bot.joined", BOT_NAME,
+                Component.translatable("challengecraft.lockout.bot.difficulty." + difficulty.name().toLowerCase(java.util.Locale.ROOT))), false);
+    }
+
+    /** Every Lockout bot out of the lobby (and off the server). */
+    private static void removeLockoutBots(MinecraftServer server, LockoutBingoSavedData data) {
+        for (net.kasax.challengecraft.bot.Bot bot : List.copyOf(net.kasax.challengecraft.bot.BotManager.all())) {
+            if (!(bot.brain() instanceof net.kasax.challengecraft.bot.lockout.LockoutBrain)) continue;
+            data.removeTeam(bot.id);
+            net.kasax.challengecraft.bot.BotManager.remove(server, bot);
+        }
+        syncToAll(server);
     }
 
     public static void handleScreenSlotClick(Player player, AbstractContainerMenu handler, int slotIndex) {
@@ -1537,7 +1585,8 @@ public final class Chal_40_LockoutBingo {
                     name,
                     entry.getValue(),
                     data.isReady(uuid),
-                    onlinePlayer != null
+                    onlinePlayer != null,
+                    onlinePlayer != null && net.kasax.challengecraft.bot.BotManager.isBot(onlinePlayer)
             ));
         }
         players.sort(Comparator.comparingInt(LockoutBingoSyncPacket.PlayerState::teamId).thenComparing(LockoutBingoSyncPacket.PlayerState::name, String.CASE_INSENSITIVE_ORDER));

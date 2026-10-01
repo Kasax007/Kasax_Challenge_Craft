@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /** Full lockout match snapshot shared with every participating client. */
 public class LockoutBingoSyncPacket implements CustomPacketPayload {
-    public record PlayerState(UUID uuid, String name, int teamId, boolean ready, boolean online) {
+    public record PlayerState(UUID uuid, String name, int teamId, boolean ready, boolean online, boolean bot) {
     }
 
     public static final Type<LockoutBingoSyncPacket> ID =
@@ -34,6 +34,7 @@ public class LockoutBingoSyncPacket implements CustomPacketPayload {
                         buf.writeVarInt(player.teamId());
                         buf.writeBoolean(player.ready());
                         buf.writeBoolean(player.online());
+                        buf.writeBoolean(player.bot());
                     }
 
                     buf.writeBoolean(packet.started);
@@ -57,6 +58,7 @@ public class LockoutBingoSyncPacket implements CustomPacketPayload {
                                 buf.readUUID(),
                                 buf.readUtf(),
                                 buf.readVarInt(),
+                                buf.readBoolean(),
                                 buf.readBoolean(),
                                 buf.readBoolean()
                         ));

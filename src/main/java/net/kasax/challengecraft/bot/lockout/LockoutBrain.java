@@ -745,13 +745,15 @@ public final class LockoutBrain implements BotBrain {
 
     /** Before the game: take a team nobody else is on and say ready. */
     private void joinLobby(Bot bot, MinecraftServer server) {
-        if (joined && Chal_40_LockoutBingo.teamOf(server, bot.id) != null) return;
+        LockoutBingoTeam mine = Chal_40_LockoutBingo.teamOf(server, bot.id);
         Set<LockoutBingoTeam> used = EnumSet.noneOf(LockoutBingoTeam.class);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (p == bot.body()) continue;
             LockoutBingoTeam t = Chal_40_LockoutBingo.teamOf(server, p.getUUID());
             if (t != null) used.add(t);
         }
+        // Stays put unless someone joined its team (it plays against them, not with them).
+        if (joined && mine != null && !used.contains(mine)) return;
         for (LockoutBingoTeam t : LockoutBingoTeam.values()) {
             if (!used.contains(t)) {
                 Chal_40_LockoutBingo.joinAndReady(bot.body(), t);

@@ -26,6 +26,11 @@ public class LockoutBingoTeamScreen extends Screen {
 
     private CraftButton leaveButton;
     private CraftButton readyButton;
+    private CraftButton botDifficultyButton;
+    private CraftButton botButton;
+    /** Bob's difficulty for the next add: 0 easy, 1 normal, 2 hard. */
+    private static int botDifficulty = 1;
+    private static final String[] BOT_DIFFICULTIES = {"easy", "normal", "hard"};
 
     private final int[] panelX = new int[4];
     private final int[] panelY = new int[4];
@@ -68,6 +73,29 @@ public class LockoutBingoTeamScreen extends Screen {
 
         readyButton = addRenderableWidget(new CraftButton(this.width / 2 + 4, this.height - 30, 120, 20,
                 Component.translatable("challengecraft.lockout.team.ready"), CraftButton.Style.PRIMARY, b -> sendReadyToggle()));
+
+        // Play against Bob: pick his difficulty, then add him (he joins a free team and readies).
+        botDifficultyButton = addRenderableWidget(new CraftButton(6, 6, 110, 16, botDifficultyLabel(), CraftButton.Style.NEUTRAL, b -> {
+            botDifficulty = (botDifficulty + 1) % BOT_DIFFICULTIES.length;
+            b.setMessage(botDifficultyLabel());
+        }));
+        botButton = addRenderableWidget(new CraftButton(6, 24, 110, 16,
+                Component.translatable("challengecraft.lockout.bot.add"), CraftButton.Style.PRIMARY, b -> {
+            if (botPresent(LockoutBingoClientState.get())) {
+                ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.REMOVE_BOT, -1));
+            } else {
+                ClientPlayNetworking.send(new LockoutBingoActionPacket(LockoutBingoActionPacket.Action.ADD_BOT, botDifficulty));
+            }
+        }));
+    }
+
+    private static Component botDifficultyLabel() {
+        return Component.translatable("challengecraft.lockout.bot.difficulty_button",
+                Component.translatable("challengecraft.lockout.bot.difficulty." + BOT_DIFFICULTIES[botDifficulty]));
+    }
+
+    private static boolean botPresent(LockoutBingoSyncPacket state) {
+        return state.players().stream().anyMatch(player -> player.bot() && player.online());
     }
 
     @Override
@@ -91,6 +119,14 @@ public class LockoutBingoTeamScreen extends Screen {
         }
         if (leaveButton != null) {
             leaveButton.active = localTeam != null && !state.started();
+        }
+        boolean botPresent = botPresent(state);
+        if (botButton != null) {
+            botButton.setMessage(Component.translatable(botPresent ? "challengecraft.lockout.bot.remove" : "challengecraft.lockout.bot.add"));
+            botButton.active = !state.started();
+        }
+        if (botDifficultyButton != null) {
+            botDifficultyButton.active = !state.started() && !botPresent;
         }
 
         context.centeredText(this.font, this.title, this.width / 2, 14, CraftUI.TEXT_PRIMARY);
@@ -192,7 +228,10 @@ public class LockoutBingoTeamScreen extends Screen {
             int chipX = x + panelW - chipW - 8;
             CraftUI.labelChip(context, this.font, badge, chipX, lineY, accent);
 
-            String name = CraftUI.trimToWidth(this.font, player.name(), chipX - (x + 8) - 4);
+            String label = player.bot()
+                    ? player.name() + " " + Component.translatable("challengecraft.lockout.bot.badge").getString()
+                    : player.name();
+            String name = CraftUI.trimToWidth(this.font, label, chipX - (x + 8) - 4);
             int nameColor = player.online() ? CraftUI.TEXT_PRIMARY : CraftUI.TEXT_MUTED;
             context.text(this.font, Component.nullToEmpty(name), x + 8, lineY + 1, nameColor, false);
             lineY += rowH;

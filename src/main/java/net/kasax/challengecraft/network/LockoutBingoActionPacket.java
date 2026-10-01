@@ -15,7 +15,10 @@ public class LockoutBingoActionPacket implements CustomPacketPayload {
         LEAVE_TEAM,
         READY,
         UNREADY,
-        REQUEST_SYNC
+        REQUEST_SYNC,
+        /** Bob joins the lobby as an opponent; {@code teamId} carries his difficulty (0 easy, 1 normal, 2 hard). */
+        ADD_BOT,
+        REMOVE_BOT
     }
 
     public static final Type<LockoutBingoActionPacket> ID =
