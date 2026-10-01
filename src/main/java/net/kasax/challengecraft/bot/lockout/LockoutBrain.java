@@ -146,6 +146,25 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         strategist.update(bot, planner, replanNow);
+        // The Nether phase: with the kit in hand and several Nether tiles open, a player goes now
+        // rather than one more Overworld tile at a time (each looks a bit cheaper on its own, and
+        // the trip never happens). A couple of tries per life.
+        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && netherTries < 2
+                && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.WATER_BUCKET)) > 0) {
+            int netherTiles = 0;
+            for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+                if (t.claimedBy() == null && t.goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) netherTiles++;
+            }
+            if (netherTiles >= 2) {
+                LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
+                if (trip != null && trip.cost() < 120 * netherTiles) {
+                    netherTries++;
+                    bot.say("Nether phase: " + netherTiles + " tiles there, the way in ~" + Math.round(trip.cost()) + " s");
+                    start(bot, trip.task().get(), budget(trip.cost(), 2400, 9000));
+                    return;
+                }
+            }
+        }
         // The investment the plan has decided on: iron tools and a bucket now, before the cheap
         // tiles (they pay for themselves on the tiles after). A few tries, then without.
         if (strategist.wantsIron() && kitTries < 3 && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
@@ -236,7 +255,7 @@ public final class LockoutBrain implements BotBrain {
         return false;
     }
 
-    private int openingTries, kitTries;
+    private int openingTries, kitTries, netherTries;
 
     private boolean needsFood(Bot bot) {
         long now = bot.body().level().getGameTime();
@@ -558,6 +577,7 @@ public final class LockoutBrain implements BotBrain {
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
         kitTries = 0;
+        netherTries = 0;
         openingTries = 0;
         targetIndex = -1;
         goalTask = null;
