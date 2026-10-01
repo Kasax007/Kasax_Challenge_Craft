@@ -104,9 +104,51 @@ public final class LockoutGoals {
         if (t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM_AMOUNT
                 && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.CRAFT) return null;
         Option there = planner.inNether(bot, () -> basic(bot, planner, goal));
-        if (there == null) return null;
         Option trip = nether(bot, planner);
-        return trip == null ? null : new Option(trip.cost() + there.cost() + 60, trip.task(), trip.yields());
+        if (trip == null) return null;
+        if (there != null) return new Option(trip.cost() + there.cost() + 60, trip.task(), trip.yields());
+        return fetchFromNether(bot, planner, goal, trip);
+    }
+
+    /** What only the Nether has, that Overworld things are made from. */
+    private static final List<Item> NETHER_RAWS = List.of(Items.QUARTZ, Items.BLAZE_ROD, Items.GLOWSTONE_DUST, Items.SOUL_SAND,
+            Items.NETHER_WART, Items.GHAST_TEAR, Items.MAGMA_CREAM, Items.CRIMSON_STEM, Items.WARPED_STEM, Items.BLACKSTONE);
+
+    /**
+     * Made at home from something only the Nether has (a comparator: stone and redstone here, the
+     * quartz there): over, just that fetched, back, and made up here as a player does it. Null
+     * when that does not work out either.
+     */
+    private static Option fetchFromNether(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal, Option trip) {
+        Set<Item> all = new java.util.HashSet<>(NETHER_RAWS);
+        Option home = planner.assuming(bot, all, () -> basic(bot, planner, goal));
+        if (home == null) return null;
+        // Which of them it really takes: those without which it is not to be had.
+        List<Item> wanted = new ArrayList<>();
+        for (Item raw : NETHER_RAWS) {
+            if (ObtainPlanner.countAny(bot.body(), Set.of(raw)) > 0) continue;
+            Set<Item> without = new java.util.HashSet<>(all);
+            without.remove(raw);
+            if (planner.assuming(bot, without, () -> basic(bot, planner, goal)) == null) wanted.add(raw);
+        }
+        if (wanted.isEmpty() || wanted.size() > 2) return null;
+        double fetch = 0;
+        for (Item raw : wanted) {
+            double c = planner.inNether(bot, () -> planner.estimate(bot, Set.of(raw), 3));
+            if (c >= INF) return null;
+            fetch += c;
+        }
+        double cost = trip.cost() + fetch + 120 + home.cost();
+        List<Supplier<BotTask>> steps = new ArrayList<>();
+        steps.add(trip.task());
+        for (Item raw : wanted) steps.add(() -> new ObtainTask(Set.of(raw), 3, planner));
+        steps.add(net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
+        steps.add(() -> {
+            Option now = basic(bot, planner, goal);
+            return now == null ? null : now.task().get();
+        });
+        String names = wanted.stream().map(ObtainPlanner::name).collect(java.util.stream.Collectors.joining(" and "));
+        return new Option(cost, () -> new SequenceTask(names + " from the Nether, then " + goal.id(), steps), trip.yields());
     }
 
     private static Option basic(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
@@ -176,8 +218,10 @@ public final class LockoutGoals {
      * there at the pool (see {@link net.kasax.challengecraft.bot.task.CastPortalTask}).
      */
     private static Option castPortal(Bot bot, ObtainPlanner planner) {
-        Double lava = planner.seen(bot, Blocks.LAVA);
-        if (lava == null) return null;
+        // A pool under the open sky it knows of (casting down in a cave costs minutes a try).
+        BlockPos open = openPool(bot);
+        if (open == null) return null;
+        double lava = 5 + Math.sqrt(open.distSqr(bot.body().blockPosition())) / 4.0;
         Set<Item> blocks = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
         boolean water = ObtainPlanner.countAny(bot.body(), Set.of(Items.WATER_BUCKET)) > 0;
         double cost = planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1)
@@ -222,7 +266,9 @@ public final class LockoutGoals {
             if (level.canSeeSky(p.above())) return p;
             skip.add(p);
         }
-        return first;
+        // (Lava down in a cave is no place to cast: digging out the room and pouring in the dark
+        // took five minutes a try. Then the other ways in.)
+        return null;
     }
 
     /** Ten obsidian mined (a diamond pickaxe), flint and steel, then the frame built block by block. */
@@ -305,6 +351,14 @@ public final class LockoutGoals {
                         () -> new ObtainTask(Set.of(Items.BOW), 1, planner).keeping(Set.of(Items.ARROW)),
                         () -> new ObtainTask(Set.of(Items.ARROW), 4, planner).keeping(Set.of(Items.BOW)),
                         () -> new net.kasax.challengecraft.bot.task.ShootTask(Items.BOW, e -> e instanceof net.minecraft.world.entity.Mob, 4))));
+            }
+            case "obtain_firework_crossbow" -> {
+                double xbow = planner.estimate(bot, Set.of(Items.CROSSBOW), 1), rocket = planner.estimate(bot, Set.of(Items.FIREWORK_ROCKET), 1);
+                Set<Item> kit = Set.of(Items.CROSSBOW, Items.FIREWORK_ROCKET);
+                yield xbow + rocket >= INF ? null : new Option(xbow + rocket + 6, () -> new SequenceTask("a crossbow loaded with a firework", List.of(
+                        () -> new ObtainTask(Set.of(Items.CROSSBOW), 1, planner).keeping(kit),
+                        () -> new ObtainTask(Set.of(Items.FIREWORK_ROCKET), 1, planner).keeping(kit),
+                        net.kasax.challengecraft.bot.task.LoadCrossbowTask::new)));
             }
             case "shoot_crossbow" -> {
                 double xbow = planner.estimate(bot, Set.of(Items.CROSSBOW), 1), arrows = planner.estimate(bot, Set.of(Items.ARROW), 1);

@@ -373,7 +373,7 @@ public final class CastPortalTask implements BotTask {
         // put a floor where there is none. The one with the least work, with nothing liquid in it.
         BlockPos best = null;
         Direction bestDir = null;
-        int bestWork = 60;
+        int bestWork = 40;
         for (int r = 7; r <= 14; r++) {
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {

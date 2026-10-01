@@ -320,6 +320,9 @@ public final class BotKnowledge {
         mob(EntityTypes.DROWNED, 120, Items.ROTTEN_FLESH, 1.0);
         mob(EntityTypes.HORSE, 90, Items.LEATHER, 1.0);
         mob(EntityTypes.WITCH, 300, Items.GLOWSTONE_DUST, 0.7, Items.REDSTONE, 0.7);
+        // Their arrows are tipped (slowness, poison): the only tipped arrows without brewing.
+        mob(EntityTypes.STRAY, 120, Items.TIPPED_ARROW, 0.5, Items.BONE, 1.0);
+        mob(EntityTypes.BOGGED, 120, Items.TIPPED_ARROW, 0.5, Items.BONE, 1.0);
         // The Nether (only counted there, see ObtainPlanner#mobCost).
         mob(EntityTypes.ZOMBIFIED_PIGLIN, 20, Items.GOLD_NUGGET, 1.0, Items.ROTTEN_FLESH, 1.0);
         mob(EntityTypes.PIGLIN, 40, Items.GOLD_INGOT, 0.1);

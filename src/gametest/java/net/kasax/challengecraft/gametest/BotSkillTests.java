@@ -223,6 +223,15 @@ public class BotSkillTests {
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.WATER_BUCKET)) > 0);
     }
 
+    /** A crossbow and a firework rocket: the rocket loaded into the crossbow (the "firework crossbow" tile). */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void fireworkCrossbow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "firework_crossbow");
+        a.spawn(20, FEET, 20, new ItemStack(Items.CROSSBOW), new ItemStack(Items.FIREWORK_ROCKET, 2), new ItemStack(Items.BREAD, 2));
+        a.run(new net.kasax.challengecraft.bot.task.LoadCrossbowTask(), 300,
+                () -> net.kasax.challengecraft.bot.task.LoadCrossbowTask.loaded(a.bot().body()));
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {
