@@ -34,6 +34,11 @@ public final class Bot {
     public boolean waterLandingAllowed = true;
     /** The way it last walked out exploring: kept, so a fresh search does not turn back on itself. */
     public net.minecraft.core.Direction exploreHeading;
+    /** Biomes it has set out for, far off, with what grows there (so it keeps to one, see ObtainPlanner). */
+    public record FarLead(String dimension, net.minecraft.core.BlockPos pos) {
+    }
+
+    public final java.util.Map<FarLead, java.util.List<String>> farLeads = new java.util.HashMap<>();
     /** Chat what it is doing (for testing). */
     public boolean verbose = true;
 
@@ -158,12 +163,23 @@ public final class Bot {
             tasks.remove(task);
             navigator.stop();
             if (r == BotTask.Result.FAILED) failures++;
+            if (task == retreat) {
+                body.hurry = false;
+                if (r == BotTask.Result.FAILED) {
+                    retreatFailedAt = body.tickCount;
+                    retreatFails++;
+                }
+                retreat = null;
+            }
             say((r == BotTask.Result.FAILED ? "x " : "done: ") + task.describe());
             if (brain != null) brain.finished(this, task, r == BotTask.Result.DONE);
         }
     }
 
     private int reflexCooldown;
+    /** The last way off from a monster, and when one found no way (then it is a fight). */
+    private BotTask retreat;
+    private int retreatFailedAt = -1000, retreatFails;
 
     /**
      * Things a player does without thinking about them, whatever the plan: hit back at a monster
@@ -174,22 +190,31 @@ public final class Bot {
         reflexCooldown = 10;
         tidyInventory();
         BotTask top = tasks.peek();
-        if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.KillTask) return;
+        if (top instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
         // Low on health with a monster close: get away first (and eat on the way), as a player
-        // backs off rather than trade the last hearts. A creeper about to blow: always away.
-        if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+        // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
+        // creeper about to blow: always away. (Cornered, with no way off: fight on, below.)
+        boolean recent = body.tickCount - retreatFailedAt < 200;
+        if (!recent) retreatFails = 0;
+        boolean cornered = recent && retreatFails >= 2;
+        if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask) && !cornered) {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(6), net.minecraft.world.entity.LivingEntity::isAlive)) {
                 boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0;
-                if (creeper || body.getHealth() <= 7) {
-                    net.minecraft.world.phys.Vec3 away = body.position().subtract(m.position()).normalize().scale(12);
+                if (creeper || body.getHealth() <= (fighting ? 6 : 7)) {
+                    net.minecraft.world.phys.Vec3 away = body.position().subtract(m.position()).normalize().scale(16);
+                    // (That way was blocked last time: off to the side instead.)
+                    if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
                     actions.reset();
-                    interject(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3));
+                    retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
+                    interject(retreat);
                     return;
                 }
             }
         }
+        if (fighting) return;
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
-        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && body.getHealth() > 7
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1));

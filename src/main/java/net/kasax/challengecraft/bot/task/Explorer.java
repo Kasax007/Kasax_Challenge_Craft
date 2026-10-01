@@ -54,8 +54,8 @@ final class Explorer {
     /** The next leg toward {@code target}: at most {@code leg} blocks on, on the surface there. */
     static BlockPos legToward(net.minecraft.server.level.ServerLevel level, BlockPos from, BlockPos target, int leg) {
         double dx = target.getX() - from.getX(), dz = target.getZ() - from.getZ(), d = Math.sqrt(dx * dx + dz * dz);
-        if (d <= leg) return target;
-        BlockPos p = BlockPos.containing(from.getX() + dx / d * leg, from.getY(), from.getZ() + dz / d * leg);
+        BlockPos p = d <= leg ? target : BlockPos.containing(from.getX() + dx / d * leg, from.getY(), from.getZ() + dz / d * leg);
+        if (!level.hasChunkAt(p)) return new BlockPos(p.getX(), Math.max(level.getSeaLevel(), from.getY()), p.getZ());
         return level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
     }
 

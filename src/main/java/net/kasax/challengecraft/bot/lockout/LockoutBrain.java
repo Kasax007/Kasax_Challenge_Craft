@@ -230,6 +230,9 @@ public final class LockoutBrain implements BotBrain {
             } catch (RuntimeException e) {
                 o = null;
             }
+            // Harder than it looked last time (it ran over its time): believed less now.
+            int over = overruns.getOrDefault(tile.goal().id(), 0);
+            if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + over) + 30 * over, o.task(), o.yields());
             if (o != null) out.add(new Choice(tile, o));
         }
         return out;
@@ -279,6 +282,8 @@ public final class LockoutBrain implements BotBrain {
     private double goalEstimate;
     private net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal goalGoal;
     private int extensions;
+    /** How often each goal ran over its time: its estimates are trusted that much less. */
+    private final java.util.Map<String, Integer> overruns = new java.util.HashMap<>();
 
     /** What the current goal would still take from here (seconds), or infinity if it cannot be told. */
     private double remaining(Bot bot) {
@@ -293,11 +298,20 @@ public final class LockoutBrain implements BotBrain {
     /** Whatever the brain set going last (a goal, food, the opening), and its time allowance. */
     private BotTask running;
     private long runningSince, runningBudget;
+    private net.minecraft.core.BlockPos runningFrom;
+    private int runningExtensions;
+
+    private static double horizontal(net.minecraft.core.BlockPos a, net.minecraft.core.BlockPos b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
+    }
 
     private void start(Bot bot, BotTask task, long budgetTicks) {
         running = task;
         runningSince = bot.body().level().getGameTime();
         runningBudget = budgetTicks;
+        runningFrom = bot.body().blockPosition();
+        runningExtensions = 0;
         bot.doNow(task);
     }
 
@@ -309,6 +323,14 @@ public final class LockoutBrain implements BotBrain {
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
             if (sideWant != null) wantRest.put(sideWant, now + 6000);
             drop(bot);
+            return;
+        }
+        if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null
+                && runningExtensions < 4 && runningFrom != null && horizontal(runningFrom, bot.body().blockPosition()) > 60) {
+            // Still on its way somewhere (the forest on the horizon): not stuck, more time.
+            runningExtensions++;
+            runningSince = now;
+            runningFrom = bot.body().blockPosition();
             return;
         }
         if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null) {
@@ -330,6 +352,7 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
             bot.say(targetId + " takes too long, something else first");
+            overruns.merge(targetId, 1, Integer::sum);
             restUntil.put(targetId, now + REST_TICKS);
             drop(bot);
             return;

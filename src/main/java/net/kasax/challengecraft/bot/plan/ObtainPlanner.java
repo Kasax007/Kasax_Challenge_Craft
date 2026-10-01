@@ -375,6 +375,16 @@ public final class ObtainPlanner {
         if (seen != null) find = Math.min(find, seen);
         Double hint = biomeHints.get(block);
         if (hint != null) find = Math.min(find, hint + 10); // + finding it there
+        // Only far off, where it grows (snow beyond the desert): the walk there.
+        if (seen == null && hint == null) {
+            String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+            String dim = bot.body().level().dimension().identifier().toString();
+            double nearest = Double.MAX_VALUE;
+            for (var e : bot.farLeads.entrySet()) {
+                if (e.getKey().dimension().equals(dim) && e.getValue().contains(id)) nearest = Math.min(nearest, Math.sqrt(e.getKey().pos().distSqr(bot.body().blockPosition())));
+            }
+            if (nearest < Double.MAX_VALUE) find = Math.max(find, nearest / 5 + 10);
+        }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         return find + breakSeconds + toolCost(bot, k, block, cost);
     }
@@ -567,7 +577,9 @@ public final class ObtainPlanner {
 
     /** The nearest biome in view known for one of these blocks, if none of them is in sight. */
     private BlockPos lead(Bot bot, Set<Block> blocks) {
-        for (Block b : blocks) if (visibleBlocks.containsKey(b)) return null;
+        // Seen ones may turn out out of reach (deep down, under water): the far lead stands by.
+        for (Block b : blocks) if (visibleBlocks.containsKey(b)) return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+                && BotKnowledge.depth(b, bot.body().getBlockY()) == null ? farLeadStandBy(bot, blocks) : null;
         BlockPos from = bot.body().blockPosition(), best = null;
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
             boolean known = false;
@@ -581,6 +593,18 @@ public final class ObtainPlanner {
         return best;
     }
 
+    /** A far lead only if one was found before (no new biome search for blocks that are in sight). */
+    private static BlockPos farLeadStandBy(Bot bot, Set<Block> blocks) {
+        BlockPos from = bot.body().blockPosition(), known = null;
+        String dim = bot.body().level().dimension().identifier().toString();
+        for (var e : bot.farLeads.entrySet()) {
+            if (!e.getKey().dimension().equals(dim)) continue;
+            boolean fits = e.getValue().stream().anyMatch(id -> blocks.contains(BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id))));
+            if (fits && (known == null || e.getKey().pos().distSqr(from) < known.distSqr(from))) known = e.getKey().pos();
+        }
+        return known != null && known.distSqr(from) > 24 * 24 ? known : null;
+    }
+
     /**
      * None in view either: the nearest biome known for them further out (a forest on the horizon),
      * from the world's biome layout. Only for blocks some biome is known for.
@@ -592,8 +616,24 @@ public final class ObtainPlanner {
                         .anyMatch(id -> blocks.contains(BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id)))))
                 .orElse(false);
         BlockPos from = bot.body().blockPosition();
-        var found = level.findClosestBiome3d(typical, new BlockPos(from.getX(), Math.max(from.getY(), level.getSeaLevel()), from.getZ()), 480, 24, 64);
-        return found == null ? null : level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, found.getFirst());
+        // Where it set out to last time (the same forest), so a fresh start does not turn round.
+        BlockPos known = null;
+        for (var e : bot.farLeads.entrySet()) {
+            if (!e.getKey().dimension().equals(level.dimension().identifier().toString())) continue;
+            boolean fits = e.getValue().stream().anyMatch(id -> blocks.contains(BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id))));
+            BlockPos p = e.getKey().pos();
+            if (fits && (known == null || p.distSqr(from) < known.distSqr(from))) known = p;
+        }
+        if (known != null && known.distSqr(from) > 24 * 24) return known;
+        var found = level.findClosestBiome3d(typical, new BlockPos(from.getX(), Math.max(from.getY(), level.getSeaLevel()), from.getZ()), 1200, 32, 64);
+        if (found == null) return null;
+        BlockPos at = found.getFirst();
+        // (Not generated yet the ground there reads as the bottom of the world: sea level instead.)
+        BlockPos lead = level.hasChunkAt(at) ? level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at)
+                : new BlockPos(at.getX(), level.getSeaLevel(), at.getZ());
+        String biome = found.getSecond().unwrapKey().map(k -> k.identifier().getPath()).orElse("");
+        bot.farLeads.put(new Bot.FarLead(level.dimension().identifier().toString(), lead), BotKnowledge.typicalOf(biome));
+        return lead;
     }
 
     /** Plays getting {@code count} of {@code accept} through on {@code sim}; null if it works out, else why not. */

@@ -266,6 +266,8 @@ public final class BotPathfinder {
         for (BlockPos c : cells) {
             if (clear(c)) continue;
             if (!abilities.mayBreak() || !breakable(c) || liquidAround(c)) return null;
+            // Stone by hand (seven seconds a block, and nothing to show for it): no way through.
+            if (abilities.tools().breakTicks(state(c)) > 100) return null;
             if (out == null) out = new ArrayList<>(2);
             out.add(c);
         }

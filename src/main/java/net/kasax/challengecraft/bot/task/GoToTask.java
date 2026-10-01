@@ -11,6 +11,13 @@ public final class GoToTask implements BotTask {
     private final double range;
     private boolean started;
     private int ticks, limit = Integer.MAX_VALUE;
+    private boolean sprint;
+
+    /** Running, whatever the difficulty (getting away from something). */
+    public GoToTask sprinting() {
+        sprint = true;
+        return this;
+    }
 
     public GoToTask(BlockPos target, double range) {
         this.target = target.immutable();
@@ -27,6 +34,7 @@ public final class GoToTask implements BotTask {
             if (range <= 0) bot.navigator().goTo(target);
             else bot.navigator().goStandNear(target, range);
         }
+        bot.body().hurry = sprint;
         return switch (bot.navigator().tick()) {
             case ARRIVED -> Result.DONE;
             case FAILED -> Result.FAILED;

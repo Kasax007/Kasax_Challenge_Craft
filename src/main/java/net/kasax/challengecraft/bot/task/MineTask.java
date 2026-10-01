@@ -39,11 +39,11 @@ public final class MineTask implements BotTask {
     private final Set<BlockPos> skip = new HashSet<>();
     private BlockPos target;
     private int collectTicks, idle, searchTicks, legs, scanCooldown, budget;
-    private boolean walking, searching;
+    private boolean walking, searching, leadSaid;
     private Direction heading;
     private Explorer explorer;
     private BlockPos lead, approaching;
-    private int approachTicks;
+    private int approachTicks, leadFails, sideStep;
 
     /** Mine until the bot holds {@code count} of the {@code items} together. */
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count) {
@@ -94,6 +94,14 @@ public final class MineTask implements BotTask {
                 target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
                 // Nothing right here: somewhere it has been past (or seen from afar).
                 if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
+                // Things from the surface (logs, sand) seen deep down (a mineshaft's beams) are not
+                // worth digging fifty blocks for: those are left for ones up here.
+                for (int i = 0; i < 8 && target != null && !worthIt(level, bot, target); i++) {
+                    skip.add(target);
+                    target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
+                    if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
+                }
+                if (target != null && !worthIt(level, bot, target)) target = null;
             }
             if (target == null) return search(bot);
             // A trunk (or any column of them) is taken from the bottom: that one is in reach from
@@ -170,7 +178,9 @@ public final class MineTask implements BotTask {
     private Result search(Bot bot) {
         // Digging: time to get down there, plus five minutes of tunnel.
         if (budget == 0) budget = depth == null ? SEARCH_TICKS : 6000 + 50 * Math.max(0, bot.body().blockPosition().getY() - depth);
-        if (++searchTicks > budget || legs > (depth == null ? MAX_LEGS : 600)) {
+        // (Walking to where they are known to be is not searching: only the looking about counts.)
+        if (lead == null) searchTicks++;
+        if (searchTicks > budget || legs > (depth == null ? MAX_LEGS : 600)) {
             bot.say("found no " + what);
             return Result.FAILED;
         }
@@ -185,16 +195,30 @@ public final class MineTask implements BotTask {
         if (lead != null) {
             // Far off: over the surface in legs (a path search straight there would dig through
             // the hills in between, and go underground where it ran out of budget).
+            if (!leadSaid) {
+                leadSaid = true;
+                bot.say("none in sight: off to where " + what + " is found, " + lead.toShortString());
+            }
             if (!walking) {
-                nav.goNear(Explorer.legToward(level(bot), nav.feet(), lead, 40), 4);
+                BlockPos aim = lead;
+                if (sideStep != 0) {
+                    // (Turned 60 degrees off the straight line, for one leg.)
+                    double dx = lead.getX() - nav.feet().getX(), dz = lead.getZ() - nav.feet().getZ();
+                    double a = Math.atan2(dz, dx) + sideStep * Math.PI / 3;
+                    aim = nav.feet().offset((int) (Math.cos(a) * 30), 0, (int) (Math.sin(a) * 30));
+                }
+                nav.goNear(Explorer.legToward(level(bot), nav.feet(), aim, sideStep != 0 ? 30 : 40), 4);
                 walking = true;
             }
             BotNavigator.Status s = nav.tick();
             if (s != BotNavigator.Status.MOVING) {
                 walking = false;
                 scanCooldown = 0;
-                // There (or no way on): look around there, then explore from there.
-                if (s == BotNavigator.Status.FAILED || horizontal(nav.feet(), lead) < 8) lead = null;
+                // There: look around there, then explore from there. No way on: a leg a bit to
+                // the side (a lake, a cliff in the way), and only after a few of those give up.
+                if (s == BotNavigator.Status.FAILED && ++leadFails > 5 || horizontal(nav.feet(), lead) < 8) lead = null;
+                if (s == BotNavigator.Status.FAILED) sideStep = bot.body().getRandom().nextBoolean() ? 1 : -1;
+                else sideStep = 0;
             }
             return Result.RUNNING;
         }
@@ -203,6 +227,26 @@ public final class MineTask implements BotTask {
         Result r = explorer.tick(bot);
         if (r == Result.FAILED) bot.say("found no " + what);
         return r;
+    }
+
+    /** Not buried far below the ground when it is a surface thing (and the bot is not down there too). */
+    private boolean worthIt(ServerLevel level, Bot bot, BlockPos p) {
+        // Under water: diving and digging there (five times slower) is not worth it while there
+        // are others on dry land.
+        if (!bot.actions().inReach(p)) {
+            for (Direction d : Direction.values()) {
+                if (d != Direction.DOWN && !level.getFluidState(p.relative(d)).isEmpty()) return false;
+            }
+        }
+        // Below a river or a lake: the way down is through the water. Others first.
+        if (!bot.actions().inReach(p) && p.getY() < bot.body().getBlockY()) {
+            for (int y = p.getY() + 1; y <= Math.min(p.getY() + 24, bot.body().getBlockY() + 2); y++) {
+                if (!level.getFluidState(new BlockPos(p.getX(), y, p.getZ())).isEmpty()) return false;
+            }
+        }
+        if (depth != null) return true;
+        if (Math.abs(p.getY() - bot.body().getBlockY()) <= 8) return true;
+        return p.getY() >= level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ()) - 6;
     }
 
     private static ServerLevel level(Bot bot) {

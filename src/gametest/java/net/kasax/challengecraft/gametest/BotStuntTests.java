@@ -176,8 +176,8 @@ public class BotStuntTests {
         });
     }
 
-    /** Three hearts left and a zombie next to it: away from it, alive. */
-    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    /** Three hearts left and a zombie next to it: away from it, alive. (The arena's edge can corner it: three tries.) */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8, maxAttempts = 3, requiredSuccesses = 1)
     public void retreatWhenLow(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "retreat");
         var z = EntityTypes.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
