@@ -166,20 +166,29 @@ public final class BotActions {
         ItemStack held = bot.getMainHandItem();
         if (!(held.getItem() instanceof BlockItem)) return false;
         ServerLevel level = (ServerLevel) bot.level();
-        for (Direction d : new Direction[]{Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST, Direction.UP}) {
-            BlockPos against = target.relative(d);
-            if (level.getBlockState(against).getCollisionShape(level, against).isEmpty()) continue;
-            Direction face = d.getOpposite();
-            Vec3 hitAt = Vec3.atCenterOf(against).add(face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5);
-            bot.lookAt(hitAt);
-            InteractionResult r = bot.gameMode.useItemOn(bot, level, held, InteractionHand.MAIN_HAND,
-                    new BlockHitResult(hitAt, face, against, false));
-            if (r.consumesAction()) {
-                bot.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
-                return true;
+        // (Crouched, as a player places against a crafting table or a chest without opening it;
+        // every face tried, not just the first.)
+        var before = level.getBlockState(target);
+        boolean wasCrouching = bot.isShiftKeyDown();
+        bot.setShiftKeyDown(true);
+        try {
+            for (Direction d : new Direction[]{Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST, Direction.UP}) {
+                BlockPos against = target.relative(d);
+                if (level.getBlockState(against).getCollisionShape(level, against).isEmpty()) continue;
+                Direction face = d.getOpposite();
+                Vec3 hitAt = Vec3.atCenterOf(against).add(face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5);
+                bot.lookAt(hitAt);
+                InteractionResult r = bot.gameMode.useItemOn(bot, level, held, InteractionHand.MAIN_HAND,
+                        new BlockHitResult(hitAt, face, against, false));
+                if (r.consumesAction() && level.getBlockState(target) != before) {
+                    bot.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+                    return true;
+                }
+                if (held.isEmpty()) return false;
             }
             return false;
+        } finally {
+            bot.setShiftKeyDown(wasCrouching);
         }
-        return false;
     }
 }

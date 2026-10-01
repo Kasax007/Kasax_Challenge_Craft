@@ -101,4 +101,22 @@ public class BotPortalTests {
         a.spawn(30, FEET, 30, kit());
         castAndGo(h, a, 4800);
     }
+
+    /** A meadow full of flowers (no block goes in over a flower), crafting tables standing about. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
+    public void lavaCastFlowers(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "lava_cast_flowers");
+        a.fill(1, FEET, 1, 38, FEET, 38, Blocks.POPPY);
+        for (int i = 4; i < 36; i += 5) a.fill(i, FEET, 12, i, FEET, 12, Blocks.CRAFTING_TABLE);
+        a.fill(24, GROUND, 4, 27, GROUND, 7, Blocks.LAVA);
+        a.fill(24, FEET, 4, 27, FEET, 7, Blocks.AIR);
+        a.fill(20, FEET, 20, 20, FEET, 20, Blocks.AIR);
+        a.spawn(20, FEET, 20, kit());
+        // (The first site holds: no mould given up on over a flower.)
+        var task = new LavaPortalTask(h.getLevel(), null);
+        a.run(task, 3600, () -> {
+            if (task.sitesGivenUp() > 0) h.fail("gave up on a site");
+            return a.bot().body().level().dimension() == Level.NETHER;
+        });
+    }
 }

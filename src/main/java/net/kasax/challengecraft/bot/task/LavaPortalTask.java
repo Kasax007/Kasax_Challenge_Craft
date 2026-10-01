@@ -301,6 +301,12 @@ public final class LavaPortalTask implements BotTask {
                 if (corner(x, y, 0)) continue;
                 BlockPos q = at(x, y, 1);
                 if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) continue;
+                // A flower, a sapling, a torch there: away first (a block does not go in over it).
+                if (!level.getBlockState(q).isAir() && !level.getBlockState(q).canBeReplaced() && level.getFluidState(q).isEmpty()) {
+                    if (++tries > 200) return replan(bot, "can't clear " + q.toShortString());
+                    bot.actions().breakTick(q);
+                    return Result.RUNNING;
+                }
                 if (!bot.actions().hasThrowaway()) return fail(bot, "no blocks for the mould");
                 if (++tries > 80) return replan(bot, "can't build the mould at " + q.toShortString());
                 // (Nothing to set it against: one below it first.)
@@ -612,6 +618,11 @@ public final class LavaPortalTask implements BotTask {
         bot.tools().select(slot);
         bot.body().lookAt(at);
         bot.body().gameMode.useItem(bot.body(), level, bot.body().getMainHandItem(), InteractionHand.MAIN_HAND);
+    }
+
+    /** How many sites it gave up on before the one it cast at. */
+    public int sitesGivenUp() {
+        return sites;
     }
 
     @Override
