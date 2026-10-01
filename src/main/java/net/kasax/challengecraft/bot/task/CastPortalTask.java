@@ -58,7 +58,7 @@ public final class CastPortalTask implements BotTask {
     private final Set<Long> footprint = new HashSet<>();
     /** Spots it stood on and could not pour from after all. */
     private final Set<Long> badStands = new HashSet<>();
-    private BlockPos inside, pool;
+    private BlockPos inside, pool, planLava;
     private int index, wait, ticks, tries, walkFails;
     private boolean walking, lit;
     private BotTask refill;
@@ -248,8 +248,13 @@ public final class CastPortalTask implements BotTask {
     private Result scoop(Bot bot, ServerLevel level) {
         if (BotInventory.slotOf(bot.body(), Items.BUCKET) < 0) return Result.FAILED;
         if (pool == null || !level.getFluidState(pool).is(FluidTags.LAVA) || !level.getFluidState(pool).isSource()) {
-            pool = BotWorld.nearest(level, inside, 20, 8, s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, badPools);
-            if (pool == null) return Result.FAILED;
+            // (Round the pool the spot was planned by first, then round the spot.)
+            pool = planLava != null && !badPools.contains(planLava) && level.getFluidState(planLava).is(FluidTags.LAVA) && level.getFluidState(planLava).isSource() ? planLava : null;
+            if (pool == null) pool = BotWorld.nearest(level, inside, 28, 16, s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, badPools);
+            if (pool == null) {
+                bot.say("no lava left to scoop near " + inside.toShortString());
+                return Result.FAILED;
+            }
             walking = false;
         }
         if (!bot.actions().inReach(pool)) return walkNear(bot, pool);
@@ -309,9 +314,12 @@ public final class CastPortalTask implements BotTask {
 
     /** A spot for the frame near a lava pool, so every scoop is a short walk. */
     private boolean plan(Bot bot, ServerLevel level) {
-        BlockPos lava = near != null && level.getFluidState(near).is(FluidTags.LAVA) ? near : BotWorld.nearest(level, bot.body().blockPosition(), 40, 16,
+        // (A source to scoop from: the pool it was sent to may show only its running edge.)
+        BlockPos lava = near != null && level.getFluidState(near).is(FluidTags.LAVA) && level.getFluidState(near).isSource() ? near
+                : BotWorld.nearest(level, near != null ? near : bot.body().blockPosition(), 40, 16,
                 s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, Set.of());
         if (lava == null) return false;
+        planLava = lava;
         // Far enough that the water poured for casting cannot run into the pool and turn it to
         // stone, near enough for quick trips with the lava bucket.
         for (int r = 9; r <= 13; r++) {
