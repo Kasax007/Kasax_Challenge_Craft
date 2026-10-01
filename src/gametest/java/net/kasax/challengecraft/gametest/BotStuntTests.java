@@ -334,7 +334,7 @@ public class BotStuntTests {
         // (Peaceful, the test world's default, takes ghasts away at once.)
         level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
         var ghast = EntityTypes.GHAST.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
-        ghast.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET + 7, 33)));
+        ghast.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET + 3, 32)));
         ghast.setPersistenceRequired();
         h.getLevel().addFreshEntity(ghast);
         a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16));
@@ -387,6 +387,35 @@ public class BotStuntTests {
             var body = a.bot().body();
             h.assertTrue(net.kasax.challengecraft.bot.BotWorld.drops(h.getLevel(), body.blockPosition(), 8, (java.util.Set<Item>) null).isEmpty(), "threw something away");
             return net.kasax.challengecraft.bot.BotBundles.freeSlots(body) >= 2 && net.kasax.challengecraft.bot.BotBundles.countInside(body, java.util.Set.of(odds)) > 0;
+        });
+    }
+
+    /** A skeleton sixty blocks off along a causeway: shot dead from over fifty blocks. */
+    // (A batch of its own: it widens the server's view and simulation distance meanwhile.)
+    @GameTest(environment = "challengecraft:sniper", structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 90)
+    public void sniperDuel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "sniper_duel");
+        a.fill(40, BotArena.GROUND - 2, 16, 90, BotArena.GROUND, 24, Blocks.STONE);
+        a.fill(40, FEET, 16, 40, FEET + 24, 24, Blocks.AIR); // (the test's barrier wall: opened)
+        var level = h.getLevel();
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(80, FEET, 20)));
+        sk.setNoAi(true);
+        sk.setPersistenceRequired();
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET)); // (no burning in the sun)
+        level.addFreshEntity(sk);
+        // (The test server simulates only a chunk or two round a player: arrows would stop in the
+        // air half way. A real server's simulation distance is ten.)
+        var players = level.getServer().getPlayerList();
+        int view = players.getViewDistance(), sim = players.getSimulationDistance();
+        players.setSimulationDistance(10);
+        players.setViewDistance(10);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 48));
+        a.run(new net.kasax.challengecraft.bot.task.SniperTask(), 3000, () -> {
+            if (sk.isAlive()) return false;
+            players.setViewDistance(view);
+            players.setSimulationDistance(sim);
+            return true;
         });
     }
 

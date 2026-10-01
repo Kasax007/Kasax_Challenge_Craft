@@ -40,10 +40,22 @@ public class BotPlayer extends ServerPlayer {
     /** Joins a new bot to the server at {@code pos}, as if a player with that name logged in there. */
     static BotPlayer join(MinecraftServer server, String name, ServerLevel level, Vec3 pos) {
         GameProfile profile = net.minecraft.core.UUIDUtil.createOfflineProfile(name);
-        BotPlayer bot = new BotPlayer(server, level, profile, ClientInformation.createDefault());
+        BotPlayer bot = new BotPlayer(server, level, profile, clientInformation(server));
         server.getPlayerList().placeNewPlayer(new BotConnection(), bot, CommonListenerCookie.createInitial(profile, false));
         bot.teleportTo(level, pos.x, pos.y, pos.z, Set.of(), bot.getYRot(), 0f, true);
         return bot;
+    }
+
+    /**
+     * What a player's client tells the server about itself, the view distance above all: the
+     * default (2 chunks) would have the server load and run only a patch of 32 blocks round the
+     * bot. It sees as far as the server lets anyone see (a player's client asks for 12).
+     */
+    static ClientInformation clientInformation(MinecraftServer server) {
+        ClientInformation d = ClientInformation.createDefault();
+        int view = Math.max(2, Math.min(12, server.getPlayerList().getViewDistance()));
+        return new ClientInformation(d.language(), view, d.chatVisibility(), d.chatColors(), d.modelCustomisation(), d.mainHand(),
+                d.textFilteringEnabled(), d.allowsListing(), d.particleStatus());
     }
 
     @Override

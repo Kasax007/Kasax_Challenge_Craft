@@ -328,8 +328,13 @@ public final class LockoutGoals {
                 int left = Math.max(0, 200 - taken);
                 int falls = (left + 79) / 80;
                 if (falls == 0) yield null;
-                Option one = body.getHealth() >= 18 ? fall(bot, planner, 11, true) : null;
-                yield one == null ? null : new Option(one.cost() + (falls - 1) * 45, one.task());
+                Option one = fall(bot, planner, 11, true);
+                if (one == null) yield null;
+                // (Hurt already: the hearts back first, then the fall.)
+                double heal = Math.max(0, 18 - body.getHealth()) * 4;
+                yield new Option(one.cost() + heal + (falls - 1) * 45, () -> new SequenceTask("hearts back, then a fall", List.of(
+                        () -> bot.body().getHealth() >= 18 ? null : new net.kasax.challengecraft.bot.task.WaitTask(Math.max(20, (int) ((18 - bot.body().getHealth()) * 80))),
+                        one.task())));
             }
             case "take_fall_damage" -> fall(bot, planner, 5, false);
             case "fall_20_blocks_and_survive" -> body.getHealth() >= 19 ? fall(bot, planner, 22, true) : null;
@@ -464,6 +469,72 @@ public final class LockoutGoals {
             case "splash_potion" -> ObtainPlanner.countAny(body, Set.of(Items.SPLASH_POTION)) > 0
                     ? new Option(3, () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f))
                     : brew(bot, planner, List.of(Items.GUNPOWDER), () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f));
+            case "light_campfire" -> {
+                // A campfire put down burns: put out with a shovel, lit with flint and steel.
+                Set<Item> shovels = Set.of(Items.WOODEN_SHOVEL, Items.STONE_SHOVEL, Items.IRON_SHOVEL, Items.DIAMOND_SHOVEL);
+                double c = planner.estimate(bot, Set.of(Items.CAMPFIRE), 1) + planner.estimate(bot, shovels, 1)
+                        + planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1);
+                Set<Item> kit = Set.of(Items.CAMPFIRE, Items.FLINT_AND_STEEL, Items.WOODEN_SHOVEL, Items.STONE_SHOVEL, Items.IRON_SHOVEL);
+                yield c >= INF ? null : new Option(c + 8, () -> new SequenceTask("light a campfire", List.of(
+                        () -> new ObtainTask(Set.of(Items.CAMPFIRE), 1, planner).keeping(kit),
+                        () -> new ObtainTask(shovels, 1, planner).keeping(kit),
+                        () -> new ObtainTask(Set.of(Items.FLINT_AND_STEEL), 1, planner).keeping(kit),
+                        net.kasax.challengecraft.bot.task.CampfireTask::new)));
+            }
+            case "reach_build_limit" -> {
+                // A pillar to the top of the world (from a hill, fewer blocks), and down again.
+                if (!overworld(bot)) yield null;
+                int up = body.level().getMaxY() - 4 - body.getBlockY();
+                if (up <= 0) yield null;
+                Set<Item> blocks = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
+                int have = ObtainPlanner.countAny(body, BLOCKS);
+                double b = planner.estimate(bot, blocks, Math.max(1, up + 4 - have + ObtainPlanner.countAny(body, blocks)));
+                yield b >= INF ? null : new Option(b + up * 1.3 + 10, () -> new SequenceTask("up to the build limit", List.of(
+                        () -> new ObtainTask(blocks, ObtainPlanner.countAny(bot.body(), blocks) + Math.max(0,
+                                bot.body().level().getMaxY() - bot.body().getBlockY() - ObtainPlanner.countAny(bot.body(), BLOCKS)), planner),
+                        net.kasax.challengecraft.bot.task.BuildLimitTask::new)));
+            }
+            case "kill_phantom" -> {
+                // Phantoms come at night to whoever has not slept for three days and more.
+                if (!overworld(bot)) yield null;
+                int awake = body.getStats().getValue(net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.TIME_SINCE_REST));
+                if (awake < 72000) yield null;
+                var seen = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Phantom.class,
+                        new net.minecraft.world.phys.AABB(body.blockPosition()).inflate(48), e -> e.isAlive());
+                if (seen.isEmpty() && !body.level().isDarkOutside()) yield null;
+                yield new Option(seen.isEmpty() ? 150 : 30, () -> new KillTask(Set.of(EntityTypes.PHANTOM), Set.of(), 0, 1));
+            }
+            case "freeze_in_powder_snow" -> {
+                if (!overworld(bot)) yield null;
+                var level = (net.minecraft.server.level.ServerLevel) body.level();
+                BlockPos snow = bot.memory().nearest(level, body.blockPosition(), st -> st.is(Blocks.POWDER_SNOW), Set.of());
+                yield snow == null || body.getHealth() < 12 ? null
+                        : new Option(15 + Math.sqrt(snow.distSqr(body.blockPosition())) / 4, net.kasax.challengecraft.bot.task.PowderSnowTask::new);
+            }
+            case "eat_glow_berries" -> {
+                // Glow berries hang on cave vines (lush caves): picked where it has seen some.
+                if (ObtainPlanner.countAny(body, Set.of(Items.GLOW_BERRIES)) > 0) yield consume(bot, planner, Set.of(Items.GLOW_BERRIES));
+                var level = (net.minecraft.server.level.ServerLevel) body.level();
+                java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> berries = st -> (st.is(Blocks.CAVE_VINES) || st.is(Blocks.CAVE_VINES_PLANT))
+                        && st.getValue(net.minecraft.world.level.block.CaveVines.BERRIES);
+                BlockPos vine = bot.memory().nearest(level, body.blockPosition(), berries, Set.of());
+                yield vine == null ? null : new Option(10 + Math.sqrt(vine.distSqr(body.blockPosition())) / 3.5, () -> new SequenceTask("eat glow berries", List.of(
+                        () -> new net.kasax.challengecraft.bot.task.ClickBlockTask("pick glow berries", berries).with(null, Set.of(Items.GLOW_BERRIES)),
+                        () -> new ConsumeTask(Set.of(Items.GLOW_BERRIES)))));
+            }
+            case "advancement_sniper_duel" -> {
+                // A skeleton shot dead from fifty blocks: a bow, plenty of arrows (few hit that far),
+                // a skeleton (at night on the surface, or one in sight).
+                if (!overworld(bot)) yield null;
+                double bowCost = planner.estimate(bot, Set.of(Items.BOW), 1), arrows = planner.estimate(bot, Set.of(Items.ARROW), 32);
+                boolean skeleton = !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.skeleton.Skeleton.class,
+                        new net.minecraft.world.phys.AABB(body.blockPosition()).inflate(96), e -> e.isAlive()).isEmpty();
+                if (bowCost + arrows >= INF || !skeleton && !body.level().isDarkOutside()) yield null;
+                yield new Option(bowCost + arrows + (skeleton ? 90 : 240), () -> new SequenceTask("a sniper duel", List.of(
+                        () -> new ObtainTask(Set.of(Items.BOW), 1, planner).keeping(Set.of(Items.ARROW)),
+                        () -> new ObtainTask(Set.of(Items.ARROW), 32, planner).keeping(Set.of(Items.BOW)),
+                        net.kasax.challengecraft.bot.task.SniperTask::new)));
+            }
             case "kill_slime" -> slime(bot, planner, false);
             case "obtain_slime_ball" -> slime(bot, planner, true);
             case "ride_pig" -> ride(bot, planner, EntityTypes.PIG);
@@ -984,6 +1055,18 @@ public final class LockoutGoals {
     private static Option kill(Bot bot, ObtainPlanner planner, String entityId) {
         EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(entityId)).orElse(null);
         if (type == null) return null;
+        // Guardians at an ocean monument, breezes in trial chambers: once one has been seen,
+        // the way there and a fight (at good health).
+        if ((type == EntityTypes.GUARDIAN || type == EntityTypes.BREEZE) && overworld(bot)) {
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            String home = type == EntityTypes.GUARDIAN ? "minecraft:monument" : "minecraft:trial_chambers";
+            var seen = VisitStructureTask.nearest(bot, VisitStructureTask.resolve(level, home));
+            if (seen == null || bot.body().getHealth() < 16) return null;
+            double walk = Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4;
+            return new Option(walk + 120, () -> new SequenceTask("kill a " + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath(), List.of(
+                    () -> new VisitStructureTask(level, home),
+                    () -> new KillTask(Set.of(type), Set.of(), 0, 1))));
+        }
         double cost = planner.mobEffort(bot, type, INF);
         if (cost >= INF) {
             // No drop worth knowing it by: still findable. Monsters come out at night and in caves;

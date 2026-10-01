@@ -50,11 +50,22 @@ abstract class StationTask implements BotTask {
                     bot.say("no " + block.getName().getString() + " to use");
                     return Result.FAILED;
                 }
+                // Carving a niche for it (see below): on with that first.
+                if (niche != null) {
+                    if (!bot.actions().breakTick(niche)) return Result.RUNNING;
+                    niche = null;
+                }
                 station = bot.actions().placeNearby(item);
                 placedHere = station;
                 if (block == Blocks.CRAFTING_TABLE && station != null) bot.ownTable = station;
                 if (station == null) {
-                    // Nowhere to put it here: step aside and try again.
+                    // Nowhere to put it here (down a narrow shaft, say): a block out of the wall
+                    // beside the feet, as a player makes room; else a step aside and again.
+                    if (!carved) {
+                        carved = true;
+                        niche = niche(bot);
+                        if (niche != null) return Result.RUNNING;
+                    }
                     if (++placeTries > 4) return Result.FAILED;
                     BlockPos p = bot.body().blockPosition().offset(bot.body().getRandom().nextInt(7) - 3, 0,
                             bot.body().getRandom().nextInt(7) - 3);
@@ -83,7 +94,25 @@ abstract class StationTask implements BotTask {
         return work(bot);
     }
 
-    private BlockPos placedHere;
+    private BlockPos placedHere, niche;
+    private boolean carved;
+
+    /** A block beside the feet to take out for room: breakable, a floor under it, nothing liquid by it. */
+    private static BlockPos niche(Bot bot) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        BlockPos feet = bot.body().blockPosition();
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos p = feet.relative(d);
+            var st = level.getBlockState(p);
+            if (st.isAir() || !st.getFluidState().isEmpty() || st.getDestroySpeed(level, p) < 0 || st.getDestroySpeed(level, p) > 5) continue;
+            if (level.getBlockState(p.below()).getCollisionShape(level, p.below()).isEmpty()) continue;
+            boolean wet = false;
+            for (net.minecraft.core.Direction n : net.minecraft.core.Direction.values()) if (!level.getFluidState(p.relative(n)).isEmpty()) wet = true;
+            if (wet) continue;
+            return p;
+        }
+        return null;
+    }
 
     /** Called every tick once the station is in reach. */
     protected abstract Result work(Bot bot);

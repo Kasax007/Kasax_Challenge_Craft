@@ -43,6 +43,8 @@ public final class BarterTask implements BotTask {
     private Stage stage = Stage.FIND;
     private Piglin piglin;
     private BlockPos rim, hole;
+    /** Every pit dug so far (hole -> its rim): a piglin may go for the gold in an older one. */
+    private final java.util.Map<BlockPos, BlockPos> pits = new java.util.LinkedHashMap<>();
     private int ticks, stageTicks, trades, holeTries;
     private boolean walking, admiredSeen;
     private int goldAtStart = -1, baitedAt = -1000;
@@ -192,6 +194,7 @@ public final class BarterTask implements BotTask {
             if (!dry) continue;
             rim = feet;
             hole = h2;
+            pits.put(hole, rim);
             return true;
         }
         return false;
@@ -259,6 +262,25 @@ public final class BarterTask implements BotTask {
 
     private Result lure(Bot bot, ServerLevel level) {
         BotPlayer body = bot.body();
+        // A piglin in an older pit (gone for the gold left there): that pit is the one now.
+        for (var e : pits.entrySet()) {
+            if (e.getKey().equals(hole)) continue;
+            BlockPos h = e.getKey();
+            boolean taken = !level.getEntitiesOfClass(Piglin.class, new AABB(h.above()).deflate(0.05), p -> p.isAlive() && !p.isBaby()).isEmpty()
+                    || !level.getEntitiesOfClass(Piglin.class, new AABB(h), p -> p.isAlive() && !p.isBaby() && p.getY() < h.getY() + 0.5).isEmpty();
+            if (taken) {
+                hole = h;
+                rim = e.getValue();
+                bot.say("a piglin went for the gold in the pit at " + h.above().toShortString());
+                break;
+            }
+        }
+        // (Off the rim of the pit that matters now: back onto it.)
+        if (!bot.navigator().feet().equals(rim) && !bot.actions().inReach(hole)) {
+            bot.navigator().goNear(rim, 0.4);
+            bot.navigator().tick();
+            return Result.RUNNING;
+        }
         // One in the hole (the one it lured, or another that went for the gold): that one.
         for (Piglin p : level.getEntitiesOfClass(Piglin.class, new AABB(hole).inflate(2), p -> p.isAlive() && !p.isBaby())) {
             if (inHole(p)) {
@@ -292,7 +314,9 @@ public final class BarterTask implements BotTask {
             body.drop(one, false, net.minecraft.util.Prediction.SERVER_ONLY);
         }
         // None comes (wandered off): to the next piglin, a new hole there (the gold stays as bait).
-        if (stageTicks > 600) {
+        // (One still about the pit: a while longer.)
+        boolean near = !level.getEntitiesOfClass(Piglin.class, new AABB(hole).inflate(8), p -> p.isAlive() && !p.isBaby()).isEmpty();
+        if (stageTicks > (near ? 1200 : 600)) {
             holeTries++;
             enter(Stage.FIND);
         }

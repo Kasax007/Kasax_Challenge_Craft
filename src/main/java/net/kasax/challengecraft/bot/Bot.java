@@ -242,7 +242,8 @@ public final class Bot {
         tidyInventory();
         // Better armour on as soon as it has some (and gold in the Nether); not while a task puts
         // on something in particular (a tile wants leather worn).
-        if (++armorCheck % 5 == 0 && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.EquipTask)) BotArmor.wearBest(this);
+        if (++armorCheck % 5 == 0 && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.EquipTask)
+                && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.PowderSnowTask)) BotArmor.wearBest(this);
         // Bundled things the plan wants again: out, while there is room.
         if (armorCheck % 10 == 0 && !keepItems.isEmpty() && BotBundles.freeSlots(body) >= 3
                 && BotBundles.countInside(body, keepItems) > 0) BotBundles.unpack(this, keepItems);
