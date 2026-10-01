@@ -91,13 +91,18 @@ public final class ObtainPlanner {
     public void markFailed(Step step, long gameTime) {
         failed.put(step.key(), gameTime + 2400);
         // (Water is everywhere: one failed fill says nothing about water at large.)
-        for (Object source : step.sources()) if (source != Blocks.WATER) missing.put(source, gameTime + 12000);
+        // (Ores and other things found deep down: not there where it looked; elsewhere, soon.)
+        for (Object source : step.sources()) if (source != Blocks.WATER) missing.put(source, gameTime + (oreLike(source) ? 2400 : 12000));
         scannedAt = -10_000; // look again
     }
 
     private boolean isMissing(Object source) {
         Long until = missing.get(source);
         return until != null && until > costsAt;
+    }
+
+    private static boolean oreLike(Object source) {
+        return source instanceof Block b && (BuiltInRegistries.BLOCK.getKey(b).getPath().endsWith("_ore") || b == Blocks.STONE || b == Blocks.DEEPSLATE);
     }
 
     private boolean isFailed(String key, long now) {
