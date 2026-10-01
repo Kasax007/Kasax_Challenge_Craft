@@ -64,7 +64,7 @@ public final class BotMemory {
         scanNextChunk(level, at, now);
         // Down in a cave: what it sees around it now (the chunk reading only takes what the open
         // air shows, and what was in sight when that chunk came round).
-        if (now - lookedAround >= 40 && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, at.above()) < 8) {
+        if (now - lookedAround >= 40 && level.dimensionType().hasSkyLight() && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, at.above()) < 8) {
             lookedAround = now;
             lookAround(level, body.getEyePosition(), at);
         }

@@ -36,6 +36,7 @@ public final class BotArena {
     private BotArena(GameTestHelper helper, String name) {
         this.helper = helper;
         this.name = name;
+        LOG.info("[BOTTEST] {} origin {}", name, helper.absolutePos(BlockPos.ZERO).toShortString());
     }
 
     /** A new arena with the flat floor built. */

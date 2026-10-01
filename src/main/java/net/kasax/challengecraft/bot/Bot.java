@@ -227,7 +227,7 @@ public final class Bot {
         if (trail.size() > TRAIL_CAP) for (int i = trail.size() - 2; i > 0; i -= 2) trail.remove(i);
     }
 
-    private int reflexCooldown;
+    private int reflexCooldown, armorCheck;
     /** The last way off from a monster, and when one found no way (then it is a fight). */
     private BotTask retreat;
     private int retreatFailedAt = -1000, retreatFails;
@@ -240,6 +240,9 @@ public final class Bot {
         if (reflexCooldown-- > 0) return;
         reflexCooldown = 10;
         tidyInventory();
+        // Better armour on as soon as it has some (and gold in the Nether); not while a task puts
+        // on something in particular (a tile wants leather worn).
+        if (++armorCheck % 5 == 0 && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.EquipTask)) BotArmor.wearBest(this);
         BotTask top = tasks.peek();
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;

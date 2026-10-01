@@ -99,7 +99,7 @@ public final class CraftTask extends StationTask {
         return true;
     }
 
-    static void give(BotPlayer body, ItemStack stack) {
+    public static void give(BotPlayer body, ItemStack stack) {
         if (!body.getInventory().add(stack) && !stack.isEmpty()) body.spawnAtLocation((net.minecraft.server.level.ServerLevel) body.level(), stack);
     }
 

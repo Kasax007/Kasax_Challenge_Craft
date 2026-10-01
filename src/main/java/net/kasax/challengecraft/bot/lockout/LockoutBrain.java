@@ -121,6 +121,8 @@ public final class LockoutBrain implements BotBrain {
         }
         // Keep something to eat: a player who is starving loses more time than bread costs.
         if (needsFood(bot)) return;
+        // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
+        if (goldGuard(bot)) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
         if (opening(bot)) return;
@@ -187,6 +189,9 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
         }
+        // A bastion near in the Nether and gold of use on the board (bartering, gold tiles): its
+        // chests and gold blocks, where few piglins watch. Once per bastion.
+        if (bastionRaid(bot)) return;
         // Night (or a cave, or the Nether), and several monsters wanted: one hunt for all of them.
         if (huntRound(bot)) return;
         replanNow = false;
@@ -323,6 +328,69 @@ public final class LockoutBrain implements BotBrain {
             if (!st.isDamageableItem() || st.getDamageValue() < st.getMaxDamage() * 0.9) return false;
         }
         return any;
+    }
+
+    private long bastionCheckAt;
+
+    private boolean bastionRaid(Bot bot) {
+        var body = bot.body();
+        long now = body.level().getGameTime();
+        if (now < bastionCheckAt || body.level().dimension() != net.minecraft.world.level.Level.NETHER || body.getHealth() < 16) return false;
+        bastionCheckAt = now + 1200;
+        var level = (net.minecraft.server.level.ServerLevel) body.level();
+        var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
+                net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "bastion_remnant"));
+        if (seen == null || seen.spot().distSqr(body.blockPosition()) > 128 * 128) return false;
+        String key = "bastion@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
+        if (raided.contains(key)) return false;
+        // Worth it: something on the board wants gold, or what piglins give for it.
+        boolean wanted = false;
+        for (var item : bot.keepItems) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item).getPath();
+            if (id.contains("gold") || ObtainPlanner.BARTER_GOLD.containsKey(item)) wanted = true;
+        }
+        if (!wanted) return false;
+        raided.add(key);
+        bot.say("the bastion at " + seen.spot().toShortString() + ": its gold");
+        start(bot, new net.kasax.challengecraft.bot.task.BastionLootTask(level), 9600);
+        return true;
+    }
+
+    private long goldCheckAt;
+    private static final Set<net.minecraft.world.item.Item> GOLD_PIECES = Set.of(net.minecraft.world.item.Items.GOLDEN_HELMET,
+            net.minecraft.world.item.Items.GOLDEN_BOOTS, net.minecraft.world.item.Items.GOLDEN_CHESTPLATE, net.minecraft.world.item.Items.GOLDEN_LEGGINGS);
+
+    /**
+     * Piglins attack whoever wears no gold. In the Nether without a gold piece: one made (the
+     * cheapest, a helmet or boots); up here with the gold for one and Nether tiles open: made
+     * before going. Returns whether it started on that.
+     */
+    private boolean goldGuard(Bot bot) {
+        var body = bot.body();
+        long now = body.level().getGameTime();
+        if (now < goldCheckAt) return false;
+        goldCheckAt = now + 600;
+        if (net.kasax.challengecraft.bot.BotArmor.wearsGold(body) || ObtainPlanner.countAny(body, GOLD_PIECES) > 0) return false;
+        boolean nether = body.level().dimension() == net.minecraft.world.level.Level.NETHER;
+        Set<net.minecraft.world.item.Item> piece = Set.of(net.minecraft.world.item.Items.GOLDEN_HELMET, net.minecraft.world.item.Items.GOLDEN_BOOTS);
+        if (nether) {
+            double cost = planner.estimate(bot, piece, 1);
+            if (cost > 400) return false;
+            goldCheckAt = now + 3600; // (once in a while if it does not work out)
+            bot.say("no gold on in the Nether: a gold piece first (~" + Math.round(cost) + " s)");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(piece, 1, planner), 4800);
+            return true;
+        }
+        if (body.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        if (ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.GOLD_INGOT)) < 4) return false;
+        boolean netherTiles = false;
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() == null && t.goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) netherTiles = true;
+        }
+        if (!netherTiles) return false;
+        bot.say("gold boots for the Nether, from the gold I carry");
+        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(piece, 1, planner), 1200);
+        return true;
     }
 
     private boolean keepKit(Bot bot) {

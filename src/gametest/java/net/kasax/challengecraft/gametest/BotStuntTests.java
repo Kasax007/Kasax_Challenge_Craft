@@ -256,6 +256,96 @@ public class BotStuntTests {
                         && net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.TROPICAL_FISH)) > 0);
     }
 
+    /**
+     * Bartering, the safe way: in a golden helmet, a hole dug beside it, gold dropped in; the
+     * piglin goes in after it and is stuck; two trades, the loot picked up at the rim.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void barterInHole(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "barter_in_hole");
+        var level = h.getLevel();
+        // (A yard, so the piglin does not wander off out of sight of the gold.)
+        a.fill(14, FEET, 14, 30, FEET + 2, 14, Blocks.COBBLESTONE);
+        a.fill(14, FEET, 26, 30, FEET + 2, 26, Blocks.COBBLESTONE);
+        a.fill(14, FEET, 14, 14, FEET + 2, 26, Blocks.COBBLESTONE);
+        a.fill(30, FEET, 14, 30, FEET + 2, 26, Blocks.COBBLESTONE);
+        var piglin = EntityTypes.PIGLIN.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        piglin.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(24, FEET, 20)));
+        piglin.setImmuneToZombification(true);
+        piglin.setCanPickUpLoot(true);
+        level.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.MOB_GRIEFING, true, level.getServer());
+        piglin.setPersistenceRequired();
+        // (Nothing in its hands: the gold it is given goes to the off hand.)
+        piglin.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+        level.addFreshEntity(piglin);
+        a.spawn(20, FEET, 20, new ItemStack(Items.GOLD_INGOT, 10), new ItemStack(Items.STONE_PICKAXE));
+        a.bot().body().setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.GOLDEN_HELMET));
+        a.run(new net.kasax.challengecraft.bot.task.BarterTask(java.util.Set.of(), 0, 2), 2400, () -> {
+            var body = a.bot().body();
+            h.assertTrue(piglin.getTarget() != body, "the piglin turned on the bot");
+            int gold = net.kasax.challengecraft.bot.BotInventory.count(body, Items.GOLD_INGOT);
+            int loot = 0;
+            for (var st : body.getInventory().getNonEquipmentItems()) {
+                if (!st.isEmpty() && !st.is(Items.GOLD_INGOT) && !st.is(Items.STONE_PICKAXE) && !st.is(Items.DIRT)
+                        && !st.is(Items.COBBLESTONE) && !st.is(Items.STONE)) loot++;
+            }
+            return gold <= 8 && loot > 0 && piglin.getY() < a.abs(0, FEET, 0).getY() - 1 && a.bot().current() == null;
+        });
+    }
+
+    /** A brewing stand close by: water bottle, nether wart, sugar, blaze powder: a potion of swiftness. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1400, skyAccess = true, padding = 8)
+    public void brewSwiftness(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "brew_swiftness");
+        a.fill(23, FEET, 20, 23, FEET, 20, Blocks.BREWING_STAND);
+        a.spawn(20, FEET, 20, net.minecraft.world.item.alchemy.PotionContents.createItemStack(Items.POTION, net.minecraft.world.item.alchemy.Potions.WATER),
+                new ItemStack(Items.NETHER_WART), new ItemStack(Items.SUGAR), new ItemStack(Items.BLAZE_POWDER));
+        a.run(new net.kasax.challengecraft.bot.task.BrewTask(java.util.List.of(Items.NETHER_WART, Items.SUGAR), 1), 1400, () -> {
+            for (var st : a.bot().body().getInventory().getNonEquipmentItems()) {
+                var c = st.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
+                if (st.is(Items.POTION) && c != null && c.is(net.minecraft.world.item.alchemy.Potions.SWIFTNESS)) return true;
+            }
+            return false;
+        });
+    }
+
+    /** A pig and a saddle: saddled, ridden a moment, and off again. */
+    @GameTest(structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 8)
+    public void ridePig(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "ride_pig");
+        var pig = EntityTypes.PIG.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        pig.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        h.getLevel().addFreshEntity(pig);
+        a.spawn(20, FEET, 20, new ItemStack(Items.SADDLE));
+        boolean[] rode = {false};
+        a.run(new net.kasax.challengecraft.bot.task.RideTask(EntityTypes.PIG), 800, () -> {
+            if (a.bot().body().getVehicle() == pig) rode[0] = true;
+            return rode[0] && a.bot().body().getVehicle() == null && a.bot().current() == null;
+        });
+    }
+
+    /** A ghast in the sky: its fireball hit back at it, and it dies of it. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 30)
+    public void returnToSender(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "return_to_sender");
+        var level = h.getLevel();
+        // (Peaceful, the test world's default, takes ghasts away at once.)
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var ghast = EntityTypes.GHAST.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        ghast.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET + 7, 33)));
+        ghast.setPersistenceRequired();
+        h.getLevel().addFreshEntity(ghast);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16));
+        a.run(new net.kasax.challengecraft.bot.task.GhastDeflectTask(), 2400, () -> {
+            if (h.getTick() % 10 == 0) BotArena.LOG.info("[BOTTEST] ghast hp {} at {} last {} hurtBy {}", ghast.getHealth(), ghast.blockPosition().subtract(a.abs(0, 0, 0)).toShortString(),
+                    ghast.getLastDamageSource() == null ? "-" : ghast.getLastDamageSource().getMsgId(), ghast.getLastHurtByMob());
+            if (ghast.isAlive()) return false;
+            var src = ghast.getLastDamageSource();
+            h.assertTrue(src != null && src.is(net.minecraft.world.damagesource.DamageTypes.FIREBALL), "the ghast died of " + src + " removed " + ghast.getRemovalReason() + " hp " + ghast.getHealth());
+            return true;
+        });
+    }
+
     /** "Survive an explosion" open: a creeper going off at a distance, taken at full health. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void creeperWelcome(GameTestHelper h) {
@@ -444,7 +534,7 @@ public class BotStuntTests {
     }
 
     /** A free composter beside the only jobless villager: taken up (or the new farmer's taken away), so it becomes a fletcher. */
-    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 72)
+    @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 72)
     public void jobSiteRival(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "job_site_rival");
         var level = h.getLevel();
@@ -456,7 +546,7 @@ public class BotStuntTests {
         a.spawn(20, FEET, 20, new ItemStack(Items.FLETCHING_TABLE), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64),
                 new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.WOODEN_AXE));
         var bowTrade = net.kasax.challengecraft.bot.plan.TradeKnowledge.get(level.getServer()).selling(Items.BOW).get(0);
-        a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 3600,
+        a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 6000,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
     }
 

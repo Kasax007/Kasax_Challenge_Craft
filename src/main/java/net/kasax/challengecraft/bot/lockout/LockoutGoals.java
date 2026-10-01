@@ -92,7 +92,16 @@ public final class LockoutGoals {
         if (goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER && overworld(bot)
                 && goal.type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) {
             Option trip = nether(bot, planner);
-            return trip == null ? null : new Option(trip.cost() + 90, trip.task(), trip.yields());
+            if (trip == null) return null;
+            // Brewing wants water (none down there): the blaze rods and the wart fetched, the
+            // potion brewed up here. Or already brewable up here with what it carries.
+            if (goal.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.BREW) {
+                Option here = basic(bot, planner, goal);
+                if (here != null) return here;
+                Option home = fetchFromNether(bot, planner, goal, trip);
+                if (home != null) return home;
+            }
+            return new Option(trip.cost() + 90, trip.task(), trip.yields());
         }
         // An Overworld tile from down in the Nether: back through the portal first (the tile is
         // planned for real once up there). Nether tiles come first that way, then home.
@@ -107,8 +116,13 @@ public final class LockoutGoals {
         // Not to be had up here, but made from something the Nether has (quartz, blaze rods, soul
         // sand): the trip there, then the rest planned there.
         var t = goal.type();
-        if (t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM_AMOUNT
-                && t != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.CRAFT) return null;
+        switch (t) {
+            case DIMENSION, BIOME, STRUCTURE, LOCATION, KILL -> {
+                return null;
+            }
+            default -> {
+            }
+        }
         Option there = planner.inNether(bot, () -> basic(bot, planner, goal));
         Option trip = nether(bot, planner);
         if (trip == null) return null;
@@ -166,7 +180,9 @@ public final class LockoutGoals {
             case CRAFT -> craft(bot, planner, items(goal.targets()));
             case KILL -> kill(bot, planner, goal.primaryTarget());
             case CONSUME -> "eat_cake_slice".equals(goal.id()) ? null : consume(bot, planner, items(goal.targets()));
-            case EQUIP -> goal.contextTarget().isBlank() || goal.contextTarget().equals(Level.OVERWORLD.identifier().toString())
+            // (Worn in a dimension: once there, as anywhere.)
+            case EQUIP -> goal.contextTarget().isBlank() || goal.contextTarget().equals(bot.body().level().dimension().identifier().toString())
+                    || planner.planningNether() && goal.contextTarget().equals(Level.NETHER.identifier().toString())
                     ? equip(bot, planner, items(goal.targets()), goal.amount()) : null;
             case INVENTORY_SET -> collectDistinct(bot, planner, items(goal.targets()), goal.amount());
             case INTERACT -> interact(bot, planner, goal.id());
@@ -175,6 +191,7 @@ public final class LockoutGoals {
             case STRUCTURE -> structure(bot, planner, goal);
             case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
             case ADVANCEMENT -> advancement(bot, planner, goal.id());
+            case BREW -> brewGoal(bot, planner, goal.id());
             case TRADE -> trade(bot, planner, goal.id());
             default -> null;
         };
@@ -442,6 +459,25 @@ public final class LockoutGoals {
                         () -> new ObtainTask(Set.of(Items.ENDER_PEARL), 1, planner),
                         () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.ENDER_PEARL, -30f))));
             }
+            // A splash potion thrown: a water bottle with gunpowder brewed in (no Nether wart
+            // needed), then thrown; one held already is just thrown.
+            case "splash_potion" -> ObtainPlanner.countAny(body, Set.of(Items.SPLASH_POTION)) > 0
+                    ? new Option(3, () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f))
+                    : brew(bot, planner, List.of(Items.GUNPOWDER), () -> new net.kasax.challengecraft.bot.task.UseItemTask(Items.SPLASH_POTION, -30f));
+            case "ride_pig" -> ride(bot, planner, EntityTypes.PIG);
+            case "ride_strider" -> planner.planningNether() ? ride(bot, planner, EntityTypes.STRIDER) : null;
+            // Withered: a wither skeleton's hit (they live in fortresses), taken at good health.
+            case "get_withered" -> {
+                if (!planner.planningNether() || body.getHealth() < 14) yield null;
+                double mob = planner.mobEffort(bot, EntityTypes.WITHER_SKELETON, 600);
+                yield mob >= INF ? null : new Option(mob + 30, () -> new KillTask(Set.of(EntityTypes.WITHER_SKELETON), Set.of(), 0, 1));
+            }
+            // A ghast's own fireball hit back at it.
+            case "advancement_return_to_sender" -> {
+                if (!planner.planningNether() || body.getHealth() < 16) yield null;
+                double mob = planner.mobEffort(bot, EntityTypes.GHAST, 400);
+                yield mob >= INF ? null : new Option(mob + 90, net.kasax.challengecraft.bot.task.GhastDeflectTask::new);
+            }
             case "craft_cake" -> withEgg(bot, planner, Items.CAKE, null);
             case "eat_cake_slice" -> withEgg(bot, planner, Items.CAKE, () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.CAKE,
                     net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0));
@@ -519,6 +555,98 @@ public final class LockoutGoals {
         Option best = null;
         for (Option o : new Option[]{plain, hunt, fishing}) if (o != null && (best == null || o.cost() < best.cost())) best = o;
         return best;
+    }
+
+    private static final Set<Item> GOLD_PIECES = Set.of(Items.GOLDEN_HELMET, Items.GOLDEN_BOOTS, Items.GOLDEN_CHESTPLATE, Items.GOLDEN_LEGGINGS);
+
+    /**
+     * One trade with a piglin (in the Nether): a gold ingot, a gold piece to wear (piglins attack
+     * anyone without), then the piglin lured into a hole and handed the gold (see BarterTask).
+     */
+    private static Option barterOnce(Bot bot, ObtainPlanner planner) {
+        if (!planner.planningNether()) return null;
+        var body = bot.body();
+        boolean armour = net.kasax.challengecraft.bot.BotArmor.wearsGold(body) || ObtainPlanner.countAny(body, GOLD_PIECES) > 0;
+        Set<Item> piece = Set.of(Items.GOLDEN_BOOTS, Items.GOLDEN_HELMET);
+        double wear = armour ? 0 : planner.estimate(bot, piece, 1);
+        double gold = planner.estimate(bot, Set.of(Items.GOLD_INGOT), ObtainPlanner.countAny(body, Set.of(Items.GOLD_INGOT)) > 0 ? 1 : 2);
+        if (wear >= INF || gold >= INF) return null;
+        return new Option(wear + gold + 50, () -> new SequenceTask("barter with a piglin", List.of(
+                () -> armour ? null : new ObtainTask(piece, 1, planner),
+                () -> new ObtainTask(Set.of(Items.GOLD_INGOT), 2, planner).keeping(GOLD_PIECES),
+                net.kasax.challengecraft.bot.task.BarterTask::once)));
+    }
+
+    /** Onto a pig or a strider: a saddle (made: leather and iron) unless one wears one already. */
+    private static Option ride(Bot bot, ObtainPlanner planner, EntityType<?> type) {
+        double saddle = planner.estimate(bot, Set.of(Items.SADDLE), 1);
+        double mob = planner.mobEffort(bot, type, 240);
+        if (saddle >= INF || mob >= INF) return null;
+        return new Option(saddle + mob + 10, () -> new SequenceTask("ride a " + BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath(), List.of(
+                () -> new ObtainTask(Set.of(Items.SADDLE), 1, planner),
+                () -> new net.kasax.challengecraft.bot.task.RideTask(type))));
+    }
+
+    private static Option cheapest(Option... options) {
+        Option best = null;
+        for (Option o : options) if (o != null && (best == null || o.cost() < best.cost())) best = o;
+        return best;
+    }
+
+    private static Option brewGoal(Bot bot, ObtainPlanner planner, String id) {
+        return switch (id) {
+            case "brew_speed_potion" -> brew(bot, planner, List.of(Items.NETHER_WART, Items.SUGAR), null);
+            case "brew_strength_potion" -> brew(bot, planner, List.of(Items.NETHER_WART, Items.BLAZE_POWDER), null);
+            case "brew_fire_resistance" -> brew(bot, planner, List.of(Items.NETHER_WART, Items.MAGMA_CREAM), null);
+            case "brew_night_vision" -> brew(bot, planner, List.of(Items.NETHER_WART, Items.GOLDEN_CARROT), null);
+            // Any potion with an effect: weakness needs no wart (a fermented spider eye in water).
+            case "brew_any_potion" -> cheapest(brew(bot, planner, List.of(Items.FERMENTED_SPIDER_EYE), null),
+                    brew(bot, planner, List.of(Items.NETHER_WART, Items.SUGAR), null),
+                    brew(bot, planner, List.of(Items.NETHER_WART, Items.BLAZE_POWDER), null),
+                    brew(bot, planner, List.of(Items.NETHER_WART, Items.MAGMA_CREAM), null));
+            default -> null;
+        };
+    }
+
+    /**
+     * A potion brewed: a brewing stand (one close by, or made: a blaze rod and stone), blaze powder
+     * to fuel it, a water bottle (filled up here: there is no water in the Nether), the
+     * ingredients; brewed one after the other, then {@code after} (thrown, drunk), if any.
+     */
+    private static Option brew(Bot bot, ObtainPlanner planner, List<Item> ingredients, Supplier<BotTask> after) {
+        var body = bot.body();
+        boolean standNear = nearby(bot, Blocks.BREWING_STAND);
+        double stand = standNear ? 5 : planner.estimate(bot, Set.of(Items.BREWING_STAND), 1);
+        int powderUse = 1 + (int) ingredients.stream().filter(i -> i == Items.BLAZE_POWDER).count();
+        double powder = planner.estimate(bot, Set.of(Items.BLAZE_POWDER), powderUse);
+        boolean bottleHeld = net.kasax.challengecraft.bot.task.BrewTask.waterBottles(body) > 0;
+        double bottle = 0;
+        if (!bottleHeld) {
+            if (!overworld(bot)) return null;
+            Double water = planner.seen(bot, Blocks.WATER);
+            bottle = planner.estimate(bot, Set.of(Items.GLASS_BOTTLE), 1) + (water == null ? 90 : water) + 4;
+        }
+        double rest = 0;
+        for (Item i : ingredients) if (i != Items.BLAZE_POWDER) rest += planner.estimate(bot, Set.of(i), 1);
+        double cost = stand + powder + bottle + rest + 22 * ingredients.size() + 8;
+        if (cost >= INF) return null;
+        Set<Item> kit = new java.util.HashSet<>(ingredients);
+        kit.addAll(List.of(Items.BREWING_STAND, Items.BLAZE_POWDER, Items.GLASS_BOTTLE, Items.POTION));
+        Set<Item> keep = Set.copyOf(kit);
+        List<Supplier<BotTask>> steps = new ArrayList<>();
+        steps.add(() -> nearby(bot, Blocks.BREWING_STAND) ? null : new ObtainTask(Set.of(Items.BREWING_STAND), 1, planner).keeping(keep));
+        steps.add(() -> new ObtainTask(Set.of(Items.BLAZE_POWDER), powderUse, planner).keeping(keep));
+        steps.add(() -> net.kasax.challengecraft.bot.task.BrewTask.waterBottles(bot.body()) > 0 ? null
+                : new ObtainTask(Set.of(Items.GLASS_BOTTLE), 1, planner).keeping(keep));
+        steps.add(() -> net.kasax.challengecraft.bot.task.BrewTask.waterBottles(bot.body()) > 0 ? null
+                : net.kasax.challengecraft.bot.task.FillBucketTask.bottle());
+        for (Item i : ingredients) {
+            if (i == Items.BLAZE_POWDER) continue;
+            steps.add(() -> new ObtainTask(Set.of(i), 1, planner).keeping(keep));
+        }
+        steps.add(() -> new net.kasax.challengecraft.bot.task.BrewTask(ingredients, 1));
+        if (after != null) steps.add(after);
+        return new Option(cost, () -> new SequenceTask("brew " + ingredients.stream().map(ObtainPlanner::name).toList(), steps));
     }
 
     /** An enchanting table (made or found), lapis, the item, a level or two of experience. */
@@ -767,6 +895,11 @@ public final class LockoutGoals {
                     ObtainPlanner.countAny(bot.body(), Set.of(Items.IRON_INGOT)) + 1);
             case "advancement_diamonds" -> obtain(bot, planner, Set.of(Items.DIAMOND), ObtainPlanner.countAny(bot.body(), Set.of(Items.DIAMOND)) + 1);
             case "advancement_we_need_to_go_deeper" -> nether(bot, planner);
+            case "advancement_into_fire" -> obtain(bot, planner, Set.of(Items.BLAZE_ROD), ObtainPlanner.countAny(bot.body(), Set.of(Items.BLAZE_ROD)) + 1);
+            // Any potion taken out of a brewing stand: the cheapest brew (an awkward potion, a
+            // splash water bottle, weakness).
+            case "advancement_local_brewery" -> cheapest(brew(bot, planner, List.of(Items.NETHER_WART), null),
+                    brew(bot, planner, List.of(Items.GUNPOWDER), null), brew(bot, planner, List.of(Items.FERMENTED_SPIDER_EYE), null));
             case "advancement_suit_up" -> equip(bot, planner, Set.of(Items.IRON_HELMET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS,
                     Items.IRON_BOOTS), 1);
             default -> null;
@@ -861,6 +994,7 @@ public final class LockoutGoals {
     }
 
     private static Option interact(Bot bot, ObtainPlanner planner, String id) {
+        if (id.equals("barter_with_piglin")) return barterOnce(bot, planner);
         if (id.equals("milk_cow")) {
             return useOnMob(bot, planner, EntityTypes.COW, Items.BUCKET, e -> !e.isBaby());
         }

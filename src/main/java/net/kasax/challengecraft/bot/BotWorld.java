@@ -72,8 +72,15 @@ public final class BotWorld {
      * from the open air, or in its line of sight close by. (Null eye: from the open air only.)
      */
     public static boolean seen(ServerLevel level, BlockPos p, net.minecraft.world.phys.Vec3 eye) {
+        // No sky (the Nether, the End): wide open caverns lit by lava and glowstone; what lies
+        // open within a few dozen blocks is in view.
+        if (!level.dimensionType().hasSkyLight()) {
+            return exposed(level, p) && (eye == null || net.minecraft.world.phys.Vec3.atCenterOf(p).distanceToSqr(eye) <= NETHER_SIGHT * NETHER_SIGHT);
+        }
         return skyVisible(level, p) || eye != null && inSight(level, eye, p, SIGHT);
     }
+
+    private static final double NETHER_SIGHT = 48;
 
     /** An open side (air, water) lit by the sky: in view from the surface, a ravine, a cave mouth. */
     public static boolean skyVisible(ServerLevel level, BlockPos p) {

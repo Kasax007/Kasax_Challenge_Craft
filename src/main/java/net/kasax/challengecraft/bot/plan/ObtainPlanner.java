@@ -168,6 +168,11 @@ public final class ObtainPlanner {
      * Runs {@code what} as if the bot stood in the Nether (with what it holds now, none of what is
      * about it here): what a trip there would make possible (quartz for a comparator, say).
      */
+    /** Planning for the Nether now (being there, or as if: see {@link #inNether}). */
+    public boolean planningNether() {
+        return nether;
+    }
+
     public <T> T inNether(Bot bot, java.util.function.Supplier<T> what) {
         refresh(bot);
         boolean savedNether = nether;
@@ -415,7 +420,35 @@ public final class ObtainPlanner {
             best = Math.min(best, mobCost(d.type(), d.effort()) / d.count());
         }
         best = Math.min(best, tradeCost(bot, item, cost));
+        best = Math.min(best, barterCost(bot, item, cost));
         return Math.min(best, specialCost(bot, k, item, cost));
+    }
+
+    /**
+     * Gold ingots a piglin takes, on average, per item of these (from the bartering table: an
+     * ender pearl in about every fifteen trades, obsidian in twelve, ...).
+     */
+    public static final Map<Item, Double> BARTER_GOLD = Map.ofEntries(Map.entry(Items.ENDER_PEARL, 15.3), Map.entry(Items.OBSIDIAN, 11.5),
+            Map.entry(Items.CRYING_OBSIDIAN, 5.7), Map.entry(Items.FIRE_CHARGE, 11.5), Map.entry(Items.LEATHER, 3.8),
+            Map.entry(Items.STRING, 3.8), Map.entry(Items.QUARTZ, 2.7), Map.entry(Items.SOUL_SAND, 2.3), Map.entry(Items.NETHER_BRICK, 2.3),
+            Map.entry(Items.SPECTRAL_ARROW, 1.3), Map.entry(Items.IRON_NUGGET, 2.0));
+
+    /**
+     * Seconds per item bartered from piglins (in the Nether only): the gold (about six seconds of
+     * admiring an ingot each), a gold piece to wear if it has none, finding a piglin.
+     */
+    private double barterCost(Bot bot, Item item, Map<Item, Double> cost) {
+        Double per = BARTER_GOLD.get(item);
+        if (per == null || !nether) return INF;
+        double gold = cost.getOrDefault(Items.GOLD_INGOT, INF);
+        if (gold >= INF) return INF;
+        boolean armour = net.kasax.challengecraft.bot.BotArmor.wearsGold(bot.body())
+                || countAny(bot.body(), Set.of(Items.GOLDEN_HELMET, Items.GOLDEN_BOOTS, Items.GOLDEN_CHESTPLATE, Items.GOLDEN_LEGGINGS)) > 0;
+        double wear = armour ? 0 : Math.min(cost.getOrDefault(Items.GOLDEN_BOOTS, INF), cost.getOrDefault(Items.GOLDEN_HELMET, INF));
+        if (wear >= INF) return INF;
+        Double piglin = visibleMobs.get(net.minecraft.world.entity.EntityTypes.PIGLIN);
+        double find = piglin != null ? piglin : 60;
+        return per * (gold + 6.5) + (wear + find + 20) / Math.max(1, 4 / per);
     }
 
     /** Seconds to the nearest known village (INF: none known), and the best level per profession there. */
@@ -539,7 +572,7 @@ public final class ObtainPlanner {
     // only the first step, but sized for the whole plan (all the logs the pickaxe, the sticks and
     // the table will need, in one go instead of one trip per log).
 
-    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST, TRADE }
+    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST, TRADE, BARTER }
 
     private record Way(String key, double cost, Kind kind, Object data) {
     }
@@ -688,6 +721,12 @@ public final class ObtainPlanner {
                 // for (that walk can be a thousand blocks long); otherwise made.
                 boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
                 if (BotKnowledge.rarity(common, nether) >= 1000) mine.knownOnly();
+                // Nether wart grows in fortresses only: to the fortress first (exploring for one).
+                if (nether && blocks.contains(Blocks.NETHER_WART) && !visibleBlocks.containsKey(Blocks.NETHER_WART)) {
+                    var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+                    yield new net.kasax.challengecraft.bot.task.SequenceTask("nether wart from a fortress", List.of(
+                            () -> new net.kasax.challengecraft.bot.task.VisitStructureTask(level, "minecraft:fortress"), () -> mine));
+                }
                 yield mine;
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
@@ -697,6 +736,9 @@ public final class ObtainPlanner {
                     ? net.minecraft.tags.FluidTags.LAVA : net.minecraft.tags.FluidTags.WATER);
             case CAST -> new net.kasax.challengecraft.bot.task.MakeObsidianTask(countAny(bot.body(), Set.of(Items.OBSIDIAN)) + total);
             case TRADE -> new net.kasax.challengecraft.bot.task.VillagerTradeTask((TradeKnowledge.Trade) p.data(), countAny(bot.body(), p.accept()) + total);
+            // (Luck decides: up to half as many trades again as the average wants.)
+            case BARTER -> new net.kasax.challengecraft.bot.task.BarterTask(p.accept(), countAny(bot.body(), p.accept()) + total,
+                    (int) Math.ceil(BARTER_GOLD.get(p.accept().iterator().next()) * total * 1.5) + 2);
             default -> throw new IllegalStateException();
         };
     }
@@ -836,6 +878,15 @@ public final class ObtainPlanner {
                     }
                 }
             }
+            // Bartered from piglins (in the Nether).
+            if (nether) {
+                for (Item item : accept) {
+                    String key = "barter:" + name(item);
+                    if (!BARTER_GOLD.containsKey(item) || isFailed(key, now) || visiting.contains(Items.GOLD_INGOT)) continue;
+                    double c = barterCost(bot, item, costs);
+                    if (c < INF) ways.add(new Way(key, c, Kind.BARTER, item));
+                }
+            }
             if (accept.contains(Items.OBSIDIAN) && visibleBlocks.containsKey(Blocks.LAVA) && !isFailed("cast:obsidian", now)) {
                 ways.add(new Way("cast:obsidian", specialCost(bot, k, Items.OBSIDIAN, costs), Kind.CAST, null));
             }
@@ -864,6 +915,7 @@ public final class ObtainPlanner {
                 case FILL -> fill(bot, sim, (Item) w.data(), count - sim.count(accept), depth, visiting, w.key());
                 case CAST -> cast(bot, k, sim, count - sim.count(accept), depth, visiting, w.key());
                 case TRADE -> trade(bot, sim, (TradeKnowledge.Trade) w.data(), count - sim.count(accept), depth, visiting, w.key());
+                case BARTER -> barter(bot, sim, (Item) w.data(), count - sim.count(accept), depth, visiting, w.key());
                 default -> route(bot, k, sim, (BotKnowledge.Route) w.data(), accept, count, depth, visiting);
             };
             if (why == null) return null;
@@ -946,6 +998,18 @@ public final class ObtainPlanner {
         if (t.wantsB() != null) sim.take(Set.of(t.wantsB()), t.wantsBCount() * rounds);
         sim.add(t.gives(), t.givesCount() * rounds);
         sim.steps.add(new Pending(Kind.TRADE, key, Set.of(t.gives()), t.givesCount() * rounds, t));
+        return null;
+    }
+
+    private String barter(Bot bot, Sim sim, Item item, int need, int depth, Set<Item> visiting, String key) {
+        Set<Item> v = new HashSet<>(visiting);
+        v.add(item);
+        int gold = (int) Math.ceil(BARTER_GOLD.get(item) * need);
+        String why = expand(bot, sim, Set.of(Items.GOLD_INGOT), gold, depth + 1, v);
+        if (why != null) return why;
+        sim.take(Set.of(Items.GOLD_INGOT), gold);
+        sim.add(item, need);
+        sim.steps.add(new Pending(Kind.BARTER, key, Set.of(item), need, gold));
         return null;
     }
 

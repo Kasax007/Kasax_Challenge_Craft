@@ -207,7 +207,22 @@ public final class KillTask implements BotTask {
     }
 
     /** None in sight: walk out (up from a mine first) for up to two minutes. */
+    private boolean fortressTried;
+
     private Result explore(Bot bot) {
+        // Blazes and wither skeletons live in fortresses (nowhere else): to the fortress first,
+        // exploring the Nether for one if none is known.
+        if (!fortressTried && (types.contains(net.minecraft.world.entity.EntityTypes.BLAZE) || types.contains(net.minecraft.world.entity.EntityTypes.WITHER_SKELETON))
+                && bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER) {
+            fortressTried = true;
+            net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            var fortress = VisitStructureTask.resolve(level, "minecraft:fortress");
+            if (!VisitStructureTask.inside(bot, fortress)) {
+                bot.say("to a fortress for " + describeTypes());
+                bot.interject(new VisitStructureTask(level, "minecraft:fortress"));
+                return Result.RUNNING;
+            }
+        }
         // Where it last saw one: the herd is likely still about there.
         if (!triedMemory) {
             net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) bot.body().level();
