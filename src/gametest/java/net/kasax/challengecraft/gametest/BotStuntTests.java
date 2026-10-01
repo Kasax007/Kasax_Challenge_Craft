@@ -259,4 +259,38 @@ public class BotStuntTests {
         });
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(400), 400, () -> blast[0] && !died[0] && h.getTick() > 140);
     }
+
+    /** A bow and arrows, a pig a dozen blocks off: hit with an arrow. */
+    @GameTest(structure = STRUCTURE, maxTicks = 500, skyAccess = true, padding = 8)
+    public void shootBow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "shoot_bow");
+        var pig = EntityTypes.PIG.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        pig.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET, 32)));
+        pig.setNoAi(true);
+        h.getLevel().addFreshEntity(pig);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 8));
+        a.run(new net.kasax.challengecraft.bot.task.ShootTask(Items.BOW, e -> e == pig, 4), 500,
+                () -> pig.getLastDamageSource() != null && pig.getLastDamageSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE) || !pig.isAlive());
+    }
+
+    /** A crossbow and an arrow: loaded and fired at the ground ahead. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void shootCrossbow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "shoot_crossbow");
+        a.spawn(20, FEET, 20, new ItemStack(Items.CROSSBOW), new ItemStack(Items.ARROW, 2));
+        a.run(new net.kasax.challengecraft.bot.task.ShootTask(Items.CROSSBOW, a.abs(20, BotArena.GROUND, 30), 1), 300,
+                () -> !h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.projectile.arrow.AbstractArrow.class,
+                        new net.minecraft.world.phys.AABB(a.abs(20, FEET, 20)).inflate(16)).isEmpty());
+    }
+
+    /** A target block ten blocks off: an arrow in it. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void hitTarget(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hit_target");
+        a.fill(20, FEET, 30, 20, FEET, 30, Blocks.TARGET);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 4));
+        a.run(net.kasax.challengecraft.bot.task.ShootTask.atBlock(Items.BOW, st -> st.is(Blocks.TARGET), 2), 400,
+                () -> !h.getLevel().getEntitiesOfClass(net.minecraft.world.entity.projectile.arrow.AbstractArrow.class,
+                        new net.minecraft.world.phys.AABB(a.abs(20, FEET, 30)).inflate(0.6)).isEmpty());
+    }
 }

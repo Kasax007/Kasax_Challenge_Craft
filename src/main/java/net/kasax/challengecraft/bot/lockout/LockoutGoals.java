@@ -116,7 +116,7 @@ public final class LockoutGoals {
             case INTERACT -> interact(bot, planner, goal.id());
             case DIMENSION -> "minecraft:the_nether".equals(goal.primaryTarget()) ? nether(bot, planner) : null;
             case BIOME -> biome(bot, goal);
-            case STRUCTURE -> structure(bot, goal);
+            case STRUCTURE -> structure(bot, planner, goal);
             case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
             case ADVANCEMENT -> advancement(bot, planner, goal.id());
             case TRADE -> trade(bot, planner, goal.id());
@@ -237,6 +237,44 @@ public final class LockoutGoals {
                 }
                 yield best;
             }
+            case "advancement_take_aim" -> {
+                // Anything hit with an arrow: a bow, a few arrows, the nearest mob.
+                double bow = planner.estimate(bot, Set.of(Items.BOW), 1), arrows = planner.estimate(bot, Set.of(Items.ARROW), 4);
+                yield bow + arrows >= INF ? null : new Option(bow + arrows + 25, () -> new SequenceTask("hit something with an arrow", List.of(
+                        () -> new ObtainTask(Set.of(Items.BOW), 1, planner).keeping(Set.of(Items.ARROW)),
+                        () -> new ObtainTask(Set.of(Items.ARROW), 4, planner).keeping(Set.of(Items.BOW)),
+                        () -> new net.kasax.challengecraft.bot.task.ShootTask(Items.BOW, e -> e instanceof net.minecraft.world.entity.Mob, 4))));
+            }
+            case "shoot_crossbow" -> {
+                double xbow = planner.estimate(bot, Set.of(Items.CROSSBOW), 1), arrows = planner.estimate(bot, Set.of(Items.ARROW), 1);
+                yield xbow + arrows >= INF ? null : new Option(xbow + arrows + 8, () -> new SequenceTask("shoot a crossbow", List.of(
+                        () -> new ObtainTask(Set.of(Items.CROSSBOW), 1, planner).keeping(Set.of(Items.ARROW)),
+                        () -> new ObtainTask(Set.of(Items.ARROW), 1, planner).keeping(Set.of(Items.CROSSBOW)),
+                        () -> new net.kasax.challengecraft.bot.task.ShootTask(Items.CROSSBOW,
+                                ((net.minecraft.server.level.ServerLevel) bot.body().level()).getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+                                        bot.body().blockPosition().relative(bot.body().getDirection(), 8)).below(), 1))));
+            }
+            case "hit_target_block" -> {
+                // A target block put down a few steps off, and an arrow into it.
+                double target = planner.estimate(bot, Set.of(Items.TARGET), 1), bow = planner.estimate(bot, Set.of(Items.BOW), 1),
+                        arrows = planner.estimate(bot, Set.of(Items.ARROW), 2);
+                yield target + bow + arrows >= INF ? null : new Option(target + bow + arrows + 15, () -> new SequenceTask("hit a target block", List.of(
+                        () -> new ObtainTask(Set.of(Items.TARGET), 1, planner).keeping(Set.of(Items.BOW, Items.ARROW)),
+                        () -> new ObtainTask(Set.of(Items.BOW), 1, planner).keeping(Set.of(Items.TARGET, Items.ARROW)),
+                        () -> new ObtainTask(Set.of(Items.ARROW), 2, planner).keeping(Set.of(Items.TARGET, Items.BOW)),
+                        () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.TARGET, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.NOTHING, null, 6),
+                        () -> net.kasax.challengecraft.bot.task.ShootTask.atBlock(Items.BOW, st -> st.is(Blocks.TARGET), 2))));
+            }
+            case "advancement_monster_hunter" -> {
+                // Any monster killed: whichever is nearest or quickest.
+                Option best = null;
+                for (String m : List.of("minecraft:zombie", "minecraft:skeleton", "minecraft:spider", "minecraft:creeper",
+                        "minecraft:drowned", "minecraft:husk", "minecraft:enderman", "minecraft:slime")) {
+                    Option o = kill(bot, planner, m);
+                    if (o != null && (best == null || o.cost() < best.cost())) best = o;
+                }
+                yield best;
+            }
             case "advancement_best_friends_forever" -> {
                 // Any animal tamed: whichever is quickest (a wolf with bones, a cat with fish, a horse).
                 Option best = null;
@@ -325,10 +363,22 @@ public final class LockoutGoals {
     }
 
     /** A block it knows of, clicked: the walk there is the cost. */
+    /**
+     * To the nearest village (bells, lecterns, beds, villagers to trade with): planned as the walk
+     * there, the tile itself is planned again once there. Null outside the Overworld.
+     */
+    private static Option villageTrip(Bot bot) {
+        if (!overworld(bot)) return null;
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        var village = VisitStructureTask.nearest(bot, VisitStructureTask.resolve(level, "village"));
+        double dist = village == null ? 400 : Math.sqrt(village.spot().distSqr(bot.body().blockPosition()));
+        return new Option(dist / 4 + 90 + (village == null ? 300 : 0), () -> new VisitStructureTask(level, "village"));
+    }
+
     private static Option click(Bot bot, String what, Block block) {
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
         BlockPos at = bot.memory().nearest(level, bot.body().blockPosition(), s -> s.is(block), Set.of());
-        if (at == null) return null;
+        if (at == null) return block == Blocks.BELL || block == Blocks.LECTERN ? villageTrip(bot) : null;
         double cost = 5 + Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5;
         return new Option(cost, () -> new net.kasax.challengecraft.bot.task.ClickBlockTask(what, s -> s.is(block)));
     }
@@ -336,7 +386,7 @@ public final class LockoutGoals {
     private static Option clickBed(Bot bot) {
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
         BlockPos at = bot.memory().nearest(level, bot.body().blockPosition(), s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of());
-        if (at == null) return null;
+        if (at == null) return villageTrip(bot);
         return new Option(5 + Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5,
                 () -> new net.kasax.challengecraft.bot.task.ClickBlockTask("sleep in a village bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS)));
     }
@@ -429,11 +479,7 @@ public final class LockoutGoals {
         // No villager about: to the nearest village known, then the trade is planned there.
         if (body.level().getEntitiesOfClass(net.minecraft.world.entity.npc.villager.AbstractVillager.class,
                 new net.minecraft.world.phys.AABB(body.blockPosition()).inflate(96), v -> v.isAlive() && !v.isBaby()).isEmpty()) {
-            if (!overworld(bot)) return null;
-            var level = (net.minecraft.server.level.ServerLevel) body.level();
-            var village = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot, net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "village"));
-            double dist = village == null ? 400 : Math.sqrt(village.spot().distSqr(body.blockPosition()));
-            return new Option(dist / 4 + 90 + (village == null ? 300 : 0), () -> new net.kasax.challengecraft.bot.task.VisitStructureTask(level, "village"));
+            return villageTrip(bot);
         }
         double best = INF;
         net.minecraft.world.item.trading.MerchantOffer bestOffer = null;
@@ -480,9 +526,15 @@ public final class LockoutGoals {
     }
 
     /** Structures: those it has seen are a walk away; surface ones are worth exploring for. */
-    private static Option structure(Bot bot, LockoutBingoGoal goal) {
+    private static Option structure(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         String path = Identifier.parse(goal.primaryTarget()).getPath();
         boolean netherOrEnd = path.equals("fortress") || path.equals("bastion_remnant") || path.equals("end_city");
+        boolean netherOnly = path.equals("fortress") || path.equals("bastion_remnant");
+        // A fortress or a bastion from up here: the way into the Nether first.
+        if (netherOnly && overworld(bot)) {
+            Option trip = nether(bot, planner);
+            return trip == null ? null : new Option(trip.cost() + 400, trip.task(), trip.yields());
+        }
         if (netherOrEnd != !overworld(bot)) return null;
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
         Set<Identifier> ids = VisitStructureTask.resolve(level, goal.primaryTarget());
@@ -493,6 +545,8 @@ public final class LockoutGoals {
         else if (SURFACE_STRUCTURES.contains(path)) cost = unseenEffort(goal);
         else if (path.equals("mineshaft")) cost = 420;
         else if (path.equals("trial_chambers")) cost = 700;
+        // In the Nether: walked into while exploring (they are big, and close to the portal often).
+        else if (path.equals("fortress") || path.equals("bastion_remnant")) cost = 400;
         else return null; // underground (mineshaft, stronghold, ancient city): found by chance only
         return new Option(cost, () -> new VisitStructureTask(level, goal.primaryTarget()));
     }

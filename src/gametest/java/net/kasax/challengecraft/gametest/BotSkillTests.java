@@ -32,6 +32,31 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /** Not a test of skill: logs which goals of the whole pool Bob knows no way for ([COVERAGE]). */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void coverage(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "coverage");
+        a.spawn(20, FEET, 20);
+        h.runAfterDelay(20, () -> {
+            var planner = new ObtainPlanner();
+            java.util.Map<String, java.util.List<String>> missing = new java.util.TreeMap<>();
+            int total = 0;
+            for (var g : net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalPool.all()) {
+                total++;
+                boolean covered;
+                try {
+                    covered = net.kasax.challengecraft.bot.lockout.LockoutGoals.covers(a.bot(), planner, g);
+                } catch (RuntimeException e) {
+                    covered = false;
+                }
+                if (!covered) missing.computeIfAbsent(g.type().name(), k -> new java.util.ArrayList<>()).add(g.id());
+            }
+            int n = missing.values().stream().mapToInt(java.util.List::size).sum();
+            BotArena.LOG.info("[COVERAGE] {} of {} goals without a way: {}", n, total, missing);
+            a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
+        });
+    }
+
     /** Its things lying where it died, 20 blocks off: all picked up again. */
     @GameTest(structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 8)
     public void recoverThings(GameTestHelper h) {
