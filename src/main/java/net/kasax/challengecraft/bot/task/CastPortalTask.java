@@ -98,6 +98,20 @@ public final class CastPortalTask implements BotTask {
             return Result.FAILED;
         }
         Result r = index < ops.size() ? step(bot, level, ops.get(index)) : lightAndEnter(bot, level);
+        // Could not get to the spot (before anything was poured there): another spot, a few times.
+        if (r == Result.FAILED && index <= prepOps && respots < 3 && origin != null) {
+            badOrigins.add(origin.asLong());
+            respots++;
+            bot.say("that spot is out of reach, another one");
+            ops = null;
+            index = 0;
+            tries = 0;
+            walkFails = 0;
+            walking = false;
+            footprint.clear();
+            bot.navigator().stop();
+            return Result.RUNNING;
+        }
         if (r == Result.FAILED) {
             var b = bot.body();
             Op op = index < ops.size() ? ops.get(index) : null;
@@ -307,7 +321,8 @@ public final class CastPortalTask implements BotTask {
                     for (int dy = -1; dy <= 2; dy++) {
                         for (Direction dir : new Direction[]{Direction.EAST, Direction.SOUTH}) {
                             BlockPos o = lava.offset(dx, dy, dz);
-                            if (fits(level, o, dir)) {
+                            if (!badOrigins.contains(o.asLong()) && fits(level, o, dir)) {
+                                prepOps = 0;
                                 build(o, dir);
                                 return true;
                             }
@@ -329,7 +344,9 @@ public final class CastPortalTask implements BotTask {
                     for (int dy = 1; dy <= 3; dy++) {
                         for (Direction dir : new Direction[]{Direction.EAST, Direction.SOUTH}) {
                             BlockPos o = lava.offset(dx, dy, dz);
-                            int work = work(bot, level, o, dir);
+                            if (badOrigins.contains(o.asLong())) continue;
+                            // (Near where it stands counts too: a spot it can get to.)
+                            int work = work(bot, level, o, dir) + (int) (Math.sqrt(o.distSqr(bot.body().blockPosition())) / 8);
                             if (work < bestWork) {
                                 bestWork = work;
                                 best = o;
@@ -359,6 +376,7 @@ public final class CastPortalTask implements BotTask {
             }
         }
         List<Op> prep = ops;
+        prepOps = prep.size();
         build(best, bestDir);
         prep.addAll(ops);
         ops = prep;
@@ -408,10 +426,14 @@ public final class CastPortalTask implements BotTask {
     }
 
     private Direction along;
+    private BlockPos origin;
+    private int prepOps, respots;
+    private final Set<Long> badOrigins = new HashSet<>();
 
     /** The casting order (see the picture above). */
     private void build(BlockPos o, Direction dir) {
         along = dir;
+        origin = o;
         ops = new ArrayList<>();
         BlockPos c0 = o, x1 = o.relative(dir, 1), x2 = o.relative(dir, 2), c3 = o.relative(dir, 3);
         inside = x1.above();
