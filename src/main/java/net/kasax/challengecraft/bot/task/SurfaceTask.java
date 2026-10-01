@@ -22,7 +22,7 @@ public final class SurfaceTask implements BotTask {
     private BlockPos jumpedFrom, stepTo;
     private int ticks, stepTicks, bestY = Integer.MIN_VALUE, sinceBest, switches;
     private boolean stairs, navigating;
-    private int navFails;
+    private int navFails, navBestY = Integer.MIN_VALUE, navSince;
     private boolean failedPlace, triedEntry;
 
     /** Deep enough under the ground that walking about on the surface needs a climb first. */
@@ -51,9 +51,13 @@ public final class SurfaceTask implements BotTask {
             if (level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) > feetY + 1) high++;
         }
         // ... and it is hemmed in (a hole or a tunnel, not a valley floor).
+        // (In water the walls at the first level above it count: rock round a flooded pit, open
+        // air over a lake.)
+        BlockPos at = feet.above();
+        for (int i = 0; i < 6 && !level.getFluidState(at).isEmpty(); i++) at = at.above();
         int walls = 0;
         for (Direction d : Direction.Plane.HORIZONTAL) {
-            BlockPos n = feet.above().relative(d);
+            BlockPos n = at.relative(d);
             if (!level.getBlockState(n).getCollisionShape(level, n).isEmpty()) walls++;
         }
         return samples > 0 && high * 10 >= samples * 7 && walls >= 2;
@@ -96,6 +100,16 @@ public final class SurfaceTask implements BotTask {
                 navigating = true;
             }
             BotNavigator.Status s = bot.navigator().tick();
+            // (Searching on and on without getting any higher, bobbing in a flooded pit, say:
+            // that counts as failing too.)
+            if (feet.getY() > navBestY) {
+                navBestY = feet.getY();
+                navSince = 0;
+            } else if (s == BotNavigator.Status.MOVING && ++navSince > 900) {
+                bot.navigator().stop();
+                s = BotNavigator.Status.FAILED;
+                navSince = 0;
+            }
             if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
             navigating = false;
             if (s == BotNavigator.Status.FAILED) navFails++;

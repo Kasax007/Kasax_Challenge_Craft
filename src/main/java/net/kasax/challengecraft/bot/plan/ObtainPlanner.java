@@ -74,6 +74,8 @@ public final class ObtainPlanner {
     private Map<Block, Double> visibleBlocks = Map.of();
     private Map<EntityType<?>, Double> visibleMobs = Map.of();
     private boolean dark, nether;
+    /** Seconds until morning (villagers take no new job at night). */
+    private double nightLeft;
     /** Blocks typical of a biome in view, with the walk there. */
     private Map<Block, Double> biomeHints = Map.of();
     private long scannedAt = -10_000, costsAt = -1;
@@ -317,6 +319,8 @@ public final class ObtainPlanner {
         }
         visibleMobs = mobs;
         dark = level.isDarkOutside();
+        long clock = level.getOverworldClockTime() % 24000;
+        nightLeft = dark && clock >= 12000 ? (24000 - clock) / 20.0 : 0;
         nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
         // Villagers: how far the nearest village is, and which trades are there at which level.
         villageWalk = INF;
@@ -425,7 +429,7 @@ public final class ObtainPlanner {
         double pay = t.wantsCount() * cost.getOrDefault(t.wants(), INF) + (t.wantsB() == null ? 0 : t.wantsBCount() * cost.getOrDefault(t.wantsB(), INF));
         if (pay >= INF) return INF;
         int has = villagerLevels.getOrDefault(t.profession(), 0);
-        double job = has > 0 ? 0 : villagerLevels.containsKey("none") ? 40 + cost.getOrDefault(TradeKnowledge.JOB_SITES.get(t.profession()).asItem(), INF) : INF;
+        double job = has > 0 ? 0 : villagerLevels.containsKey("none") ? 40 + nightLeft + cost.getOrDefault(TradeKnowledge.JOB_SITES.get(t.profession()).asItem(), INF) : INF;
         if (job >= INF) return INF;
         // Each level is so much experience from selling it things: the cheapest way per point,
         // with what Bob holds (sticks in the pack make a fletcher's levels a matter of seconds).

@@ -141,8 +141,9 @@ public final class BotPathfinder {
         else if (dy < 0 && dx == 0 && dz == 0) c = WALK;
         else if (dy < 0) c = WALK + FALL_PER_BLOCK * -dy;
         else c = dx != 0 && dz != 0 ? DIAGONAL : WALK;
-        // Digging while afloat is five times slower (not on the ground).
-        double digFactor = inWater(from) && !solid(from.below()) ? 5 : 1;
+        // Digging while afloat is five times slower (not on the ground), with the head under
+        // water five times more.
+        double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
             double ticks = abilities.tools().breakTicks(state(b));
             // Stone by hand (seven seconds a block, and nothing to show for it): only if there is
@@ -166,7 +167,8 @@ public final class BotPathfinder {
         List<Step> out = new ArrayList<>(12);
         boolean floor = placedBelow || solid(p.below());
         // Water with ground right under the feet (a shallow stream) is walked through, not swum.
-        boolean swimming = inWater(p) && !floor;
+        // (Head under water too is swimming, ground or not: up first.)
+        boolean swimming = inWater(p) && (!floor || inWater(p.above()));
         for (int[] d : DIRS) {
             boolean diagonal = d[0] != 0 && d[1] != 0;
             BlockPos t = p.offset(d[0], 0, d[1]);
@@ -233,17 +235,20 @@ public final class BotPathfinder {
         // Out of deep water where the bank is too high: set a block in the water against the bank
         // (or anything solid) and climb onto it. The search does not know the block is there
         // afterwards, so it ends its leg on it and plans on from there.
-        if (swimming && abilities.mayPillar() && clear(p.above()) && !inWater(p.above()) && clear(p.above(2))) {
+        // (With rock over that spot, as in a flooded pit: dug out first.)
+        if (swimming && abilities.mayPillar() && clear(p.above()) && !inWater(p.above())) {
             for (int i = 0; i < 4; i++) {
                 BlockPos t = p.offset(DIRS[i][0], 0, DIRS[i][1]);
-                if (solid(t) || !clear(t.above()) || !clear(t.above(2)) || inWater(t.above())) continue;
+                if (solid(t) || inWater(t.above())) continue;
                 if (!inWater(t) && !clear(t)) continue;
+                List<BlockPos> room = breaksFor(p.above(2), t.above(), t.above(2));
+                if (room == null) continue;
                 boolean against = false;
                 for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
                     BlockPos n = t.relative(d);
-                    if (!n.equals(p) && solid(n)) against = true;
+                    if (!n.equals(p) && solid(n) && !room.contains(n)) against = true;
                 }
-                if (against) out.add(new Step(t.above(), List.of(), t));
+                if (against) out.add(new Step(t.above(), room, t));
             }
         }
         // Straight down: dig the block below and stand on the next one.
@@ -252,7 +257,8 @@ public final class BotPathfinder {
             out.add(new Step(below, List.of(below), null));
         }
         // Swim up and down.
-        if (swimming && clear(p.above())) out.add(new Step(p.above(), List.of(), null));
+        // (Up into the air over the water is no place to be: afloat, the feet stay in the water.)
+        if (swimming && (inWater(p.above()) || canStand(p.above())) && clear(p.above())) out.add(new Step(p.above(), List.of(), null));
         if (swimming && inWater(below)) out.add(new Step(below, List.of(), null));
         // Pillar up: jump and put a block where the feet were.
         // (Not standing in water: a jump from there does not get high enough to set a block.)
@@ -260,7 +266,26 @@ public final class BotPathfinder {
             List<BlockPos> head = breaksFor(p.above(2));
             if (head != null) out.add(new Step(p.above(), head, p));
         }
+        // ... or afloat at the top of deep water with a wall beside: swimming against it lifts the
+        // body out far enough (a flooded shaft or pit).
+        if (abilities.mayPillar() && swimming && !inWater(p.above()) && clear(p.above())) {
+            boolean wall = false, holds = solid(p.below());
+            for (int i = 0; i < 4; i++) {
+                BlockPos n = p.offset(DIRS[i][0], 0, DIRS[i][1]);
+                if (solid(p.above().offset(DIRS[i][0], 0, DIRS[i][1]))) wall = true;
+                // (The block needs something to go against: beside it, or a block set beside it first.)
+                if (solid(n) || (inWater(n) || clear(n)) && supportable(n)) holds = true;
+            }
+            List<BlockPos> head = breaksFor(p.above(2));
+            if (wall && holds && head != null) out.add(new Step(p.above(), head, p));
+        }
         return out;
+    }
+
+    /** Whether a block set at {@code p} has something solid to go against. */
+    boolean supportable(BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) if (solid(p.relative(d))) return true;
+        return false;
     }
 
     /** The blocks to break so all these become clear, or null if one of them cannot be. */

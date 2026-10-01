@@ -158,6 +158,8 @@ public final class Bot {
             if (task == null) {
                 idleTicks++;
                 body.stopInputs();
+                // (Even doing nothing: not under water.)
+                if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) body.jump = true;
                 return;
             }
         }

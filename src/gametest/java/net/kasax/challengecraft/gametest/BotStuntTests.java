@@ -366,7 +366,7 @@ public class BotStuntTests {
     }
 
     /** A fletcher of the first level and a pile of sticks: levelled up by selling them, then a bow bought. */
-    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 72)
     public void buyBow(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "buy_bow");
         var level = h.getLevel();
@@ -387,7 +387,7 @@ public class BotStuntTests {
     }
 
     /** Just "get a bow", with a fletcher about and sticks to sell: the planner buys it. */
-    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 72)
     public void planBuysBow(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "plan_buys_bow");
         var level = h.getLevel();
@@ -408,10 +408,12 @@ public class BotStuntTests {
     }
 
     /** A jobless villager only: given a fletching table, it becomes a fletcher, and sells the bow. */
-    @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 72)
     public void jobSiteBow(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "job_site_bow");
         var level = h.getLevel();
+        // (Daytime: at night villagers rest and take no job; Bob would wait for the morning.)
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set 1000");
         var v = EntityTypes.VILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
         v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
         level.addFreshEntity(v);

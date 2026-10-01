@@ -80,6 +80,28 @@ public class BotMovementTests {
         a.run(new SurfaceTask(), 600, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
     }
 
+    /** Up a shaft whose bottom is flooded four deep (a flooded mine): blocks at hand, out of the water and up. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void floodedShaft(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "flooded_shaft");
+        a.fill(19, 1, 19, 21, GROUND, 21, Blocks.STONE);
+        a.fill(20, 1, 20, 20, GROUND, 20, Blocks.AIR);
+        a.fill(19, 1, 19, 21, 4, 21, Blocks.AIR);
+        a.fill(19, 1, 19, 21, 4, 21, Blocks.WATER);
+        a.spawn(20, 3, 20, new ItemStack(Items.COBBLESTONE, 32), new ItemStack(Items.WOODEN_PICKAXE));
+        a.run(new SurfaceTask(), 1200, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
+    }
+
+    /** A one-wide shaft with water three deep at the bottom (dug into an aquifer): up and out. */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void floodedNarrowShaft(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "flooded_narrow");
+        a.fill(20, 1, 20, 20, GROUND, 20, Blocks.AIR);
+        a.fill(20, 1, 20, 20, 3, 20, Blocks.WATER);
+        a.spawn(20, 1, 20, new ItemStack(Items.COBBLESTONE, 32), new ItemStack(Items.WOODEN_PICKAXE));
+        a.run(new SurfaceTask(), 900, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
+    }
+
     /** Out of a closed cave twenty below the grass (gravel and dirt on the way), wooden pickaxe only. */
     @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
     public void caveEscape(GameTestHelper h) {

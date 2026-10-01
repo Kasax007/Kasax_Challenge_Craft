@@ -33,7 +33,7 @@ public final class UseOnMobTask implements BotTask {
     private final Set<UUID> failed = new HashSet<>();
     private LivingEntity target;
     private boolean walking;
-    private int repath, chase;
+    private int repath, chase, riding;
 
     public UseOnMobTask(EntityType<?> type, Item tool, Predicate<LivingEntity> suitable) {
         this.type = type;
@@ -60,6 +60,8 @@ public final class UseOnMobTask implements BotTask {
             target = null;
             return Result.RUNNING;
         }
+        // Sitting on it already: a moment more to see it does not throw it off, then done.
+        if (emptyHand && target != null && body.getVehicle() == target) return ++riding >= 3 ? Result.DONE : Result.RUNNING;
         double dist = body.distanceTo(target);
         if (dist > 2.8) {
             if (!walking || --repath <= 0) {
@@ -91,7 +93,11 @@ public final class UseOnMobTask implements BotTask {
             body.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
             // An empty-handed click on a mount is about getting on: a horse rearing up takes the
             // click without letting it on. Again, then.
-            if (emptyHand && body.getVehicle() == null && target instanceof net.minecraft.world.entity.animal.equine.AbstractHorse) return Result.RUNNING;
+            if (emptyHand && target instanceof net.minecraft.world.entity.animal.equine.AbstractHorse) {
+                // (On it, and still on it a moment later: a bucking horse throws one off at once.)
+                riding = 0;
+                return Result.RUNNING;
+            }
             return Result.DONE;
         }
         failed.add(target.getUUID());

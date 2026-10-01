@@ -220,6 +220,39 @@ public final class BotNavigator {
             bot.jump = true;
             // (Open means air, or water it stood in: a block goes in there as well.)
             boolean open = bot.level().getBlockState(step.place()).getCollisionShape(bot.level(), step.place()).isEmpty();
+            // Afloat, swimming up stops with the eyes at the surface, too low to set a block under
+            // the feet. Swimming against a wall pops the body out of the water, as it does at a
+            // bank: that is high enough.
+            if (open && bot.isInWater() && !bot.onGround()) {
+                // (A wall anywhere along the body will do, up at the head as well.)
+                wall:
+                for (double h : new double[] {0.6, 1.2, 1.75}) {
+                    BlockPos at = BlockPos.containing(bot.getX(), bot.getY() + h, bot.getZ());
+                    for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                        BlockPos w = at.relative(d);
+                        if (bot.level().getBlockState(w).getCollisionShape(bot.level(), w).isEmpty()) continue;
+                        bot.setYRot(d.toYRot());
+                        bot.forward = 1f;
+                        break wall;
+                    }
+                }
+            }
+            // Nothing for the block to go against (the middle of a flooded pit): one set beside
+            // it first, against whatever is solid there.
+            if (open && bot.isInWater() && !supported(step.place())) {
+                for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                    BlockPos n = step.place().relative(d);
+                    if (!bot.level().getBlockState(n).getCollisionShape(bot.level(), n).isEmpty() || !supported(n)) continue;
+                    if (bot.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(n))) continue;
+                    if (actions.inReach(n)) actions.placeThrowaway(n);
+                    break;
+                }
+                if (!supported(step.place()) && ++stuck > STUCK_TICKS * 2) {
+                    stuck = 0;
+                    path = null;
+                }
+                return status;
+            }
             if (bot.getY() > step.place().getY() + 1.0 && open) {
                 if (!actions.placeThrowaway(step.place())) {
                     path = null; // out of blocks: find a way that needs none
@@ -341,6 +374,15 @@ public final class BotNavigator {
         lastDistance = Double.MAX_VALUE;
     }
 
+    /** Whether a block set at {@code p} has a solid face to go against. */
+    private boolean supported(BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = p.relative(d);
+            if (!bot.level().getBlockState(n).getCollisionShape(bot.level(), n).isEmpty()) return true;
+        }
+        return false;
+    }
+
     private void centreOn(BlockPos p) {
         double dx = p.getX() + 0.5 - bot.getX(), dz = p.getZ() + 0.5 - bot.getZ();
         if (dx * dx + dz * dz > 0.04) {
@@ -356,6 +398,8 @@ public final class BotNavigator {
      */
     private BlockPos standing(BlockPos feet) {
         var level = bot.level();
+        // Bobbing up out of water: it is in the water still, as far as moving on goes.
+        if (!bot.onGround() && level.getFluidState(feet).isEmpty() && level.getFluidState(feet.below()).is(net.minecraft.tags.FluidTags.WATER)) return feet.below();
         if (!bot.onGround() || !level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) return feet;
         var box = bot.getBoundingBox();
         BlockPos best = feet;
