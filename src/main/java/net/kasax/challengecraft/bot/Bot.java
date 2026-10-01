@@ -402,6 +402,8 @@ public final class Bot {
     private boolean clutter(net.minecraft.world.item.ItemStack st) {
         var item = st.getItem();
         if (keepItems.contains(item) || st.isDamageableItem() || st.get(net.minecraft.core.component.DataComponents.FOOD) != null) return false;
+        // (The challenge's own things, the board map: handed out again anyway.)
+        if (!item.toString().startsWith("minecraft:")) return false;
         String id = item.toString().replace("minecraft:", "");
         // The stuff of everything else: ores, metals, gems, wood, string, the buckets.
         if (id.contains("ingot") || id.startsWith("raw_") || id.contains("diamond") || id.contains("emerald") || id.contains("bucket")

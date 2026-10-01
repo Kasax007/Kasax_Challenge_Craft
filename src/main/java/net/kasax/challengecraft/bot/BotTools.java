@@ -77,9 +77,11 @@ public final class BotTools {
         double score = ticks;
         if (!harvests) score += 10_000;
         if (!s.isEmpty() && s.isDamageableItem()) {
-            if (s.getMaxDamage() - s.getDamageValue() <= 3) score += 5_000;
             // A faster tool is worth it only when it saves real time: value tools by durability.
             score += s.getMaxDamage() / 25.0;
+            // Of two alike the more worn one first: used up one after the other (and gone), not
+            // all worn down together to a pack of nearly broken ones.
+            score += (s.getMaxDamage() - s.getDamageValue()) / (double) Math.max(1, s.getMaxDamage()) * 0.5;
         }
         return score;
     }
