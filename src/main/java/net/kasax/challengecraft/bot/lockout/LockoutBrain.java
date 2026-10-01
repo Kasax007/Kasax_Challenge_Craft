@@ -149,7 +149,7 @@ public final class LockoutBrain implements BotBrain {
         // The Nether phase: with the kit in hand and several Nether tiles open, a player goes now
         // rather than one more Overworld tile at a time (each looks a bit cheaper on its own, and
         // the trip never happens). A couple of tries per life.
-        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && netherTries < 2
+        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().level().getGameTime() >= netherRetryAt
                 && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.WATER_BUCKET)) > 0) {
             int netherTiles = 0;
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
@@ -158,7 +158,8 @@ public final class LockoutBrain implements BotBrain {
             if (netherTiles >= 2) {
                 LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
                 if (trip != null && trip.cost() < 120 * netherTiles) {
-                    netherTries++;
+                    // (Again in three minutes if this one does not get there.)
+                    netherRetryAt = bot.body().level().getGameTime() + 3600;
                     bot.say("Nether phase: " + netherTiles + " tiles there, the way in ~" + Math.round(trip.cost()) + " s");
                     start(bot, trip.task().get(), budget(trip.cost(), 2400, 9000));
                     return;
@@ -255,7 +256,8 @@ public final class LockoutBrain implements BotBrain {
         return false;
     }
 
-    private int openingTries, kitTries, netherTries;
+    private int openingTries, kitTries;
+    private long netherRetryAt;
 
     private boolean needsFood(Bot bot) {
         long now = bot.body().level().getGameTime();
@@ -577,7 +579,6 @@ public final class LockoutBrain implements BotBrain {
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
         kitTries = 0;
-        netherTries = 0;
         openingTries = 0;
         targetIndex = -1;
         goalTask = null;

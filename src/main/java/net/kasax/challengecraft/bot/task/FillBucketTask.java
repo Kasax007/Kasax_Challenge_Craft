@@ -24,6 +24,7 @@ public final class FillBucketTask implements BotTask {
     private final TagKey<Fluid> fluid;
     private final Item filled, empty;
     private final Set<BlockPos> skip = new HashSet<>();
+    private final Explorer explorer = new Explorer(2400);
     private BlockPos source;
     private boolean walking;
     private int tries;
@@ -58,7 +59,12 @@ public final class FillBucketTask implements BotTask {
             // None in sight: the nearest it remembers (a lake passed on the way).
             if (source == null) source = bot.memory().nearest(level, body.blockPosition(), s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), skip);
             walking = false;
-            if (source == null) return Result.FAILED;
+            // Nothing known at all: out over the surface until some turns up (water is never far).
+            if (source == null) {
+                if (fluid == FluidTags.LAVA) return Result.FAILED;
+                return explorer.tick(bot);
+            }
+            explorer.pause(bot);
         }
         if (!bot.actions().inReach(source)) {
             if (!walking) {

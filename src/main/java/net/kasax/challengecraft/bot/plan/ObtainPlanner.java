@@ -378,10 +378,15 @@ public final class ObtainPlanner {
         return Math.min(best, specialCost(bot, k, item, cost));
     }
 
+    /** Seconds to find some water when none is known (in the Overworld it is never far). */
+    private static final double WATER_SEARCH = 90;
+
     /** Things not made by a recipe nor dropped: filled buckets, obsidian from a lava pool. */
     private double specialCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
         if (item == Items.WATER_BUCKET || item == Items.LAVA_BUCKET) {
             Double seen = visibleBlocks.get(item == Items.WATER_BUCKET ? Blocks.WATER : Blocks.LAVA);
+            // Water in the Overworld is never far, even when none is known: a short search.
+            if (seen == null && item == Items.WATER_BUCKET && !nether) seen = WATER_SEARCH;
             return seen == null ? INF : seen + 3 + cost.getOrDefault(Items.BUCKET, INF);
         }
         if (item == Items.OBSIDIAN) {
@@ -726,8 +731,9 @@ public final class ObtainPlanner {
         if (!onlyCraft) {
             for (Item item : accept) {
                 Block source = item == Items.WATER_BUCKET ? Blocks.WATER : item == Items.LAVA_BUCKET ? Blocks.LAVA : null;
-                if (source != null && visibleBlocks.containsKey(source) && !visiting.contains(Items.BUCKET) && !isFailed("fill:" + name(item), now)) {
-                    ways.add(new Way("fill:" + name(item), visibleBlocks.get(source) + 3 + cost(Items.BUCKET), Kind.FILL, item));
+                boolean known = source != null && (visibleBlocks.containsKey(source) || source == Blocks.WATER && !nether);
+                if (known && !visiting.contains(Items.BUCKET) && !isFailed("fill:" + name(item), now)) {
+                    ways.add(new Way("fill:" + name(item), visibleBlocks.getOrDefault(source, WATER_SEARCH) + 3 + cost(Items.BUCKET), Kind.FILL, item));
                 }
             }
             if (accept.contains(Items.OBSIDIAN) && visibleBlocks.containsKey(Blocks.LAVA) && !isFailed("cast:obsidian", now)) {
