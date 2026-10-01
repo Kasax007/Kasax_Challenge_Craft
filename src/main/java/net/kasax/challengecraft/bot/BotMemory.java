@@ -168,6 +168,17 @@ public final class BotMemory {
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         list.removeIf(p -> (p.getX() >> 4) == (x0 >> 4) && (p.getZ() >> 4) == (z0 >> 4));
         boolean nether = level.dimension() == Level.NETHER;
+        // Water at the surface, one column in sixteen (rivers, lakes, the sea): where a bucket is
+        // filled. (All of it would be far too much to keep.)
+        Map<Block, List<BlockPos>> known = blocks.computeIfAbsent(level.dimension(), k -> new IdentityHashMap<>());
+        for (int x = 2; x < 16; x += 4) {
+            for (int z = 2; z < 16; z += 4) {
+                int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                BlockPos w = new BlockPos(x0 + x, top, z0 + z);
+                var fs = chunk.getBlockState(w).getFluidState();
+                if (fs.isSource() && fs.is(net.minecraft.tags.FluidTags.WATER)) add(known, Blocks.WATER, w, at);
+            }
+        }
         for (int x = 1; x < 16; x += 4) {
             for (int z = 1; z < 16; z += 4) {
                 int top = nether ? level.getMaxY() : chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z) - 6;

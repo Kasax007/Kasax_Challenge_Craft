@@ -38,11 +38,13 @@ public final class FillBucketTask implements BotTask {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (BotInventory.slotOf(body, filled) >= 0) return Result.DONE;
-        if (BotInventory.slotOf(body, Items.BUCKET) < 0 || ++tries > 1200) return Result.FAILED;
+        if (BotInventory.slotOf(body, Items.BUCKET) < 0 || ++tries > 3000) return Result.FAILED;
         if (source == null || !level.getFluidState(source).isSource()) {
             // A source with open air above, so the bot can look at it from the side or above.
             source = BotWorld.nearest(level, body.blockPosition(), 32, 12,
                     s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), true, skip);
+            // None in sight: the nearest it remembers (a lake passed on the way).
+            if (source == null) source = bot.memory().nearest(level, body.blockPosition(), s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), skip);
             walking = false;
             if (source == null) return Result.FAILED;
         }
