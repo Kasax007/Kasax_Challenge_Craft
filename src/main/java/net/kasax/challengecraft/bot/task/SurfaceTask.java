@@ -18,6 +18,7 @@ import java.util.List;
  * up a staircase it digs. Stops as soon as it sees the sky.
  */
 public final class SurfaceTask implements BotTask {
+    private static final int STAGE = 16;
     private Direction heading;
     private BlockPos jumpedFrom, stepTo;
     private int ticks, stepTicks, bestY = Integer.MIN_VALUE, sinceBest, switches;
@@ -95,8 +96,12 @@ public final class SurfaceTask implements BotTask {
         }
         if (navFails < 4) {
             if (!navigating) {
-                bot.navigator().setGoal(p -> !underground(level, p),
-                        new BlockPos(feet.getX(), level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()), feet.getZ()));
+                // Deep down (ninety blocks of deepslate overhead) one search cannot see the whole
+                // way up: a stage of sixteen blocks at a time, each easy to find, then the next.
+                // (Not the height map: up an open shaft that is the shaft's own floor.)
+                int stage = feet.getY() + STAGE;
+                bot.navigator().setGoal(p -> !underground(level, p) || p.getY() >= stage,
+                        new BlockPos(feet.getX(), stage, feet.getZ()));
                 navigating = true;
             }
             BotNavigator.Status s = bot.navigator().tick();
@@ -113,6 +118,11 @@ public final class SurfaceTask implements BotTask {
             if (s == BotNavigator.Status.MOVING) return Result.RUNNING;
             navigating = false;
             if (s == BotNavigator.Status.FAILED) navFails++;
+            else {
+                // A stage done: the time allowed starts again (a long climb is not a stuck one).
+                navFails = 0;
+                ticks = Math.min(ticks, 600);
+            }
             return Result.RUNNING; // arrived: judged again next tick
         }
         if (heading == null) heading = body.getDirection();

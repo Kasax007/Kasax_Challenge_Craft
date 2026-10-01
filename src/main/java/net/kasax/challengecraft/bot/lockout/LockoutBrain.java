@@ -360,7 +360,10 @@ public final class LockoutBrain implements BotBrain {
      * {@code min} ticks, at most {@code max}. A player notices when something is not working.
      */
     private static long budget(double estimateSeconds, long min, long max) {
-        return Math.max(min, Math.min(max, (long) (estimateSeconds * 20 * 3)));
+        // (Three times a short estimate; a long one is less far off in proportion, and losing
+        // three times ten minutes on one tile costs the game.)
+        double factor = estimateSeconds > 120 ? 2.2 : 3;
+        return Math.max(min, Math.min(max, (long) (estimateSeconds * 20 * factor)));
     }
 
     private long goalStarted, goalBudget, sideStarted, sideBudget;

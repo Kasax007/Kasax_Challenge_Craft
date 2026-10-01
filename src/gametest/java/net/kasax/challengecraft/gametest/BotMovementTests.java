@@ -102,6 +102,17 @@ public class BotMovementTests {
         a.run(new SurfaceTask(), 900, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
     }
 
+    /** Out of a closed cave fifty-five blocks under solid stone (deep in the deepslate, say), in stages. */
+    @GameTest(structure = STRUCTURE, maxTicks = 7200, skyAccess = true, padding = 8)
+    public void deepClimb(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "deep_climb");
+        a.fill(0, GROUND, 0, 39, GROUND + 40, 39, Blocks.STONE);
+        a.fill(0, GROUND + 41, 0, 39, GROUND + 41, 39, Blocks.GRASS_BLOCK);
+        a.fill(18, 2, 18, 22, 4, 22, Blocks.AIR);
+        a.spawn(20, 2, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 16));
+        a.run(new SurfaceTask(), 7200, () -> a.feet().getY() >= GROUND + 40 && a.bot().body().onGround());
+    }
+
     /** Out of a closed cave twenty below the grass (gravel and dirt on the way), wooden pickaxe only. */
     @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
     public void caveEscape(GameTestHelper h) {
