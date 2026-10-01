@@ -59,7 +59,8 @@ public class BotSkillTests {
                 } catch (RuntimeException e) {
                     covered = false;
                 }
-                if (!covered) missing.computeIfAbsent(g.type().name(), k -> new java.util.ArrayList<>()).add(g.id());
+                if (!covered) missing.computeIfAbsent(g.type().name(), k -> new java.util.ArrayList<>())
+                        .add(g.id() + (g.isSelectableOnNormalBoard() && g.isImplemented() ? "" : "(off-board)"));
             }
             int n = missing.values().stream().mapToInt(java.util.List::size).sum();
             BotArena.LOG.info("[COVERAGE] {} of {} goals without a way: {}", n, total, missing);
@@ -186,6 +187,48 @@ public class BotSkillTests {
                 return "there and back (stage " + stage[0] + ") " + (stage[0] == 2 ? out.status() : in.status());
             }
         }, 3000, () -> stage[0] == 2 && a.bot().body().level().dimension() == Level.OVERWORLD);
+    }
+
+    /**
+     * Dead once before the portal: the respawned body (a new player object) crosses like the first
+     * one did, and comes out in the Nether at an eighth of its Overworld coordinates.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void portalAfterDeath(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "portal_after_death");
+        var level = h.getLevel();
+        a.fill(24, FEET, 20, 27, FEET + 4, 20, Blocks.OBSIDIAN);
+        a.fill(25, FEET + 1, 20, 26, FEET + 3, 20, Blocks.AIR);
+        net.minecraft.world.level.portal.PortalShape.findEmptyPortalShape(level, a.abs(25, FEET + 1, 20), net.minecraft.core.Direction.Axis.X)
+                .ifPresent(sh -> sh.createPortalBlocks(level));
+        var bot = a.spawn(20, FEET, 22);
+        var first = bot.body();
+        var gate = a.abs(25, FEET + 1, 20);
+        boolean[] started = {false};
+        h.runAfterDelay(5, () -> {
+            first.hurtServer(level, level.damageSources().fellOutOfWorld(), 1000f);
+            if (!first.isDeadOrDying()) {
+                first.setHealth(0f);
+                first.die(level.damageSources().fellOutOfWorld());
+            }
+        });
+        h.onEachTick(() -> {
+            var body = bot.body();
+            if (started[0] || body == first || body.isDeadOrDying()) return;
+            started[0] = true;
+            // Back from the respawn point to the arena (a teleport: the network handler's), then
+            // through the portal.
+            var to = a.abs(20, FEET, 22);
+            body.teleportTo(level, to.getX() + 0.5, to.getY(), to.getZ() + 0.5, java.util.Set.of(), 0f, 0f, true);
+            a.run(new net.kasax.challengecraft.bot.task.ThroughPortalTask(), 1200, () -> {
+                var now = bot.body();
+                if (now.level().dimension() != Level.NETHER) return false;
+                double dx = now.getX() - gate.getX() / 8.0, dz = now.getZ() - gate.getZ() / 8.0;
+                h.assertTrue(dx * dx + dz * dz < 32 * 32, "came out at " + now.blockPosition().toShortString() + ", not near "
+                        + gate.getX() / 8 + ", " + gate.getZ() / 8);
+                return true;
+            });
+        });
     }
 
     /** Where mobs live, from the game's spawn lists: horses in plains not snow, zombies anywhere, drowned in rivers. */
