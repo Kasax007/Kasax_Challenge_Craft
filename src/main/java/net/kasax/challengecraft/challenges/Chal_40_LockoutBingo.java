@@ -1393,19 +1393,39 @@ public final class Chal_40_LockoutBingo {
             onlinePlayer.level().playSound(null, onlinePlayer.getX(), onlinePlayer.getY(), onlinePlayer.getZ(), SoundEvents.NOTE_BLOCK_CHIME, SoundSource.MASTER, 1.0f, 1.1f);
         }
 
-        LockoutBingoTeam winner = getWinner(data);
+        LockoutBingoTeam winner = PLAY_OUT_BOARD ? null : getWinner(data);
         if (winner != null) {
             finishGame(server, data, winner);
             return;
         }
 
         if (getRemainingTiles(data) == 0) {
+            // (Playing the whole board out: the one with the most tiles wins at the end.)
+            if (PLAY_OUT_BOARD) {
+                LockoutBingoTeam most = null;
+                int best = 0;
+                for (LockoutBingoTeam t : LockoutBingoTeam.values()) {
+                    int sc = getScore(data, t);
+                    if (sc > best) {
+                        best = sc;
+                        most = t;
+                    }
+                }
+                finishGame(server, data, most);
+                return;
+            }
             finishGame(server, data, null);
             return;
         }
 
         syncToAll(server);
     }
+
+    /**
+     * For test runs of the whole board (the bot benchmark): no early win by majority, the game
+     * goes on until every tile is claimed. Set by the environment variable CHALLENGECRAFT_FULL_BOARD=1.
+     */
+    public static final boolean PLAY_OUT_BOARD = "1".equals(System.getenv("CHALLENGECRAFT_FULL_BOARD"));
 
     private static LockoutBingoTeam getWinner(LockoutBingoSavedData data) {
         int remainingTiles = getRemainingTiles(data);

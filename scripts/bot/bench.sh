@@ -24,7 +24,7 @@ rm -rf $RUN/bench_$SEED
 cd $ROOT
 # A JDK 25 (the one on PATH, or JAVA_HOME if set).
 if ! "${JAVA_HOME:-/nonexistent}/bin/java" -version 2>&1 | grep -q "version \"25"; then [ -d /opt/jdk25 ] && JAVA_HOME=$(ls -d /opt/jdk25/*/ | head -1) && export JAVA_HOME; fi
-CHALLENGECRAFT_TEST_CHALLENGES=40 setsid nohup sh ./gradlew runServer --no-daemon > $LOG 2>&1 < /dev/null &
+CHALLENGECRAFT_FULL_BOARD=1 CHALLENGECRAFT_TEST_CHALLENGES=40 setsid nohup sh ./gradlew runServer --no-daemon > $LOG 2>&1 < /dev/null &
 for i in $(seq 1 120); do sleep 5; grep -q "Done (" $LOG && break; grep -q "BUILD FAILED" $LOG && { tail -20 $LOG; exit 1; }; done
 python3 $HERE/rcon.py "challengecraft_bot spawn Bob" > /dev/null
 sleep 3
