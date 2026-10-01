@@ -36,8 +36,14 @@ public final class NavBenchTask implements BotTask {
                 return Result.DONE;
             }
             var r = bot.body().getRandom();
-            double a = r.nextDouble() * Math.PI * 2, d = min + r.nextDouble() * (max - min);
-            BlockPos flat = bot.body().blockPosition().offset((int) (Math.cos(a) * d), 0, (int) (Math.sin(a) * d));
+            double a = 0, d = 0;
+            BlockPos flat = null;
+            // (Only where the world is loaded: the ground elsewhere reads as the bottom of the world.)
+            for (int i = 0; i < 50 && (flat == null || !level.hasChunkAt(flat)); i++) {
+                a = r.nextDouble() * Math.PI * 2;
+                d = min + r.nextDouble() * (max - min);
+                flat = bot.body().blockPosition().offset((int) (Math.cos(a) * d), 0, (int) (Math.sin(a) * d));
+            }
             target = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, flat);
             // (Not into the sea: the shore is what a player would walk to.)
             from = bot.body().blockPosition();

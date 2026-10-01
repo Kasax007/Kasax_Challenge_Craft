@@ -17,9 +17,27 @@ import java.util.function.Predicate;
 public final class BotNavigator {
     public enum Status { IDLE, MOVING, ARRIVED, FAILED }
 
-    private static final int BUDGET = 5000;
-    private static final int STUCK_TICKS = 50;
-    private static final int MAX_REPLANS = 12;
+    /** A search on the server thread (goals that look at the world): nodes, and at most this long. */
+    private static final int BUDGET = 40000;
+    private static final long SYNC_NANOS = 25_000_000L;
+    /** A search on a worker thread (plain position goals): first try, and the longer one if that found nothing. */
+    private static final int QUICK_NODES = 8000;
+    private static final long QUICK_NANOS = 8_000_000L;
+    private static final int ASYNC_NODES = 200_000, ASYNC_NODES_HARD = 600_000;
+    private static final long ASYNC_NANOS = 300_000_000L, ASYNC_NANOS_HARD = 1_500_000_000L;
+    /** Chunks around the start a search may read (beyond is unknown: a leg's end, planned on from there). */
+    private static final int VIEW_CHUNKS = 7;
+    private static final int STUCK_TICKS = 40;
+    private static final int MAX_REPLANS = 30;
+    /** Searches one after another that found no step forward at all, before giving up. */
+    private static final int MAX_NO_WAY = 3;
+
+    /** Path searches off the server thread (as Baritone plans while the player walks). */
+    private static final java.util.concurrent.ExecutorService SEARCH = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+        Thread t = new Thread(r, "bot-path-search");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final BotPlayer bot;
     private final BotTools tools;
@@ -37,6 +55,15 @@ public final class BotNavigator {
     private final java.util.Set<Long> avoid = new java.util.HashSet<>();
     private double lastDistance;
     private Status status = Status.IDLE;
+    /** The goal only reads positions (no world): its search may run on the worker thread. */
+    private boolean pureGoal;
+    /** The path does not reach the goal (a leg): the next leg is planned before this one ends. */
+    private boolean partial;
+    private java.util.concurrent.Future<BotPathfinder.Result> pending;
+    private boolean pendingAhead, pendingHard;
+    private int generation, pendingGeneration, noWay;
+    /** Under water on purpose (sprint-swimming just below the surface): the bot does not hold jump. */
+    private boolean diving;
     /** Allow digging and building on the way. */
     public boolean mayBreak = true, mayPillar = true;
 
@@ -52,14 +79,14 @@ public final class BotNavigator {
 
     /** Go to exactly this block (feet position). */
     public void goTo(BlockPos feet) {
-        setGoal(p -> p.equals(feet), feet);
+        setGoal(p -> p.equals(feet), feet, true);
     }
 
     /** Go within {@code range} blocks of {@code pos} (to work on it or pick something up). */
     public void goNear(BlockPos pos, double range) {
         double r2 = range * range;
         // Measured from the eyes, which is what reach is about.
-        setGoal(p -> Vec3.atCenterOf(p).add(0, 1.12, 0).distanceToSqr(Vec3.atCenterOf(pos)) <= r2, pos);
+        setGoal(p -> Vec3.atCenterOf(p).add(0, 1.12, 0).distanceToSqr(Vec3.atCenterOf(pos)) <= r2, pos, true);
     }
 
     /** Stand within {@code range} blocks of {@code pos}, measured at the feet (being there, not reaching it). */
@@ -68,7 +95,7 @@ public final class BotNavigator {
         setGoal(p -> {
             double dx = p.getX() - pos.getX(), dz = p.getZ() - pos.getZ();
             return dx * dx + dz * dz <= r2 && Math.abs(p.getY() - pos.getY()) <= dy;
-        }, pos);
+        }, pos, true);
     }
 
     /** Close enough to an item lying about to pick it up (it may hover or lie on a slab). */
@@ -77,19 +104,42 @@ public final class BotNavigator {
         setGoal(p -> {
             double dx = p.getX() + 0.5 - ix, dz = p.getZ() + 0.5 - iz;
             return dx * dx + dz * dz <= 1.1 * 1.1 && iy - p.getY() > -0.6 && iy - p.getY() < 1.6;
-        }, item.blockPosition());
+        }, item.blockPosition(), true);
     }
 
+    /** To any spot {@code goal} accepts (it may look at the world: searched on the server thread). */
     public void setGoal(Predicate<BlockPos> goal, BlockPos steer) {
+        setGoal(goal, steer, false);
+    }
+
+    /** {@code pure}: the goal only does arithmetic on the position, so the search may run on a worker thread. */
+    public void setGoal(Predicate<BlockPos> goal, BlockPos steer, boolean pure) {
         this.goal = goal;
         this.target = steer.immutable();
+        this.pureGoal = pure;
         this.path = null;
+        this.partial = false;
         this.replans = 0;
+        this.noWay = 0;
         this.avoid.clear();
+        cancelSearch();
+        generation++;
         this.status = Status.MOVING;
     }
 
+    private void cancelSearch() {
+        if (pending != null) pending.cancel(true);
+        pending = null;
+        pendingAhead = false;
+    }
+
+    /** Swimming on purpose with the head under (the bot's own "swim up" is held off meanwhile). */
+    public boolean diving() {
+        return diving && status == Status.MOVING;
+    }
+
     private Predicate<BlockPos> savedGoal;
+    private boolean savedPure;
     private BlockPos savedTarget;
     private BotTask savedFor;
 
@@ -99,6 +149,7 @@ public final class BotNavigator {
      */
     public void suspend(BotTask owner) {
         if (status == Status.MOVING && goal != null) {
+            savedPure = pureGoal;
             savedGoal = goal;
             savedTarget = target;
             savedFor = owner;
@@ -109,13 +160,15 @@ public final class BotNavigator {
     /** {@code task} is on top again: the walk it was on when interrupted goes on. */
     public void resumeFor(BotTask task) {
         if (task != null && task == savedFor && savedGoal != null && status != Status.MOVING) {
-            setGoal(savedGoal, savedTarget);
+            setGoal(savedGoal, savedTarget, savedPure);
         }
         savedGoal = null;
         savedFor = null;
     }
 
     public void stop() {
+        cancelSearch();
+        diving = false;
         bankDig = null;
         // Only abandon a dig the navigator itself started; the caller may be mining on its own.
         if (digging) actions.reset();
@@ -154,8 +207,21 @@ public final class BotNavigator {
             status = Status.ARRIVED;
             return status;
         }
-        if (path == null || index >= path.size()) {
-            if (!replan(feet)) return status;
+        pollSearch();
+        if (status != Status.MOVING) return status;
+        if (path != null && index >= path.size()) {
+            // The end of a leg with the next one not there yet (or a whole path walked and the goal
+            // not quite met): a search from here.
+            path = null;
+        }
+        if (path == null) {
+            if (pending == null && !startSearch(standing(feet), false)) return status;
+            holdStill();
+            return status;
+        }
+        // The next leg planned while this one is walked (no stop at the end of each leg).
+        if (pureGoal && partial && pending == null && path.size() - index <= 12 && plainEnd()) {
+            startSearch(path.get(path.size() - 1).to(), true);
         }
         BotPathfinder.Step step = path.get(index);
         // A step taking far longer than it should (jumping at a wall it cannot get up, pushed back
@@ -164,7 +230,7 @@ public final class BotNavigator {
         if (bankDig == null && ++stepTicks > stepLimit(step) + (bot.isInWater() ? 160 : 0)) {
             avoid.add(step.to().asLong());
             stepTicks = 0;
-            path = null;
+            dropPath();
             bankDig = null;
             bankTicks = 0;
             return status;
@@ -209,7 +275,7 @@ public final class BotNavigator {
                 bot.forward = 0.6f; // sneaking stops at the edge by itself
                 if (actions.inReach(place) && !actions.placeThrowaway(place) && ++stuck > STUCK_TICKS) {
                     stuck = 0;
-                    path = null; // out of blocks: find a way that needs none
+                    dropPath(); // out of blocks: find a way that needs none
                     return status;
                 }
                 return status;
@@ -255,13 +321,13 @@ public final class BotNavigator {
                 }
                 if (!supported(step.place()) && ++stuck > STUCK_TICKS * 2) {
                     stuck = 0;
-                    path = null;
+                    dropPath();
                 }
                 return status;
             }
             if (bot.getY() > step.place().getY() + 1.0 && open) {
                 if (!actions.placeThrowaway(step.place())) {
-                    path = null; // out of blocks: find a way that needs none
+                    dropPath(); // out of blocks: find a way that needs none
                     return status;
                 }
             }
@@ -296,11 +362,22 @@ public final class BotNavigator {
             return status;
         }
         if (step.leap()) return leap(to, feet);
-        bot.sprintNow = false;
+        // The world still as planned for this step? (A block put or broken since, water run in.)
+        if (!stillValid(step, feet)) {
+            dropPath();
+            holdStill();
+            return status;
+        }
         Vec3 aim = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
         double dx = aim.x - bot.getX(), dz = aim.z - bot.getZ();
         double flat = Math.sqrt(dx * dx + dz * dz);
-        if (flat < 0.3 && Math.abs(bot.getY() - to.getY()) < 0.7 || feet.equals(to) && flat < 0.45) {
+        BotPathfinder.Step next = index + 1 < path.size() ? path.get(index + 1) : null;
+        // Straight on after this one: no need to come to the middle of the block first.
+        boolean straightOn = next != null && next.breaks().isEmpty() && next.place() == null && !next.leap()
+                && next.to().getY() == to.getY() && to.getY() == feet.getY()
+                && Integer.signum(next.to().getX() - to.getX()) == Integer.signum(to.getX() - feet.getX())
+                && Integer.signum(next.to().getZ() - to.getZ()) == Integer.signum(to.getZ() - feet.getZ());
+        if (flat < 0.3 && Math.abs(bot.getY() - to.getY()) < 0.7 || feet.equals(to) && (flat < 0.45 || straightOn && flat < 0.9)) {
             advance();
             return status;
         }
@@ -309,29 +386,95 @@ public final class BotNavigator {
         bot.setYHeadRot(yaw);
         bot.setXRot(10f);
         bot.forward = flat > 0.15 ? 1f : 0f;
+        bot.strafe = 0;
+        boolean careful = false;
         // The next step breaks a pressure plate: creep up, so as not to slide onto it.
-        if (index + 1 < path.size() && path.get(index + 1).breaks().stream()
+        if (next != null && next.breaks().stream()
                 .anyMatch(b -> bot.level().getBlockState(b).is(net.minecraft.tags.BlockTags.PRESSURE_PLATES))) {
             bot.forward = flat > 0.1 ? 0.25f : 0f;
-            bot.setSprinting(false);
-            bot.sprintNow = false;
+            careful = true;
         }
-        bot.strafe = 0;
-        bot.setSprinting(false);
         boolean up = to.getY() > bot.getY() + 0.4;
-        bot.jump = (up && flat < 1.6) || bot.isInWater() && (up || to.getY() >= bot.getY() - 0.2 || bot.horizontalCollision);
-        if (bot.onGround() && bot.horizontalCollision && !up) bot.jump = true; // over a lip
+        // Sprinting wherever a player would: on the flat, up steps and down drops; not into a
+        // step that needs care (digging, building) right after.
+        boolean nextCareful = next != null && (next.place() != null || !next.breaks().isEmpty());
+        bot.sprintNow = !careful && !(nextCareful && flat < 1.2);
+        diving = false;
+        if (bot.isInWater()) {
+            swim(to, feet, flat, up);
+        } else {
+            // Up a step: jump once lined up and close (as Baritone does), never into a ceiling.
+            bot.jump = up && flat < 1.2 && headRoom(feet);
+            // Walking into something on the flat: a lip (a slab, a path block), hopped over.
+            if (bot.onGround() && bot.horizontalCollision && !up) bot.jump = true;
+        }
         // Stuck: no progress for a while.
         double d = flat + Math.abs(bot.getY() - to.getY());
         if (d < lastDistance - 0.02) stuck = 0;
         else if (++stuck > STUCK_TICKS) {
             stuck = 0;
-            path = null;
+            avoid.add(to.asLong());
+            dropPath();
         }
         lastDistance = d;
         // Knocked off the path.
-        if (feet.distManhattan(to) > 4 && !step.leap()) path = null;
+        if (feet.distManhattan(to) > 4) dropPath();
         return status;
+    }
+
+    /**
+     * In the water: deep water is crossed sprint-swimming (under the surface at first, then along
+     * it, breathing), not bobbing; out onto a bank or up a step, swimming up.
+     */
+    private void swim(BlockPos to, BlockPos feet, double flat, boolean up) {
+        var level = bot.level();
+        boolean deep = level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()
+                || bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+        boolean outOnto = up || !level.getFluidState(to).is(net.minecraft.tags.FluidTags.WATER);
+        if (deep && !outOnto && flat > 1.2 && bot.getAirSupply() > bot.getMaxAirSupply() / 3) {
+            diving = true;
+            bot.sprintNow = true;
+            bot.jump = false;
+            if (bot.isSwimming()) {
+                // Along the surface (the eyes come out, it breathes) or down to where the path goes.
+                double dy = to.getY() + 0.2 - bot.getY();
+                float pitch = (float) Mth.clamp(-Math.toDegrees(Math.atan2(dy, Math.max(flat, 0.5))), -30, 45);
+                if (dy >= -0.3) pitch = Math.min(pitch, -4f);
+                bot.setXRot(pitch);
+            } else {
+                // Not swimming yet: head under first (sprinting with the eyes in the water starts it).
+                bot.setXRot(35f);
+            }
+            return;
+        }
+        bot.jump = up || to.getY() >= bot.getY() - 0.2 || bot.horizontalCollision;
+    }
+
+    /** Room over the head to jump: nothing solid two blocks above the feet. */
+    private boolean headRoom(BlockPos feet) {
+        BlockPos h = feet.above(2);
+        return bot.level().getBlockState(h).getCollisionShape(bot.level(), h).isEmpty();
+    }
+
+    /**
+     * Whether a plain step can still be walked as planned: room for the body there, something to
+     * stand on (or water), no lava; going up, room over the head to jump. A step that digs or
+     * builds checks its own blocks as it goes.
+     */
+    private boolean stillValid(BotPathfinder.Step step, BlockPos feet) {
+        if (!step.breaks().isEmpty() || step.place() != null) return true;
+        var level = bot.level();
+        BlockPos to = step.to();
+        for (BlockPos c : new BlockPos[]{to, to.above()}) {
+            var st = level.getBlockState(c);
+            if (!st.getCollisionShape(level, c).isEmpty() || st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return false;
+        }
+        boolean floor = !level.getBlockState(to.below()).getCollisionShape(level, to.below()).isEmpty()
+                || !level.getFluidState(to).isEmpty() || !level.getFluidState(to.below()).isEmpty();
+        // (A drop lands further down: the floor is checked there, not right under the edge.)
+        if (!floor && to.getY() >= feet.getY()) return false;
+        if (to.getY() > feet.getY() && !bot.isInWater() && !headRoom(feet)) return false;
+        return true;
     }
 
     /** Ticks a step may take: its digging plus a generous allowance for the movement itself. */
@@ -356,7 +499,7 @@ public final class BotNavigator {
         }
         if (bot.getY() < to.getY() - 1.2) {
             bot.sprintNow = false;
-            path = null; // fell in
+            dropPath(); // fell in
             return status;
         }
         float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
@@ -427,26 +570,117 @@ public final class BotNavigator {
         return best;
     }
 
-    private boolean replan(BlockPos feet) {
-        feet = standing(feet);
-        if (++replans > MAX_REPLANS) {
-            fail("no way found");
-            return false;
-        }
-        BotPathfinder finder = new BotPathfinder((ServerLevel) bot.level(),
-                new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(), tools), avoid);
-        path = finder.find(feet, goal, target, BUDGET);
-        index = 0;
-        stepTicks = 0;
-        stuck = 0;
-        lastDistance = Double.MAX_VALUE;
-        if (path == null || path.isEmpty()) {
-            fail("no way found from " + feet.toShortString() + " (" + bot.level().getBlockState(feet).getBlock().getName().getString()
-                    + " on " + bot.level().getBlockState(feet.below()).getBlock().getName().getString() + ", "
-                    + finder.debugMoves(feet) + ")");
-            return false;
+    /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
+    private void dropPath() {
+        path = null;
+        partial = false;
+        cancelSearch();
+    }
+
+    /** Waiting for a search: standing still (in water keeping the head up). */
+    private void holdStill() {
+        bot.stopInputs();
+        if (bot.isInWater()) bot.jump = true;
+        diving = false;
+    }
+
+    /** The path's last steps need nothing placed or broken (a leg can be planned on from its end). */
+    private boolean plainEnd() {
+        for (int i = Math.max(index, path.size() - 3); i < path.size(); i++) {
+            BotPathfinder.Step s = path.get(i);
+            if (s.place() != null || !s.breaks().isEmpty()) return false;
         }
         return true;
+    }
+
+    /**
+     * Starts a search from {@code from} ({@code ahead}: from the end of the path being walked, for
+     * the next leg). Position goals are searched on a worker thread; goals that look at the world
+     * right here, within a time limit. False when it has given up.
+     */
+    private boolean startSearch(BlockPos from, boolean ahead) {
+        if (!ahead && ++replans > MAX_REPLANS) {
+            fail("no way found (" + replans + " tries)");
+            return false;
+        }
+        ServerLevel level = (ServerLevel) bot.level();
+        BotPathfinder.WorldView view = BotPathfinder.WorldView.capture(level, from, VIEW_CHUNKS);
+        BotPathfinder.Abilities abilities = new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(),
+                tools.snapshot(), bot.getFoodData().getFoodLevel() > 6);
+        java.util.Set<Long> favoured = new java.util.HashSet<>();
+        if (!ahead && path != null) for (int i = index; i < path.size(); i++) favoured.add(path.get(i).to().asLong());
+        BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured);
+        Predicate<BlockPos> g = goal;
+        BlockPos t = target;
+        boolean hard = noWay > 0;
+        if (!pureGoal) {
+            apply(finder.search(from, g, t, BUDGET * (hard ? 3 : 1), SYNC_NANOS * (hard ? 3 : 1)), ahead, from, finder);
+            return status == Status.MOVING;
+        }
+        // First a quick look right here (moving at once, as a player does not stand and think);
+        // the long search plans on from the end of that, while it walks.
+        if (!ahead && !hard) {
+            BotPathfinder.Result quick = finder.search(from, g, t, QUICK_NODES, QUICK_NANOS);
+            if (quick != null && (quick.complete() || quick.steps().get(quick.steps().size() - 1).to().distSqr(from) >= 9)) {
+                apply(quick, false, from, finder);
+                return true;
+            }
+        }
+        pendingAhead = ahead;
+        pendingGeneration = generation;
+        pendingFrom = from;
+        pendingFinder = finder;
+        pending = SEARCH.submit(() -> finder.search(from, g, t, hard ? ASYNC_NODES_HARD : ASYNC_NODES, hard ? ASYNC_NANOS_HARD : ASYNC_NANOS));
+        return true;
+    }
+
+    private BlockPos pendingFrom;
+    private BotPathfinder pendingFinder;
+
+    /** A finished search on the worker thread: taken up. */
+    private void pollSearch() {
+        if (pending == null || !pending.isDone()) return;
+        BotPathfinder.Result r;
+        try {
+            r = pending.get();
+        } catch (Exception e) {
+            BotManager.LOG.warn("[Bot] path search failed", e);
+            r = null;
+        }
+        boolean ahead = pendingAhead;
+        pending = null;
+        pendingAhead = false;
+        if (pendingGeneration != generation) return; // (for a goal since replaced)
+        apply(r, ahead, pendingFrom, pendingFinder);
+    }
+
+    private void apply(BotPathfinder.Result r, boolean ahead, BlockPos from, BotPathfinder finder) {
+        if (r == null || r.steps().isEmpty()) {
+            // The next leg not found from the end of this one: on to the end, then from there.
+            if (ahead) {
+                partial = false;
+                return;
+            }
+            if (++noWay > MAX_NO_WAY) {
+                fail("no way found from " + from.toShortString() + " (" + bot.level().getBlockState(from).getBlock().getName().getString()
+                        + " on " + bot.level().getBlockState(from.below()).getBlock().getName().getString() + ", " + finder.debugMoves(from) + ")");
+                return;
+            }
+            // (Another try: a longer search, and the spots that failed before allowed again.)
+            if (noWay >= 2) avoid.clear();
+            return;
+        }
+        noWay = 0;
+        if (ahead && path != null && path.get(path.size() - 1).to().equals(from)) {
+            path.addAll(r.steps());
+        } else {
+            path = new java.util.ArrayList<>(r.steps());
+            index = 0;
+            stepTicks = 0;
+            stuck = 0;
+            lastDistance = Double.MAX_VALUE;
+        }
+        partial = !r.complete();
     }
 
     /** Searches that found no way at all, since the bot joined (for the benchmarks). */
@@ -454,7 +688,9 @@ public final class BotNavigator {
 
     private Status fail(String why) {
         failures++;
-        BotManager.debug(bot, "navigation failed: " + why);
+        // (In the log; the chat only hears of it from the task that gives up.)
+        BotManager.LOG.info("[Bot] {}: navigation failed: {}", bot.getGameProfile().name(), why);
+        cancelSearch();
         bot.stopInputs();
         actions.reset();
         path = null;

@@ -30,6 +30,25 @@ public final class BotTools {
         return best;
     }
 
+    /**
+     * The same, from a copy of the tools it holds now: safe to ask from another thread (the path
+     * search), and fixed for the length of that search.
+     */
+    public java.util.function.ToDoubleFunction<BlockState> snapshot() {
+        java.util.List<ItemStack> held = new java.util.ArrayList<>();
+        for (ItemStack s : bot.getInventory().getNonEquipmentItems()) {
+            if (!s.isEmpty() && s.has(net.minecraft.core.component.DataComponents.TOOL)) held.add(s.copy());
+        }
+        return state -> {
+            float hardness = state.getDestroySpeed(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO);
+            if (hardness < 0) return Double.POSITIVE_INFINITY;
+            if (hardness == 0) return 1;
+            double best = ticksWith(ItemStack.EMPTY, state, hardness);
+            for (ItemStack s : held) best = Math.min(best, ticksWith(s, state, hardness));
+            return best;
+        };
+    }
+
     private static double ticksWith(ItemStack tool, BlockState state, float hardness) {
         float speed = tool.isEmpty() ? 1f : tool.getDestroySpeed(state);
         boolean harvest = !state.requiresCorrectToolForDrops() || (!tool.isEmpty() && tool.isCorrectToolForDrops(state));

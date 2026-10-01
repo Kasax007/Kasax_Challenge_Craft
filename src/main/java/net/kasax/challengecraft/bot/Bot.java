@@ -208,7 +208,7 @@ public final class Bot {
             r = task.tick(this);
             // Head under water: hold jump to swim up, whatever the task does (a player never forgets
             // that). Unless it is digging its way out from the bottom (afloat, it digs five times slower).
-            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig) body.jump = true;
+            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig && !navigator.diving()) body.jump = true;
         } catch (RuntimeException e) {
             BotManager.LOG.warn("[Bot] {} task {} crashed", name, task.describe(), e);
             r = BotTask.Result.FAILED;
@@ -310,7 +310,7 @@ public final class Bot {
                     return;
                 }
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7)) {
-                    net.minecraft.world.phys.Vec3 away = body.position().subtract(m.position()).normalize().scale(16);
+                    net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
                     // (That way was blocked last time: off to the side instead.)
                     if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
                     actions.reset();
@@ -373,6 +373,33 @@ public final class Bot {
             actions.reset();
             interject(new net.kasax.challengecraft.bot.task.EatTask());
         }
+    }
+
+    /**
+     * Which way to run from a threat at {@code from}: straight away from it, or up to ninety
+     * degrees off that, whichever has the most open ground ahead (not into a wall or a corner).
+     */
+    net.minecraft.world.phys.Vec3 openWayFrom(net.minecraft.world.phys.Vec3 from, double length) {
+        net.minecraft.world.phys.Vec3 base = body.position().subtract(from).multiply(1, 0, 1);
+        if (base.lengthSqr() < 1e-4) base = new net.minecraft.world.phys.Vec3(1, 0, 0);
+        base = base.normalize();
+        net.minecraft.world.phys.Vec3 best = base.scale(length);
+        double bestFree = -1;
+        net.minecraft.world.phys.Vec3 eye = body.getEyePosition();
+        for (double deg : new double[]{0, 45, -45, 90, -90}) {
+            double r = Math.toRadians(deg);
+            net.minecraft.world.phys.Vec3 dir = new net.minecraft.world.phys.Vec3(base.x * Math.cos(r) - base.z * Math.sin(r), 0, base.x * Math.sin(r) + base.z * Math.cos(r));
+            var hit = body.level().clip(new net.minecraft.world.level.ClipContext(eye, eye.add(dir.scale(length)),
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, body));
+            double free = hit.getLocation().distanceTo(eye);
+            // (Straight away is worth a little more: the others lead past the threat's side.)
+            free -= Math.abs(deg) / 45.0;
+            if (free > bestFree + 0.5) {
+                bestFree = free;
+                best = dir.scale(length);
+            }
+        }
+        return best;
     }
 
     private net.minecraft.core.BlockPos mlgWater;

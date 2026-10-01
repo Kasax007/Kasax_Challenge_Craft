@@ -31,29 +31,106 @@ public final class BotPathfinder {
         }
     }
 
-    /** What the search may assume about the bot's abilities. */
-    public record Abilities(boolean mayBreak, boolean mayPillar, BotTools tools) {
+    /**
+     * What the search may assume about the bot: whether it may dig and build, how long a block
+     * takes it to break (from a copy of its tools, so the search can run off the server thread),
+     * and whether it sprints (enough food).
+     */
+    public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint) {
+        public Abilities(boolean mayBreak, boolean mayPillar, BotTools tools) {
+            this(mayBreak, mayPillar, tools::breakTicks, true);
+        }
     }
 
-    private static final int MAX_FALL = 3;
-    private static final double WALK = 4.6, DIAGONAL = 6.5, JUMP_UP = 7.0, FALL_PER_BLOCK = 1.5,
-            SWIM = 9.0, PILLAR = 14.0, BRIDGE = 12.0, DIG_EXTRA = 2.0, LEAP = 6.0;
+    // ---- costs, in ticks, from the game's own movement (the numbers Baritone works out) -------
 
-    private final ServerLevel level;
+    private static final int MAX_FALL = 3;
+    static final double WALK = 20 / 4.317, SPRINT = 20 / 5.612, WADE = 20 / 2.2, SWIM_SPRINT = 20 / 2.86,
+            SNEAK = 20 / 1.3, WALK_OFF = WALK * 0.8, CENTRE = WALK - WALK_OFF;
+    private static final double[] FALL = new double[257];
+    static {
+        for (int i = 0; i < FALL.length; i++) FALL[i] = distanceToTicks(i);
+    }
+    /** The rise of a jump onto a block: up 1.25 and back down 0.25. */
+    static final double JUMP_ONE = distanceToTicks(1.25) - distanceToTicks(0.25);
+    private static final double JUMP_PENALTY = 2, PLACE_PENALTY = 10, BREAK_PENALTY = 2, LEAP_EXTRA = 4;
+
+    /** Ticks to fall {@code distance} blocks from standing (drag 0.98, gravity 0.08 a tick). */
+    static double distanceToTicks(double distance) {
+        if (distance <= 0) return 0;
+        double left = distance;
+        for (int tick = 0; ; tick++) {
+            double v = (Math.pow(0.98, tick) - 1) * -3.92;
+            if (left <= v) return tick + left / v;
+            left -= v;
+        }
+    }
+
+    /**
+     * The chunks the search may read, collected on the server thread: the search itself then runs
+     * on a worker thread without touching the chunk cache (as Baritone reads its own copy of the
+     * world). Chunks not in it count as unknown, which the search treats as blocked.
+     */
+    public static final class WorldView {
+        private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<LevelChunk> chunks = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        final int minY, maxY;
+
+        private WorldView(int minY, int maxY) {
+            this.minY = minY;
+            this.maxY = maxY;
+        }
+
+        /** The loaded chunks within {@code radius} chunks of {@code center}. */
+        public static WorldView capture(ServerLevel level, BlockPos center, int radius) {
+            WorldView v = new WorldView(level.getMinY(), level.getMaxY());
+            int cx = center.getX() >> 4, cz = center.getZ() >> 4;
+            for (int x = cx - radius; x <= cx + radius; x++) {
+                for (int z = cz - radius; z <= cz + radius; z++) {
+                    LevelChunk c = level.getChunkSource().getChunkNow(x, z);
+                    if (c != null) v.chunks.put(net.minecraft.world.level.ChunkPos.pack(x, z), c);
+                }
+            }
+            return v;
+        }
+
+        boolean loaded(BlockPos p) {
+            return p.getY() >= minY && p.getY() < maxY && chunks.containsKey(net.minecraft.world.level.ChunkPos.pack(p.getX() >> 4, p.getZ() >> 4));
+        }
+
+        BlockState state(BlockPos p) {
+            if (p.getY() < minY || p.getY() >= maxY) return Blocks.BEDROCK.defaultBlockState();
+            LevelChunk c = chunks.get(net.minecraft.world.level.ChunkPos.pack(p.getX() >> 4, p.getZ() >> 4));
+            return c == null ? Blocks.BEDROCK.defaultBlockState() : c.getBlockState(p);
+        }
+    }
+
+    private static final net.minecraft.world.level.BlockGetter NO_WORLD = net.minecraft.world.level.EmptyBlockGetter.INSTANCE;
+
+    private final WorldView world;
     private final Abilities abilities;
     private final Map<Long, BlockState> cache = new HashMap<>();
+    private final Map<BlockState, Double> breakCache = new java.util.IdentityHashMap<>();
+    private final double flatCost;
 
     /** Spots where a step already failed: kept out of the search (as Baritone blacklists them). */
     private final java.util.Set<Long> avoid;
+    /** The path being walked: staying on it costs half (no dithering between equal ways, no half-built bridges dropped). */
+    private java.util.Set<Long> favoured = java.util.Set.of();
 
-    public BotPathfinder(ServerLevel level, Abilities abilities) {
-        this(level, abilities, java.util.Set.of());
-    }
-
-    public BotPathfinder(ServerLevel level, Abilities abilities, java.util.Set<Long> avoid) {
-        this.level = level;
+    public BotPathfinder(WorldView world, Abilities abilities, java.util.Set<Long> avoid) {
+        this.world = world;
         this.abilities = abilities;
         this.avoid = avoid;
+        this.flatCost = abilities.sprint() ? SPRINT : WALK;
+    }
+
+    public BotPathfinder favouring(java.util.Set<Long> path) {
+        this.favoured = path;
+        return this;
+    }
+
+    private double breakTicks(BlockState s) {
+        return breakCache.computeIfAbsent(s, abilities.breakTicks()::applyAsDouble);
     }
 
     private static final class Node implements Comparable<Node> {
@@ -73,33 +150,62 @@ public final class BotPathfinder {
         }
     }
 
-    /**
-     * A path from {@code start} to a position {@code goal} accepts; {@code target} steers the
-     * search. Returns null when no step at all brings the bot closer.
-     */
+    /** A search's outcome: the steps, and whether they end at the goal (else a partial way, to go on from). */
+    public record Result(List<Step> steps, boolean complete, int expanded) {
+    }
+
+    /** Weights on the cost so far for picking a partial path (Baritone's): the first that gets far enough is taken. */
+    private static final double[] COEFFICIENTS = {1.5, 2, 2.5, 3, 4, 5, 10};
+    /** A partial path must get at least this far from the start (squared), or it is no progress. */
+    private static final double MIN_PROGRESS_SQ = 5 * 5;
+
+    /** As {@link #search}, with a node budget only (on the server thread, for small searches). */
     public List<Step> find(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int budget) {
+        Result r = search(start, goal, target, budget, Long.MAX_VALUE);
+        return r == null ? null : r.steps();
+    }
+
+    /**
+     * A* from {@code start} to a position {@code goal} accepts, steered by {@code target}; stops after
+     * {@code maxNodes} nodes or {@code nanos} of time. Without reaching the goal, the best partial
+     * way that gets at least five blocks away, or null.
+     */
+    public Result search(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int maxNodes, long nanos) {
+        long until = nanos == Long.MAX_VALUE ? Long.MAX_VALUE : System.nanoTime() + nanos;
         Map<Long, Node> nodes = new HashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>();
         Node first = new Node(start);
         first.f = heuristic(start, target);
         nodes.put(start.asLong(), first);
         open.add(first);
-        Node best = first;
-        double bestH = first.f;
+        Node[] best = new Node[COEFFICIENTS.length];
+        Node closest = first;
+        double closestH = first.f;
+        double[] bestScore = new double[COEFFICIENTS.length];
+        java.util.Arrays.fill(bestScore, Double.MAX_VALUE);
         int expanded = 0;
-        while (!open.isEmpty() && expanded < budget) {
+        while (!open.isEmpty() && expanded < maxNodes) {
+            if ((expanded & 255) == 0 && System.nanoTime() > until) break;
             Node n = open.poll();
             if (n.closed) continue;
             n.closed = true;
             expanded++;
-            if (goal.test(n.pos)) return build(n);
+            if (goal.test(n.pos)) return new Result(build(n), true, expanded);
             double h = heuristic(n.pos, target);
-            if (h < bestH) {
-                bestH = h;
-                best = n;
+            if (h < closestH) {
+                closestH = h;
+                closest = n;
+            }
+            for (int i = 0; i < COEFFICIENTS.length; i++) {
+                double score = h + n.g / COEFFICIENTS[i];
+                if (score < bestScore[i]) {
+                    bestScore[i] = score;
+                    best[i] = n;
+                }
             }
             for (Step s : moves(n.pos, n.step != null && n.step.place() != null && n.step.place().equals(n.pos.below()))) {
                 double cost = cost(n.pos, s) + (avoid.contains(s.to().asLong()) ? 400 : 0);
+                if (favoured.contains(s.to().asLong())) cost *= 0.5;
                 Node m = nodes.computeIfAbsent(s.to().asLong(), k -> new Node(s.to()));
                 if (m.closed) continue;
                 double g = n.g + cost;
@@ -111,7 +217,11 @@ public final class BotPathfinder {
                 open.add(m);
             }
         }
-        return best == first ? null : build(best);
+        for (Node b : best) {
+            if (b != null && b != first && b.pos.distSqr(start) >= MIN_PROGRESS_SQ) return new Result(build(b), false, expanded);
+        }
+        // (Nowhere five blocks away: whatever got nearest the target, if anything did.)
+        return closest == first ? null : new Result(build(closest), false, expanded);
     }
 
     String debugMoves(BlockPos p) {
@@ -126,33 +236,40 @@ public final class BotPathfinder {
         return steps;
     }
 
-    private static double heuristic(BlockPos a, BlockPos b) {
+    private double heuristic(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dy = a.getY() - b.getY(), dz = a.getZ() - b.getZ();
-        return Math.sqrt(dx * dx + dz * dz) * WALK + Math.abs(dy) * WALK;
+        // Up costs a jump a block, down a short fall (Baritone's way of weighing height).
+        return Math.sqrt(dx * dx + dz * dz) * flatCost + (dy < 0 ? -dy * (JUMP_ONE + 1) : dy * FALL[2] / 2);
     }
 
     private double cost(BlockPos from, Step s) {
         int dx = s.to().getX() - from.getX(), dy = s.to().getY() - from.getY(), dz = s.to().getZ() - from.getZ();
+        boolean diagonal = dx != 0 && dz != 0;
         double c;
-        if (s.leap()) c = WALK * Math.max(Math.abs(dx), Math.abs(dz)) + LEAP;
-        else if (s.place() != null) c = s.place().getY() < s.to().getY() && s.place().getX() == from.getX() && s.place().getZ() == from.getZ() ? PILLAR : BRIDGE;
-        else if (inWater(s.to()) || inWater(from)) c = SWIM;
-        else if (dy > 0) c = JUMP_UP;
-        else if (dy < 0 && dx == 0 && dz == 0) c = WALK;
-        else if (dy < 0) c = WALK + FALL_PER_BLOCK * -dy;
-        else c = dx != 0 && dz != 0 ? DIAGONAL : WALK;
+        if (s.leap()) c = flatCost * Math.max(Math.abs(dx), Math.abs(dz)) + JUMP_ONE + LEAP_EXTRA;
+        else if (s.place() != null) {
+            boolean pillar = s.place().getY() < s.to().getY() && s.place().getX() == from.getX() && s.place().getZ() == from.getZ();
+            c = pillar ? JUMP_ONE + WALK + PLACE_PENALTY : SNEAK + PLACE_PENALTY;
+        } else if (inWater(s.to()) || inWater(from)) {
+            // Deep water is swum (sprint-swimming); a shallow stream is waded.
+            boolean deep = inWater(s.to()) && !solid(s.to().below()) || inWater(s.to().above());
+            c = (deep && abilities.sprint() ? SWIM_SPRINT : WADE) * (diagonal ? Math.sqrt(2) : 1) + (dy > 0 ? JUMP_PENALTY : 0);
+        } else if (dy > 0) c = Math.max(JUMP_ONE, flatCost) + WALK * 0.5 + JUMP_PENALTY;
+        else if (dy < 0 && dx == 0 && dz == 0) c = FALL[Math.min(-dy, FALL.length - 1)] + CENTRE;
+        else if (dy < 0) c = WALK_OFF + FALL[Math.min(-dy, FALL.length - 1)] + CENTRE;
+        else c = flatCost * (diagonal ? Math.sqrt(2) : 1);
         // Digging while afloat is five times slower (not on the ground), with the head under
         // water five times more.
         double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
-            double ticks = abilities.tools().breakTicks(state(b));
+            double ticks = breakTicks(state(b));
             // Stone by hand (seven seconds a block, and nothing to show for it): only if there is
             // no other way at all.
-            c += ticks * digFactor * (ticks > 100 ? 4 : 1) + DIG_EXTRA;
+            c += ticks * digFactor * (ticks > 100 ? 4 : 1) + BREAK_PENALTY;
             // Sand or gravel on top falls into the gap: every block of the column is dug too.
             BlockPos up = b.above();
             for (int i = 0; i < 12 && state(up).getBlock() instanceof net.minecraft.world.level.block.FallingBlock; i++, up = up.above()) {
-                c += abilities.tools().breakTicks(state(up)) * digFactor + DIG_EXTRA + 4;
+                c += breakTicks(state(up)) * digFactor + BREAK_PENALTY + 4;
             }
         }
         return c;
@@ -303,17 +420,14 @@ public final class BotPathfinder {
     // ---- the world ------------------------------------------------------------------------------
 
     private boolean loaded(BlockPos p) {
-        return p.getY() >= level.getMinY() && p.getY() < level.getMaxY()
-                && level.getChunkSource().getChunkNow(p.getX() >> 4, p.getZ() >> 4) != null;
+        return world.loaded(p);
     }
 
     BlockState state(BlockPos p) {
         long key = p.asLong();
         BlockState s = cache.get(key);
         if (s == null) {
-            LevelChunk chunk = level.getChunkSource().getChunkNow(p.getX() >> 4, p.getZ() >> 4);
-            s = chunk == null || p.getY() < level.getMinY() || p.getY() >= level.getMaxY()
-                    ? Blocks.BEDROCK.defaultBlockState() : chunk.getBlockState(p);
+            s = world.state(p);
             cache.put(key, s);
         }
         return s;
@@ -324,7 +438,7 @@ public final class BotPathfinder {
         if (!loaded(p)) return false;
         BlockState s = state(p);
         if (s.getFluidState().is(FluidTags.LAVA) || dangerous(s)) return false;
-        return s.getCollisionShape(level, p).isEmpty();
+        return s.getCollisionShape(NO_WORLD, p).isEmpty();
     }
 
     boolean inWater(BlockPos p) {
@@ -334,7 +448,7 @@ public final class BotPathfinder {
     private boolean solid(BlockPos p) {
         if (!loaded(p)) return false;
         BlockState s = state(p);
-        return !s.getCollisionShape(level, p).isEmpty() && !dangerous(s);
+        return !s.getCollisionShape(NO_WORLD, p).isEmpty() && !dangerous(s);
     }
 
     /** Whether feet at {@code p} stand on something (or swim). */
@@ -361,9 +475,9 @@ public final class BotPathfinder {
         BlockState s = state(p);
         if (s.isAir() || !s.getFluidState().isEmpty()) return false;
         if (s.is(Blocks.TRIPWIRE) || s.is(Blocks.TRIPWIRE_HOOK)) return false; // cutting it without shears sets it off
-        float hardness = s.getDestroySpeed(level, p);
+        float hardness = s.getDestroySpeed(NO_WORLD, p);
         if (hardness < 0 || hardness > 50) return false; // bedrock, obsidian and the like are walls
-        return abilities.tools().breakTicks(s) < 400;
+        return breakTicks(s) < 400;
     }
 
     /** Breaking here would let a liquid in (from above or a side). */
