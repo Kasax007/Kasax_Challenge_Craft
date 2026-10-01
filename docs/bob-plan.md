@@ -363,3 +363,39 @@ In der Benchmark-Welt kommt Bob im Nether an genau den Oberwelt-Koordinaten an, 
 In der GameTest-Welt (auch mit `tick sprint`) teilt das Spiel korrekt durch 8 und baut ein Portal.
 Bob ist abgesichert (merkt sich die Ankunftsstelle, besorgt notfalls Obsidian), die Ursache in der
 Welt-Erzeugung der Challenge ist noch nicht gefunden.
+
+## 10. Runde 3: Plan (Spieler-Realismus, Nether, restliche Ziele)
+
+### Analyse
+
+- **Portal-Rätsel der Testwelten**: Nach einem Tod zeigte die Netzwerk-Schicht des Bots noch auf
+  den toten Körper. Jeder spätere Teleport, auch der durchs Portal, bewegte die Leiche. Bob kam im
+  Nether bei seinen Oberwelt-Koordinaten an, ohne Portal. Die GameTests trafen das nie, weil Bob
+  dort vor dem Portal nicht starb. → Behoben, Test `portal_after_death`.
+- **Allwissen**: Gedächtnis, Planer und Blocksuche kannten jeden freiliegenden Block, auch in
+  Höhlen 40 Blöcke unter Bob. Deshalb grub er zu Seen, die er nie gesehen haben konnte.
+  → Sichtmodell: Ein Block gilt als gesehen, wenn eine offene Seite Himmelslicht hat (Oberfläche,
+  Schlucht, Höhleneingang) oder er in Sichtlinie in bis zu 24 Blöcken liegt. Unterirdische
+  Strukturen erkennt Bob erst aus der Nähe.
+- **Abdeckung**: Ehrlich gemessen (Nether-Ziele so, als stünde Bob im Nether) sind es rund
+  55 Ziele auf dem Brett ohne Weg. Sie fallen in drei Gruppen: Nether (Gold, Tauschhandel, Bastion,
+  Festung, Brauen), einfache Oberwelt-Stunts (Apfel, Schwein reiten, Lagerfeuer, Pulverschnee,
+  Bauhöhe, Scharfschütze, Phantom) und teure Ausnahmen (Eis/Sculk nur mit Behutsamkeit, Ende,
+  Waldanwesen).
+
+### Umsetzung (Reihenfolge)
+
+1. Portal-Fehler, Sichtmodell, Wasser wie ein Spieler (nächste gesehene Quelle, Fluss/Meer/Sumpf
+   aus dem Atlas, sonst erkunden) — erledigt.
+2. Reserve: immer Holz (12 Bretter-Äquivalent) und Bruchstein (16) dabei — erledigt.
+3. Fische: Eimer-Fisch, Kugel- und Tropenfisch per Jagd oder Angel — erledigt.
+4. **Nether**: Goldrüstung (Piglins bleiben friedlich), Tauschhandel in einer Grube (Piglin wird
+   mit Gold hineingelockt, Bob steht daneben im Graben, Beute fällt vor seine Füße), Bastion-
+   Plünderung (Truhen, Goldblöcke), Festung, Lohenruten, Brauen, Schreiter reiten,
+   Witherskelett, Ghast-Feuerball zurückschlagen.
+5. **Schiffswracks** im Vorbeigehen plündern (Eisen, Ausrüstung), Rüstung anziehen.
+6. **Schleim**: Sumpf bei Nacht (Biom aus dem Atlas), Schleim unter Tage nur wenn gesehen.
+7. **Kampf**: kritische Treffer, Schild, Creeper-Abstand, Rückzug, Bogen gegen Fliegendes.
+8. **Bündel** für die Inventarverwaltung: Kleinkram ins Bündel statt wegwerfen.
+9. **Restliche Ziele** einzeln mit GameTest, wo es geht.
+10. **Komplett-Bretter** als Benchmark (aus einer eigenen Kopie, damit Entwickeln weiterläuft).
