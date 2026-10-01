@@ -200,6 +200,8 @@ public class BotSkillTests {
         h.assertFalse(horse.contains(net.minecraft.resources.Identifier.parse("minecraft:snowy_plains")), "no horses in the snow");
         h.assertTrue(zombie.isEmpty(), "zombies anywhere");
         h.assertTrue(drowned.contains(net.minecraft.resources.Identifier.parse("minecraft:river")), "drowned in rivers");
+        h.assertTrue(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.ZOMBIE), "zombies turn up anywhere");
+        h.assertFalse(net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, net.minecraft.world.entity.EntityTypes.CAVE_SPIDER), "cave spiders only from spawners");
         h.succeed();
     }
 

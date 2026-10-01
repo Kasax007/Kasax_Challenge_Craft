@@ -263,6 +263,11 @@ public final class LockoutBrain implements BotBrain {
             if (type == net.minecraft.world.entity.EntityTypes.ENDER_DRAGON || type == net.minecraft.world.entity.EntityTypes.WITHER
                     || type == net.minecraft.world.entity.EntityTypes.WARDEN || type == net.minecraft.world.entity.EntityTypes.ELDER_GUARDIAN) continue;
             if (net.kasax.challengecraft.bot.plan.BotKnowledge.NETHER_MOBS.contains(type) != nether) continue;
+            // Only what may turn up here: the common night monsters, or those whose home this is
+            // (a slime in the swamp it stands in); not cave spiders far from any mineshaft.
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            if (!nether && !net.kasax.challengecraft.bot.plan.MobHabitats.anywhere(level, type)
+                    && (net.kasax.challengecraft.bot.plan.MobHabitats.of(level, type).isEmpty() || !net.kasax.challengecraft.bot.plan.MobHabitats.inHabitat(bot, type))) continue;
             out.add(type);
         }
         return out;
@@ -281,7 +286,7 @@ public final class LockoutBrain implements BotBrain {
         if (now < huntRetryAt || !huntingTime(bot) || bot.body().getHealth() < 14) return false;
         Set<net.minecraft.world.entity.EntityType<?>> wanted = wantedMonsters(bot);
         if (wanted.size() < 2) return false;
-        huntRetryAt = now + 2400; // (not straight back into it if it found nothing)
+        huntRetryAt = now + 6000; // (not straight back into it if it found nothing)
         long clock = bot.body().level().getOverworldClockTime() % 24000;
         long nightLeft = clock >= 12000 ? 24000 - clock : 0;
         long budgetTicks = Math.max(2400, Math.min(9000, nightLeft > 0 ? nightLeft : 4800));

@@ -20,6 +20,7 @@ import java.util.Set;
  */
 public final class MobHabitats {
     private static final Map<EntityType<?>, Set<Identifier>> CACHE = new HashMap<>();
+    private static final Map<EntityType<?>, Boolean> ANYWHERE = new HashMap<>();
     private static Object cachedFor;
 
     private MobHabitats() {
@@ -29,6 +30,7 @@ public final class MobHabitats {
     public static Set<Identifier> of(ServerLevel level, EntityType<?> type) {
         if (cachedFor != level.getServer()) {
             CACHE.clear();
+            ANYWHERE.clear();
             cachedFor = level.getServer();
         }
         return CACHE.computeIfAbsent(type, t -> compute(level, t));
@@ -50,8 +52,19 @@ public final class MobHabitats {
             if (here) out.add(holder.key().identifier());
         }
         // (Almost everywhere is no habitat to walk to.)
+        ANYWHERE.put(type, out.size() * 2 > total);
         if (out.size() * 2 > total) return Set.of();
         return out;
+    }
+
+    /**
+     * Whether it may turn up wherever Bob is (zombies, creepers at night): true for those that
+     * spawn nearly everywhere, false for those with a habitat elsewhere and for those that never
+     * spawn naturally (cave spiders: only from the spawners in mineshafts).
+     */
+    public static boolean anywhere(ServerLevel level, EntityType<?> type) {
+        of(level, type);
+        return ANYWHERE.getOrDefault(type, false);
     }
 
     /** The nearest spot of its habitat Bob knows of in his atlas, or null. */
