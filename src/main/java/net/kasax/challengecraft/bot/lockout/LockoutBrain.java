@@ -181,6 +181,8 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
         }
+        // Night (or a cave, or the Nether), and several monsters wanted: one hunt for all of them.
+        if (huntRound(bot)) return;
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
@@ -247,6 +249,46 @@ public final class LockoutBrain implements BotBrain {
     private static final Set<net.minecraft.world.item.Item> GOOD_PICKAXES = Set.of(net.minecraft.world.item.Items.STONE_PICKAXE,
             net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE);
     private long kitCheckAt;
+
+    private long huntRetryAt;
+
+    /** The kinds of monster wanted for open kill tiles that can be met where Bob is now. */
+    private Set<net.minecraft.world.entity.EntityType<?>> wantedMonsters(Bot bot) {
+        Set<net.minecraft.world.entity.EntityType<?>> out = new java.util.HashSet<>();
+        boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() != null || t.goal().type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL) continue;
+            var type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getOptional(net.minecraft.resources.Identifier.tryParse(t.goal().primaryTarget())).orElse(null);
+            if (type == null || type.getCategory() != net.minecraft.world.entity.MobCategory.MONSTER) continue;
+            if (type == net.minecraft.world.entity.EntityTypes.ENDER_DRAGON || type == net.minecraft.world.entity.EntityTypes.WITHER
+                    || type == net.minecraft.world.entity.EntityTypes.WARDEN || type == net.minecraft.world.entity.EntityTypes.ELDER_GUARDIAN) continue;
+            if (net.kasax.challengecraft.bot.plan.BotKnowledge.NETHER_MOBS.contains(type) != nether) continue;
+            out.add(type);
+        }
+        return out;
+    }
+
+    /** Whether it is hunting time here: night on the surface, any time in a cave or the Nether. */
+    private static boolean huntingTime(Bot bot) {
+        var level = bot.body().level();
+        if (level.dimension() == net.minecraft.world.level.Level.NETHER) return true;
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        return level.isDarkOutside() || net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
+    }
+
+    private boolean huntRound(Bot bot) {
+        long now = bot.body().level().getGameTime();
+        if (now < huntRetryAt || !huntingTime(bot) || bot.body().getHealth() < 14) return false;
+        Set<net.minecraft.world.entity.EntityType<?>> wanted = wantedMonsters(bot);
+        if (wanted.size() < 2) return false;
+        huntRetryAt = now + 2400; // (not straight back into it if it found nothing)
+        long clock = bot.body().level().getOverworldClockTime() % 24000;
+        long nightLeft = clock >= 12000 ? 24000 - clock : 0;
+        long budgetTicks = Math.max(2400, Math.min(9000, nightLeft > 0 ? nightLeft : 4800));
+        bot.say("hunting time: one round for " + wanted.size() + " kinds of monster");
+        start(bot, new net.kasax.challengecraft.bot.task.HuntRoundTask(() -> wantedMonsters(bot), () -> huntingTime(bot)), budgetTicks);
+        return true;
+    }
 
     private boolean keepKit(Bot bot) {
         long now = bot.body().level().getGameTime();

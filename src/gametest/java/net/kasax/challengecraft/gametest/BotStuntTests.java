@@ -440,4 +440,24 @@ public class BotStuntTests {
         a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 3600,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
     }
+
+    /** A zombie and a spider wanted (two tiles): one round, both taken, one after the other. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void huntRound(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hunt_round");
+        var level = h.getLevel();
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(30, FEET, 20)));
+        level.addFreshEntity(z);
+        var sp = EntityTypes.SPIDER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sp.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(10, FEET, 30)));
+        level.addFreshEntity(sp);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.BREAD, 8));
+        a.run(new net.kasax.challengecraft.bot.task.HuntRoundTask(() -> {
+            java.util.Set<net.minecraft.world.entity.EntityType<?>> open = new java.util.HashSet<>();
+            if (z.isAlive()) open.add(EntityTypes.ZOMBIE);
+            if (sp.isAlive()) open.add(EntityTypes.SPIDER);
+            return open;
+        }, () -> true), 1200, () -> !z.isAlive() && !sp.isAlive());
+    }
 }
