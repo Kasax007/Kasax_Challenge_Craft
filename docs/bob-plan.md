@@ -1,7 +1,7 @@
 # Bob – Plan zum guten Lockout-Spieler
 
-> Fortschritt: Schritte 1–7 umgesetzt (siehe `docs/konzept-bot.md`, Abschnitt „Stand“). Jetzt:
-> viele ganze Bretter spielen und aus den Benchmarks verbessern.
+> Fortschritt: Schritte 1–7 umgesetzt (siehe `docs/konzept-bot.md`, Abschnitt „Stand“). Seitdem
+> Testphase mit ganzen Brettern, siehe Abschnitt 6.
 
 Stand: 30.09.2026. Dieser Plan ist die Arbeitsgrundlage, um Bob ohne Rückfragen Schritt für Schritt
 zu einem ebenbürtigen Lockout-Gegner zu machen. Jeder Schritt hat messbare Abnahmekriterien; ein
@@ -173,3 +173,41 @@ Ausführer-Abbruchregeln; Schwimmen mit Sprint/Wasserlinie; Fundort-Listen mit B
   `26.3-lockout-bot`.
 - Client-Tests nur noch zum visuellen Abschluss.
 - Jeder Fehler aus einem Benchmark wird als GameTest-Szenario festgehalten, bevor er behoben wird.
+
+## 6. Testphase: ganze Bretter (10 Welten, je 10 Minuten, schwer)
+
+Gemessen mit `scripts/bot/bench-many.sh 600 hard 11 22 33 44 55 66 77 88 99 1010`, ausgewertet mit
+`scripts/bot/analyse.py run/bench_*.log` (Zeit je Wurzelaufgabe, Felder, Tode).
+
+| Runde | Felder Ø | Runden mit 0 | Tode | Wichtigste Änderung davor |
+|---|---|---|---|---|
+| 1 | 2,0 | 3 | 4 | (Ausgang) |
+| 2 | 2,2 | 2 | 7 | Chunk-Tickets folgen dem Bot |
+| 3 | 2,5 | 0 | 8 | Fernziele (Biome), Unterwasser-/Tiefziele überspringen |
+| 4 | 3,0 | 0 | 7 | Verstecken vor Schützen, Rückzug im Kampf |
+
+### Gefundene und behobene Ursachen
+
+- **Die Welt stand still:** Die Chunk-Tickets des Bots blieben am Einlogpunkt. Weiter weg fielen
+  Drops nicht, Tiere bewegten sich nicht, das Gedächtnis sah keine Chunks. Jetzt
+  `ServerChunkCache.move` jeden Tick wie beim echten Spieler.
+- **Bäume:** Stamm von unten abbauen, nur mit festem Stand (in der Luft 5× langsamer).
+- **Keine Bäume in Sicht:** Fernziel aus der Biomverteilung (Wald hinter der Wüste). Es wird gemerkt
+  und in Etappen über die Oberfläche angelaufen. Gescheiterte Etappen werden seitlich umgangen, und
+  der Weg zählt in die Zeitschätzung.
+- **Falsche Ziele:** Holz tief in Minen, Stein unter Flüssen oder unter Wasser wird übersprungen.
+  Stein mit der Hand im Weg kostet viermal so viel.
+- **Zeitbudget:** Ziele, die gut vorankommen, bekommen mehr Zeit. Unterwegs zu sein zählt als
+  Fortschritt. Ziele, die einmal überzogen haben, werden danach teurer geschätzt.
+- **Essen:** Gesucht wird erst bei echtem Hunger, Nahrung direkt vor Ort nimmt Bob gleich mit.
+  Gescheiterte Mitnahmen (Feuerstein) ruhen eine Weile.
+- **Kampf:** Rückzug auch im Kampf, mit Sprint und Ausweichen zur Seite. Gegen Schützen gräbt sich
+  Bob ein (3 tief, Deckel, essen).
+- **Portal gießen:** Endlosschleife beim Wasserschöpfen behoben; der GameTest besteht stabil.
+
+### Offen (nächste Hebel)
+
+- Die Eröffnung nach einem Tod kostet weiter viel. Tode senken (Creeper, Ertrinken, Tropfstein) und
+  nach dem Tod die eigenen Sachen zurückholen.
+- Wüsten- und Ozeanstarts: Der Weg zum Wald ist lang; Dorf- oder Schiffswrack-Holz wäre schneller.
+- Teure Kettenziele (Bogen, Item Frame, Feuerwerk) genauer schätzen.
