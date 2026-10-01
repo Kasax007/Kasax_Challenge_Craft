@@ -7,6 +7,7 @@ import net.kasax.challengecraft.bot.BotPlayer;
 import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.BotWorld;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
@@ -54,15 +55,29 @@ public final class FillBucketTask implements BotTask {
         if (BotInventory.slotOf(body, filled) >= 0) return Result.DONE;
         if (BotInventory.slotOf(body, empty) < 0 || ++tries > 3000) return Result.FAILED;
         if (source == null || !level.getFluidState(source).isSource()) {
-            // A source with open air above, so the bot can look at it from the side or above.
-            source = BotWorld.nearest(level, body.blockPosition(), 32, 32,
-                    s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), true, skip);
-            // None in sight: the nearest it remembers (a lake passed on the way).
-            if (source == null) source = bot.memory().nearest(level, body.blockPosition(), s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), skip);
+            java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> any =
+                    s -> s.getFluidState().is(fluid) && s.getFluidState().isSource();
+            // What a player would take: the source in sight (or the one it remembers: a lake, a
+            // river passed on the way) that is quickest to get to. A pool far down a ravine is
+            // worth less than a river a little further on; a lake under the hill it never saw is
+            // not known at all (see BotWorld#seen).
+            BlockPos inSight = BotWorld.nearest(level, body.blockPosition(), 32, 32, any, true, skip);
+            BlockPos remembered = bot.memory().nearest(level, body.blockPosition(), any, skip);
+            source = effort(body, inSight) <= effort(body, remembered) ? inSight : remembered;
             walking = false;
-            // Nothing known at all: out over the surface until some turns up (water is never far).
             if (source == null) {
                 if (fluid == FluidTags.LAVA) return Result.FAILED;
+                // Nothing known: to the nearest river, sea, beach or swamp it has seen, then out
+                // over the surface until some turns up (water is never far).
+                if (!toWaterBiome) {
+                    toWaterBiome = true;
+                    Identifier biome = nearestWaterBiome(bot);
+                    if (biome != null) {
+                        bot.say("no water known: to the " + biome.getPath().replace('_', ' ') + " I passed");
+                        bot.interject(new GoToBiomeTask(biome));
+                        return Result.RUNNING;
+                    }
+                }
                 return explorer.tick(bot);
             }
             explorer.pause(bot);
@@ -125,6 +140,36 @@ public final class FillBucketTask implements BotTask {
         skip.add(source); // the look did not hit it (something in between): another one
         source = null;
         return Result.RUNNING;
+    }
+
+    private boolean toWaterBiome;
+
+    /** Roughly the seconds to get to a source: the walk, and the climb down (digging) to it. */
+    private static double effort(BotPlayer body, BlockPos p) {
+        if (p == null) return Double.MAX_VALUE;
+        double hx = p.getX() - body.getX(), hz = p.getZ() - body.getZ();
+        int down = Math.max(0, body.getBlockY() - p.getY() - 2), up = Math.max(0, p.getY() - body.getBlockY() - 2);
+        return Math.sqrt(hx * hx + hz * hz) / 4.3 + down * 1.5 + up * 0.6;
+    }
+
+    private static final java.util.List<String> WATER_BIOMES = java.util.List.of("river", "ocean", "beach", "swamp", "mangrove_swamp",
+            "lukewarm_ocean", "warm_ocean", "cold_ocean", "deep_ocean", "deep_lukewarm_ocean", "deep_cold_ocean", "frozen_river",
+            "stony_shore", "mushroom_fields");
+
+    private static Identifier nearestWaterBiome(Bot bot) {
+        Identifier best = null;
+        double bestD = 600 * 600;
+        for (String name : WATER_BIOMES) {
+            Identifier id = Identifier.withDefaultNamespace(name);
+            BlockPos p = bot.senses().biome(id);
+            if (p == null) continue;
+            double d = p.distSqr(bot.body().blockPosition());
+            if (d < bestD) {
+                bestD = d;
+                best = id;
+            }
+        }
+        return best;
     }
 
     @Override

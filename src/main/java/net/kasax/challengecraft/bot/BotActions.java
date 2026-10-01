@@ -120,8 +120,8 @@ public final class BotActions {
     }
 
     private static final Set<net.minecraft.world.item.Item> CRAFTING_STONE = Set.of(Items.COBBLESTONE, Items.BLACKSTONE, Items.COBBLED_DEEPSLATE);
-    /** Enough for a pickaxe or an axe: a player keeps that much stone rather than build with it. */
-    private static final int KEEP_CRAFTING_STONE = 3;
+    /** Enough for a furnace: a player keeps that much stone rather than build with it. */
+    private static final int KEEP_CRAFTING_STONE = 8;
 
     /** Puts a throwaway block at {@code target}, against the block below it. */
     public boolean placeThrowaway(BlockPos target) {

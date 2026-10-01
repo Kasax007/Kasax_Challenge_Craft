@@ -62,6 +62,12 @@ public final class BotMemory {
         long now = level.getGameTime();
         BlockPos at = body.blockPosition();
         scanNextChunk(level, at, now);
+        // Down in a cave: what it sees around it now (the chunk reading only takes what the open
+        // air shows, and what was in sight when that chunk came round).
+        if (now - lookedAround >= 40 && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, at.above()) < 8) {
+            lookedAround = now;
+            lookAround(level, body.getEyePosition(), at);
+        }
         if (now - lookedAtMobs >= 40) {
             lookedAtMobs = now;
             lookAtMobs(level, body, now);
@@ -69,6 +75,45 @@ public final class BotMemory {
     }
 
     // ---- blocks ---------------------------------------------------------------------------------
+
+    private long lookedAround;
+
+    private static net.minecraft.world.phys.Vec3 caveEye(BlockPos at) {
+        return new net.minecraft.world.phys.Vec3(at.getX() + 0.5, at.getY() + 1.62, at.getZ() + 0.5);
+    }
+
+    /** The cave around: the blocks worth remembering in its line of sight, and the cave itself. */
+    private void lookAround(ServerLevel level, net.minecraft.world.phys.Vec3 eye, BlockPos at) {
+        Map<Block, List<BlockPos>> known = blocks.computeIfAbsent(level.dimension(), k -> new IdentityHashMap<>());
+        List<BlockPos> cave = caves.computeIfAbsent(level.dimension(), k -> new ArrayList<>());
+        boolean nether = level.dimension() == Level.NETHER;
+        int r = 16;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (level.getChunkSource().getChunkNow((at.getX() + dx) >> 4, (at.getZ() + dz) >> 4) == null) continue;
+                for (int dy = -10; dy <= 10; dy++) {
+                    m.set(at.getX() + dx, at.getY() + dy, at.getZ() + dz);
+                    BlockState s = level.getBlockState(m);
+                    if (s.isAir()) {
+                        // (A spot to stand in, every fourth: the cave, for the way down.)
+                        if (!nether && (m.getX() & 3) == 1 && (m.getZ() & 3) == 1 && (m.getY() & 3) == 2
+                                && level.getBlockState(m.above()).isAir() && BotWorld.inSight(level, eye, m, BotWorld.SIGHT)) {
+                            BlockPos p = m.immutable();
+                            if (!cave.contains(p)) cave.add(p);
+                        }
+                        continue;
+                    }
+                    if (!interesting(s)) continue;
+                    BlockPos p = m.immutable();
+                    if (!BotWorld.inSight(level, eye, p, BotWorld.SIGHT)) continue;
+                    List<BlockPos> list = known.get(s.getBlock());
+                    if (list != null && list.contains(p)) continue;
+                    add(known, s.getBlock(), p, at);
+                }
+            }
+        }
+    }
 
     /** One chunk a tick: the nearest one not read yet (or not for a while), ring by ring. */
     private void scanNextChunk(ServerLevel level, BlockPos at, long now) {
@@ -117,6 +162,7 @@ public final class BotMemory {
 
     private void scan(ServerLevel level, LevelChunk chunk, BlockPos at) {
         Map<Block, List<BlockPos>> known = blocks.computeIfAbsent(level.dimension(), k -> new IdentityHashMap<>());
+        net.minecraft.world.phys.Vec3 eye = new net.minecraft.world.phys.Vec3(at.getX() + 0.5, at.getY() + 1.62, at.getZ() + 0.5);
         // Forget what was there: it is read afresh.
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         for (List<BlockPos> list : known.values()) list.removeIf(p -> (p.getX() >> 4) == (x0 >> 4) && (p.getZ() >> 4) == (z0 >> 4));
@@ -133,7 +179,9 @@ public final class BotMemory {
                         BlockPos p = new BlockPos(x0 + x, y0 + y, z0 + z);
                         // Only what can be seen: next to air or water (a cave wall, the ground),
                         // not ore buried in the rock - that is what caves and tunnels are for.
-                        if (!exposed(level, chunk, p)) continue;
+                        // And only from where a player would see it: from the open air, or close
+                        // by in its line of sight (not the cave forty blocks under its feet).
+                        if (!exposed(level, chunk, p) || !BotWorld.seen(level, p, eye)) continue;
                         add(known, s.getBlock(), p, at);
                     }
                 }
@@ -188,6 +236,9 @@ public final class BotMemory {
                     // Room to stand: air here and above, something under it.
                     if (!st.isAir() || !chunk.getBlockState(p.above()).isAir()) continue;
                     if (nether) continue; // (the Nether is one big cave: no use)
+                    // A cave it can know of: its mouth (lit by the sky), or the one it is in.
+                    if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, p) == 0
+                            && !BotWorld.inSight(level, caveEye(at), p, BotWorld.SIGHT)) continue;
                     list.add(p);
                 }
             }

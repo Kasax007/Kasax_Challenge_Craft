@@ -281,6 +281,10 @@ public final class ObtainPlanner {
 
     // ---- looking around -----------------------------------------------------------------------
 
+    /** Rock and soil: wherever it digs there is some, no need to have seen it. */
+    private static final Set<Block> COMMON = Set.of(Blocks.STONE, Blocks.DEEPSLATE, Blocks.DIRT, Blocks.GRASS_BLOCK, Blocks.NETHERRACK,
+            Blocks.ANDESITE, Blocks.DIORITE, Blocks.GRANITE, Blocks.TUFF, Blocks.SAND, Blocks.GRAVEL, Blocks.BEDROCK, Blocks.END_STONE);
+
     private void refresh(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         long now = level.getGameTime();
@@ -297,6 +301,7 @@ public final class ObtainPlanner {
         // Seconds to dig one level of a staircase (two blocks of stone) with what it holds.
         double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        net.minecraft.world.phys.Vec3 eye = bot.body().getEyePosition();
         for (int x = -SCAN_RADIUS; x <= SCAN_RADIUS; x++) {
             for (int z = -SCAN_RADIUS; z <= SCAN_RADIUS; z++) {
                 if (level.getChunkSource().getChunkNow((c.getX() + x) >> 4, (c.getZ() + z) >> 4) == null) continue;
@@ -308,7 +313,10 @@ public final class ObtainPlanner {
                     double reach = 2 + Math.sqrt(x * x + z * z) / 4.0 + vertical(y, digPerBlock);
                     Double known = blocks.get(s.getBlock());
                     if (known != null && known <= reach) continue;
-                    if (BotWorld.exposed(level, m)) blocks.put(s.getBlock(), reach);
+                    if (!BotWorld.exposed(level, m)) continue;
+                    // Only what it could have seen (common rock anywhere it digs is seen enough).
+                    if (!COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
+                    blocks.put(s.getBlock(), reach);
                 }
             }
         }

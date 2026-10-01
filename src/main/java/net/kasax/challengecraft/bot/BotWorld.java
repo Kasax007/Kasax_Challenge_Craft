@@ -13,9 +13,10 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * What a bot can find around it. By default it only "sees" blocks a player could see: blocks
- * touching air or water somewhere (the surface, caves, ravines). Buried ores are found by digging,
- * as a player finds them — no X-ray.
+ * What a bot can find around it. By default it only "sees" blocks a player could see: blocks on
+ * view from the open air (the surface, a ravine, a cave mouth: lit by the sky), and blocks in its
+ * line of sight close by (the cave it is in). Ores in caves it never went into, a lake under the
+ * hill, are found as a player finds them: by going there - no X-ray.
  */
 public final class BotWorld {
     private BotWorld() {
@@ -27,6 +28,7 @@ public final class BotWorld {
         BlockPos best = null;
         double bestD = Double.MAX_VALUE;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        net.minecraft.world.phys.Vec3 eye = new net.minecraft.world.phys.Vec3(center.getX() + 0.5, center.getY() + 1.62, center.getZ() + 0.5);
         int cx0 = (center.getX() - radius) >> 4, cx1 = (center.getX() + radius) >> 4;
         int cz0 = (center.getZ() - radius) >> 4, cz1 = (center.getZ() + radius) >> 4;
         for (int cx = cx0; cx <= cx1; cx++) {
@@ -43,7 +45,7 @@ public final class BotWorld {
                             if (s.isAir() || !match.test(s)) continue;
                             double d = m.distSqr(center);
                             if (d >= bestD || ignore.contains(m)) continue;
-                            if (exposedOnly && !exposed(level, m)) continue;
+                            if (exposedOnly && !seen(level, m, eye)) continue;
                             bestD = d;
                             best = m.immutable();
                         }
@@ -52,6 +54,48 @@ public final class BotWorld {
             }
         }
         return best;
+    }
+
+    /** How far it makes out a block in a cave around it (a torch-less player sees about that far). */
+    public static final double SIGHT = 24;
+
+    /**
+     * Whether a player standing with its eyes at {@code eye} could have seen this block: on view
+     * from the open air, or in its line of sight close by. (Null eye: from the open air only.)
+     */
+    public static boolean seen(ServerLevel level, BlockPos p, net.minecraft.world.phys.Vec3 eye) {
+        return skyVisible(level, p) || eye != null && inSight(level, eye, p, SIGHT);
+    }
+
+    /** An open side (air, water) lit by the sky: in view from the surface, a ravine, a cave mouth. */
+    public static boolean skyVisible(ServerLevel level, BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = p.relative(d);
+            if (open(level, n) && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, n) > 0) return true;
+        }
+        return false;
+    }
+
+    /** One of its open faces in a straight line from {@code eye}, within {@code range}. */
+    public static boolean inSight(ServerLevel level, net.minecraft.world.phys.Vec3 eye, BlockPos p, double range) {
+        net.minecraft.world.phys.Vec3 c = net.minecraft.world.phys.Vec3.atCenterOf(p);
+        if (c.distanceToSqr(eye) > range * range) return false;
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = p.relative(d);
+            if (!open(level, n)) continue;
+            // (Only faces turned towards the eye can be seen.)
+            net.minecraft.world.phys.Vec3 face = c.add(d.getStepX() * 0.51, d.getStepY() * 0.51, d.getStepZ() * 0.51);
+            if (face.subtract(c).dot(eye.subtract(c)) <= 0 && !n.equals(net.minecraft.core.BlockPos.containing(eye))) continue;
+            var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, face, net.minecraft.world.level.ClipContext.Block.VISUAL,
+                    net.minecraft.world.level.ClipContext.Fluid.NONE, net.minecraft.world.phys.shapes.CollisionContext.empty()));
+            if (hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || hit.getBlockPos().equals(p)) return true;
+        }
+        return false;
+    }
+
+    private static boolean open(ServerLevel level, BlockPos n) {
+        BlockState st = level.getBlockState(n);
+        return st.isAir() || !st.getFluidState().isEmpty() && st.getCollisionShape(level, n).isEmpty() || st.is(net.minecraft.tags.BlockTags.LEAVES);
     }
 
     /** Touches air or water on some side: visible from somewhere. */

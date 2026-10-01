@@ -365,20 +365,23 @@ public final class Bot {
         for (var s : inv) if (s.isEmpty()) free++;
         if (free >= 3) return;
         throwawaySeen = 0;
+        // A stack of building blocks stays, cobblestone first (furnaces, tools, walls), then the
+        // rest (dirt, netherrack, the stone kinds); junk beyond that goes.
         int keep = 64;
-        for (int i = 0; i < inv.size(); i++) {
-            var s = inv.get(i);
-            if (s.isEmpty() || !JUNK.contains(s.getItem())) {
-                // Anything that is not junk stays; junk with a use (cobblestone) is kept up to a stack.
-                continue;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int i = 0; i < inv.size(); i++) {
+                var s = inv.get(i);
+                if (s.isEmpty() || !JUNK.contains(s.getItem())) continue; // (anything not junk stays)
+                boolean cobble = s.is(net.minecraft.world.item.Items.COBBLESTONE) || s.is(net.minecraft.world.item.Items.COBBLED_DEEPSLATE);
+                if (pass == 0 != cobble) continue;
+                boolean building = BotActions.THROWAWAY.contains(s.getItem());
+                if (building && keep > 0) {
+                    keep -= s.getCount();
+                    continue;
+                }
+                inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+                body.drop(s, false, net.minecraft.util.Prediction.SERVER_ONLY);
             }
-            boolean building = BotActions.THROWAWAY.contains(s.getItem());
-            if (building && keep > 0) {
-                keep -= s.getCount();
-                continue;
-            }
-            inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
-            body.drop(s, false, net.minecraft.util.Prediction.SERVER_ONLY);
         }
         body.getInventory().setChanged();
         free = 0;

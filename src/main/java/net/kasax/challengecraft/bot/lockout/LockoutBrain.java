@@ -351,7 +351,44 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
             return true;
         }
+        // Spare cobblestone (a furnace, stone tools, a wall against a creeper or a ghast) and spare
+        // wood (a crafting table, sticks, a boat, a chest) on the way, as a player keeps them.
+        boolean overworld = body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
+        int cobble = ObtainPlanner.countAny(body, CRAFTING_STONE);
+        if (overworld && cobble < SPARE_COBBLE && now >= spareRetryAt) {
+            spareRetryAt = now + 2400;
+            bot.say("spare cobblestone (" + cobble + ")");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE),
+                    cobble + 24, planner), 1800);
+            return true;
+        }
+        if (overworld && woodPlanks(body) < SPARE_PLANKS && now >= woodRetryAt) {
+            woodRetryAt = now + 2400;
+            int logs = ObtainPlanner.countAny(body, LOGS);
+            bot.say("spare wood (" + woodPlanks(body) + " planks' worth)");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + 6, planner), 1800);
+            return true;
+        }
         return false;
+    }
+
+    /** At least this much cobblestone and this much wood (in planks) on hand, always. */
+    private static final int SPARE_COBBLE = 16, SPARE_PLANKS = 12;
+    private static final Set<net.minecraft.world.item.Item> CRAFTING_STONE = Set.of(net.minecraft.world.item.Items.COBBLESTONE,
+            net.minecraft.world.item.Items.COBBLED_DEEPSLATE, net.minecraft.world.item.Items.BLACKSTONE);
+    private static final Set<net.minecraft.world.item.Item> LOGS = tagged(net.minecraft.tags.ItemTags.LOGS);
+    private static final Set<net.minecraft.world.item.Item> PLANKS = tagged(net.minecraft.tags.ItemTags.PLANKS);
+    private long spareRetryAt, woodRetryAt;
+
+    private static Set<net.minecraft.world.item.Item> tagged(net.minecraft.tags.TagKey<net.minecraft.world.item.Item> tag) {
+        Set<net.minecraft.world.item.Item> out = new java.util.HashSet<>();
+        for (var item : net.minecraft.core.registries.BuiltInRegistries.ITEM) if (new net.minecraft.world.item.ItemStack(item).is(tag)) out.add(item);
+        return out;
+    }
+
+    /** The wood on hand, counted in planks (a log makes four). */
+    static int woodPlanks(net.kasax.challengecraft.bot.BotPlayer body) {
+        return ObtainPlanner.countAny(body, LOGS) * 4 + ObtainPlanner.countAny(body, PLANKS);
     }
 
     private boolean opening(Bot bot) {

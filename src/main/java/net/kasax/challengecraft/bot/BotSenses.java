@@ -122,6 +122,7 @@ public final class BotSenses {
         var registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
         net.minecraft.world.phys.Vec3 eye = body.getEyePosition();
         int view = Math.min(STRUCTURE_VIEW, level.getServer().getPlayerList().getViewDistance() * 16);
+        boolean overworld = level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
         int r = view >> 4;
         for (int cx = (c.getX() >> 4) - r; cx <= (c.getX() >> 4) + r; cx++) {
             for (int cz = (c.getZ() >> 4) - r; cz <= (c.getZ() >> 4) + r; cz++) {
@@ -139,6 +140,11 @@ public final class BotSenses {
                         if (distance(box, c) > view) continue;
                         BlockPos centre = box.getCenter();
                         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centre.getX(), centre.getZ());
+                        // Under the ground (a mineshaft, a stronghold, an ancient city, buried
+                        // treasure): nothing of it shows from up here; only once it is close by,
+                        // down in the caves. (The sea floor counts as open: a wreck, a monument.)
+                        if (overworld && box.maxY() < level.getHeight(Heightmap.Types.OCEAN_FLOOR, centre.getX(), centre.getZ()) - 2
+                                && distance(box, c) > BotWorld.SIGHT) continue;
                         // Within view distance it is known (as a player would spot it; no line of sight needed).
                         BlockPos spot = new BlockPos(centre.getX(), Math.max(box.minY(), Math.min(box.maxY(), surface)), centre.getZ());
                         addStructure(new SeenStructure(id, spot, box), c);

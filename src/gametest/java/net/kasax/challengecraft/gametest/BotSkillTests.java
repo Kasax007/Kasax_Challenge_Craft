@@ -42,6 +42,24 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.WATER_BUCKET)) > 0);
     }
 
+    /**
+     * A lake sealed in the rock right under its feet (that it cannot have seen) and a pond on the
+     * surface 22 blocks off: the pond, as a player would; no digging down.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void waterNotXray(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "water_not_xray");
+        a.fill(16, GROUND - 9, 16, 24, GROUND - 6, 24, Blocks.WATER);
+        a.fill(34, GROUND - 1, 34, 36, GROUND, 36, Blocks.WATER);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET));
+        int[] lowest = {FEET};
+        a.run(new ObtainTask(Set.of(Items.WATER_BUCKET), 1, new ObtainPlanner()), 1200, () -> {
+            lowest[0] = Math.min(lowest[0], a.feet().getY());
+            h.assertTrue(lowest[0] >= GROUND - 1, "dug down to " + lowest[0]);
+            return ObtainPlanner.countAny(a.bot().body(), Set.of(Items.WATER_BUCKET)) > 0;
+        });
+    }
+
     /** Not a test of skill: logs which goals of the whole pool Bob knows no way for ([COVERAGE]). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void coverage(GameTestHelper h) {
