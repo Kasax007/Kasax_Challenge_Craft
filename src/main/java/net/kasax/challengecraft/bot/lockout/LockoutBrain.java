@@ -146,6 +146,17 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         strategist.update(bot, planner, replanNow);
+        // The investment the plan has decided on: iron tools and a bucket now, before the cheap
+        // tiles (they pay for themselves on the tiles after). A few tries, then without.
+        if (strategist.wantsIron() && kitTries < 3 && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            for (var item : List.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.BUCKET)) {
+                if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
+                kitTries++;
+                bot.say("investing: " + ObtainPlanner.name(item) + " (the plan wants the iron kit)");
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 4800);
+                return;
+            }
+        }
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
@@ -224,7 +235,7 @@ public final class LockoutBrain implements BotBrain {
         return false;
     }
 
-    private int openingTries;
+    private int openingTries, kitTries;
 
     private boolean needsFood(Bot bot) {
         long now = bot.body().level().getGameTime();
@@ -529,6 +540,7 @@ public final class LockoutBrain implements BotBrain {
     public void respawned(Bot bot) {
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
+        kitTries = 0;
         openingTries = 0;
         targetIndex = -1;
         goalTask = null;
