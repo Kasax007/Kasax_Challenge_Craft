@@ -421,10 +421,11 @@ public final class LockoutBrain implements BotBrain {
         }
         int blocks = 0;
         for (var st : body.getInventory().getNonEquipmentItems()) if (net.kasax.challengecraft.bot.BotActions.THROWAWAY.contains(st.getItem())) blocks += st.getCount();
-        if (blocks < 12) {
+        if (blocks < 12 && now >= blocksRetryAt) {
             var stone = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER
                     ? Set.of(net.minecraft.world.item.Items.NETHERRACK) : Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE, net.minecraft.world.item.Items.DIRT);
             bot.say("few blocks left (" + blocks + "): a stack to build with");
+            nextErrand = "blocks";
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
             return true;
         }
@@ -449,6 +450,7 @@ public final class LockoutBrain implements BotBrain {
         if (overworld && cobble < SPARE_COBBLE && now >= spareRetryAt) {
             spareRetryAt = now + 2400;
             bot.say("spare cobblestone (" + cobble + ")");
+            nextErrand = "cobble";
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE),
                     cobble + 24, planner), 1800);
             return true;
@@ -457,6 +459,7 @@ public final class LockoutBrain implements BotBrain {
             woodRetryAt = now + 2400;
             int logs = ObtainPlanner.countAny(body, LOGS);
             bot.say("spare wood (" + woodPlanks(body) + " planks' worth)");
+            nextErrand = "wood";
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + 6, planner), 1800);
             return true;
         }
@@ -558,6 +561,7 @@ public final class LockoutBrain implements BotBrain {
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
         if (level >= 12 && cost > 25 || cost > 90) return false;
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
+        nextErrand = "food";
         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));
         return true;
     }
@@ -674,7 +678,17 @@ public final class LockoutBrain implements BotBrain {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
+    /**
+     * The kind of errand running (spare wood, food, ...), or null: one that ran out of time is
+     * left alone for longer each time (no wood near here: no wood near here a minute later either).
+     */
+    private String errand, nextErrand;
+    private final Map<String, Integer> errandOverruns = new HashMap<>();
+    private long blocksRetryAt;
+
     private void start(Bot bot, BotTask task, long budgetTicks) {
+        errand = nextErrand;
+        nextErrand = null;
         running = task;
         runningSince = bot.body().level().getGameTime();
         runningBudget = budgetTicks;
@@ -705,6 +719,18 @@ public final class LockoutBrain implements BotBrain {
             bot.say(running.describe() + " takes too long, something else");
             running = null;
             nextFoodCheck = now + 2400; // (if it was food: not the same way again right away)
+            if (errand != null) {
+                int n = errandOverruns.merge(errand, 1, Integer::sum);
+                long later = now + (3600L << Math.min(3, n)); // 6, 12, 24, 48 minutes... of game time
+                switch (errand) {
+                    case "wood" -> woodRetryAt = later;
+                    case "cobble" -> spareRetryAt = later;
+                    case "blocks" -> blocksRetryAt = now + (1200L << Math.min(3, n));
+                    case "food" -> nextFoodCheck = Math.max(nextFoodCheck, now + (2400L << Math.min(2, n - 1)));
+                    default -> { }
+                }
+                errand = null;
+            }
             drop(bot);
             pause = 100;
             return;
