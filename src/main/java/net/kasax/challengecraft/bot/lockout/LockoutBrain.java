@@ -290,6 +290,17 @@ public final class LockoutBrain implements BotBrain {
         return true;
     }
 
+    /** Every pickaxe it has nearly used up (under a tenth left). */
+    private static boolean pickaxeAlmostGone(Bot bot) {
+        boolean any = false;
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+            if (!PICKAXES.contains(st.getItem())) continue;
+            any = true;
+            if (!st.isDamageableItem() || st.getDamageValue() < st.getMaxDamage() * 0.9) return false;
+        }
+        return any;
+    }
+
     private boolean keepKit(Bot bot) {
         long now = bot.body().level().getGameTime();
         if (now < kitCheckAt) return false;
@@ -532,6 +543,12 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (goalTask != null && targetId != null) spent.merge(targetId, 1, Integer::sum);
+        // In the middle of a long goal (digging for diamonds) the pickaxe wears out too: a spare
+        // made before it breaks, without dropping the goal.
+        if (checkTicks % 200 == 0 && goalTask != null && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask) && pickaxeAlmostGone(bot)) {
+            bot.say("the pickaxe is about to break: a spare one first");
+            bot.interject(new net.kasax.challengecraft.bot.task.ObtainTask(GOOD_PICKAXES, ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) + 1, planner));
+        }
         if (checkTicks % 100 == 0) {
             boolean open = false;
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {

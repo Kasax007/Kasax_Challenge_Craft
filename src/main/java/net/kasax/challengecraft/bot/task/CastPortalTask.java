@@ -251,6 +251,11 @@ public final class CastPortalTask implements BotTask {
             // (Round the pool the spot was planned by first, then round the spot.)
             pool = planLava != null && !badPools.contains(planLava) && level.getFluidState(planLava).is(FluidTags.LAVA) && level.getFluidState(planLava).isSource() ? planLava : null;
             if (pool == null) pool = BotWorld.nearest(level, inside, 28, 16, s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, badPools);
+            // Run dry here: the nearest other lava it remembers, if not too far off.
+            if (pool == null) {
+                BlockPos known = bot.memory().nearest(level, inside, s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), badPools);
+                if (known != null && known.distSqr(inside) < 96 * 96) pool = known;
+            }
             if (pool == null) {
                 bot.say("no lava left to scoop near " + inside.toShortString());
                 return Result.FAILED;
@@ -268,6 +273,14 @@ public final class CastPortalTask implements BotTask {
             tries = 0;
         }
         return Result.RUNNING;
+    }
+
+    /** Lava sources within six blocks of {@code p} (how many buckets the pool holds). */
+    private static int sources(ServerLevel level, BlockPos p) {
+        int n = 0;
+        for (BlockPos q : BlockPos.betweenClosed(p.offset(-6, -3, -6), p.offset(6, 3, 6)))
+            if (level.getFluidState(q).is(FluidTags.LAVA) && level.getFluidState(q).isSource() && ++n >= 12) return n;
+        return n;
     }
 
     private Result lightAndEnter(Bot bot, ServerLevel level) {
@@ -319,6 +332,18 @@ public final class CastPortalTask implements BotTask {
                 : BotWorld.nearest(level, near != null ? near : bot.body().blockPosition(), 40, 16,
                 s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), true, Set.of());
         if (lava == null) return false;
+        // Ten buckets of lava go into a frame: a puddle of two or three runs dry half way. A
+        // bigger pool about, if there is one.
+        if (sources(level, lava) < 6) {
+            BlockPos from = bot.body().blockPosition(), better = null;
+            for (BlockPos q : BlockPos.betweenClosed(from.offset(-40, -16, -40), from.offset(40, 16, 40))) {
+                if (!level.isLoaded(q) || !level.getFluidState(q).is(FluidTags.LAVA) || !level.getFluidState(q).isSource()) continue;
+                if (better != null && q.distSqr(from) >= better.distSqr(from)) continue;
+                if (!BotWorld.exposed(level, q) || sources(level, q) < 6) continue;
+                better = q.immutable();
+            }
+            if (better != null) lava = better;
+        }
         planLava = lava;
         // Far enough that the water poured for casting cannot run into the pool and turn it to
         // stone, near enough for quick trips with the lava bucket.

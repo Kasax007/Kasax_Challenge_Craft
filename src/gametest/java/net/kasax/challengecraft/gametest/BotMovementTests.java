@@ -66,6 +66,7 @@ public class BotMovementTests {
     @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
     public void shaftClimbStairs(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "shaft_stairs");
+        a.fill(0, 0, 0, 39, 0, 39, Blocks.BEDROCK); // (the world's floor, as in a real world: nothing to dig out under)
         a.fill(20, 1, 20, 20, GROUND, 20, Blocks.AIR);
         a.spawn(20, 1, 20, new ItemStack(Items.WOODEN_PICKAXE));
         a.run(new SurfaceTask(), 2400, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
