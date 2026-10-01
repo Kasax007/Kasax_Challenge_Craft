@@ -434,7 +434,7 @@
   "challengecraft.lockout.goal.status_effect.desc": "%s erhalten.",
   "challengecraft.lockout.goal.status_effect.condition": "Wird beansprucht, solange ein Teammitglied den geforderten Effekt hat.",
   "challengecraft.lockout.goal.health_check.desc": "%s abschließen.",
-  "challengecraft.lockout.goal.health_check.condition": "Wird beansprucht, solange einem Teammitglied mindestens 10 Herzen fehlen.",
+  "challengecraft.lockout.goal.health_check.condition": "Wird beansprucht, sobald ein Teammitglied seit Spielbeginn insgesamt 10 Herzen Schaden genommen hat.",
   "challengecraft.lockout.goal.location.desc": "%s erreichen.",
   "challengecraft.lockout.goal.location.condition": "Wird beansprucht, sobald ein Teammitglied sich am geforderten Ort befindet.",
   "challengecraft.lockout.goal.todo.desc": "Dieses Ziel existiert im Pool, ist aber für normale Spielfelder noch nicht freigeschaltet: %s.",

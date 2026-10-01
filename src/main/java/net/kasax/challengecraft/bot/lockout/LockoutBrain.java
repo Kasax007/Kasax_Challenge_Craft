@@ -558,7 +558,8 @@ public final class LockoutBrain implements BotBrain {
             // The game counts it within a second (it checks inventories once a second): wait for
             // that instead of starting on the same tile again.
             // If it never counts (the goal wants something else than the bot thought), give up on it.
-            boolean again = tries.merge(targetId, 1, Integer::sum) < MAX_TRIES + 1;
+            // (A tile done in parts - ten hearts in a few falls - is not "done but not counted".)
+            boolean again = targetId.equals("have_10_hearts_missing") || tries.merge(targetId, 1, Integer::sum) < MAX_TRIES + 1;
             restUntil.put(targetId, now + (again ? 40 : REST_TICKS));
             targetIndex = -1;
             goalTask = null;

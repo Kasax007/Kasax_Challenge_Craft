@@ -221,6 +221,16 @@ public final class LockoutGoals {
     private static Option stunt(Bot bot, ObtainPlanner planner, String id) {
         var body = bot.body();
         return switch (id) {
+            case "have_10_hearts_missing" -> {
+                // Ten hearts lost in all: a few safe falls at full health (about four hearts each),
+                // healing up in between. (Fights on the way count too.)
+                int taken = net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.damageTakenSinceStart(bot.server(), body, "have_10_hearts_missing");
+                int left = Math.max(0, 200 - taken);
+                int falls = (left + 79) / 80;
+                if (falls == 0) yield null;
+                Option one = body.getHealth() >= 18 ? fall(bot, planner, 11, true) : null;
+                yield one == null ? null : new Option(one.cost() + (falls - 1) * 45, one.task());
+            }
             case "take_fall_damage" -> fall(bot, planner, 5, false);
             case "fall_20_blocks_and_survive" -> body.getHealth() >= 19 ? fall(bot, planner, 22, true) : null;
             case "stand_on_bedrock" -> {

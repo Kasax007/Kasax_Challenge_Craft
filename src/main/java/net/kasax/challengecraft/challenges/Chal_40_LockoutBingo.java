@@ -341,6 +341,11 @@ public final class Chal_40_LockoutBingo {
     }
 
     /** Whether a game is on (started, not ended). */
+    /** Damage a player has taken since the game began, in tenths of a health point (for the hearts goal). */
+    public static int damageTakenSinceStart(MinecraftServer server, ServerPlayer player, String goalId) {
+        return player.getStats().getValue(Stats.CUSTOM.get(Stats.DAMAGE_TAKEN)) - getData(server).getGoalStatBaseline(player.getUUID(), goalId);
+    }
+
     public static boolean isRunning(MinecraftServer server) {
         if (!active) {
             return false;
@@ -925,7 +930,7 @@ public final class Chal_40_LockoutBingo {
 
     private static boolean usesStatBaseline(LockoutBingoGoal goal) {
         return switch (goal.type()) {
-            case CRAFT, TRADE, FISHING, ACTION, ENCHANT -> true;
+            case CRAFT, TRADE, FISHING, ACTION, ENCHANT, HEALTH_CHECK -> true;
             case INTERACT -> goal.id().startsWith("use_") || "ring_bell".equals(goal.id()) || "sleep_in_bed".equals(goal.id());
             case CONSUME -> !"eat_cake_slice".equals(goal.id());
             default -> false;
@@ -995,7 +1000,9 @@ public final class Chal_40_LockoutBingo {
             case ADVANCEMENT -> hasAdvancement(player, goal.primaryTarget());
             case STRUCTURE -> matchesStructureGoal(player, goal);
             case STATUS_EFFECT -> matchesStatusGoal(player, goal);
-            case HEALTH_CHECK -> player.getMaxHealth() - player.getHealth() >= 20.0f;
+            // Ten hearts lost in all since the game began (the damage-taken statistic counts tenths of
+            // a health point: twenty points are 200), not ten missing at once.
+            case HEALTH_CHECK -> readProgressStat(player, goal) - data.getGoalStatBaseline(player.getUUID(), goal.id()) >= 200;
             case LOCATION -> matchesLocationGoal(player, goal);
             default -> false;
         };
@@ -1038,6 +1045,7 @@ public final class Chal_40_LockoutBingo {
                     ? player.getStats().getValue(Stats.CUSTOM.get(Stats.ENCHANT_ITEM))
                     : countEnchantedTargetItems(player, goal);
             case ACTION -> readActionStat(player, goal);
+            case HEALTH_CHECK -> player.getStats().getValue(Stats.CUSTOM.get(Stats.DAMAGE_TAKEN));
             default -> 0;
         };
     }
