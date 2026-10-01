@@ -68,8 +68,14 @@ public final class LockoutGoals {
 
     /** Whether the bot knows any way for this goal (whatever the cost; Nether goals count in any dimension). */
     public static boolean covers(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
-        if (goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER && overworld(bot)) {
-            return goal.type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ADVANCEMENT || option(bot, planner, goal) != null;
+        if (goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER && overworld(bot)
+                && goal.type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) {
+            // From up here: whether it knows a way once down there (as if it stood in the Nether,
+            // knowing nothing of it yet). Places there are found by exploring.
+            var t = goal.type();
+            if (t == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.BIOME
+                    || t == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.STRUCTURE) return true;
+            return planner.inNether(bot, () -> basic(bot, planner, goal)) != null;
         }
         return option(bot, planner, goal) != null;
     }
@@ -442,34 +448,17 @@ public final class LockoutGoals {
             case "craft_pumpkin_pie" -> withEgg(bot, planner, Items.PUMPKIN_PIE, null);
             case "eat_pumpkin_pie" -> withEgg(bot, planner, Items.PUMPKIN_PIE, () -> new ConsumeTask(Set.of(Items.PUMPKIN_PIE)));
             case "advancement_tactical_fishing" -> {
-                // A fish caught in a bucket of water: a water bucket, then into the water at a fish.
+                // A fish caught in a bucket of water: any fish (cod, salmon, ...) in a river or the
+                // sea; one in sight is a short swim, else to the nearest river or sea known.
                 double bucket = planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1);
                 if (bucket >= INF) yield null;
-                var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-                EntityType<?> kind = EntityTypes.COD;
-                double near = INF;
-                for (EntityType<?> t : List.of(EntityTypes.COD, EntityTypes.SALMON, EntityTypes.TROPICAL_FISH, EntityTypes.PUFFERFISH)) {
-                    var seen = bot.memory().lastSeen(level, t, bot.body().blockPosition());
-                    if (seen != null && Math.sqrt(seen.distSqr(bot.body().blockPosition())) < near) {
-                        near = Math.sqrt(seen.distSqr(bot.body().blockPosition()));
-                        kind = t;
-                    }
-                }
-                EntityType<?> fish = kind;
-                yield new Option(bucket + (near >= INF ? 150 : near / 4 + 15), () -> new SequenceTask("catch a fish in a bucket", List.of(
+                double find = fishSearch(bot, FISH);
+                yield find >= INF ? null : new Option(bucket + find, () -> new SequenceTask("catch a fish in a bucket", List.of(
                         () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner),
-                        () -> new UseOnMobTask(fish, Items.WATER_BUCKET, e -> true))));
+                        () -> new UseOnMobTask(FISH, Items.WATER_BUCKET, e -> true))));
             }
-            case "obtain_pufferfish" -> {
-                // One catch in eight is a pufferfish: fishing beats searching a warm ocean.
-                Option plain = obtain(bot, planner, Set.of(Items.PUFFERFISH), 1);
-                double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
-                Double water = planner.seen(bot, Blocks.WATER);
-                Option fishing = rod >= INF || water == null ? null : new Option(rod + water + 8 * 25, () -> new SequenceTask("fish for a pufferfish", List.of(
-                        () -> new ObtainTask(Set.of(Items.FISHING_ROD), 1, planner),
-                        () -> new net.kasax.challengecraft.bot.task.FishTask(Set.of(Items.PUFFERFISH), 12000))));
-                yield fishing == null || plain != null && plain.cost() < fishing.cost() ? plain : fishing;
-            }
+            case "obtain_pufferfish" -> fishItem(bot, planner, Items.PUFFERFISH, EntityTypes.PUFFERFISH, 8);
+            case "obtain_tropical_fish" -> fishItem(bot, planner, Items.TROPICAL_FISH, EntityTypes.TROPICAL_FISH, 50);
             case "catch_fish", "advancement_fishy_business" -> {
                 double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
                 Double water = planner.seen(bot, Blocks.WATER);
@@ -486,6 +475,50 @@ public final class LockoutGoals {
             case "sleep_in_village_bed" -> body.level().isDarkOutside() ? clickBed(bot) : null;
             default -> null;
         };
+    }
+
+    private static final Set<EntityType<?>> FISH = Set.of(EntityTypes.COD, EntityTypes.SALMON, EntityTypes.TROPICAL_FISH, EntityTypes.PUFFERFISH);
+
+    /**
+     * Seconds to find one of these fish: the swim to one in sight, else the walk to the nearest
+     * river or sea known (where they live), and a look about there. INF: no such water known.
+     */
+    private static double fishSearch(Bot bot, Set<EntityType<?>> kinds) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        if (level.dimension() != Level.OVERWORLD) return INF;
+        BlockPos at = bot.body().blockPosition();
+        double best = INF;
+        for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(at).inflate(48),
+                e -> kinds.contains(e.getType()) && e.isAlive())) {
+            best = Math.min(best, 8 + Math.sqrt(e.distanceToSqr(bot.body())) / 3);
+        }
+        if (best < INF) return best;
+        for (EntityType<?> t : kinds) {
+            var seen = bot.memory().lastSeen(level, t, at);
+            if (seen != null) best = Math.min(best, 25 + Math.sqrt(seen.distSqr(at)) / 4);
+            if (net.kasax.challengecraft.bot.plan.MobHabitats.inHabitat(bot, t)) best = Math.min(best, 45);
+            BlockPos home = net.kasax.challengecraft.bot.plan.MobHabitats.nearestKnown(bot, t);
+            if (home != null) best = Math.min(best, 50 + Math.sqrt(home.distSqr(at)) / 4);
+        }
+        return best;
+    }
+
+    /**
+     * A fish item (a pufferfish, a tropical fish): the fish itself killed where it lives (it drops
+     * itself), or caught with a rod (one cast in {@code oneIn} brings that kind). The quicker.
+     */
+    private static Option fishItem(Bot bot, ObtainPlanner planner, Item item, EntityType<?> kind, int oneIn) {
+        Option plain = obtain(bot, planner, Set.of(item), 1);
+        double find = fishSearch(bot, Set.of(kind));
+        Option hunt = find >= INF ? null : new Option(find + 20, () -> new KillTask(Set.of(kind), Set.of(item), 1, 1));
+        double rod = planner.estimate(bot, Set.of(Items.FISHING_ROD), 1);
+        Double water = planner.seen(bot, Blocks.WATER);
+        Option fishing = rod >= INF || water == null ? null : new Option(rod + water + oneIn * 25, () -> new SequenceTask("fish for " + ObtainPlanner.name(item), List.of(
+                () -> new ObtainTask(Set.of(Items.FISHING_ROD), 1, planner),
+                () -> new net.kasax.challengecraft.bot.task.FishTask(Set.of(item), 24000))));
+        Option best = null;
+        for (Option o : new Option[]{plain, hunt, fishing}) if (o != null && (best == null || o.cost() < best.cost())) best = o;
+        return best;
     }
 
     /** An enchanting table (made or found), lapis, the item, a level or two of experience. */

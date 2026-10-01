@@ -237,6 +237,25 @@ public class BotStuntTests {
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.COD_BUCKET)) > 0);
     }
 
+    /** A pufferfish and a tropical fish in a deep pool: both killed in the water, both items picked up. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void huntFish(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hunt_fish");
+        a.fill(24, BotArena.GROUND - 3, 24, 30, BotArena.GROUND, 30, Blocks.WATER);
+        for (var type : java.util.List.of(EntityTypes.PUFFERFISH, EntityTypes.TROPICAL_FISH)) {
+            var fish = type.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            fish.setPos(net.minecraft.world.phys.Vec3.atCenterOf(a.abs(27, BotArena.GROUND - 2, 27)));
+            ((net.minecraft.world.entity.Mob) fish).setPersistenceRequired();
+            h.getLevel().addFreshEntity(fish);
+        }
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        a.run(new net.kasax.challengecraft.bot.task.SequenceTask("two fish", java.util.List.of(
+                () -> new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.PUFFERFISH), java.util.Set.of(Items.PUFFERFISH), 1, 1),
+                () -> new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.TROPICAL_FISH), java.util.Set.of(Items.TROPICAL_FISH), 1, 1))), 1600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.PUFFERFISH)) > 0
+                        && net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.TROPICAL_FISH)) > 0);
+    }
+
     /** "Survive an explosion" open: a creeper going off at a distance, taken at full health. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void creeperWelcome(GameTestHelper h) {

@@ -27,6 +27,7 @@ import java.util.function.Predicate;
  */
 public final class UseOnMobTask implements BotTask {
     private final EntityType<?> type;
+    private final Set<EntityType<?>> types;
     private final Item tool;
     private final Predicate<LivingEntity> suitable;
     private final Explorer explorer = new Explorer(3600);
@@ -36,8 +37,14 @@ public final class UseOnMobTask implements BotTask {
     private int repath, chase, riding;
 
     public UseOnMobTask(EntityType<?> type, Item tool, Predicate<LivingEntity> suitable) {
-        this.type = type;
-        explorer.lookingFor(java.util.Set.of(type));
+        this(Set.of(type), tool, suitable);
+    }
+
+    /** Any of these kinds (a fish for the bucket: cod, salmon, whichever is about). */
+    public UseOnMobTask(Set<EntityType<?>> types, Item tool, Predicate<LivingEntity> suitable) {
+        this.types = Set.copyOf(types);
+        this.type = types.iterator().next();
+        explorer.lookingFor(this.types);
         this.tool = tool;
         this.suitable = suitable;
     }
@@ -49,7 +56,7 @@ public final class UseOnMobTask implements BotTask {
         if (!emptyHand && BotInventory.slotOf(body, tool) < 0) return Result.FAILED;
         if (target == null || !target.isAlive() || !suitable.test(target)) {
             target = body.level().getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(48),
-                            e -> e.getType() == type && e.isAlive() && suitable.test(e) && !failed.contains(e.getUUID()))
+                            e -> types.contains(e.getType()) && e.isAlive() && suitable.test(e) && !failed.contains(e.getUUID()))
                     .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
             walking = false;
             chase = 0;

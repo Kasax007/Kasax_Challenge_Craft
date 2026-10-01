@@ -45,7 +45,7 @@ public final class BotWorld {
                             if (s.isAir() || !match.test(s)) continue;
                             double d = m.distSqr(center);
                             if (d >= bestD || ignore.contains(m)) continue;
-                            if (exposedOnly && !seen(level, m, eye)) continue;
+                            if (exposedOnly && !(COMMON.contains(s.getBlock()) ? exposed(level, m) : seen(level, m, eye))) continue;
                             bestD = d;
                             best = m.immutable();
                         }
@@ -55,6 +55,14 @@ public final class BotWorld {
         }
         return best;
     }
+
+    /** Rock and soil: wherever it digs there is some, no need to have seen it. */
+    public static final Set<net.minecraft.world.level.block.Block> COMMON = Set.of(net.minecraft.world.level.block.Blocks.STONE,
+            net.minecraft.world.level.block.Blocks.DEEPSLATE, net.minecraft.world.level.block.Blocks.DIRT, net.minecraft.world.level.block.Blocks.GRASS_BLOCK,
+            net.minecraft.world.level.block.Blocks.NETHERRACK, net.minecraft.world.level.block.Blocks.ANDESITE, net.minecraft.world.level.block.Blocks.DIORITE,
+            net.minecraft.world.level.block.Blocks.GRANITE, net.minecraft.world.level.block.Blocks.TUFF, net.minecraft.world.level.block.Blocks.GRAVEL,
+            net.minecraft.world.level.block.Blocks.BEDROCK, net.minecraft.world.level.block.Blocks.END_STONE, net.minecraft.world.level.block.Blocks.BLACKSTONE,
+            net.minecraft.world.level.block.Blocks.BASALT, net.minecraft.world.level.block.Blocks.SOUL_SAND, net.minecraft.world.level.block.Blocks.SOUL_SOIL);
 
     /** How far it makes out a block in a cave around it (a torch-less player sees about that far). */
     public static final double SIGHT = 24;

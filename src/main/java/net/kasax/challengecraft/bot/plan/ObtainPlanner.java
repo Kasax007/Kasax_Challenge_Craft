@@ -281,10 +281,6 @@ public final class ObtainPlanner {
 
     // ---- looking around -----------------------------------------------------------------------
 
-    /** Rock and soil: wherever it digs there is some, no need to have seen it. */
-    private static final Set<Block> COMMON = Set.of(Blocks.STONE, Blocks.DEEPSLATE, Blocks.DIRT, Blocks.GRASS_BLOCK, Blocks.NETHERRACK,
-            Blocks.ANDESITE, Blocks.DIORITE, Blocks.GRANITE, Blocks.TUFF, Blocks.SAND, Blocks.GRAVEL, Blocks.BEDROCK, Blocks.END_STONE);
-
     private void refresh(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         long now = level.getGameTime();
@@ -315,7 +311,7 @@ public final class ObtainPlanner {
                     if (known != null && known <= reach) continue;
                     if (!BotWorld.exposed(level, m)) continue;
                     // Only what it could have seen (common rock anywhere it digs is seen enough).
-                    if (!COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
+                    if (!BotWorld.COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
                     blocks.put(s.getBlock(), reach);
                 }
             }
