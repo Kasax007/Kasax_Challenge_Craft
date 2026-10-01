@@ -271,3 +271,44 @@ Schnitt sind Rauschen. Für belastbare Vergleiche braucht es mehr Welten (20+).
 `scripts/bot/bench-many.sh 3600 hard <seeds>` spielt bis zu 60 Minuten oder bis das Brett voll
 ist. Der Bericht listet jedes offene Feld mit „kein Weg bekannt“ oder mit Plan, Starts, Fehlschlägen,
 Überziehungen und verbrauchter Zeit. Das ist die Arbeitsliste für die nächsten Runden.
+
+## 8. Komplett-Bretter: Befunde und Fähigkeiten (Runde 2)
+
+Bob spielt ein Brett bis zu 60 Minuten und muss jedes Feld erfüllen. Der Bericht am Ende nennt
+für jedes offene Feld, ob ein Weg bekannt ist und was versucht wurde.
+
+### Was die Komplett-Bretter aufgedeckt haben (und behoben ist)
+
+| Befund | Ursache | Behoben durch |
+|---|---|---|
+| Nie im Nether | Nether-Felder galten von der Oberwelt aus als unmöglich | Der Weg dorthin wird mitgeplant und auf alle Nether-Felder verteilt; eigene **Nether-Phase**, sobald der Eimer da ist |
+| Eisen erst nach 30–50 Min. | Das lohnende Eisen-Kit wurde erkannt, aber nie geholt | **Kit-Phase** nach der Eröffnung: Eisen nach 76–255 s statt 1447–2899 s |
+| Dreimal Eisen holen | Jedes Feld wurde einzeln geplant | **Einkaufsliste** fürs ganze Brett |
+| Suche nach Roheisen- oder Kupferblöcken | Speicherblöcke hatten den Standard-Seltenheitswert | Werden nie gesucht |
+| Wassereimer „unmöglich“ | Wasser war nur in Sicht bekannt; ein Fehlschlag sperrte Wasser für 10 Min. | Wasseroberflächen im Gedächtnis, Suche, kurze Sperre |
+| Gehen bleibt nach Unterbrechung stehen | Ein Reflex hielt den Navigator an, die Aufgabe „lief“ weiter | Der Navigator nimmt unterbrochene Wege wieder auf |
+| Kein Platz zum Portalgießen | Die Form braucht einen ebenen, freien Streifen | Bob gräbt sich den Platz samt Standreihe frei |
+| „Air on Air“ an Kanten | Der Pfad startete über der Luft | Start vom Block, auf dem Bob wirklich steht |
+| Erz per Röntgenblick | Das Gedächtnis kannte eingeschlossenes Erz | Nur freiliegende Blöcke; Höhlen als Abstieg |
+| Zombie-Tode in Höhlen | Rückzug scheitert, Eingraben zu langsam | 2–3 Blöcke hoch bauen, außer Reichweite |
+
+### Neue Fähigkeiten (jeweils mit GameTest)
+
+Eier sammeln (Kuchen, Kürbiskuchen), Fisch im Eimer, Angeln bis zum Kugelfisch, Bogen und Armbrust
+(Take Aim, Armbrust schießen, Zielblock), Schild-Block, absichtlich vom Skelett angeschossen
+werden, Wasserflasche trinken („Trank trinken“), Honigwaben, Creeper-Explosion überleben, Monster
+Hunter, beliebiges Tier zähmen, Dorf-Trips (Handel, Glocke, Lesepult, Dorfbett), Nether-Strukturen
+und Nether-Gegenstände über den Trip, Lerngedächtnis über Spiele hinweg
+(`config/challengecraft-bob-experience.properties`).
+
+### Hinweis zur Zieldefinition
+
+`have_10_hearts_missing` prüft `maxHealth - health >= 20`. Bei 20 maximalen HP ist das nur im
+Moment des Todes erfüllt, deshalb fiel das Feld bisher nur beim Sterben. Vermutlich ist `>= 19`
+gemeint (ein halbes Herz übrig).
+
+### Noch offen (aus den Berichten)
+
+Getränkter Pfeil, Armbrust mit Feuerwerk, Packeis/Eis (Behutsamkeit), Waldanwesen, Brauen
+(Braustand, Wurftrank), Ende und Bosse; Tode durch Creeper und Zombie-Gruppen bleiben die größte
+Zeitbremse.
