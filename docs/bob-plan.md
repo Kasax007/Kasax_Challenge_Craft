@@ -481,3 +481,199 @@ Ergebnisse:
   geht er bei großem Höhenunterschied direkt auf das Portal zu und gräbt oder baut sich hinauf.
 - **Benchmark-Skripte**: `SERVER_PORT`/`RCON_PORT` erlauben zwei Läufe parallel. Am Ende jedes
   Laufs steht eine Abdeckungsliste (`[COVERAGE]`).
+
+## 12. Runde 4: Neuausrichtung (Analyse und Plan nach dem Live-Test)
+
+### 12.1 Ziel und Messgrößen
+
+- **Langfristziel**: ein komplettes Lockout-Brett (25 Felder) auf *schwer* in einer zufälligen Welt
+  in höchstens **90 Minuten**.
+- **Zwischenziel**:
+  - alle Punkte aus dem Live-Test umgesetzt;
+  - Bob spielt ein komplettes Brett eigenständig zu Ende (Zeit noch offen; Tests dürfen mit
+    `tick sprint` beschleunigt laufen).
+- **Messgrößen pro Benchmark** (10 feste Seeds):
+  - Felder nach 30, 60 und 90 Minuten;
+  - Zeit bis zum ganzen Brett;
+  - Tode;
+  - Leerlauf;
+  - Wegsuche-Fehler pro Minute;
+  - mittlere Laufgeschwindigkeit (Blöcke/s gegenüber Sprint);
+  - abgebrochene Ziele.
+- **Hinweis zur Brettzusammensetzung**: Manche Felder sind in 90 Minuten für niemanden machbar
+  (Endstadt, End-Gateway, Behüterhaus, Ancient City, Behutsamkeit-Ziele). Ein "komplettes Brett"
+  braucht eine Brettauswahl ohne solche Felder. Das Benchmark-Brett wird dafür auf die Felder
+  begrenzt, die ein guter Spieler in 90 Minuten schaffen kann. Die übrigen werden getrennt gezählt.
+
+### 12.2 Wo Bob steht (Ist-Analyse)
+
+**Benchmarks der letzten Stände** (60 Minuten, schwer):
+
+| Seed | Felder | Bemerkung |
+|---|---|---|
+| 11 | 6–7 | |
+| 22 | 7 | |
+| 77 | 6 | |
+| 66 | 4–7 | |
+
+- Nether meist nicht erreicht.
+- Tode: 1–2 pro Lauf.
+- Durchsatz: **etwa 7 Felder pro Stunde**. Das Ziel braucht rund 17 pro Stunde, also das
+  2,5- bis 3,5-Fache.
+- Die letzte Zehnerreihe wurde durch einen Container-Neustart abgebrochen. Ihre ersten Läufe lagen
+  bei 7 Feldern nach 42 bzw. 51 Minuten.
+
+**Live-Test des Spielers** (Seed -8848941644679110190), am Chatverlauf und am Code geprüft:
+
+| Beobachtung | Bestätigt durch | Ursache im Code |
+|---|---|---|
+| "navigation failed" fast im Minutentakt (35× in 30 min) | Chat | Suche bricht nach **5000 Knoten** ab (Baritone: 0,5–4 s Suche, Hunderttausende Knoten); nach 12 Neuversuchen Abbruch; Teilpfade ohne Mindestfortschritt |
+| Springt gegen zwei Blöcke hohe Stufen, baut erst danach ab | Beobachtung | Ausführung springt, sobald das Ziel höher liegt, ohne Kopffreiheit und Weltzustand zu prüfen; Fehler fällt erst nach 50 Ticks "festgesteckt" auf |
+| Hügel schlecht, wirkt ziellos | Beobachtung | kein Sprinten (`setSprinting(false)` beim Laufen), Teilpfade kurz, an jedem Segmentende Stillstand bis zur nächsten Suche |
+| Hüpft über Wasser statt zu schwimmen | Beobachtung | im Wasser wird dauerhaft "springen" gehalten; kein Sprint-Schwimmen |
+| Brücke über die Schlucht abgebrochen | Beobachtung | jede neue Suche verwirft den alten Plan; keine Zusage an angefangene Bauten (Hysterese) |
+| Skelett und Baby-Zombie fast/ganz tödlich, Tod nach 5 Minuten | Chat ("slain by Zombie" 17:27) | Reflexe nur bei wenig Leben bzw. zischendem Creeper; keine Bedrohungsbewertung (Fernkämpfer in Sichtlinie, schnelle Babys), keine Rüstung früh |
+| Erz und Kohle liegen gelassen, Eisenerz direkt vor ihm ignoriert | Beobachtung | Abbau-Aufgabe nimmt das *nächste bekannte* Ziel aus dem Gedächtnis, nicht die Ader vor ihm; "unterwegs mitnehmen" nur für eine kurze Liste |
+| Schmilzt mit Holz, baut Öfen immer neu, schmilzt in 3er-Portionen | Chat ("craft furnace" 17:23 und 17:41, "smelt iron x3") | SmeltTask nimmt den billigsten Brennstoff im Inventar; kein Kohle-Ziel; jede Teilaufgabe schmilzt nur ihren Bedarf |
+| Nur Spitzhacke dabei | Beobachtung | nur Spitzhacke und Axt in der Eröffnung; Schwert und Schaufel nur bei Bedarf |
+| Dorf "geplündert", aber nichts getan | Chat ("done: raid the village" direkt nach "navigation failed") | RaidTask öffnet höchstens 3 Truhen und meldet "erledigt", wenn keine da ist; kein Bett, keine Felder, keine Glocke |
+| Schneeball zuerst, ohne kaltes Biom in Sicht | Chat ("Snowball (~5 s)", dann "off to … -978, 63, 1111") | Schätzung (5 s) und Suche widersprechen sich; die Schätzung bewertet Fernes zu billig |
+| 3 Blumenarten geplant, Blumen ringsum ignoriert | Chat (Plan nennt 3_flower_types, Mitnahmeliste nicht) | keine Gelegenheits-Logik für sichtbare Ziele |
+| Rohstoffblock direkt nach dem Eisenabbau nicht mitgemacht | Chat | Ziele werden einzeln geplant, nicht nach Ort gebündelt |
+| Redstone kurz vor dem Ziel abgebrochen, zurück zum Dorf | Chat ("still on … ~32 s left", 90 s später "takes too long" → "raid the village") | starres Zeitbudget mit höchstens 2 Verlängerungen statt Neubewertung nach Lage (tief unten, große Höhle) |
+| Nachts Spinne geplant, aber nicht gesucht | Chat | Jagdrunde sucht kurz, dann "found no spider"; keine gezielte Nachtroutine |
+| Schätzwert ~888 Mio. s für den Netherweg | Chat ("flint and steel 888888913") | unendlicher Wert sickert in Summen durch |
+
+**Kern der Analyse**: Bob *kann* fast alles einzeln (über 300 Ziele, über 85 GameTests). Er verliert die
+Zeit an zwei Stellen:
+1. **Bewegung**: kurze Suchen, Stillstand an Segmentgrenzen, kein Sprint, schlechte Ausführung von
+   Sprüngen und Schwimmen, häufige Abbrüche.
+2. **Entscheidung**: Ziele werden einzeln und nach Punktschätzungen gewählt; starre Zeitbudgets
+   brechen gute Läufe ab; keine Bündelung nach Ort und Gelegenheit; wenig Wahrnehmung dessen, was
+   gerade direkt vor ihm liegt.
+
+Das passt zu dem, was der Spieler gesehen hat. Ein Mensch läuft zielstrebig, nimmt mit, was am Weg
+liegt, bündelt nach Ort ("jetzt unter Tage: Redstone, Diamanten, Eisen, Kohle, Höhlenspinne") und
+bricht nur ab, wenn die Lage sich wirklich verschlechtert.
+
+### 12.3 Recherche: was wir übernehmen
+
+**Baritone** (nur als Vorbild, keine Abhängigkeit):
+- **Zeitbudget statt Knotenbudget**: 0,5 s pro Segment (bis 2 s, wenn noch nichts gefunden ist),
+  dabei Zehn- bis Hunderttausende Knoten.
+- **Bester Teilpfad über mehrere Gewichte** (1,5 bis 10 auf die bisherigen Kosten) mit
+  **Mindestfortschritt von 5 Blöcken**. Ein Teilpfad, der nicht voranbringt, gilt nicht.
+- **Kosten in Ticks** aus der echten Spielphysik:
+  - Gehen 4,63, Sprinten 3,56, Schwimmen (Sprint) 6,99, Kriechen 15,4;
+  - Sprung als Fallzeit-Differenz;
+  - Fallkosten nach Fallhöhe;
+  - Zuschläge: Platzieren +20, Abbauen +2, Springen +2.
+- **Vorausplanen**: Das nächste Segment wird ab dem Ende des laufenden geplant (150 Ticks vorher),
+  danach werden die Pfade zusammengefügt. Kein Stillstand an Segmentgrenzen.
+- **Ausführung je Bewegungsart** mit eigener Zustandsprüfung:
+  - Stufe hoch erst springen, wenn ausgerichtet, nah genug (≤ 1,2) und der Kopf frei ist;
+  - Diagonale, Fallen, Parkour, Säule und Brücke jeweils eigen;
+  - Abweichen vom geplanten Weltzustand wird sofort erkannt, nicht nach 50 Ticks.
+- **Sprint-Entscheidung** pro Tick: Sprinten, wenn die nächsten Bewegungen es zulassen.
+- **Bevorzugung des alten Pfads** (Faktor 0,5) bei neuer Suche: verhindert Hin und Her und
+  abgebrochene Brücken.
+- **Weitere Strecken**: grobe Wegpunkte, dann feine Suche je Segment.
+
+**Zielwahl**, als Algorithmen aus Spiele-KI und Planung:
+- **Nutzenbasierte KI (Utility AI)**: Jede Handlung bekommt einen Wert "erwartete Felder pro
+  Zeit", bewertet aus dem, was Bob über die Welt weiß und gerade sieht. Statt fester Regeln wird
+  laufend das Beste gewählt.
+- **Erwartete Restzeit statt Punktschätzung**:
+  - Suchzeit als Ereignisrate (z. B. "Redstone pro Minute Höhle auf Höhe −50"), aus Minecraft-Wissen
+    über Erzverteilung, Biome, Tageszeit und Mob-Spawns;
+  - Bayes-Aktualisierung mit dem, was Bob tatsächlich sieht und durchsucht hat.
+- **Optimales Abbrechen**: Weitermachen, solange die erwartete Restzeit kleiner ist als der Wechsel
+  zur besten Alternative plus Wechselkosten. Keine starren Budgets mehr.
+- **Routenplanung als Orientierungslauf-Problem** (*orienteering problem*): Felder an Orten,
+  Reisezeiten, gemeinsame Zutaten.
+  - Gruppierung nach Zonen: hier an der Oberfläche, Bergbau-Ausflug bis Tiefe X, Dorf, Nether.
+  - Lösung mit Strahlsuche (*beam search*) über Reihenfolgen der nächsten 4–8 Felder.
+  - Bewertet nach Feldern pro Minute, mit geteilten Vorleistungen (gemeinsame Stückliste).
+- **Gelegenheiten**: Ein Umweg lohnt, wenn die eingesparte spätere Zeit größer ist als der Umweg
+  jetzt (Blumen für "3 Blumenarten", Erz der Stückliste, Kohle vor dem Schmelzen, Spinne nachts).
+
+### 12.4 Plan (Reihenfolge, je mit Abnahme)
+
+**Phase A: Bewegung (zuerst, größter Hebel)**
+1. **A1 Suche**:
+   - Zeitbudget pro Tick (verteilt über mehrere Ticks, ohne den Server zu blockieren);
+   - bester Teilpfad mit Mindestfortschritt und mehreren Gewichten;
+   - Kosten nach Spielphysik (Sprint, Sprünge, Fallen, Schwimmen, Abbau mit Werkzeug, Platzieren);
+   - Bevorzugung des laufenden Pfads.
+2. **A2 Vorausplanen und Zusammenfügen**: das nächste Segment schon während des Laufens; kein
+   Stillstand, kein "navigation failed" bei weiten Wegen.
+3. **A3 Ausführung neu**, eine Routine je Bewegungsart, mit Prüfung des Weltzustands vor jedem
+   Schritt:
+   - Sprinten auf geraden Stücken;
+   - Stufe hoch nur bei freiem Kopf;
+   - Sprint-Schwimmen an der Oberfläche;
+   - Brücke mit Zusage bis zum Ende.
+4. **A4 Weite Wege**: grobe Wegpunkte über die Höhenkarte (Berge, Wasser, Schluchten als Kosten),
+   feine Suche je Abschnitt.
+5. **A5 Fehlerbehandlung**:
+   - gestaffelte Strategien (andere Gewichte, Abbauen und Bauen erlauben, Umweg-Wegpunkt);
+   - "navigation failed" nur noch im Debug-Log;
+   - Zähler für Fehler pro Minute im Benchmark.
+6. **Abnahme**:
+   - neue Bewegungs-GameTests: Hügel-Treppen, zwei Blöcke hohe Wand, Schlucht mit Brücke, See
+     queren (Zeit gemessen), Höhle hinab, Wald;
+   - ein **Navigations-Benchmark** in echten Welten mit zufälligen Zielen in 50–300 Blöcken.
+     Ziele: über 95 % erreicht, mittleres Tempo über 70 % des Sprinttempos, unter 1 Fehler pro
+     10 Minuten.
+
+**Phase B: Zielwahl neu (nutzenbasiert, nach Wahrscheinlichkeit)**
+1. **B1 Weltmodell mit Wahrscheinlichkeiten**: Zu jedem Rohstoff, Mob und Ort Fundraten nach Biom,
+   Höhe und Tageszeit, verbunden mit dem Gesehenen und dem Durchsuchten. Ergebnis: erwartete Zeit
+   *und* Unsicherheit. Schätzung und Suche nutzen **dieselbe** Quelle (behebt den Schneeball-Fall).
+2. **B2 Stückliste fürs ganze Brett**: Eisen, Kohle, Redstone, Holz, Werkzeuge. Der Abbau richtet
+   sich danach (ganze Ader nehmen, wenn die Liste es will).
+3. **B3 Routenplaner**:
+   - Zonen-Ausflüge mit Strahlsuche über die nächsten Felder;
+   - der Plan nennt die Ausflüge ("Oberfläche hier: Blumen, Schneeball nein; Bergbau bis −50:
+     Redstone, Diamant, Eisen, Kohle, Höhlenspinne");
+   - neu geplant wird nur bei Ereignissen (neues Gesehenes, Feld vergeben, Tod, Nacht).
+4. **B4 Abbruch nach Lage**: erwartete Restzeit wird laufend aktualisiert (tief unten, große Höhle:
+   Redstone sehr wahrscheinlich bald); Wechsel nur mit Vorteil über den Wechselkosten.
+5. **B5 Gelegenheiten**: Sichtbares, das offene Felder oder die Stückliste bedient, wird mitgenommen,
+   wenn sich der Umweg lohnt.
+6. **B6 Tag und Nacht**:
+   - nachts Monster-Felder und Bergbau;
+   - tagsüber Oberfläche;
+   - Bett mitnehmen und schlafen, wenn nachts nichts zu tun ist.
+7. **Abnahme**:
+   - Szenario-Tests für die Fälle aus dem Live-Test: Blumen mitnehmen, kein Schneeball ohne Kälte,
+     Redstone nicht abbrechen, Rohstoffblock beim Eisen;
+   - Benchmark: Felder pro Stunde mindestens ×1,5 gegenüber dem Stand nach Phase A.
+
+**Phase C: Ressourcen, Werkzeuge, Dorf, Kampf**
+1. **C1 Werkzeugsatz**: Spitzhacke, Axt, Schwert, Schaufel stets dabei (Stein, später Eisen).
+2. **C2 Schmelzen in einem Rutsch**:
+   - Kohle bevorzugt (am Weg mitgenommen);
+   - ein Ofen, der mitgenommen wird;
+   - während der Ofen läuft (Dauer berechnet), wird in der Nähe gesammelt.
+3. **C3 Abbau**: ganze Adern, Erz am Weg, Kohle für den Brennstoffbedarf.
+4. **C4 Dorf richtig**:
+   - Truhen, Bett mitnehmen;
+   - Felder ernten → Brot;
+   - Glocke und Handel, wenn auf dem Brett.
+5. **C5 Kampf und Sicherheit**:
+   - Bedrohungsbewertung je Mob (Skelett in Sichtlinie, Baby-Zombie, Creeper);
+   - Schild und frühe Rüstung, Deckung, Nachtregeln.
+6. **Abnahme**: weniger als 0,5 Tode pro Stunde im Benchmark, Szenario-Tests je Punkt.
+
+**Phase D: Messen und nachschärfen**
+- 10 Seeds, volles Brett, 90 Minuten.
+- Kennzahlen wie in 12.1, Auswertung nach Zeitfressern (Bewegung, Suche, Leerlauf, Tod).
+- Danach gezielt die größten Zeitfresser angehen, bis das Brett in 90 Minuten fällt.
+
+### 12.5 Arbeitsweise
+
+- Jede Phase in kleinen, getesteten Schritten. Zu jedem Schritt GameTests und eine Messung vorher
+  und nachher.
+- Benchmarks laufen in eigenen Arbeitskopien parallel zur Entwicklung (zwei Server, eigene Ports).
+- Ergebnisse und Abweichungen hier im Dokument.
