@@ -364,6 +364,7 @@ public final class Bot {
         int free = 0;
         for (var s : inv) if (s.isEmpty()) free++;
         if (free >= 3) return;
+        throwawaySeen = 0;
         int keep = 64;
         for (int i = 0; i < inv.size(); i++) {
             var s = inv.get(i);
@@ -380,7 +381,39 @@ public final class Bot {
             body.drop(s, false, net.minecraft.util.Prediction.SERVER_ONLY);
         }
         body.getInventory().setChanged();
+        free = 0;
+        for (var st : inv) if (st.isEmpty()) free++;
+        if (free >= 2) return;
+        // Still full (a pack of odds and ends): what is no use to anything on the board goes.
+        for (int i = 0; i < inv.size() && free < 3; i++) {
+            var st = inv.get(i);
+            if (st.isEmpty() || !clutter(st)) continue;
+            // (Gone for good: dropped at its feet it would be picked up again at once.)
+            inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+            say("pack full: threw away " + st.getCount() + " " + st.getItem().toString().replace("minecraft:", ""));
+            free++;
+        }
+        body.getInventory().setChanged();
     }
+
+    /** What the board or the plan still wants (kept up to date by the brain): never dropped. */
+    public final java.util.Set<net.minecraft.world.item.Item> keepItems = new java.util.HashSet<>();
+
+    private boolean clutter(net.minecraft.world.item.ItemStack st) {
+        var item = st.getItem();
+        if (keepItems.contains(item) || st.isDamageableItem() || st.get(net.minecraft.core.component.DataComponents.FOOD) != null) return false;
+        String id = item.toString().replace("minecraft:", "");
+        // The stuff of everything else: ores, metals, gems, wood, string, the buckets.
+        if (id.contains("ingot") || id.startsWith("raw_") || id.contains("diamond") || id.contains("emerald") || id.contains("bucket")
+                || id.equals("coal") || id.equals("redstone") || id.equals("lapis_lazuli") || id.equals("stick") || id.equals("string")
+                || id.equals("flint") || id.equals("flint_and_steel") || id.equals("gunpowder") || id.equals("obsidian") || id.equals("ender_pearl")
+                || id.equals("crafting_table") || id.equals("furnace") || id.equals("blaze_rod") || id.equals("quartz")
+                || st.is(net.minecraft.tags.ItemTags.LOGS) || st.is(net.minecraft.tags.ItemTags.PLANKS)) return false;
+        // Building blocks: a stack stays (the first one met), the rest is clutter.
+        return !BotActions.THROWAWAY.contains(item) || ++throwawaySeen > 1;
+    }
+
+    private int throwawaySeen;
 
     public void say(String text) {
         if (verbose) BotManager.debug(body, text);

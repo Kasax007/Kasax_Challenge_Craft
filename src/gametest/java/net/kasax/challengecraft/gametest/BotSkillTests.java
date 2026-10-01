@@ -232,6 +232,19 @@ public class BotSkillTests {
                 () -> net.kasax.challengecraft.bot.task.LoadCrossbowTask.loaded(a.bot().body()));
     }
 
+    /** A pack full of poppies (nothing the plan wants): some dropped, so the log it chops fits in. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void fullPack(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "full_pack");
+        a.fill(24, FEET, 20, 24, FEET + 3, 20, Blocks.OAK_LOG);
+        ItemStack[] pack = new ItemStack[36];
+        pack[0] = new ItemStack(Items.WOODEN_AXE);
+        for (int i = 1; i < 36; i++) pack[i] = new ItemStack(Items.POPPY, 64);
+        a.spawn(20, FEET, 20, pack);
+        a.run(new net.kasax.challengecraft.bot.task.ObtainTask(java.util.Set.of(Items.OAK_LOG), 1, new net.kasax.challengecraft.bot.plan.ObtainPlanner()), 600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.OAK_LOG)) > 0);
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {

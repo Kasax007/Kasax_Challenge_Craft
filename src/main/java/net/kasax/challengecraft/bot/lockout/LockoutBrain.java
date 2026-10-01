@@ -149,6 +149,12 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         strategist.update(bot, planner, replanNow);
+        // What not to throw away when the pack is full: what the board and the plan want.
+        bot.keepItems.clear();
+        bot.keepItems.addAll(planner.boardDemand.keySet());
+        bot.keepItems.addAll(strategist.wants().keySet());
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server()))
+            if (t.claimedBy() == null) bot.keepItems.addAll(LockoutGoals.items(t.goal().targets()));
         // The Nether phase: with the kit in hand and several Nether tiles open, a player goes now
         // rather than one more Overworld tile at a time (each looks a bit cheaper on its own, and
         // the trip never happens). A couple of tries per life.

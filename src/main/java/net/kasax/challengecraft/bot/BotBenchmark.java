@@ -109,7 +109,9 @@ public final class BotBenchmark {
                 if (BotActions.THROWAWAY.contains(st.getItem())) blocks += st.getCount();
                 if (st.get(net.minecraft.core.component.DataComponents.FOOD) != null) food += st.getCount();
             }
-            BotManager.LOG.info("[BOTBENCH] {} kit: pick {} ({} in all), blocks {}, food {}, hp {}, trail {}", bot.name, pick, picks, blocks, food, Math.round(body.getHealth()), bot.trail.size());
+            int freeSlots = 0;
+            for (var st : body.getInventory().getNonEquipmentItems()) if (st.isEmpty()) freeSlots++;
+            BotManager.LOG.info("[BOTBENCH] {} kit: pick {} ({} in all), blocks {}, food {}, hp {}, trail {}, free slots {}", bot.name, pick, picks, blocks, food, Math.round(body.getHealth()), bot.trail.size(), freeSlots);
             BotManager.LOG.info("[BOTBENCH] {} minute {}: {} tiles, at {}, doing{} | body {} ground {} water {} in {} on {} | nav {}", bot.name, ticks / 1200, claimed,
                     feet.toShortString(), bot.status(), String.format("%.2f %.2f %.2f", body.getX(), body.getY(), body.getZ()), body.onGround(), body.isInWater(),
                     body.level().getBlockState(feet).getBlock().getName().getString(), body.level().getBlockState(feet.below()).getBlock().getName().getString(),
