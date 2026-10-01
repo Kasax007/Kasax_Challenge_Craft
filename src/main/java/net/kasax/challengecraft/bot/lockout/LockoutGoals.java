@@ -163,8 +163,7 @@ public final class LockoutGoals {
         Set<Item> bucketKit = Set.of(Items.WATER_BUCKET, Items.BUCKET, Items.FLINT_AND_STEEL);
         return new Option(cost + lava + 75, () -> {
             // The pool in sight now: the gathering may lead away from it.
-            BlockPos pool = bot.memory().nearest((ServerLevel) bot.body().level(), bot.body().blockPosition(),
-                    st -> st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && st.getFluidState().isSource(), Set.of());
+            BlockPos pool = openPool(bot);
             return new SequenceTask("cast a portal to the Nether", List.of(
                 () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner).keeping(Set.of(Items.FLINT_AND_STEEL)),
                 () -> new ObtainTask(Set.of(Items.BUCKET), 1, planner).keeping(Set.of(Items.WATER_BUCKET, Items.FLINT_AND_STEEL)),
@@ -172,6 +171,27 @@ public final class LockoutGoals {
                 () -> new ObtainTask(blocks, 10, planner).keeping(bucketKit),
                 () -> new net.kasax.challengecraft.bot.task.CastPortalTask(bot.body().level(), pool)));
         });
+    }
+
+    /**
+     * The lava pool to cast at: one under the open sky if there is one about (room, light, no
+     * climbing out of a cave with the buckets), else the nearest.
+     */
+    private static BlockPos openPool(Bot bot) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> lava =
+                st -> st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && st.getFluidState().isSource();
+        Set<BlockPos> skip = new java.util.HashSet<>();
+        BlockPos first = null;
+        for (int i = 0; i < 24; i++) {
+            BlockPos p = bot.memory().nearest(level, bot.body().blockPosition(), lava, skip);
+            if (p == null) break;
+            if (first == null) first = p;
+            if (p.distSqr(bot.body().blockPosition()) > 256 * 256) break;
+            if (level.canSeeSky(p.above())) return p;
+            skip.add(p);
+        }
+        return first;
     }
 
     /** Ten obsidian mined (a diamond pickaxe), flint and steel, then the frame built block by block. */

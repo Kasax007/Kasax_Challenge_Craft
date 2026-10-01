@@ -159,7 +159,8 @@ public final class LockoutBrain implements BotBrain {
                 LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
                 if (trip != null && trip.cost() < 120 * netherTiles) {
                     // (Again in three minutes if this one does not get there.)
-                    netherRetryAt = bot.body().level().getGameTime() + 3600;
+                    // (Each failed try waits longer for the next: 3, 6, 12 minutes...)
+                    netherRetryAt = bot.body().level().getGameTime() + (3600L << Math.min(3, netherFails++));
                     bot.say("Nether phase: " + netherTiles + " tiles there, the way in ~" + Math.round(trip.cost()) + " s");
                     start(bot, trip.task().get(), budget(trip.cost(), 2400, 9000));
                     return;
@@ -258,6 +259,7 @@ public final class LockoutBrain implements BotBrain {
 
     private int openingTries;
     private long netherRetryAt, kitRetryAt;
+    private int netherFails;
 
     private boolean needsFood(Bot bot) {
         long now = bot.body().level().getGameTime();
