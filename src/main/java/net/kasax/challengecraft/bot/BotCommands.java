@@ -164,6 +164,32 @@ final class BotCommands {
                                     bot.doNow(new net.kasax.challengecraft.bot.task.PortalTask(bot.body().level()));
                                     return 1;
                                 })))
+                        .then(Commands.literal("coverage").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .executes(ctx -> {
+                                    // Which goals of the whole pool it knows a way for, here and now ([COVERAGE] in the log).
+                                    Bot bot = bot(ctx);
+                                    if (bot == null) return 0;
+                                    var planner = new net.kasax.challengecraft.bot.plan.ObtainPlanner();
+                                    java.util.Map<String, java.util.List<String>> missing = new java.util.TreeMap<>();
+                                    int total = 0, n = 0;
+                                    for (var g : net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalPool.all()) {
+                                        if (!g.isSelectableOnNormalBoard() || !g.isImplemented()) continue;
+                                        total++;
+                                        boolean covered;
+                                        try {
+                                            covered = net.kasax.challengecraft.bot.lockout.LockoutGoals.covers(bot, planner, g);
+                                        } catch (RuntimeException e) {
+                                            covered = false;
+                                        }
+                                        if (!covered) {
+                                            n++;
+                                            missing.computeIfAbsent(g.type().name(), k -> new java.util.ArrayList<>()).add(g.id());
+                                        }
+                                    }
+                                    BotManager.LOG.info("[COVERAGE] {} of {} board goals without a way at {}: {}", n, total, bot.body().blockPosition().toShortString(), missing);
+                                    ok(ctx, n + " of " + total + " board goals without a way");
+                                    return 1;
+                                })))
                         .then(Commands.literal("stronghold").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     // Test: to the stronghold with the eyes of ender it carries.
@@ -200,29 +226,6 @@ final class BotCommands {
                                             ok(ctx, String.format("%s: ~%.0f s, first %s", item, cost, first));
                                             return 1;
                                         }))))
-                        .then(Commands.literal("coverage").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
-                                .executes(ctx -> {
-                                    // Test: which goals of the pool the bot has no way for at all (from here), by type.
-                                    Bot bot = bot(ctx);
-                                    if (bot == null) return 0;
-                                    var planner = new net.kasax.challengecraft.bot.plan.ObtainPlanner();
-                                    java.util.Map<String, java.util.List<String>> missing = new java.util.TreeMap<>();
-                                    int total = 0;
-                                    for (var g : net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalPool.all()) {
-                                        total++;
-                                        boolean covered;
-                                        try {
-                                            covered = net.kasax.challengecraft.bot.lockout.LockoutGoals.covers(bot, planner, g);
-                                        } catch (RuntimeException e) {
-                                            covered = false;
-                                        }
-                                        if (!covered) missing.computeIfAbsent(g.type().name(), k -> new java.util.ArrayList<>()).add(g.id());
-                                    }
-                                    int n = missing.values().stream().mapToInt(java.util.List::size).sum();
-                                    LOG_COVERAGE.info("[COVERAGE] {} of {} goals without a way: {}", n, total, missing);
-                                    ok(ctx, n + " of " + total + " goals without a way (see the log)");
-                                    return 1;
-                                })))
                         .then(Commands.literal("nether").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .executes(ctx -> {
                                     // Test: the way into the Nether the Lockout brain would pick, from scratch.
@@ -313,7 +316,6 @@ final class BotCommands {
         return 1;
     }
 
-    private static final org.slf4j.Logger LOG_COVERAGE = org.slf4j.LoggerFactory.getLogger("ChallengeCraft-Bot");
 
     /** Ids typed without a namespace are Minecraft's. */
     private static String ns(String id) {

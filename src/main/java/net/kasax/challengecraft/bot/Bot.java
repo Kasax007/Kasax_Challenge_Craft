@@ -312,6 +312,26 @@ public final class Bot {
                 }
             }
         }
+        // A creeper coming for it, not hissing yet: dealt with before it gets close, as a player
+        // does. With a weapon and the hearts for it, killed (hit, a step back, hit); else away.
+        if (!fighting && !welcomeExplosion && !(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+            for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(7),
+                    c -> c.isAlive() && c.getTarget() == body && c.getSwellDir() <= 0 && body.hasLineOfSight(c))) {
+                boolean armed = false;
+                for (var st : body.getInventory().getNonEquipmentItems()) {
+                    if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+                }
+                actions.reset();
+                if (armed && body.getHealth() >= 10) {
+                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(c.getType()), java.util.Set.of(), 0, 1));
+                } else {
+                    net.minecraft.world.phys.Vec3 away = body.position().subtract(c.position()).normalize().scale(14);
+                    retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
+                    interject(retreat);
+                }
+                return;
+            }
+        }
         // Hurt badly by something (an arrow from afar counts), and running did not or would not
         // help: into the ground until the hearts are back.
         var shooter = body.getLastHurtByMob();

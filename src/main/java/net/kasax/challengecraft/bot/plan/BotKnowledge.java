@@ -160,8 +160,11 @@ public final class BotKnowledge {
             if (state.isAir() || !state.getFluidState().isEmpty() && state.getCollisionShape(level, pos).isEmpty()) continue;
             if (state.getDestroySpeed(level, pos) < 0) continue;
             Map<Item, Integer> got = new HashMap<>();
+            // (Leaves give their rare things one break in two hundred: an apple from oak leaves.
+            // A dozen rolls would never see one; these are rolled until they show.)
+            int n = state.is(net.minecraft.tags.BlockTags.LEAVES) ? 4000 : rolls;
             try {
-                for (int i = 0; i < rolls; i++) {
+                for (int i = 0; i < n; i++) {
                     for (ItemStack s : Block.getDrops(state, level, pos, null, null, tool)) {
                         got.merge(s.getItem(), s.getCount(), Integer::sum);
                     }
@@ -169,7 +172,7 @@ public final class BotKnowledge {
             } catch (RuntimeException e) {
                 continue;
             }
-            got.forEach((item, n) -> drops.computeIfAbsent(item, k -> new ArrayList<>()).add(new Drop(block, n / (double) rolls)));
+            got.forEach((item, c) -> drops.computeIfAbsent(item, k -> new ArrayList<>()).add(new Drop(block, c / (double) n)));
         }
     }
 

@@ -370,6 +370,35 @@ public class BotStuntTests {
         });
     }
 
+    /** A creeper creeping up while it waits about, a sword in the pack: dealt with (killed, or left to go off far away), unhurt. */
+    @GameTest(environment = "challengecraft:melee", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void creeperArmed(GameTestHelper h) {
+        creeper(h, "creeper_armed", true);
+    }
+
+    /** The same with nothing to fight with: kept away from (alive at the end). */
+    @GameTest(environment = "challengecraft:melee", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void creeperUnarmed(GameTestHelper h) {
+        creeper(h, "creeper_unarmed", false);
+    }
+
+    private static void creeper(GameTestHelper h, String name, boolean armed) {
+        BotArena a = BotArena.flat(h, name);
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var c = EntityTypes.CREEPER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        c.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(30, FEET, 20)));
+        c.setPersistenceRequired();
+        level.addFreshEntity(c);
+        if (armed) a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        else a.spawn(20, FEET, 20, new ItemStack(Items.DIRT, 4));
+        // (Gone off far enough away to do no harm counts too: what matters is the bot unhurt.)
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(880), 880, () -> {
+            if (a.bot().body().getHealth() < 14) h.fail("hurt by the creeper: " + a.bot().body().getHealth());
+            return armed ? !c.isAlive() : h.getTick() > 600;
+        });
+    }
+
     /** A full pack of odds and ends and a bundle: room made by bundling them up, nothing thrown away. */
     @GameTest(structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
     public void bundleOddsAndEnds(GameTestHelper h) {

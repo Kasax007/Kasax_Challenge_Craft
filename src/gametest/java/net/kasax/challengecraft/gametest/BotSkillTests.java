@@ -32,6 +32,26 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void applesFromLeaves(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "apples_from_leaves");
+        for (int[] t : new int[][]{{10, 10}, {14, 26}, {28, 12}}) {
+            a.fill(t[0] - 2, FEET + 3, t[1] - 2, t[0] + 2, FEET + 5, t[1] + 2, Blocks.OAK_LEAVES);
+            a.fill(t[0], FEET, t[1], t[0], FEET + 4, t[1], Blocks.OAK_LOG);
+        }
+        a.spawn(20, FEET, 20);
+        h.runAfterDelay(20, () -> {
+            var planner = new ObtainPlanner();
+            double cost = planner.estimate(a.bot(), Set.of(Items.APPLE), 1);
+            var plan = planner.plan(a.bot(), Set.of(Items.APPLE), 1);
+            String first = plan instanceof ObtainPlanner.Step st ? st.task().describe() : plan.toString();
+            BotArena.LOG.info("[BOTTEST] apples_from_leaves: ~{} s, first {}", Math.round(cost), first);
+            if (cost >= 1e9 || !first.startsWith("mine")) h.fail("no way to an apple: " + first);
+            a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
+        });
+    }
+
     /** A bucket, no water in sight: off to find some, and filled. */
     @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
     public void waterUnseen(GameTestHelper h) {
