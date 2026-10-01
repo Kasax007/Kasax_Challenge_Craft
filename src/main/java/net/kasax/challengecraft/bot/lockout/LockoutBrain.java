@@ -307,8 +307,16 @@ public final class LockoutBrain implements BotBrain {
                 double f = GoalExperience.factor(tile.goal().id());
                 if (f != 1) o = new LockoutGoals.Option(o.cost() * f, o.task(), o.yields());
             }
+            // Ran over its time before: believed somewhat less - unless things have changed since (a
+            // new tool, a village found: the fresh estimate is well below the one that failed).
             int over = overruns.getOrDefault(tile.goal().id(), 0);
-            if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + over) + 30 * over, o.task(), o.yields());
+            Double failedAt = overrunEstimate.get(tile.goal().id());
+            if (o != null && over > 0 && failedAt != null && o.cost() < 0.7 * failedAt) {
+                overruns.remove(tile.goal().id());
+                overrunEstimate.remove(tile.goal().id());
+                over = 0;
+            }
+            if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + 0.5 * over) + 20 * over, o.task(), o.yields());
             if (o != null) out.add(new Choice(tile, o));
         }
         return out;
@@ -360,6 +368,8 @@ public final class LockoutBrain implements BotBrain {
     private int extensions;
     /** How often each goal ran over its time: its estimates are trusted that much less. */
     private final java.util.Map<String, Integer> overruns = new java.util.HashMap<>();
+    /** The (plain) estimate a goal had when it ran over: a much lower one later means things changed. */
+    private final java.util.Map<String, Double> overrunEstimate = new java.util.HashMap<>();
 
     /** What the current goal would still take from here (seconds), or infinity if it cannot be told. */
     private double remaining(Bot bot) {
@@ -429,6 +439,7 @@ public final class LockoutBrain implements BotBrain {
             }
             bot.say(targetId + " takes too long, something else first");
             overruns.merge(targetId, 1, Integer::sum);
+            overrunEstimate.put(targetId, goalFirstEstimate);
             // (For next games too: at least this long, and it was not even done.)
             GoalExperience.record(targetId, goalFirstEstimate, 1.5 * (now - goalStarted) / 20.0);
             restUntil.put(targetId, now + REST_TICKS);
@@ -558,7 +569,8 @@ public final class LockoutBrain implements BotBrain {
             // The game counts it within a second (it checks inventories once a second): wait for
             // that instead of starting on the same tile again.
             // If it never counts (the goal wants something else than the bot thought), give up on it.
-            boolean again = tries.merge(targetId, 1, Integer::sum) < MAX_TRIES + 1;
+            // (A tile done in parts - ten hearts in a few falls - is not "done but not counted".)
+            boolean again = targetId.equals("have_10_hearts_missing") || tries.merge(targetId, 1, Integer::sum) < MAX_TRIES + 1;
             restUntil.put(targetId, now + (again ? 40 : REST_TICKS));
             targetIndex = -1;
             goalTask = null;

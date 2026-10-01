@@ -318,6 +318,19 @@ public final class ObtainPlanner {
         visibleMobs = mobs;
         dark = level.isDarkOutside();
         nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
+        // Villagers: how far the nearest village is, and which trades are there at which level.
+        villageWalk = INF;
+        villagerLevels.clear();
+        if (!nether && level.dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            var seenVillager = bot.memory().lastSeen(level, net.minecraft.world.entity.EntityTypes.VILLAGER, c);
+            if (seenVillager != null) villageWalk = 10 + Math.sqrt(seenVillager.distSqr(c)) / 4;
+            var village = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot, net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "village"));
+            if (village != null) villageWalk = Math.min(villageWalk, 10 + Math.sqrt(village.spot().distSqr(c)) / 4);
+            for (var v : level.getEntitiesOfClass(net.minecraft.world.entity.npc.villager.Villager.class, new AABB(c).inflate(96), e -> e.isAlive() && !e.isBaby())) {
+                String prof = v.getVillagerData().profession().unwrapKey().map(k2 -> k2.identifier().getPath()).orElse("none");
+                villagerLevels.merge(prof, v.getVillagerData().level(), Math::max);
+            }
+        }
         // Biomes in view: what they are known for is a walk away.
         Map<Block, Double> hints = new IdentityHashMap<>();
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
@@ -342,6 +355,7 @@ public final class ObtainPlanner {
         }
         // Made neither by a recipe nor dropped (see specialCost).
         all.addAll(List.of(Items.WATER_BUCKET, Items.LAVA_BUCKET, Items.OBSIDIAN));
+        for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).all()) all.add(t.gives());
         for (Item item : all) cost.put(item, rawCost(bot, k, item, cost));
         // Relax over the recipes until nothing gets cheaper (a few rounds: recipe chains are short).
         for (int round = 0; round < 10; round++) {
@@ -382,8 +396,52 @@ public final class ObtainPlanner {
         for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
             best = Math.min(best, mobCost(d.type(), d.effort()) / d.count());
         }
+        best = Math.min(best, tradeCost(bot, item, cost));
         return Math.min(best, specialCost(bot, k, item, cost));
     }
+
+    /** Seconds to the nearest known village (INF: none known), and the best level per profession there. */
+    private double villageWalk = INF;
+    private final Map<String, Integer> villagerLevels = new HashMap<>();
+
+    /**
+     * Seconds per item bought from a villager: the walk there, a villager of the trade's profession
+     * (one given a job site if none has it), levelled up to the trade's level by selling it cheap
+     * things, and the price.
+     */
+    private double tradeCost(Bot bot, Item item, Map<Item, Double> cost) {
+        if (villageWalk >= INF) return INF;
+        double best = INF;
+        for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).selling(item)) {
+            if (t.wants() == item) continue;
+            best = Math.min(best, tradeCostOf(bot, t, cost));
+        }
+        return best;
+    }
+
+    /** {@link #tradeCost} for one particular trade. */
+    private double tradeCostOf(Bot bot, TradeKnowledge.Trade t, Map<Item, Double> cost) {
+        if (villageWalk >= INF) return INF;
+        double pay = t.wantsCount() * cost.getOrDefault(t.wants(), INF) + (t.wantsB() == null ? 0 : t.wantsBCount() * cost.getOrDefault(t.wantsB(), INF));
+        if (pay >= INF) return INF;
+        int has = villagerLevels.getOrDefault(t.profession(), 0);
+        double job = has > 0 ? 0 : villagerLevels.containsKey("none") ? 40 + cost.getOrDefault(TradeKnowledge.JOB_SITES.get(t.profession()).asItem(), INF) : INF;
+        if (job >= INF) return INF;
+        // Each level is so much experience from selling it things: the cheapest way per point,
+        // with what Bob holds (sticks in the pack make a fletcher's levels a matter of seconds).
+        double levels = 0;
+        for (int l = Math.max(1, has); l < t.level(); l++) {
+            double perXp = INF;
+            for (TradeKnowledge.Trade e : TradeKnowledge.get(bot.server()).earning(t.profession(), l)) {
+                double c = e.wantsCount() * cost.getOrDefault(e.wants(), INF) + 3;
+                if (e.xp() > 0 && c < INF) perXp = Math.min(perXp, c / e.xp());
+            }
+            levels += perXp * (TradeKnowledge.LEVEL_XP[l + 1] - TradeKnowledge.LEVEL_XP[l]);
+        }
+        if (levels >= INF) return INF;
+        return (villageWalk + 15 + job + levels + pay) / Math.max(1, t.givesCount());
+    }
+
 
     /** Seconds to find some water when none is known (in the Overworld it is never far). */
     private static final double WATER_SEARCH = 90;
@@ -463,7 +521,7 @@ public final class ObtainPlanner {
     // only the first step, but sized for the whole plan (all the logs the pickaxe, the sticks and
     // the table will need, in one go instead of one trip per log).
 
-    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST }
+    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST, TRADE }
 
     private record Way(String key, double cost, Kind kind, Object data) {
     }
@@ -615,6 +673,7 @@ public final class ObtainPlanner {
             case FILL -> new net.kasax.challengecraft.bot.task.FillBucketTask(p.data() == Items.LAVA_BUCKET
                     ? net.minecraft.tags.FluidTags.LAVA : net.minecraft.tags.FluidTags.WATER);
             case CAST -> new net.kasax.challengecraft.bot.task.MakeObsidianTask(countAny(bot.body(), Set.of(Items.OBSIDIAN)) + total);
+            case TRADE -> new net.kasax.challengecraft.bot.task.VillagerTradeTask((TradeKnowledge.Trade) p.data(), countAny(bot.body(), p.accept()) + total);
             default -> throw new IllegalStateException();
         };
     }
@@ -743,6 +802,17 @@ public final class ObtainPlanner {
                     ways.add(new Way("fill:" + name(item), visibleBlocks.getOrDefault(source, WATER_SEARCH) + 3 + cost(Items.BUCKET), Kind.FILL, item));
                 }
             }
+            // Bought from a villager.
+            if (villageWalk < INF) {
+                for (Item item : accept) {
+                    for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).selling(item)) {
+                        String key = "trade:" + t.profession() + ":" + name(item);
+                        if (t.wants() == item || isFailed(key, now) || visiting.contains(t.wants())) continue;
+                        double c = tradeCostOf(bot, t, costs);
+                        if (c < INF) ways.add(new Way(key + ":" + name(t.wants()), c, Kind.TRADE, t));
+                    }
+                }
+            }
             if (accept.contains(Items.OBSIDIAN) && visibleBlocks.containsKey(Blocks.LAVA) && !isFailed("cast:obsidian", now)) {
                 ways.add(new Way("cast:obsidian", specialCost(bot, k, Items.OBSIDIAN, costs), Kind.CAST, null));
             }
@@ -770,6 +840,7 @@ public final class ObtainPlanner {
                 case KILL -> kill(sim, accept, count, w);
                 case FILL -> fill(bot, sim, (Item) w.data(), count - sim.count(accept), depth, visiting, w.key());
                 case CAST -> cast(bot, k, sim, count - sim.count(accept), depth, visiting, w.key());
+                case TRADE -> trade(bot, sim, (TradeKnowledge.Trade) w.data(), count - sim.count(accept), depth, visiting, w.key());
                 default -> route(bot, k, sim, (BotKnowledge.Route) w.data(), accept, count, depth, visiting);
             };
             if (why == null) return null;
@@ -835,6 +906,23 @@ public final class ObtainPlanner {
             sim.add(filled, 1);
             sim.steps.add(new Pending(Kind.FILL, key, Set.of(filled), 1, filled));
         }
+        return null;
+    }
+
+    private String trade(Bot bot, Sim sim, TradeKnowledge.Trade t, int need, int depth, Set<Item> visiting, String key) {
+        Set<Item> v = new HashSet<>(visiting);
+        v.add(t.gives());
+        int rounds = (need + t.givesCount() - 1) / t.givesCount();
+        String why = expand(bot, sim, Set.of(t.wants()), t.wantsCount() * rounds, depth + 1, v);
+        if (why != null) return why;
+        if (t.wantsB() != null) {
+            why = expand(bot, sim, Set.of(t.wantsB()), t.wantsBCount() * rounds, depth + 1, v);
+            if (why != null) return why;
+        }
+        sim.take(Set.of(t.wants()), t.wantsCount() * rounds);
+        if (t.wantsB() != null) sim.take(Set.of(t.wantsB()), t.wantsBCount() * rounds);
+        sim.add(t.gives(), t.givesCount() * rounds);
+        sim.steps.add(new Pending(Kind.TRADE, key, Set.of(t.gives()), t.givesCount() * rounds, t));
         return null;
     }
 

@@ -364,4 +364,61 @@ public class BotStuntTests {
         });
         a.run(net.kasax.challengecraft.bot.task.HideTask.upward(), 400, () -> h.getTick() > 350 && !died[0] && a.feet().getY() >= FEET + 2);
     }
+
+    /** A fletcher of the first level and a pile of sticks: levelled up by selling them, then a bow bought. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void buyBow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "buy_bow");
+        var level = h.getLevel();
+        a.fill(30, FEET, 20, 30, FEET, 20, Blocks.FLETCHING_TABLE);
+        var v = EntityTypes.VILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
+        v.setVillagerData(v.getVillagerData().withProfession(level.registryAccess(), net.minecraft.world.entity.npc.villager.VillagerProfession.FLETCHER).withLevel(1));
+        v.setVillagerXp(1); // (has traded before: keeps its job)
+        level.addFreshEntity(v);
+        // (Its first-level trades are drawn at random: the stick one, for certain.)
+        v.getOffers().clear();
+        v.getOffers().add(new net.minecraft.world.item.trading.MerchantOffer(new net.minecraft.world.item.trading.ItemCost(Items.STICK, 32),
+                new ItemStack(Items.EMERALD), 16, 2, 0.05f));
+        a.spawn(20, FEET, 20, new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64));
+        var bowTrade = net.kasax.challengecraft.bot.plan.TradeKnowledge.get(level.getServer()).selling(Items.BOW).get(0);
+        a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 1200,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
+    }
+
+    /** Just "get a bow", with a fletcher about and sticks to sell: the planner buys it. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void planBuysBow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "plan_buys_bow");
+        var level = h.getLevel();
+        a.fill(30, FEET, 20, 30, FEET, 20, Blocks.FLETCHING_TABLE);
+        var v = EntityTypes.VILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
+        v.setVillagerData(v.getVillagerData().withProfession(level.registryAccess(), net.minecraft.world.entity.npc.villager.VillagerProfession.FLETCHER).withLevel(1));
+        v.setVillagerXp(1);
+        level.addFreshEntity(v);
+        v.getOffers().clear();
+        v.getOffers().add(new net.minecraft.world.item.trading.MerchantOffer(new net.minecraft.world.item.trading.ItemCost(Items.STICK, 32),
+                new ItemStack(Items.EMERALD), 16, 2, 0.05f));
+        a.spawn(20, FEET, 20, new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64));
+        h.runAfterDelay(60, () -> a.bot().doNow(new net.kasax.challengecraft.bot.task.ObtainTask(java.util.Set.of(Items.BOW), 1,
+                new net.kasax.challengecraft.bot.plan.ObtainPlanner())));
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 1200,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
+    }
+
+    /** A jobless villager only: given a fletching table, it becomes a fletcher, and sells the bow. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    public void jobSiteBow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "job_site_bow");
+        var level = h.getLevel();
+        var v = EntityTypes.VILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        v.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(28, FEET, 20)));
+        level.addFreshEntity(v);
+        a.spawn(20, FEET, 20, new ItemStack(Items.FLETCHING_TABLE), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64),
+                new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64), new ItemStack(Items.STICK, 64));
+        var bowTrade = net.kasax.challengecraft.bot.plan.TradeKnowledge.get(level.getServer()).selling(Items.BOW).get(0);
+        a.run(new net.kasax.challengecraft.bot.task.VillagerTradeTask(bowTrade, 1), 3000,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.BOW)) > 0);
+    }
 }

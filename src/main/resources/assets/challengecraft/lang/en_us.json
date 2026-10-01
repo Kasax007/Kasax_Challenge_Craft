@@ -554,7 +554,7 @@
   "challengecraft.lockout.goal.status_effect.desc": "Gain %s.",
   "challengecraft.lockout.goal.status_effect.condition": "Claimed while a team member has the required status effect.",
   "challengecraft.lockout.goal.health_check.desc": "Complete %s.",
-  "challengecraft.lockout.goal.health_check.condition": "Claimed while a team member is missing at least 10 hearts.",
+  "challengecraft.lockout.goal.health_check.condition": "Claimed once a team member has taken 10 hearts of damage in total since the game began.",
   "challengecraft.lockout.goal.location.desc": "Reach %s.",
   "challengecraft.lockout.goal.location.condition": "Claimed when a team member stands at the required location.",
   "challengecraft.lockout.goal.todo.desc": "This goal exists in the pool but is not enabled for normal boards yet: %s.",
