@@ -8,6 +8,8 @@ import net.minecraft.resources.Identifier;
 
 /** Walks into a biome: to the nearest bit of it in view, or out exploring until one comes in view. */
 public final class GoToBiomeTask implements BotTask {
+    private final FarWalk far = new FarWalk();
+    private int arrivals;
     private final Identifier biome;
     private final Explorer explorer = new Explorer(6000);
     private BlockPos target;
@@ -34,16 +36,12 @@ public final class GoToBiomeTask implements BotTask {
             return explorer.tick(bot);
         }
         explorer.pause(bot);
-        if (!walking || !seen.equals(target)) {
-            target = seen;
-            bot.navigator().goNear(seen, 2);
-            walking = true;
-        }
-        BotNavigator.Status s = bot.navigator().tick();
-        if (s != BotNavigator.Status.MOVING) {
-            walking = false;
+        // To the nearest spot it knows, however far (in legs).
+        FarWalk.Status s = far.tick(bot, seen, 2);
+        if (s != FarWalk.Status.MOVING) {
             bot.senses().refresh();
-            if (s == BotNavigator.Status.FAILED) return explorer.tick(bot);
+            // There and not in it (the edge moved), or no way: looking about from here.
+            if (s == FarWalk.Status.FAILED || ++arrivals > 3) return explorer.tick(bot);
         }
         return Result.RUNNING;
     }

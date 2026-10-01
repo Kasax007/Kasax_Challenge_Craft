@@ -34,8 +34,17 @@ public final class BotSenses {
 
     private static final int VIEW = 96, STEP = 8, NEAR = 20, STRUCTURE_VIEW = 160;
 
+    /** The nearest known spot of each biome and structure in this dimension (from the atlas, as of the last look). */
     private final Map<Identifier, BlockPos> biomes = new HashMap<>();
     private final Map<Identifier, SeenStructure> structures = new HashMap<>();
+    /**
+     * The atlas: everything it has seen, per dimension, however far it has gone since (a player
+     * remembers the village a thousand blocks back, the desert on the way, the fortress below).
+     * A few spots per biome, a few of each structure.
+     */
+    private final Map<Identifier, Map<Identifier, List<BlockPos>>> biomeAtlas = new HashMap<>();
+    private final Map<Identifier, Map<Identifier, List<SeenStructure>>> structureAtlas = new HashMap<>();
+    private static final int ATLAS_PER_KIND = 8, BIOME_SPACING = 96, STRUCTURE_SPACING = 48;
     private final List<BlockPos> lootables = new ArrayList<>();
     private final Set<BlockPos> looted = new HashSet<>();
     private long lookedAt = -10_000;
@@ -63,8 +72,6 @@ public final class BotSenses {
                 }
             }
             dimension = dim;
-            biomes.clear();
-            structures.clear();
             lootables.clear();
             lookedAt = -10_000;
         }
@@ -79,7 +86,6 @@ public final class BotSenses {
 
     private void look(BotPlayer body, ServerLevel level) {
         BlockPos c = body.blockPosition();
-        biomes.clear();
         // The landscape: the surface around, as far as one sees.
         for (int dx = -VIEW; dx <= VIEW; dx += STEP) {
             for (int dz = -VIEW; dz <= VIEW; dz += STEP) {
@@ -123,8 +129,7 @@ public final class BotSenses {
                         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centre.getX(), centre.getZ());
                         // Within view distance it is known (as a player would spot it; no line of sight needed).
                         BlockPos spot = new BlockPos(centre.getX(), Math.max(box.minY(), Math.min(box.maxY(), surface)), centre.getZ());
-                        SeenStructure known = structures.get(id);
-                        if (known == null || spot.distSqr(c) < known.spot().distSqr(c)) structures.put(id, new SeenStructure(id, spot, box));
+                        addStructure(new SeenStructure(id, spot, box), c);
                     }
                 }
             }
@@ -144,6 +149,47 @@ public final class BotSenses {
             }
         }
         lootables.sort((a, b) -> Double.compare(a.distSqr(c), b.distSqr(c)));
+        nearestFrom(c);
+    }
+
+    /** The nearest known of each kind, from {@code c}, out of the atlas of this dimension. */
+    private void nearestFrom(BlockPos c) {
+        biomes.clear();
+        structures.clear();
+        biomeAtlas.getOrDefault(dimension, Map.of()).forEach((id, spots) ->
+                spots.stream().min((a, b) -> Double.compare(a.distSqr(c), b.distSqr(c))).ifPresent(p -> biomes.put(id, p)));
+        structureAtlas.getOrDefault(dimension, Map.of()).forEach((id, seen) ->
+                seen.stream().min((a, b) -> Double.compare(a.spot().distSqr(c), b.spot().distSqr(c))).ifPresent(st -> structures.put(id, st)));
+    }
+
+    private void addStructure(SeenStructure st, BlockPos from) {
+        List<SeenStructure> list = structureAtlas.computeIfAbsent(dimension, k -> new HashMap<>()).computeIfAbsent(st.id(), k -> new ArrayList<>());
+        for (int i = 0; i < list.size(); i++) {
+            // The same one again: the part nearer to where it stands is the one to go to.
+            if (list.get(i).spot().distSqr(st.spot()) < STRUCTURE_SPACING * STRUCTURE_SPACING) {
+                if (st.spot().distSqr(from) < list.get(i).spot().distSqr(from)) list.set(i, st);
+                return;
+            }
+        }
+        addCapped(list, st, from, x -> x.spot());
+    }
+
+    /** Into a capped list: when full, in place of the one furthest from here. */
+    private static <T> void addCapped(List<T> list, T item, BlockPos from, java.util.function.Function<T, BlockPos> at) {
+        if (list.size() < ATLAS_PER_KIND) {
+            list.add(item);
+            return;
+        }
+        int far = 0;
+        for (int i = 1; i < list.size(); i++) if (at.apply(list.get(i)).distSqr(from) > at.apply(list.get(far)).distSqr(from)) far = i;
+        if (at.apply(item).distSqr(from) < at.apply(list.get(far)).distSqr(from)) list.set(far, item);
+    }
+
+    /** Everything known of a structure kind in this dimension, nearest to {@code from} first. */
+    public List<SeenStructure> structuresOf(Identifier id, BlockPos from) {
+        List<SeenStructure> out = new ArrayList<>(structureAtlas.getOrDefault(dimension, Map.of()).getOrDefault(id, List.of()));
+        out.sort((a, b) -> Double.compare(a.spot().distSqr(from), b.spot().distSqr(from)));
+        return out;
     }
 
     /**
@@ -165,8 +211,15 @@ public final class BotSenses {
 
     private void note(ServerLevel level, BlockPos p, BlockPos from) {
         level.getBiome(p).unwrapKey().ifPresent(k -> {
-            BlockPos known = biomes.get(k.identifier());
-            if (known == null || p.distSqr(from) < known.distSqr(from)) biomes.put(k.identifier(), p);
+            List<BlockPos> spots = biomeAtlas.computeIfAbsent(dimension, d -> new HashMap<>()).computeIfAbsent(k.identifier(), d -> new ArrayList<>());
+            for (int i = 0; i < spots.size(); i++) {
+                // Near one it knows: whichever is nearer to here stands for that stretch.
+                if (spots.get(i).distSqr(p) < BIOME_SPACING * BIOME_SPACING) {
+                    if (p.distSqr(from) < spots.get(i).distSqr(from)) spots.set(i, p.immutable());
+                    return;
+                }
+            }
+            addCapped(spots, p.immutable(), from, x -> x);
         });
     }
 
@@ -208,7 +261,8 @@ public final class BotSenses {
     /** Unopened loot chests it knows of, nearest first. */
     /** The known structure (its id) a spot is inside of, or null. */
     public Identifier structureAt(BlockPos p) {
-        for (SeenStructure st : structures.values()) if (st.box().isInside(p)) return st.id();
+        for (List<SeenStructure> list : structureAtlas.getOrDefault(dimension, Map.of()).values())
+            for (SeenStructure st : list) if (st.box().isInside(p)) return st.id();
         return null;
     }
 

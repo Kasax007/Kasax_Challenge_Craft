@@ -143,4 +143,40 @@ public class BotMovementTests {
         h.runAfterDelay(30, () -> a.bot().interject(new net.kasax.challengecraft.bot.task.WaitTask(1)));
         a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(34, FEET, 34), 1), 400, () -> a.near(34, FEET, 34, 1.6));
     }
+
+    /** A hundred and eighty blocks off over land never loaded before, round a wall and over a channel, and back: in legs. */
+    @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 200)
+    public void farWalk(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "far_walk");
+        // A causeway nine wide out of the arena (the test world is empty round it), with a wall
+        // to get round and a channel to swim on the way.
+        a.fill(40, GROUND - 3, 16, 215, GROUND, 24, Blocks.STONE);
+        a.fill(40, GROUND, 16, 215, GROUND, 24, Blocks.GRASS_BLOCK);
+        a.fill(40, FEET, 16, 40, FEET + 24, 24, Blocks.AIR); // (the test's barrier wall: a door in it)
+        a.fill(120, FEET, 16, 121, FEET + 3, 22, Blocks.STONE);
+        a.fill(160, GROUND - 1, 16, 161, GROUND, 24, Blocks.WATER);
+        a.spawn(20, FEET, 20, new ItemStack(Items.COBBLESTONE, 64), new ItemStack(Items.STONE_PICKAXE));
+        var home = a.abs(20, FEET, 20);
+        var away = a.abs(200, FEET, 20);
+        boolean[] there = {false};
+        a.run(new net.kasax.challengecraft.bot.BotTask() {
+            final net.kasax.challengecraft.bot.task.FarWalk walk = new net.kasax.challengecraft.bot.task.FarWalk();
+
+            @Override
+            public Result tick(net.kasax.challengecraft.bot.Bot bot) {
+                var s = walk.tick(bot, there[0] ? home : away, 6);
+                if (s == net.kasax.challengecraft.bot.task.FarWalk.Status.FAILED) return Result.FAILED;
+                if (s == net.kasax.challengecraft.bot.task.FarWalk.Status.ARRIVED) {
+                    if (there[0]) return Result.DONE;
+                    there[0] = true;
+                }
+                return Result.RUNNING;
+            }
+
+            @Override
+            public String describe() {
+                return "far and back" + (there[0] ? " (on the way back)" : "");
+            }
+        }, 6000, () -> there[0] && a.bot().body().blockPosition().closerThan(home, 8));
+    }
 }

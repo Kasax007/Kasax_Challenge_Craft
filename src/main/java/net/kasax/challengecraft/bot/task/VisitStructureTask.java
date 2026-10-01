@@ -14,6 +14,7 @@ import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 /** Walks into a structure it has seen (village, shipwreck, ruined portal, ...), or explores for one. */
 public final class VisitStructureTask implements BotTask {
+    private final FarWalk far = new FarWalk();
     private final java.util.Set<Identifier> ids;
     private final String name;
     private final Explorer explorer = new Explorer(6000);
@@ -82,19 +83,17 @@ public final class VisitStructureTask implements BotTask {
             return explorer.tick(bot);
         }
         explorer.pause(bot);
-        if (!walking) {
+        if (target == null) {
             // First the spot it saw; if that does not count, somewhere else inside that part.
-            BlockPos spot = tries == 0 ? seen.spot() : new BlockPos(
+            target = tries == 0 ? seen.spot() : new BlockPos(
                     seen.box().minX() + bot.body().getRandom().nextInt(Math.max(1, seen.box().getXSpan())),
                     seen.spot().getY(),
                     seen.box().minZ() + bot.body().getRandom().nextInt(Math.max(1, seen.box().getZSpan())));
-            target = spot;
-            bot.navigator().goNear(spot, 1.5);
-            walking = true;
         }
-        BotNavigator.Status s = bot.navigator().tick();
-        if (s != BotNavigator.Status.MOVING) {
-            walking = false;
+        // However far off it is (in legs, over the land).
+        FarWalk.Status s = far.tick(bot, target, 1.5);
+        if (s != FarWalk.Status.MOVING) {
+            target = null;
             if (++tries > 8) return Result.FAILED;
         }
         return Result.RUNNING;
