@@ -52,6 +52,7 @@ public final class NavBenchTask implements BotTask {
             failsAtStart = bot.navigator().failures;
         }
         ticks++;
+        if (ticks % 200 == 0) BotManager.LOG.info("[NAVBENCH]   at {}: {}", bot.body().blockPosition().toShortString(), bot.navigator().debug());
         FarWalk.Status s = walk.tick(bot, target, 3);
         boolean timeout = ticks > limit;
         if (s == FarWalk.Status.MOVING && !timeout) return Result.RUNNING;

@@ -242,4 +242,35 @@ public class BotMovementTests {
             return h.getTick() > 600 && !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
         });
     }
+
+    /**
+     * Up a terraced hill (a step every two blocks, twelve up) in good time: sprinting and
+     * jumping each step once, no stopping (sprint pace would be about 230 ticks).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 420, skyAccess = true, padding = 8)
+    public void hillStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hill_stairs");
+        for (int i = 0; i < 12; i++) a.fill(8 + i * 2, FEET, 4, 39, FEET + i, 36, Blocks.DIRT);
+        a.spawn(2, FEET, 20, new ItemStack(Items.BREAD, 8));
+        a.run(new GoToTask(a.abs(34, FEET + 12, 20), 1.5), 420, () -> a.near(34, FEET + 12, 20, 1.6));
+    }
+
+    /** Across a deep lake thirty wide: swum (sprint-swimming), not bobbed across (that took twice as long). */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void lakeSwim(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "lake_swim");
+        a.fill(5, GROUND - 5, 0, 34, GROUND, 39, Blocks.WATER);
+        a.spawn(2, FEET, 20, new ItemStack(Items.BREAD, 8));
+        a.run(new GoToTask(a.abs(37, FEET, 20), 1.5), 300, () -> a.near(37, FEET, 20, 1.6));
+    }
+
+    /** A wall two high across the way (a gap far off at one end): dug through or round, no jumping at it. */
+    @GameTest(structure = STRUCTURE, maxTicks = 360, skyAccess = true, padding = 8)
+    public void wallTwoHigh(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "wall_two_high");
+        a.fill(20, FEET, 0, 20, FEET + 1, 39, Blocks.STONE);
+        a.fill(20, FEET, 37, 20, FEET + 1, 37, Blocks.AIR);
+        a.spawn(10, FEET, 10, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.BREAD, 8));
+        a.run(new GoToTask(a.abs(30, FEET, 10), 1.5), 360, () -> a.near(30, FEET, 10, 1.6));
+    }
 }

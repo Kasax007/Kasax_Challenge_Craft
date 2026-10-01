@@ -45,8 +45,11 @@ public final class FarWalk {
             walking = false;
         }
         if (!walking) {
-            legDirect = near;
-            if (near) nav.goNear(target, range);
+            // Straight for the target, however far: the navigator plans it leg by leg as it walks
+            // (each next leg while on the one before). Legs of its own only to get round
+            // something after a failure.
+            legDirect = near || side == 0;
+            if (legDirect) nav.goNear(target, range);
             else {
                 BlockPos aim = target;
                 if (side != 0) {

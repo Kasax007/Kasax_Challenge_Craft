@@ -431,7 +431,7 @@ public final class BotNavigator {
         boolean deep = level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()
                 || bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
         boolean outOnto = up || !level.getFluidState(to).is(net.minecraft.tags.FluidTags.WATER);
-        if (deep && !outOnto && flat > 1.2 && bot.getAirSupply() > bot.getMaxAirSupply() / 3) {
+        if (deep && !outOnto && flat > 1.2 && bot.getAirSupply() > bot.getMaxAirSupply() / 3 && openAbove(feet) && openAbove(to)) {
             diving = true;
             bot.sprintNow = true;
             bot.jump = false;
@@ -448,6 +448,17 @@ public final class BotNavigator {
             return;
         }
         bot.jump = up || to.getY() >= bot.getY() - 0.2 || bot.horizontalCollision;
+    }
+
+    /**
+     * The water here is open to the air (no ice or rock over it within a few blocks up): safe to
+     * swim under, it can come up for air anywhere.
+     */
+    private boolean openAbove(BlockPos p) {
+        var level = bot.level();
+        BlockPos q = p;
+        for (int i = 0; i < 6 && level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER); i++) q = q.above();
+        return level.getFluidState(q).isEmpty() && level.getBlockState(q).getCollisionShape(level, q).isEmpty();
     }
 
     /** Room over the head to jump: nothing solid two blocks above the feet. */
