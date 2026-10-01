@@ -197,13 +197,26 @@ public final class MineTask implements BotTask {
 
     private boolean knownOnly;
 
-    /** No way to it: it and the rest of its kind right there (the same tree, the same vein) are left. */
+    /**
+     * No way to it: it, and the rest of the same tree or ore vein (connected, a few dozen at most),
+     * are left. Common rock is everywhere: only that one block.
+     */
     private void giveUp(Bot bot, BlockPos p) {
         ServerLevel level = (ServerLevel) bot.body().level();
-        for (BlockPos q : BlockPos.betweenClosed(p.offset(-2, -8, -2), p.offset(2, 8, 2))) {
-            if (q.equals(p) || blocks.test(level.getBlockState(q))) {
-                skip.add(q.immutable());
-                bot.markUnreachable(q);
+        skip.add(p.immutable());
+        bot.markUnreachable(p);
+        if (BotWorld.COMMON.contains(level.getBlockState(p).getBlock())) return;
+        java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>(List.of(p.immutable()));
+        Set<BlockPos> seen = new HashSet<>(open);
+        while (!open.isEmpty() && seen.size() < 32) {
+            BlockPos q = open.poll();
+            for (BlockPos n : BlockPos.betweenClosed(q.offset(-1, -1, -1), q.offset(1, 1, 1))) {
+                if (seen.size() >= 32 || seen.contains(n) || !blocks.test(level.getBlockState(n))) continue;
+                BlockPos m = n.immutable();
+                seen.add(m);
+                open.add(m);
+                skip.add(m);
+                bot.markUnreachable(m);
             }
         }
     }
