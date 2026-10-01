@@ -32,6 +32,16 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /** A bucket, no water in sight: off to find some, and filled. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void waterUnseen(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "water_unseen");
+        a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET));
+        h.runAfterDelay(60, () -> a.fill(36, BotArena.GROUND - 1, 36, 38, BotArena.GROUND, 38, Blocks.WATER));
+        a.run(new ObtainTask(Set.of(Items.WATER_BUCKET), 1, new ObtainPlanner()), 1200,
+                () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.WATER_BUCKET)) > 0);
+    }
+
     /** Not a test of skill: logs which goals of the whole pool Bob knows no way for ([COVERAGE]). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void coverage(GameTestHelper h) {

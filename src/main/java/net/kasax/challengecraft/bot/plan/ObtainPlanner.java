@@ -90,7 +90,8 @@ public final class ObtainPlanner {
      */
     public void markFailed(Step step, long gameTime) {
         failed.put(step.key(), gameTime + 2400);
-        for (Object source : step.sources()) missing.put(source, gameTime + 12000);
+        // (Water is everywhere: one failed fill says nothing about water at large.)
+        for (Object source : step.sources()) if (source != Blocks.WATER) missing.put(source, gameTime + 12000);
         scannedAt = -10_000; // look again
     }
 
