@@ -460,4 +460,18 @@ public class BotStuntTests {
             return open;
         }, () -> true), 1200, () -> !z.isAlive() && !sp.isAlive());
     }
+
+    /** A strider out on a lava pool, out of reach of a sword: shot with the bow. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void striderOnLava(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "strider_on_lava");
+        var level = h.getLevel();
+        a.fill(24, BotArena.GROUND - 1, 14, 34, BotArena.GROUND, 26, net.minecraft.world.level.block.Blocks.LAVA);
+        var st = EntityTypes.STRIDER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        st.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(30, BotArena.GROUND, 20)));
+        level.addFreshEntity(st);
+        a.spawn(16, FEET, 20, new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 32), new ItemStack(Items.STONE_SWORD));
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.STRIDER), java.util.Set.of(), 0, 1), 1200,
+                () -> !st.isAlive());
+    }
 }

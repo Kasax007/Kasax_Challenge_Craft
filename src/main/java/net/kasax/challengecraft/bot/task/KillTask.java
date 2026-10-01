@@ -15,6 +15,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
@@ -95,6 +96,9 @@ public final class KillTask implements BotTask {
             walking = false;
             equipWeapon(bot);
         }
+        // On lava (a strider), or long out of reach: shot at, if there is a bow and arrows.
+        if ((target.isInLava() || target.level().getBlockState(target.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LAVA)
+                || chaseTicks > 600) && shoot(bot, target)) return Result.RUNNING;
         if (++chaseTicks > 1200) {
             // Could not get at this one (behind water, up a cliff): try another.
             unreachable.add(target.getUUID());
@@ -143,12 +147,30 @@ public final class KillTask implements BotTask {
             walking = false;
             // No path, but close (a mob in tall grass or bamboo): go straight at it for a while.
             if (dist < 10) direct = 40;
+            else if (shoot(bot, target)) return Result.RUNNING;
             else {
                 unreachable.add(target.getUUID());
                 target = null;
             }
         }
         return Result.RUNNING;
+    }
+
+    private final Set<java.util.UUID> shotAt = new java.util.HashSet<>();
+
+    /** A bow or a crossbow and arrows: shoot it instead (once per mob). Whether it set about that. */
+    private boolean shoot(Bot bot, LivingEntity mob) {
+        if (shotAt.contains(mob.getUUID()) || bot.body().distanceTo(mob) > 32) return false;
+        if (net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.ARROW) < 0) return false;
+        Item weapon = net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.BOW) >= 0 ? Items.BOW
+                : net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.CROSSBOW) >= 0 ? Items.CROSSBOW : null;
+        if (weapon == null) return false;
+        shotAt.add(mob.getUUID());
+        if (walking) bot.navigator().stop();
+        walking = false;
+        java.util.UUID id = mob.getUUID();
+        bot.interject(new ShootTask(weapon, e -> e.getUUID().equals(id), 8));
+        return true;
     }
 
     private LivingEntity nearest(BotPlayer body, ServerLevel level) {
