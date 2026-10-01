@@ -29,7 +29,7 @@ for i in $(seq 1 120); do sleep 5; grep -q "Done (" $LOG && break; grep -q "BUIL
 python3 $HERE/rcon.py "challengecraft_bot spawn Bob" > /dev/null
 sleep 3
 python3 $HERE/rcon.py "tick sprint $((SECS * 20 + 400))" "challengecraft_bot bench Bob $SECS $DIFF" > /dev/null
-for i in $(seq 1 720); do sleep 5; grep -q "\[BOTBENCH\] idle:" $LOG && break; done
+for i in $(seq 1 4320); do sleep 5; grep -q "\[BOTBENCH\] idle:" $LOG && break; done
 python3 $HERE/rcon.py stop > /dev/null 2>&1 || true
 sleep 5
 grep "\[BOTBENCH\]" $LOG | sed 's/.*\[BOTBENCH\] //'
