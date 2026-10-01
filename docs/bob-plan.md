@@ -215,3 +215,59 @@ Schnitt sind Rauschen. Für belastbare Vergleiche braucht es mehr Welten (20+).
 - Teure Erz-Ziele (Gold, 9 Roheisen, Redstone) scheitern oft: Strip-Mining-Tempo und Schätzung.
 - Wüsten- und Ozeanstarts: Der Weg zum Wald ist lang; Dorf- oder Schiffswrack-Holz wäre schneller.
 - Teure Kettenziele (Bogen, Item Frame, Feuerwerk) genauer schätzen.
+
+## 7. Bewertung: wie Bob denkt (Stand nach der Testphase)
+
+### So läuft eine Entscheidung ab
+
+1. **Reflexe** (jede halbe Sekunde, vor allem anderen): Creeper ausweichen, bei wenig Leben
+   zurückziehen oder eingraben, zurückschlagen, essen, Wasser-MLG beim Fallen.
+2. **Grundbedarf**: Ist er gestorben, holt er zuerst seine Sachen zurück; bei echtem Hunger sucht er
+   Essen. Danach kommt die Eröffnung (Holz, Werkbank, Steinspitzhacke und -axt).
+3. **Spielplan** (`LockoutStrategist`, bei jeder Brettänderung, nach dem Tod und alle 2 Minuten):
+   - Er schätzt für jedes offene Feld die Kosten in Sekunden.
+   - Er bewertet Investitionen: Eisen-Kit oder Diamanten, wenn sie mehrere Felder genug verbilligen.
+   - Er gibt einen Bonus für den Nether-Trip, wenn dort mehrere Felder liegen.
+   - Er blockt Felder, bei denen der Gegner kurz vor dem Ziel steht.
+   - Er führt eine Einkaufsliste (Rohstoffe aller Felder zusammen) und eine Mitnahme-Liste
+     (Feuerstein, TNT, Zuckerrohr).
+4. **Zielwahl** (`LockoutBrain`):
+   - Gewählt wird das billigste Feld abzüglich Bonus, mit einem Schritt Vorausschau: welches Feld
+     das nächste am meisten verbilligt.
+   - Felder, die schon einmal ihr Zeitbudget überzogen haben, gelten danach als teurer.
+5. **Planer** (`ObtainPlanner`):
+   - Er rechnet einen Rezeptbaum durch (abbauen, töten, craften, schmelzen, Eimer füllen,
+     Obsidian gießen).
+   - Die Kosten kommen aus dem, was gesehen oder erinnert ist, aus der Seltenheit, der Tiefe und
+     dem passenden Werkzeug.
+   - Er simuliert das Inventar mit.
+6. **Ausführung**:
+   - Aufgaben laufen auf einem Stapel; Reflexe und Nebenaufgaben schieben sich davor.
+   - Ein Watchdog gibt jedem Ziel das 3-Fache seiner Schätzung. Kommt Bob dabei gut voran,
+     bekommt das Ziel mehr Zeit.
+7. **Bewegung**: A*-Pfadsuche mit echten Kosten (graben, pfeilern, brücken, springen,
+   schwimmen). Weite Strecken legt er in Etappen über die Oberfläche zurück.
+
+### Stärken
+
+- Er versteht fast alle Zieltypen und kann für etwa drei Viertel der Felder einen Weg planen.
+- Wissen aus dem Spiel selbst: Rezepte, Loot und Drops kommen aus den Spieldaten; nichts davon ist
+  von Hand gepflegt.
+- Mit festen Welten und GameTests ist jeder Fehler reproduzierbar.
+
+### Schwächen und was dagegen getan wird
+
+| Schwäche | Folge | Maßnahme |
+|---|---|---|
+| Kostenschätzungen sind Heuristiken (Seltenheit, Tiefe) | Felder dauern ein Vielfaches (Kessel 77 s geschätzt, 676 s real) | Überziehungen verteuern das Feld (erledigt); nächster Schritt: gemessene Dauern je Wegart über Läufe hinweg speichern und die Schätzung damit kalibrieren |
+| Jedes Feld wird einzeln geplant | Er holt dreimal Eisen statt einmal | Einkaufsliste fürs ganze Brett (erledigt) |
+| Nur ein Schritt Vorausschau | Er wählt keine Reihenfolge nach Ort (alles in der Höhle, dann alles im Nether) | Phasen planen: Oberwelt-Block, Höhlen-Block, Nether-Block |
+| Unerreichbares fiel aus dem Plan | Nether-Felder galten von der Oberwelt aus als unmöglich, Bob ging nie in den Nether | Der Weg dorthin wird jetzt mitgeplant (erledigt) |
+| Röntgenblick des Gedächtnisses | Er grub zu eingeschlossenen Erzen | Nur noch freiliegende Blöcke; Höhlen als Abstieg (erledigt) |
+| Fehlende Fähigkeiten | Feld „kein Weg bekannt“ | Liste aus den Komplett-Brettern, Fähigkeit für Fähigkeit nachrüsten |
+
+### Komplett-Bretter (jedes Feld muss erfüllt werden)
+
+`scripts/bot/bench-many.sh 3600 hard <seeds>` spielt bis zu 60 Minuten oder bis das Brett voll
+ist. Der Bericht listet jedes offene Feld mit „kein Weg bekannt“ oder mit Plan, Starts, Fehlschlägen,
+Überziehungen und verbrauchter Zeit. Das ist die Arbeitsliste für die nächsten Runden.
