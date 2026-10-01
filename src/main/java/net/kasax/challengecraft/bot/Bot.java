@@ -331,7 +331,7 @@ public final class Bot {
                 }
                 actions.reset();
                 if (armed && body.getHealth() >= 10) {
-                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(c.getType()), java.util.Set.of(), 0, 1));
+                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(c.getType()), java.util.Set.of(), 0, 1).nearby(12));
                 } else {
                     net.minecraft.world.phys.Vec3 away = body.position().subtract(c.position()).normalize().scale(14);
                     retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
@@ -364,7 +364,7 @@ public final class Bot {
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
-            interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1));
+            interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1).nearby(12));
             return;
         }
         int food = body.getFoodData().getFoodLevel();

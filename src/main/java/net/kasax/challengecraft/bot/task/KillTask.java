@@ -79,7 +79,7 @@ public final class KillTask implements BotTask {
         }
         if (done(bot)) return Result.DONE;
 
-        if (target == null || !target.isAlive() || target.distanceTo(body) > BotWorld.MOB_SIGHT) {
+        if (target == null || !target.isAlive() || target.distanceTo(body) > (within > 0 ? within * 1.5 : BotWorld.MOB_SIGHT)) {
             if (target != null && !target.isAlive() && target.getLastHurtByMob() == body) {
                 killed++;
                 deathSpot = target.blockPosition();
@@ -241,8 +241,16 @@ public final class KillTask implements BotTask {
         return true;
     }
 
+    /** Only what is close by (a fight that came to it): no search for more when that is gone. */
+    private double within;
+
+    public KillTask nearby(double radius) {
+        this.within = radius;
+        return this;
+    }
+
     private LivingEntity nearest(BotPlayer body, ServerLevel level) {
-        return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(BotWorld.MOB_SIGHT),
+        return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(within > 0 ? within : BotWorld.MOB_SIGHT),
                         e -> e.isAlive() && types.contains(e.getType()) && e != body && !unreachable.contains(e.getUUID()) && BotWorld.seesMob(body, e))
                 .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
     }
@@ -288,6 +296,8 @@ public final class KillTask implements BotTask {
     private boolean fortressTried;
 
     private Result explore(Bot bot) {
+        // (A fight close by, over: nothing to go looking for.)
+        if (within > 0) return killed > 0 ? Result.DONE : Result.FAILED;
         // Blazes and wither skeletons live in fortresses (nowhere else): to the fortress first,
         // exploring the Nether for one if none is known.
         if (!fortressTried && (types.contains(net.minecraft.world.entity.EntityTypes.BLAZE) || types.contains(net.minecraft.world.entity.EntityTypes.WITHER_SKELETON))
