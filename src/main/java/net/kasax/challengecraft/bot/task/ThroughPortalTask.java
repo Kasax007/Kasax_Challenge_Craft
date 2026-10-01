@@ -60,7 +60,7 @@ public final class ThroughPortalTask implements BotTask {
                 // Obsidian carried: build the frame; else, with the buckets, cast one at a lava pool.
                 boolean buckets = BotInventory.slotOf(bot.body(), Items.WATER_BUCKET) >= 0 && BotInventory.slotOf(bot.body(), Items.BUCKET) >= 0;
                 build = ObtainPlanner.countAny(bot.body(), Set.of(Items.OBSIDIAN)) < 10 && buckets && level.dimension() == Level.OVERWORLD
-                        ? new CastPortalTask(level) : new PortalTask(level);
+                        ? new LavaPortalTask(level, null) : new PortalTask(level);
                 return Result.RUNNING;
             }
         }

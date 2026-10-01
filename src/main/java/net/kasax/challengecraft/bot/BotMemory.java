@@ -324,6 +324,11 @@ public final class BotMemory {
 
     /** The nearest known position of each remembered block (for the planner's costs). */
     public Map<Block, BlockPos> nearestOfEach(ResourceKey<Level> dimension, BlockPos from) {
+        return nearestOfEach(dimension, from, java.util.Set.of());
+    }
+
+    /** ... leaving out {@code skip} (found out of reach). */
+    public Map<Block, BlockPos> nearestOfEach(ResourceKey<Level> dimension, BlockPos from, java.util.Set<BlockPos> skip) {
         Map<Block, BlockPos> out = new IdentityHashMap<>();
         Map<Block, List<BlockPos>> known = blocks.get(dimension);
         if (known == null) return out;
@@ -332,7 +337,7 @@ public final class BotMemory {
             double bestD = Double.MAX_VALUE;
             for (BlockPos p : e.getValue()) {
                 double d = p.distSqr(from);
-                if (d < bestD) {
+                if (d < bestD && !skip.contains(p)) {
                     bestD = d;
                     best = p;
                 }

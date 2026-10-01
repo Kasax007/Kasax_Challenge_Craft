@@ -22,7 +22,7 @@ public final class ObtainTask implements BotTask {
     private Set<Item> keep = Set.of();
     private BotTask step;
     private ObtainPlanner.Step stepPlan;
-    private int failures;
+    private int failures, recheck;
 
     public ObtainTask(Set<Item> items, int count) {
         this(items, count, new ObtainPlanner());
@@ -65,6 +65,18 @@ public final class ObtainTask implements BotTask {
             step = st.task();
             stepPlan = st;
             bot.say("  " + step.describe());
+        }
+        // Out searching for one kind (spruce) while another that does as well (oak) comes into
+        // sight: the plan again, every few seconds, and the other way if it now comes out first.
+        if (step instanceof MineTask m && m.searching() && stepPlan != null && ++recheck % 100 == 0) {
+            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, keep);
+            if (p instanceof ObtainPlanner.Step st && !st.key().equals(stepPlan.key())
+                    && st.task() instanceof MineTask && st.sources().stream().anyMatch(b -> b instanceof net.minecraft.world.level.block.Block block && planner.seen(bot, block) != null)) {
+                bot.navigator().stop();
+                bot.say("  other way now in sight: " + st.task().describe());
+                step = st.task();
+                stepPlan = st;
+            }
         }
         Result r;
         try {

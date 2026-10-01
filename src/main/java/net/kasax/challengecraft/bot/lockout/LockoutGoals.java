@@ -242,8 +242,11 @@ public final class LockoutGoals {
     /**
      * The speedrunners' way in, no diamond pickaxe needed: with a lava pool in sight, two buckets
      * (one of them full of water), flint and steel and ten spare blocks, the portal is cast right
-     * there at the pool (see {@link net.kasax.challengecraft.bot.task.CastPortalTask}).
+     * there at the pool (see {@link net.kasax.challengecraft.bot.task.LavaPortalTask}).
      */
+    /** Blocks for casting: the mould and the way in, with the furnace's eight cobblestone kept back. */
+    private static final int CAST_BLOCKS = 28;
+
     private static Option castPortal(Bot bot, ObtainPlanner planner) {
         // A pool under the open sky it knows of (casting down in a cave costs minutes a try).
         BlockPos open = openPool(bot);
@@ -255,7 +258,7 @@ public final class LockoutGoals {
                 // (the water bucket's estimate counts one bucket already, unless one is held)
                 + planner.estimate(bot, Set.of(Items.BUCKET), !water && ObtainPlanner.countAny(bot.body(), Set.of(Items.BUCKET)) > 0 ? 2 : 1)
                 + planner.estimate(bot, Set.of(Items.FLINT_AND_STEEL), 1)
-                + planner.estimate(bot, blocks, 10);
+                + planner.estimate(bot, blocks, CAST_BLOCKS);
         if (cost >= INF) return null;
         Set<Item> bucketKit = Set.of(Items.WATER_BUCKET, Items.BUCKET, Items.FLINT_AND_STEEL);
         return new Option(cost + lava + 75, () -> {
@@ -265,8 +268,9 @@ public final class LockoutGoals {
                 () -> new ObtainTask(Set.of(Items.WATER_BUCKET), 1, planner).keeping(Set.of(Items.FLINT_AND_STEEL)),
                 () -> new ObtainTask(Set.of(Items.BUCKET), 1, planner).keeping(Set.of(Items.WATER_BUCKET, Items.FLINT_AND_STEEL)),
                 () -> new ObtainTask(Set.of(Items.FLINT_AND_STEEL), 1, planner).keeping(bucketKit),
-                () -> new ObtainTask(blocks, 10, planner).keeping(bucketKit),
-                () -> new net.kasax.challengecraft.bot.task.CastPortalTask(bot.body().level(), pool)));
+                // (The mould behind the frame: up to sixteen blocks, the way in two more.)
+                () -> new ObtainTask(blocks, CAST_BLOCKS, planner).keeping(bucketKit),
+                () -> new net.kasax.challengecraft.bot.task.LavaPortalTask(bot.body().level(), pool)));
         });
     }
 

@@ -110,6 +110,8 @@ public final class MineTask implements BotTask {
             // Looking around costs; while searching, look again once a second (and after each leg).
             if (!searching || --scanCooldown <= 0) {
                 scanCooldown = 20;
+                // (Not the ones found out of reach a little while ago, by this task or another.)
+                skip.addAll(bot.unreachable());
                 target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
                 // Nothing right here: somewhere it has been past (or seen from afar).
                 if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
@@ -156,7 +158,7 @@ public final class MineTask implements BotTask {
                 approachTicks = 0;
             }
             if (++approachTicks > 300 + 25 * Math.sqrt(target.distSqr(bot.body().blockPosition()))) {
-                skip.add(target);
+                giveUp(bot, target);
                 target = null;
                 walking = false;
                 bot.navigator().stop();
@@ -164,13 +166,13 @@ public final class MineTask implements BotTask {
             }
             BotNavigator.Status s = bot.navigator().tick();
             if (s == BotNavigator.Status.FAILED) {
-                skip.add(target);
+                giveUp(bot, target);
                 target = null;
                 walking = false;
             } else if (s == BotNavigator.Status.ARRIVED) {
                 walking = false;
                 if (!bot.actions().inReach(target)) {
-                    skip.add(target);
+                    giveUp(bot, target);
                     target = null;
                 }
             }
@@ -194,6 +196,22 @@ public final class MineTask implements BotTask {
     }
 
     private boolean knownOnly;
+
+    /** No way to it: it and the rest of its kind right there (the same tree, the same vein) are left. */
+    private void giveUp(Bot bot, BlockPos p) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        for (BlockPos q : BlockPos.betweenClosed(p.offset(-2, -8, -2), p.offset(2, 8, 2))) {
+            if (q.equals(p) || blocks.test(level.getBlockState(q))) {
+                skip.add(q.immutable());
+                bot.markUnreachable(q);
+            }
+        }
+    }
+
+    /** None in sight: walking out to look (another kind of the same thing seen meanwhile may be better). */
+    public boolean searching() {
+        return searching && target == null;
+    }
 
     /** Only where it is seen or remembered: no searching for it. */
     public MineTask knownOnly() {

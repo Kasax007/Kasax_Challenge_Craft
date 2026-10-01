@@ -2,7 +2,7 @@ package net.kasax.challengecraft.gametest;
 
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.kasax.challengecraft.bot.plan.ObtainPlanner;
-import net.kasax.challengecraft.bot.task.CastPortalTask;
+import net.kasax.challengecraft.bot.task.LavaPortalTask;
 import net.kasax.challengecraft.bot.task.ObtainTask;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
@@ -123,18 +123,18 @@ public class BotSkillTests {
         a.fill(x, FEET, z, x + width - 1, FEET + height - 2, z + width - 1, Blocks.SPRUCE_LOG);
     }
 
-    /** The speedrunners' portal at a lava pool, then through it. (Flaky about one run in three: open.) */
-    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8, maxAttempts = 3, requiredSuccesses = 1)
+    /** The portal cast at a lava pool, then through it (see {@link BotPortalTests} for the pool shapes). */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
     public void castPortal(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "cast_portal");
         a.fill(24, GROUND, 4, 27, GROUND, 7, Blocks.LAVA);
         a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET), new ItemStack(Items.WATER_BUCKET),
-                new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 12), new ItemStack(Items.COBBLESTONE, 8));
-        a.run(new CastPortalTask(h.getLevel()), 3600, () -> a.bot().body().level().dimension() == Level.NETHER);
+                new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 20), new ItemStack(Items.COBBLESTONE, 8));
+        a.run(new LavaPortalTask(h.getLevel(), null), 3600, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
 
     /** The pool in a cave, no flat room anywhere near: room dug out, then the portal cast. */
-    @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 8, maxAttempts = 2, requiredSuccesses = 1)
+    @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 8)
     public void castPortalDug(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "cast_portal_dug");
         a.fill(0, FEET, 0, 39, FEET + 6, 39, Blocks.STONE);
@@ -143,7 +143,7 @@ public class BotSkillTests {
         a.fill(24, GROUND, 4, 27, GROUND, 7, Blocks.LAVA);
         a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET), new ItemStack(Items.WATER_BUCKET), new ItemStack(Items.IRON_PICKAXE),
                 new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 16), new ItemStack(Items.COBBLESTONE, 8));
-        a.run(new CastPortalTask(h.getLevel()), 6000, () -> a.bot().body().level().dimension() == Level.NETHER);
+        a.run(new LavaPortalTask(h.getLevel(), null), 6000, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
 
     /**

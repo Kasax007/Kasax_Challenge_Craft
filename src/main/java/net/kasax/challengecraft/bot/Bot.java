@@ -26,6 +26,23 @@ public final class Bot {
     private final BotMemory memory = new BotMemory();
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
+    /**
+     * Blocks it set out for and found no way to (a tree on top of a mesa, ore behind lava), with
+     * when: left alone for a few minutes, whichever task wants them next.
+     */
+    private final java.util.Map<net.minecraft.core.BlockPos, Long> unreachable = new java.util.HashMap<>();
+
+    public void markUnreachable(net.minecraft.core.BlockPos p) {
+        unreachable.put(p.immutable(), body.level().getGameTime());
+    }
+
+    /** The ones that still count as out of reach (five minutes after the try). */
+    public java.util.Set<net.minecraft.core.BlockPos> unreachable() {
+        long now = body.level().getGameTime();
+        unreachable.values().removeIf(t -> now - t > 6000);
+        return unreachable.keySet();
+    }
+
     /** Work blocks (tables, furnaces) it could not get to: not counted on again. */
     public final java.util.Set<net.minecraft.core.BlockPos> unreachableStations = new java.util.HashSet<>();
     /** For benchmarks: ticks with nothing to do, tasks that failed. */
@@ -248,6 +265,14 @@ public final class Bot {
         if (armorCheck % 10 == 0 && !keepItems.isEmpty() && BotBundles.freeSlots(body) >= 3
                 && BotBundles.countInside(body, keepItems) > 0) BotBundles.unpack(this, keepItems);
         BotTask top = tasks.peek();
+        // Running out of air with water over the head that swimming up does not get out of: to
+        // the nearest air first, whatever else is going on.
+        if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < body.getMaxAirSupply() * 2 / 5
+                && !(top instanceof net.kasax.challengecraft.bot.task.AirTask)) {
+            actions.reset();
+            interject(new net.kasax.challengecraft.bot.task.AirTask());
+            return;
+        }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
         // Low on health with a monster close: get away first (and eat on the way), as a player

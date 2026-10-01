@@ -134,6 +134,7 @@ public final class ObtainPlanner {
         refresh(bot);
         this.craftOnly = craftOnly;
         this.keep = keep;
+        this.wanted = Set.copyOf(accept);
         try {
             return plan(bot, Set.copyOf(accept), count, 0, new HashSet<>());
         } finally {
@@ -303,6 +304,8 @@ public final class ObtainPlanner {
         double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         net.minecraft.world.phys.Vec3 eye = bot.body().getEyePosition();
+        // (Not what it just found no way to: a tree up on a mesa is not wood at hand.)
+        Set<BlockPos> unreachable = bot.unreachable();
         for (int x = -SCAN_RADIUS; x <= SCAN_RADIUS; x++) {
             for (int z = -SCAN_RADIUS; z <= SCAN_RADIUS; z++) {
                 if (level.getChunkSource().getChunkNow((c.getX() + x) >> 4, (c.getZ() + z) >> 4) == null) continue;
@@ -315,6 +318,7 @@ public final class ObtainPlanner {
                     Double known = blocks.get(s.getBlock());
                     if (known != null && known <= reach) continue;
                     if (!BotWorld.exposed(level, m)) continue;
+                    if (!unreachable.isEmpty() && unreachable.contains(m)) continue;
                     // Only what it could have seen (common rock anywhere it digs is seen enough).
                     if (!BotWorld.COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
                     blocks.put(s.getBlock(), reach);
@@ -322,7 +326,7 @@ public final class ObtainPlanner {
             }
         }
         // And what it remembers from further away (read from the chunks it has been near).
-        for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c).entrySet()) {
+        for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c, unreachable).entrySet()) {
             BlockPos p = e.getValue();
             double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
             double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + vertical(p.getY() - c.getY(), digPerBlock);
@@ -743,11 +747,22 @@ public final class ObtainPlanner {
         };
     }
 
+    /** What is wanted in the end (wood itself, or something made from any wood). */
+    private Set<Item> wanted = Set.of();
+
     /** The nearest biome in view known for one of these blocks, if none of them is in sight. */
     private BlockPos lead(Bot bot, Set<Block> blocks) {
         // Seen ones may turn out out of reach (deep down, under water): the far lead stands by.
         for (Block b : blocks) if (visibleBlocks.containsKey(b)) return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD
                 && BotKnowledge.depth(b, bot.body().getBlockY()) == null ? farLeadStandBy(bot, blocks) : null;
+        // Wood of any kind does (planks are planks): to the nearest forest, whichever trees grow there.
+        // (Unless it is that wood that is wanted: a spruce log for its own sake.)
+        if (blocks.stream().anyMatch(b -> b.defaultBlockState().is(net.minecraft.tags.BlockTags.OVERWORLD_NATURAL_LOGS))
+                && wanted.stream().noneMatch(i -> i.getDefaultInstance().is(net.minecraft.tags.ItemTags.LOGS))) {
+            Set<Block> logs = new HashSet<>();
+            for (Block b : BuiltInRegistries.BLOCK) if (b.defaultBlockState().is(net.minecraft.tags.BlockTags.OVERWORLD_NATURAL_LOGS)) logs.add(b);
+            blocks = logs;
+        }
         BlockPos from = bot.body().blockPosition(), best = null;
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
             boolean known = false;
