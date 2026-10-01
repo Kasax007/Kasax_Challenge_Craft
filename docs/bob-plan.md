@@ -312,3 +312,15 @@ gemeint (ein halbes Herz übrig).
 Getränkter Pfeil, Armbrust mit Feuerwerk, Packeis/Eis (Behutsamkeit), Waldanwesen, Brauen
 (Braustand, Wurftrank), Ende und Bosse; Tode durch Creeper und Zombie-Gruppen bleiben die größte
 Zeitbremse.
+
+### Komplett-Bretter in Zahlen (60 Min., schwer, Welten 33/77/11/22)
+
+| Stand | Felder | Erstes Eisen | Eimer | Nether |
+|---|---|---|---|---|
+| Vor den Änderungen (Welten 33/77) | 10 / 5 | 972 / 1447 s | 1022 / 3337 s | nie |
+| Mit Kit-Phase, Einkaufsliste | 8 / 8 / 3 | 255 / 237 / – s | 549 / 334 / – s | nie |
+| Aktuell | 7 / 7 / 2 / 7 | 80 / 1199 / 2823 / 205 s | 134 / 1724 / 3494 / 337 s | einmal (Welt 22, Runde davor, 1976 s) |
+
+Eisen und Eimer kommen meist früh. Der Engpass ist jetzt das Portalgießen im echten Gelände: Platz,
+Erreichbarkeit, Lava unter Tage. Die Fehlermeldungen nennen inzwischen den genauen Grund, und jede
+Runde behebt einen weiteren. Bisher hat Bob den Nether einmal selbst erreicht.
