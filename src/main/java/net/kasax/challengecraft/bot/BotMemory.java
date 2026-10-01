@@ -208,6 +208,8 @@ public final class BotMemory {
         BlockPos best = null;
         double bestScore = Double.MAX_VALUE;
         for (BlockPos p : list) {
+            // Only ones that get it a good way nearer the height it wants.
+            if (Math.abs(p.getY() - wantY) + 8 >= Math.abs(from.getY() - wantY)) continue;
             double d = Math.sqrt(p.distSqr(from));
             if (d > maxDistance) continue;
             double score = d + 0.7 * Math.abs(p.getY() - wantY);
