@@ -52,6 +52,7 @@ public final class BotSenses {
     /** Portals it went through, per dimension: the way back, however far it walked. */
     private final Map<Identifier, List<BlockPos>> portals = new HashMap<>();
     private BlockPos lastPos;
+    private boolean wasInPortal;
 
     public void tick(BotPlayer body) {
         ServerLevel level = (ServerLevel) body.level();
@@ -64,10 +65,11 @@ public final class BotSenses {
                 BlockPos here = net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 6, 4,
                         st -> st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), false, java.util.Set.of());
                 // (Not found about, odd as that is: where it came out is where the portal is.)
-                // (Only a portal crossing, whose ends lie an eighth apart: not a respawn at home.)
-                double scale = level.dimension() == net.minecraft.world.level.Level.NETHER ? 1 / 8.0 : 8.0;
-                double ex = lastPos.getX() * scale - body.getX(), ez = lastPos.getZ() * scale - body.getZ();
-                if (here == null && level.dimension() != net.minecraft.world.level.Level.END && ex * ex + ez * ez < 256 * 256) {
+                // (A portal crossing: it stood in a portal a moment ago on the other side. Not a
+                // respawn at home.)
+                BotManager.LOG.info("[Bot] crossed from {} at {} (in a portal: {}) to {} at {}, portal here: {}", dimension.getPath(), lastPos.toShortString(),
+                        wasInPortal, dim.getPath(), body.blockPosition().toShortString(), here == null ? "none" : here.toShortString());
+                if (here == null && wasInPortal && level.dimension() != net.minecraft.world.level.Level.END) {
                     here = body.blockPosition();
                     BotManager.LOG.info("[Bot] came out at {} but saw no portal there; remembering the spot", here.toShortString());
                 }
@@ -84,6 +86,8 @@ public final class BotSenses {
             lookedAt = -10_000;
         }
         lastPos = body.blockPosition();
+        wasInPortal = level.getBlockState(lastPos).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)
+                || level.getBlockState(lastPos.above()).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL);
         // Standing in a portal (on the way in, and again on coming out at the other end): both
         // ends remembered that way, whatever tick the game moves it on.
         if (level.getBlockState(lastPos).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) remember(dim, lastPos);

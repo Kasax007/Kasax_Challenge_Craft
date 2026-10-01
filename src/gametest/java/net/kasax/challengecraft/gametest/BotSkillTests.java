@@ -245,6 +245,24 @@ public class BotSkillTests {
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.OAK_LOG)) > 0);
     }
 
+    /** Ten obsidian and flint and steel: a frame built, lit, gone through; it comes out in a portal on the other side. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void builtPortal(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "built_portal");
+        a.spawn(20, FEET, 20, new ItemStack(Items.OBSIDIAN, 10), new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.COBBLESTONE, 16));
+        var from = a.abs(20, FEET, 20);
+        a.run(new net.kasax.challengecraft.bot.task.PortalTask(h.getLevel()), 2400, () -> {
+            var body = a.bot().body();
+            if (body.level().dimension() != Level.NETHER) return false;
+            var nether = (net.minecraft.server.level.ServerLevel) body.level();
+            var portal = net.kasax.challengecraft.bot.BotWorld.nearest(nether, body.blockPosition(), 6, 4,
+                    s -> s.is(Blocks.NETHER_PORTAL), false, java.util.Set.of());
+            org.slf4j.LoggerFactory.getLogger("ChallengeCraft-BotTest").info("[BOTTEST] built_portal: from {} came out at {}, portal there {}",
+                    from.toShortString(), body.blockPosition().toShortString(), portal);
+            return portal != null;
+        });
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {
