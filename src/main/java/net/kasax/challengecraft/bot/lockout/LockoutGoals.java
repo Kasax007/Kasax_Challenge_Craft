@@ -265,6 +265,17 @@ public final class LockoutGoals {
                         () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(Items.TARGET, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.NOTHING, null, 6),
                         () -> net.kasax.challengecraft.bot.task.ShootTask.atBlock(Items.BOW, st -> st.is(Blocks.TARGET), 2))));
             }
+            case "obtain_honeycomb" -> {
+                // Shears on a bee nest full of honey: three combs (the bees get angry; it runs off).
+                var level = (net.minecraft.server.level.ServerLevel) body.level();
+                java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> full = st -> (st.is(Blocks.BEE_NEST) || st.is(Blocks.BEEHIVE))
+                        && st.getValue(net.minecraft.world.level.block.BeehiveBlock.HONEY_LEVEL) >= net.minecraft.world.level.block.BeehiveBlock.MAX_HONEY_LEVELS;
+                BlockPos nest = bot.memory().nearest(level, body.blockPosition(), full, Set.of());
+                double shears = planner.estimate(bot, Set.of(Items.SHEARS), 1);
+                yield nest == null || shears >= INF ? null : new Option(shears + 6 + Math.sqrt(nest.distSqr(body.blockPosition())) / 4, () -> new SequenceTask("honeycomb", List.of(
+                        () -> new ObtainTask(Set.of(Items.SHEARS), 1, planner),
+                        () -> new net.kasax.challengecraft.bot.task.ClickBlockTask("shear a bee nest", full).with(Items.SHEARS, Set.of(Items.HONEYCOMB)))));
+            }
             case "drink_potion" -> {
                 // A water bottle is a potion too: a glass bottle filled at the water, and drunk.
                 double bottle = planner.estimate(bot, Set.of(Items.GLASS_BOTTLE), 1);

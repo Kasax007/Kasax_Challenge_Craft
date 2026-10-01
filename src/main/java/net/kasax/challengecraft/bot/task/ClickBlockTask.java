@@ -25,15 +25,36 @@ public final class ClickBlockTask implements BotTask {
     private boolean walking;
     private int ticks, clicks;
 
+    private net.minecraft.world.item.Item tool;
+    private Set<net.minecraft.world.item.Item> collect;
+    private int collectTicks = -1;
+
     public ClickBlockTask(String what, Predicate<BlockState> match) {
         this.what = what;
         this.match = match;
+    }
+
+    /** Clicked with this item in hand (shears on a bee nest), and what drops then picked up. */
+    public ClickBlockTask with(net.minecraft.world.item.Item tool, Set<net.minecraft.world.item.Item> collect) {
+        this.tool = tool;
+        this.collect = collect;
+        return this;
     }
 
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         if (++ticks > 4800) return Result.FAILED;
+        if (collect != null && net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(bot.body(), collect) > 0) return Result.DONE;
+        // What fell: picked up.
+        if (collectTicks >= 0) {
+            if (++collectTicks > 200) return Result.FAILED;
+            var drops = BotWorld.drops(level, bot.body().blockPosition(), 8, collect);
+            if (drops.isEmpty()) return collectTicks > 40 ? Result.FAILED : Result.RUNNING;
+            if (bot.navigator().status() != BotNavigator.Status.MOVING) bot.navigator().goPickUp(drops.get(0));
+            bot.navigator().tick();
+            return Result.RUNNING;
+        }
         if (target == null || !match.test(level.getBlockState(target))) {
             target = BotWorld.nearest(level, bot.body().blockPosition(), 24, 12, match, false, skip);
             if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), match, skip);
@@ -53,7 +74,11 @@ public final class ClickBlockTask implements BotTask {
             return Result.RUNNING;
         }
         bot.navigator().stop();
-        bot.tools().selectEmptyHandPublic();
+        if (tool != null) {
+            int slot = net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), tool);
+            if (slot < 0) return Result.FAILED;
+            bot.tools().select(slot);
+        } else bot.tools().selectEmptyHandPublic();
         // The face turned towards it (a bell only rings when struck on the side).
         Vec3 to = bot.body().getEyePosition().subtract(Vec3.atCenterOf(target));
         Direction face = Direction.getApproximateNearest(to.x, 0, to.z);
@@ -64,6 +89,10 @@ public final class ClickBlockTask implements BotTask {
         bot.body().gameMode.useItemOn(bot.body(), level, bot.body().getMainHandItem(), InteractionHand.MAIN_HAND,
                 new BlockHitResult(hit, face, target, false));
         bot.body().swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+        if (collect != null) {
+            collectTicks = 0;
+            return Result.RUNNING;
+        }
         return ++clicks >= 4 ? Result.DONE : Result.RUNNING;
     }
 

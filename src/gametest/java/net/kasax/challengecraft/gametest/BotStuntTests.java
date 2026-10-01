@@ -334,4 +334,15 @@ public class BotStuntTests {
                         () -> new net.kasax.challengecraft.bot.task.ConsumeTask(java.util.Set.of(Items.POTION)))), 500,
                 () -> a.bot().body().getStats().getValue(net.minecraft.stats.Stats.ITEM_USED.get(Items.POTION)) > 0);
     }
+
+    /** Shears and a bee nest full of honey: honeycomb. */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void honeycomb(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "honeycomb");
+        a.fill(28, FEET, 20, 28, FEET, 20, Blocks.BEE_NEST.defaultBlockState().setValue(net.minecraft.world.level.block.BeehiveBlock.HONEY_LEVEL, 5));
+        a.spawn(16, FEET, 20, new ItemStack(Items.SHEARS));
+        a.run(new net.kasax.challengecraft.bot.task.ClickBlockTask("shear a bee nest", st -> st.is(Blocks.BEE_NEST)
+                        && st.getValue(net.minecraft.world.level.block.BeehiveBlock.HONEY_LEVEL) >= 5).with(Items.SHEARS, java.util.Set.of(Items.HONEYCOMB)), 400,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.HONEYCOMB)) > 0);
+    }
 }
