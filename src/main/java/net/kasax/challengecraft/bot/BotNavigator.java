@@ -136,6 +136,12 @@ public final class BotNavigator {
                 + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans;
     }
 
+    /** Whether the step being walked leads down (into deeper water, say). */
+    public boolean headingDown() {
+        if (status != Status.MOVING || path == null || index >= path.size()) return false;
+        return path.get(index).to().getY() < feet().getY();
+    }
+
     public BlockPos feet() {
         return BlockPos.containing(bot.getX(), bot.getY() + 0.2, bot.getZ());
     }

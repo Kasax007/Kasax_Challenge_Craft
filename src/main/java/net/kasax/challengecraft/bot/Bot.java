@@ -170,7 +170,10 @@ public final class Bot {
                 idleTicks++;
                 body.stopInputs();
                 // (Even doing nothing: not under water.)
-                if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) body.jump = true;
+                // (Unless the way leads down through the water, along a lake bed, and there is air
+            // to spare: then the path decides.)
+            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)
+                    && (!navigator.headingDown() || body.getAirSupply() < body.getMaxAirSupply() / 2)) body.jump = true;
                 return;
             }
         }

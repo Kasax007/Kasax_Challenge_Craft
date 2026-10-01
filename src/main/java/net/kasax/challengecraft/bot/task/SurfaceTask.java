@@ -42,15 +42,20 @@ public final class SurfaceTask implements BotTask {
                 && head.getY() < level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, head.getX(), head.getZ())) return true;
         // Down a shaft or a ravine (the sky shines straight in): the ground a few blocks around is
         // mostly well above the feet. (One side high is only a cliff or a wall.)
-        int feetY = feet.getY(), high = 0, samples = 0;
+        int feetY = feet.getY(), high = 0, deep = 0, samples = 0;
         for (int i = 0; i < 16; i++) {
             double a = i * Math.PI / 8;
             int x = feet.getX() + (int) Math.round(Math.cos(a) * 4);
             int z = feet.getZ() + (int) Math.round(Math.sin(a) * 4);
             if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
             samples++;
-            if (level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) > feetY + 1) high++;
+            int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            if (ground > feetY + 1) high++;
+            if (ground > feetY + 3) deep++;
         }
+        // Well down, the ground all round far above: a pit or a room dug out at a shaft's foot,
+        // walls or not.
+        if (samples > 0 && deep * 10 >= samples * 7) return true;
         // ... and it is hemmed in (a hole or a tunnel, not a valley floor).
         // (In water the walls at the first level above it count: rock round a flooded pit, open
         // air over a lake.)

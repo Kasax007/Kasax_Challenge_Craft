@@ -27,7 +27,8 @@ public final class FillBucketTask implements BotTask {
     private final Explorer explorer = new Explorer(2400);
     private BlockPos source;
     private boolean walking;
-    private int tries;
+    private int tries, idleLegs, walkFails;
+    private boolean closer;
 
     public FillBucketTask(TagKey<Fluid> fluid) {
         this.fluid = fluid;
@@ -54,7 +55,7 @@ public final class FillBucketTask implements BotTask {
         if (BotInventory.slotOf(body, empty) < 0 || ++tries > 3000) return Result.FAILED;
         if (source == null || !level.getFluidState(source).isSource()) {
             // A source with open air above, so the bot can look at it from the side or above.
-            source = BotWorld.nearest(level, body.blockPosition(), 32, 12,
+            source = BotWorld.nearest(level, body.blockPosition(), 32, 32,
                     s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), true, skip);
             // None in sight: the nearest it remembers (a lake passed on the way).
             if (source == null) source = bot.memory().nearest(level, body.blockPosition(), s -> s.getFluidState().is(fluid) && s.getFluidState().isSource(), skip);
@@ -67,27 +68,52 @@ public final class FillBucketTask implements BotTask {
             explorer.pause(bot);
         }
         if (!bot.actions().inReach(source)) {
+            // (Far measured over the ground: water in a cave right under the hill it stands on is
+            // near, and a leg "over the surface" to it would end where it stands, again and again.)
+            double hx = source.getX() - body.getX(), hz = source.getZ() - body.getZ();
+            boolean farOff = hx * hx + hz * hz > 24 * 24;
             if (!walking) {
-                boolean far = source.distSqr(body.blockPosition()) > 24 * 24;
+                boolean far = farOff;
                 // Far off (a lake it remembers): up out of a mine first, then over the surface in legs.
                 if (far && SurfaceTask.underground(body)) {
                     bot.interject(new SurfaceTask());
                     return Result.RUNNING;
                 }
                 if (far) bot.navigator().goNear(Explorer.legToward(level, bot.navigator().feet(), source, 40), 4);
-                else bot.navigator().goNear(source, 3.2);
+                else bot.navigator().goNear(source, closer ? 1.5 : 3.2);
                 walking = true;
             }
             BotNavigator.Status s = bot.navigator().tick();
             // (A leg of a long way done: the next leg.)
-            if (s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source) && source.distSqr(body.blockPosition()) > 24 * 24) {
+            if (s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source) && farOff) {
+                walking = false;
+                // (Legs that end where they began: not getting anywhere this way, another source.)
+                if (++idleLegs > 4) {
+                    skip.add(source);
+                    source = null;
+                    idleLegs = 0;
+                }
+                return Result.RUNNING;
+            }
+            if (s == BotNavigator.Status.MOVING) idleLegs = 0;
+            if (s == BotNavigator.Status.IDLE) walking = false;
+            // There by the walk's measure but not in reach (down a hole, round a corner): once
+            // more, right up to it; then another one.
+            if (s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source) && !closer) {
+                closer = true;
                 walking = false;
                 return Result.RUNNING;
             }
-            if (s == BotNavigator.Status.IDLE) walking = false;
+            // (One failed walk is no reason to give up a source: a fall, a mob in the way. A few.)
+            if (s == BotNavigator.Status.FAILED && ++walkFails <= 3) {
+                walking = false;
+                return Result.RUNNING;
+            }
             if (s == BotNavigator.Status.FAILED || s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(source)) {
                 skip.add(source);
                 source = null;
+                closer = false;
+                walkFails = 0;
             }
             return Result.RUNNING;
         }
@@ -99,6 +125,11 @@ public final class FillBucketTask implements BotTask {
         skip.add(source); // the look did not hit it (something in between): another one
         source = null;
         return Result.RUNNING;
+    }
+
+    @Override
+    public String status() {
+        return describe() + " [source " + (source == null ? "-" : source.toShortString()) + ", closer " + closer + ", skipped " + skip.size() + ", tries " + tries + "]";
     }
 
     @Override

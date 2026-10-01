@@ -205,6 +205,22 @@ public class BotSkillTests {
         h.succeed();
     }
 
+    /**
+     * Water seen down a sinkhole, in a cave twenty-five blocks under the hill it stands on (near
+     * over the ground, far straight down): dug down to, bucket filled.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 72)
+    public void waterUnderHill(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "water_under_hill");
+        a.fill(0, GROUND, 0, 39, GROUND + 25, 39, Blocks.STONE);
+        a.fill(24, GROUND + 1, 24, 30, GROUND + 3, 30, Blocks.AIR);
+        a.fill(30, GROUND + 4, 30, 30, GROUND + 25, 30, Blocks.AIR); // (the sinkhole it looks down)
+        a.fill(27, GROUND + 1, 27, 27, GROUND + 1, 27, Blocks.WATER);
+        a.spawn(20, GROUND + 26, 20, new ItemStack(Items.BUCKET), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 16));
+        a.run(new net.kasax.challengecraft.bot.task.FillBucketTask(net.minecraft.tags.FluidTags.WATER), 2400,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(a.bot().body(), java.util.Set.of(Items.WATER_BUCKET)) > 0);
+    }
+
     /** Killed (as by a creeper): back on its feet after the respawn, the task stack cleared. */
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {
