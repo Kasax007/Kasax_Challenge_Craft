@@ -381,6 +381,10 @@ public final class Bot {
             return;
         }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
+        // Getting out of lava, out of the water, out of the fire: nothing else meanwhile (a meal
+        // in the lava is the last one).
+        if (top instanceof net.kasax.challengecraft.bot.task.LavaEscapeTask || top instanceof net.kasax.challengecraft.bot.task.AirTask
+                || top instanceof net.kasax.challengecraft.bot.task.ExtinguishTask || top instanceof net.kasax.challengecraft.bot.task.SnowEscapeTask) return;
         // (A fight inside a hunt or a sequence counts too.)
         boolean fighting = BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.KillTask
                 || top instanceof net.kasax.challengecraft.bot.task.ShootTask && tasks.stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.KillTask);
