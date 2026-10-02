@@ -291,6 +291,9 @@ public final class LockoutBrain implements BotBrain {
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
         }
+        // Off to the Nether: packed for it first - blocks to bridge and climb with (the way
+        // home up to a portal on a ledge), and food (no animals worth the name down there).
+        if (netherBound(bot, pick) && packForNether(bot)) return;
         targetIndex = pick.tile().index();
         targetId = pick.tile().goal().id();
         goalTask = pick.option().task().get();
@@ -528,6 +531,43 @@ public final class LockoutBrain implements BotBrain {
         bot.say("the bastion at " + seen.spot().toShortString() + ": its gold");
         start(bot, new net.kasax.challengecraft.bot.task.BastionLootTask(level), 9600);
         return true;
+    }
+
+    private long netherPackAt;
+
+    private static boolean netherBound(Bot bot, Choice pick) {
+        return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+                && pick.tile().goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER;
+    }
+
+    /** Blocks and food for a Nether trip; returns whether it went for some (once in a while). */
+    private boolean packForNether(Bot bot) {
+        var body = bot.body();
+        long now = body.level().getGameTime();
+        if (now < netherPackAt) return false;
+        netherPackAt = now + 3600;
+        int blocks = net.kasax.challengecraft.bot.BotActions.buildingBlocks(body);
+        if (blocks < 48) {
+            var stone = net.kasax.challengecraft.bot.BotActions.buildingBlocks(body.level());
+            bot.say("for the Nether: blocks to build with (" + blocks + ")");
+            nextErrand = "blocks";
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 64 - blocks, planner), 1800);
+            return true;
+        }
+        int points = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
+        }
+        if (points < 24) {
+            double cost = planner.estimate(bot, FOODS, ObtainPlanner.countAny(body, FOODS) + 6);
+            if (cost > 240) return false;
+            bot.say("for the Nether: food (~" + Math.round(cost) + " s)");
+            nextErrand = "food";
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, ObtainPlanner.countAny(body, FOODS) + 6, planner), budget(cost, 600, 2400));
+            return true;
+        }
+        return false;
     }
 
     private long goldCheckAt;
