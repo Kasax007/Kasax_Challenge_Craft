@@ -100,6 +100,11 @@ public final class ShootTask implements BotTask {
                             e -> e.isAlive() && !(e instanceof Player) && mob.test(e))
                     .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
             if (target == null) return ticks > 600 ? Result.FAILED : Result.RUNNING;
+            // Come close (a magma cube's leaps, a hoglin's charge): the bow away, the sword out.
+            if (target.distanceTo(body) < 4 && target instanceof net.minecraft.world.entity.monster.Enemy) {
+                body.stopUsingItem();
+                return Result.FAILED;
+            }
             aimAt = target.position().add(0, target.getBbHeight() * 0.6, 0);
         }
         double dist = body.getEyePosition().distanceTo(aimAt);
