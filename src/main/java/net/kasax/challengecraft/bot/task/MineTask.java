@@ -323,7 +323,16 @@ public final class MineTask implements BotTask {
                 if (!level.getFluidState(new BlockPos(p.getX(), y, p.getZ())).isEmpty()) return false;
             }
         }
-        if (depth != null) return true;
+        if (depth != null) {
+            // One remembered far off against digging down for it here: the walk (some 2.5 blocks
+            // a second over and under ground) must beat the dig down plus a minute's search at
+            // the depth (a cave ore remembered 500 blocks away is not worth the trip).
+            BlockPos feet = bot.body().blockPosition();
+            double dx = p.getX() - feet.getX(), dz = p.getZ() - feet.getZ();
+            double walk = Math.sqrt(dx * dx + dz * dz) / 2.5 + Math.abs(p.getY() - feet.getY());
+            double dig = Math.max(0, feet.getY() - depth) + 60;
+            return walk <= dig;
+        }
         if (Math.abs(p.getY() - bot.body().getBlockY()) <= 8) return true;
         // (Under a roof there is no surface to be near: the Nether's blocks are all "inside".)
         if (level.dimensionType().hasCeiling()) return Math.abs(p.getY() - bot.body().getBlockY()) <= 24;
