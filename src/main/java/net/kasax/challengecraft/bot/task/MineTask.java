@@ -536,6 +536,9 @@ public final class MineTask implements BotTask {
         for (Item i : items) {
             String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(i).getPath();
             if (id.contains("diamond") || id.contains("redstone") || id.contains("gold")) return 10;
+            // (Iron is about in every cave from the deep slate up to some sixty: any cave there
+            // shows it in its walls, a broad band.)
+            if (id.contains("iron")) return 28;
         }
         return 16;
     }
