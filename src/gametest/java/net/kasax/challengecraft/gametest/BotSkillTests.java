@@ -153,6 +153,24 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 6 && a.bot().current() == null);
     }
 
+    /**
+     * Digging down for iron right over a cave: the staircase meets the cave's roof (no floor for
+     * the next step) - on along the level or down into the cave, not stuck on the spot; the ore
+     * in the cave wall then in sight and taken.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void digIntoCave(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "dig_into_cave");
+        a.fill(6, 8, 6, 34, 10, 34, Blocks.AIR);
+        // (The ore on the cave floor in the middle: in sight from wherever it comes down.)
+        a.fill(20, 8, 20, 20, 8, 20, Blocks.IRON_ORE);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.TORCH, 16));
+        var body = a.bot().body();
+        int depth = a.abs(0, 4, 0).getY();
+        a.run(new net.kasax.challengecraft.bot.task.MineTask("raw_iron", s -> s.is(Blocks.IRON_ORE), Set.of(Items.RAW_IRON), 1, depth), 2400,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 1);
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {

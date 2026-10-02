@@ -160,6 +160,21 @@ public final class MineTask implements BotTask {
             }
             walking = false;
             if (!bot.tools().canHarvest(level.getBlockState(target))) {
+                // The pickaxe broke on the way down: a new one made right here (the stone is all
+                // about, the sticks are in the pack), once - not given up for that.
+                BlockState st = level.getBlockState(target);
+                if (!retooled) {
+                    retooled = true;
+                    for (Item tool : List.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE)) {
+                        if (!new net.minecraft.world.item.ItemStack(tool).isCorrectToolForDrops(st)) continue;
+                        ObtainPlanner pl = new ObtainPlanner();
+                        if (pl.estimate(bot, Set.of(tool), 1) > 40) break;
+                        bot.say("the pickaxe is gone: a new " + ObtainPlanner.name(tool) + " right here");
+                        target = null;
+                        bot.interject(new ObtainTask(Set.of(tool), 1, pl));
+                        return Result.RUNNING;
+                    }
+                }
                 bot.say("need a better tool for " + what);
                 return Result.FAILED;
             }
@@ -227,7 +242,7 @@ public final class MineTask implements BotTask {
     }
 
     private Boolean rock;
-    private boolean rockStairs;
+    private boolean rockStairs, retooled;
 
     /** Gathering rock or soil (cobblestone, deepslate, netherrack, dirt): found everywhere. */
     private boolean rock(ServerLevel level) {
@@ -246,6 +261,7 @@ public final class MineTask implements BotTask {
      */
     private BlockPos wallRock(ServerLevel level, Bot bot) {
         BlockPos feet = bot.body().blockPosition();
+        boolean underground = SurfaceTask.underground(bot.body());
         Set<BlockPos> wet = new HashSet<>();
         for (int i = 0; i < 8; i++) {
             Set<BlockPos> ignore = new HashSet<>(skip);
@@ -256,7 +272,16 @@ public final class MineTask implements BotTask {
             if (p == null) return null;
             boolean dry = true;
             for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) dry = false;
-            if (dry) return p;
+            // From up here, not one in the dark (a cave mouth: rock showing at body height is
+            // mostly in one, and the monsters live there, at noon too). Down in a mine already,
+            // the dark is all there is.
+            boolean lit = underground;
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos n = p.relative(d);
+                if (level.getBlockState(n).isAir() && (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, n) >= 8
+                        || level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, n) >= 8)) lit = true;
+            }
+            if (dry && lit) return p;
             wet.add(p);
         }
         return null;
@@ -303,6 +328,11 @@ public final class MineTask implements BotTask {
                 bot.markUnreachable(m);
             }
         }
+    }
+
+    /** The items it gathers. */
+    public Set<Item> items() {
+        return items;
     }
 
     /** None in sight: walking out to look (another kind of the same thing seen meanwhile may be better). */
@@ -504,7 +534,20 @@ public final class MineTask implements BotTask {
             // the way back up afterwards - walked, not built with the blocks just dug.
             digTo = down ? ahead.below() : ahead;
             digBlocks = down ? List.of(ahead.above(), ahead, ahead.below()) : List.of(ahead, ahead.above());
-            if (!safeStep(level, digBlocks, digTo)) {
+            // The next step has no floor: a cave right below. A short drop into it is the way on
+            // (and its walls show more than any tunnel); else on along the level for a step.
+            if (down && !safeStep(level, digBlocks, digTo)) {
+                if (shortDrop(level, digBlocks, digTo)) {
+                    // (The landing is wherever it comes down: the step is taken from there.)
+                } else {
+                    List<BlockPos> along = List.of(ahead, ahead.above());
+                    if (safeStep(level, along, ahead)) {
+                        digTo = ahead;
+                        digBlocks = along;
+                    }
+                }
+            }
+            if (!safeStep(level, digBlocks, digTo) && !(down && shortDrop(level, digBlocks, digTo))) {
                 digTo = null;
                 heading = heading.getClockWise();
                 if (++turns >= 4) {
@@ -554,7 +597,9 @@ public final class MineTask implements BotTask {
         var body = bot.body();
         net.minecraft.world.phys.Vec3 c = net.minecraft.world.phys.Vec3.atBottomCenterOf(digTo);
         double dx = c.x - body.getX(), dz = c.z - body.getZ();
-        if (nav.feet().equals(digTo) && dx * dx + dz * dz < 0.1) {
+        boolean landed = nav.feet().getX() == digTo.getX() && nav.feet().getZ() == digTo.getZ() && nav.feet().getY() <= digTo.getY()
+                && bot.body().onGround();
+        if ((nav.feet().equals(digTo) || landed) && dx * dx + dz * dz < 0.1) {
             body.stopInputs();
             digTo = null;
             turns = 0;
@@ -568,6 +613,27 @@ public final class MineTask implements BotTask {
             heading = heading.getClockWise();
         }
         return Result.RUNNING;
+    }
+
+    /**
+     * The step down opens onto a cave: no floor under it, but solid ground at most three blocks
+     * lower (a drop that does not hurt), nothing liquid on the way down or round what gets dug.
+     */
+    private static boolean shortDrop(ServerLevel level, List<BlockPos> dig, BlockPos feet) {
+        for (BlockPos b : dig) {
+            if (!level.getBlockState(b).getFluidState().isEmpty() || level.getBlockState(b).getDestroySpeed(level, b) < 0) return false;
+            for (Direction d : Direction.values()) {
+                BlockPos n = b.relative(d);
+                if (!dig.contains(n) && !level.getFluidState(n).isEmpty()) return false;
+            }
+        }
+        BlockPos p = feet.below();
+        for (int i = 0; i < 4; i++, p = p.below()) {
+            BlockState s = level.getBlockState(p);
+            if (!s.getFluidState().isEmpty()) return false;
+            if (!s.getCollisionShape(level, p).isEmpty()) return i > 0 && !s.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK);
+        }
+        return false;
     }
 
     /** The new spot has a floor, nothing is above it that falls, and no liquid touches what gets dug out. */

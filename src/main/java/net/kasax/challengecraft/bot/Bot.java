@@ -205,12 +205,11 @@ public final class Bot {
         BotTask.Result r;
         try {
             sinkToDig = false;
-            int before = navigator.tickedAt;
+            // A walk left off without a word (the task waits for something now, or steers by
+            // itself): ended, or the body runs on with the last keys of it until a wall stops it.
+            // (Before the task's tick: what the task sets itself stands.)
+            if (navigator.status() == BotNavigator.Status.MOVING && body.tickCount - navigator.tickedAt > 2) navigator.stop();
             r = task.tick(this);
-            // A walk left off without a word (the task waits for something now): the keys let
-            // go, or the body runs on in the last direction until a wall stops it.
-            if (navigator.status() == BotNavigator.Status.MOVING && navigator.tickedAt == before && before != body.tickCount
-                    && body.tickCount - before > 2) body.stopInputs();
             // Head under water: hold jump to swim up, whatever the task does (a player never forgets
             // that). Unless it is digging its way out from the bottom (afloat, it digs five times slower).
             if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig && !navigator.diving()) body.jump = true;

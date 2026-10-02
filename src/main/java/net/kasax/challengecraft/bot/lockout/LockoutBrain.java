@@ -134,7 +134,10 @@ public final class LockoutBrain implements BotBrain {
         // And whatever the plan: a shipwreck (or a ruined portal) not far off is looted the moment
         // it is seen. Iron, gold, emeralds, food, a treasure map: things that make every later
         // tile quicker, wanted now or not.
-        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12) {
+        // (By day: at night a village is full of zombies, and a long walk in the dark is how
+        // games are lost.)
+        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
+                && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
             boolean ironWanted = strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
             for (String kind : List.of("shipwreck", "ruined_portal", "village")) {
@@ -245,7 +248,7 @@ public final class LockoutBrain implements BotBrain {
         }
         // By the plan: the effort, less what a tile is worth beyond itself (see LockoutStrategist).
         choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
-        Choice pick = difficulty == Difficulty.EASY ? choices.get(0) : lookAhead(bot, choices);
+        Choice pick = difficulty == Difficulty.EASY ? choices.get(0) : route(bot, choices);
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
         }
@@ -261,7 +264,9 @@ public final class LockoutBrain implements BotBrain {
         extensions = 0;
         stalls = 0;
         String reason = strategist.why(pick.tile().goal().id());
-        bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
+        Odds po = odds(bot, pick, hazard(bot));
+        bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, of that ~"
+                + Math.round(po.luck()) + " s luck, " + Math.round(100 * po.within(goalBudget / 20.0)) + "% within " + goalBudget / 20 + " s, "
                 + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
         start(bot, goalTask, goalBudget);
     }
@@ -570,6 +575,18 @@ public final class LockoutBrain implements BotBrain {
 
     private boolean opening(Bot bot) {
         if (bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        // Wood first, enough for the whole opening and some (table, sticks, the four tools, a
+        // chest or a boat): one stop at the trees instead of a walk back for every few logs.
+        if (openingStep == 0 && !openingWood) {
+            openingWood = true;
+            if (woodPlanks(bot.body()) < 20) {
+                int logs = ObtainPlanner.countAny(bot.body(), LOGS);
+                bot.say("opening: wood for everything (" + (logs + (20 - woodPlanks(bot.body()) + 3) / 4) + " logs)");
+                nextErrand = "wood";
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + (20 - woodPlanks(bot.body()) + 3) / 4, planner), 1800);
+                return true;
+            }
+        }
         while (openingStep < OPENING.size()) {
             Set<net.minecraft.world.item.Item> want = OPENING.get(openingStep);
             if (ObtainPlanner.countAny(bot.body(), want) > 0) {
@@ -589,6 +606,7 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private int openingTries;
+    private boolean openingWood;
     private long netherRetryAt, kitRetryAt;
     private int netherFails;
 
@@ -615,7 +633,8 @@ public final class LockoutBrain implements BotBrain {
         return true;
     }
 
-    private record Choice(Chal_40_LockoutBingo.BoardTile tile, LockoutGoals.Option option) {
+    /** A tile it could go for: the way and its effort from here, and the plain estimate (before experience). */
+    private record Choice(Chal_40_LockoutBingo.BoardTile tile, LockoutGoals.Option option, double plain) {
     }
 
     /** Every open tile the bot knows how to do, with its way and effort from here. */
@@ -633,6 +652,7 @@ public final class LockoutBrain implements BotBrain {
             } catch (RuntimeException e) {
                 o = null;
             }
+            double plain = o == null ? 0 : o.cost();
             // Harder than it looked last time (it ran over its time): believed less now.
             // What earlier games taught about this tile (it always takes three times as long...).
             if (o != null) {
@@ -649,41 +669,210 @@ public final class LockoutBrain implements BotBrain {
                 over = 0;
             }
             if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + 0.5 * over) + 20 * over, o.task(), o.yields());
-            if (o != null) out.add(new Choice(tile, o));
+            if (o != null) out.add(new Choice(tile, o, plain));
         }
         return out;
     }
 
+    // ---- odds and routes -------------------------------------------------------------------------
+
+    /** What a death costs: the respawn, the walk back for the things, the half-done work. */
+    private static final double DEATH_SECONDS = 150;
+
     /**
-     * Routes rather than single tiles: of the quickest few, the one that leaves the next tile
-     * quickest too (iron ingot first when the bucket and the shears are also on the board: the
-     * furnace and the iron are then already there). Scored as its own time plus half of the
-     * cheapest next tile's time, as if it held what this one leaves it.
+     * How a tile looks from here, as odds rather than one number: the expected seconds, the part
+     * of them that is luck (searching for what is not seen yet - it may come at once or late:
+     * exponential), where the work is (null: here, anywhere), and the risk of dying on the way
+     * (per minute).
      */
-    private Choice lookAhead(Bot bot, List<Choice> sorted) {
-        Choice best = sorted.get(0);
-        double bestScore = Double.MAX_VALUE;
-        for (Choice c : sorted.subList(0, Math.min(5, sorted.size()))) {
-            Set<net.minecraft.world.item.Item> after = c.option().yields().get();
-            double next = planner.assuming(bot, after, () -> {
-                double min = Double.MAX_VALUE;
-                for (Choice o : sorted) {
-                    if (o == c) continue;
+    record Odds(double mean, double luck, net.minecraft.core.BlockPos at, double hazard) {
+        /** The chance to be done within {@code t} seconds: the known part for sure, the rest luck. */
+        double within(double t) {
+            double sure = mean - luck;
+            if (t < sure) return 0;
+            if (luck < 1) return 1;
+            return 1 - Math.exp(-(t - sure) / luck);
+        }
+
+        /** The seconds spent on average when it is given up after {@code t}. */
+        double spent(double t) {
+            double sure = mean - luck;
+            if (t <= sure) return t;
+            return luck < 1 ? sure : sure + luck * within(t);
+        }
+
+        /** The chance of dying while at it for {@code t} seconds. */
+        double death(double t) {
+            return 1 - Math.exp(-hazard * t / 60);
+        }
+    }
+
+    /**
+     * Its odds from what is around it: whether the things for it are in sight (a walk) or must be
+     * looked for (luck), the biome (known for them, or not), the time of day for monsters (they
+     * only come out at night on the surface), what it learnt in earlier games (a tile that always
+     * takes longer than planned: the extra is luck too), and the danger where the work is.
+     */
+    private Odds odds(Bot bot, Choice c, double hazard) {
+        var g = c.tile().goal();
+        double mean = c.option().cost(), plain = Math.max(1, c.plain());
+        double luck;
+        net.minecraft.core.BlockPos at = null;
+        Set<net.minecraft.world.item.Item> items = LockoutGoals.items(g.targets());
+        var type = g.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL
+                ? net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getOptional(net.minecraft.resources.Identifier.tryParse(g.primaryTarget())).orElse(null) : null;
+        if (type != null) {
+            luck = Math.min(plain, planner.mobSearch(bot, type, 180));
+            at = planner.mobAnchor(bot, type, 180);
+        } else if (!items.isEmpty()) {
+            int n = g.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.ITEM_AMOUNT ? Math.max(1, g.amount()) : 1;
+            double est = planner.estimate(bot, items, n);
+            double sp = planner.searchPart(bot, items, n);
+            luck = est > 0 && est < 1e8 ? plain * Math.min(1, sp / est) : 0.3 * plain;
+            at = planner.anchor(bot, items);
+        } else if (g.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.STRUCTURE
+                || g.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.BIOME) {
+            luck = 0.6 * plain; // (finding a place not yet seen)
+        } else {
+            luck = 0.3 * plain;
+        }
+        // Longer than planned in earlier games or earlier tries: the extra is luck as well.
+        luck = Math.min(mean, luck + Math.max(0, mean - plain));
+        double h = hazard;
+        if (type != null) h *= 1.5; // (a fight)
+        if (g.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER
+                && bot.body().level().dimension() != net.minecraft.world.level.Level.NETHER) h += 0.03;
+        return new Odds(mean, luck, at, h);
+    }
+
+    /**
+     * Deaths per minute where it is now, roughly: a little anywhere (falls, lava), more at night on
+     * the surface, in the Nether, with monsters about; less in armour; much more on few hearts.
+     */
+    private double hazard(Bot bot) {
+        var body = bot.body();
+        var level = body.level();
+        boolean underground = net.kasax.challengecraft.bot.task.SurfaceTask.underground(body);
+        double h = 0.004;
+        if (level.dimension() == net.minecraft.world.level.Level.NETHER) h += 0.03;
+        else if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && !underground) h += 0.015;
+        if (underground) h += 0.006;
+        int monsters = level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
+                net.minecraft.world.entity.LivingEntity::isAlive).size();
+        h += 0.008 * monsters;
+        h *= 1 - Math.min(0.5, body.getArmorValue() / 40.0);
+        if (body.getHealth() < 10) h *= 1.8;
+        return h;
+    }
+
+    /** Seconds to get from one place to another: walking, a staircase down, stairs up. */
+    private static double travel(net.minecraft.core.BlockPos a, net.minecraft.core.BlockPos b) {
+        if (a == null || b == null) return 0;
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        int dy = b.getY() - a.getY();
+        return Math.sqrt(dx * dx + dz * dz) / 4.0 + (dy < 0 ? -dy * 1.2 : dy * 0.8);
+    }
+
+    /** One way through the next few tiles: in order, where it ends, the tiles expected, the seconds. */
+    private record Route(List<Choice> legs, net.minecraft.core.BlockPos at, double tiles, double seconds) {
+        double rate() {
+            return seconds <= 0 ? 0 : tiles / seconds;
+        }
+    }
+
+    private static final int ROUTE_CANDIDATES = 10, ROUTE_DEPTH = 4, BEAM = 10;
+
+    /**
+     * The next tile as the first of the best route through the next few: tiles that are worked on
+     * in the same place go together (the bell, the bread and the librarian while in the village;
+     * the redstone and the diamonds on the one trip down), and what one tile leaves in hand makes
+     * the next quicker (the iron for the bucket and the shears). A beam search over orders of the
+     * quickest ten, each leg the walk from where the last one ended plus its own work, counted
+     * as odds: the tiles expected (its chance to be done before it would be given up, and not
+     * dying) per second expected. The best tiles per second wins.
+     */
+    private Choice route(Bot bot, List<Choice> sorted) {
+        List<Choice> cand = new ArrayList<>(sorted.subList(0, Math.min(ROUTE_CANDIDATES, sorted.size())));
+        double hazard = hazard(bot);
+        Map<Choice, Odds> odds = new HashMap<>();
+        for (Choice c : cand) odds.put(c, odds(bot, c, hazard));
+        net.minecraft.core.BlockPos here = bot.body().blockPosition();
+        // What the first few leave in hand for the rest (the iron pickaxe for the redstone): the
+        // others planned again as if it held that.
+        Map<Choice, Map<String, Double>> after = new HashMap<>();
+        for (Choice f : cand.subList(0, Math.min(4, cand.size()))) {
+            Set<net.minecraft.world.item.Item> yields = f.option().yields().get();
+            if (yields.isEmpty()) continue;
+            after.put(f, planner.assuming(bot, yields, () -> {
+                Map<String, Double> m = new HashMap<>();
+                for (Choice o : cand) {
+                    if (o == f) continue;
                     LockoutGoals.Option again = LockoutGoals.plan(bot, planner, o.tile().goal());
-                    if (again != null) min = Math.min(min, again.cost());
+                    if (again != null) m.put(o.tile().goal().id(), again.cost() * GoalExperience.factor(o.tile().goal().id()));
                 }
-                return min == Double.MAX_VALUE ? 0 : min;
-            });
-            double score = c.option().cost() + 0.5 * next;
-            if (score < bestScore) {
-                bestScore = score;
-                best = c;
+                return m;
+            }));
+        }
+        List<Route> beam = List.of(new Route(List.of(), here, 0, 0));
+        Route best = null;
+        for (int depth = 0; depth < ROUTE_DEPTH; depth++) {
+            List<Route> next = new ArrayList<>();
+            for (Route r : beam) {
+                for (Choice c : cand) {
+                    if (r.legs().contains(c)) continue;
+                    Odds o = odds.get(c);
+                    double mean = o.mean(), luck = o.luck();
+                    if (!r.legs().isEmpty()) {
+                        Double a = after.getOrDefault(r.legs().get(0), Map.of()).get(c.tile().goal().id());
+                        if (a != null && a < mean) {
+                            luck *= a / mean;
+                            mean = a;
+                        }
+                    }
+                    // Its own work (its estimate is from here, the walk there included), and the
+                    // walk from where the route stands.
+                    double work = Math.max(0.3 * mean, mean - travel(here, o.at()));
+                    double walk = travel(r.at(), o.at());
+                    Odds leg = new Odds(work + walk, Math.min(luck, work), o.at(), o.hazard());
+                    double horizon = budget(leg.mean(), 600, 9000) / 20.0;
+                    double secs = leg.spent(horizon);
+                    double dies = leg.death(secs);
+                    double tiles = leg.within(horizon) * (1 - dies);
+                    // (What the plan says a tile is worth beyond itself: seconds it saves later.)
+                    secs = Math.max(0.3 * secs, secs + dies * DEATH_SECONDS - strategist.bonus(c.tile().goal().id()));
+                    List<Choice> legs = new ArrayList<>(r.legs());
+                    legs.add(c);
+                    Route nr = new Route(legs, o.at() != null ? o.at() : r.at(), r.tiles() + tiles, r.seconds() + secs);
+                    next.add(nr);
+                    if (best == null || nr.rate() > best.rate()) best = nr;
+                }
             }
+            next.sort(Comparator.comparingDouble(Route::rate).reversed());
+            beam = next.subList(0, Math.min(BEAM, next.size()));
         }
-        if (best != sorted.get(0)) {
-            bot.say("route: " + best.tile().goal().id() + " first, it makes the next ones quicker");
-        }
-        return best;
+        if (best == null || best.legs().isEmpty()) return sorted.get(0);
+        Choice first = best.legs().get(0);
+        Odds fo = odds.get(first);
+        StringBuilder sb = new StringBuilder("route:");
+        for (Choice c : best.legs()) sb.append(c == first ? " " : " > ").append(c.tile().goal().id()).append(" [").append(where(bot, odds.get(c).at())).append("]");
+        double horizon = budget(fo.mean(), 600, 9000) / 20.0;
+        sb.append(String.format(" (%.1f tiles/min; %s %d%% within %d s)", best.rate() * 60, first.tile().goal().id(),
+                Math.round(100 * fo.within(horizon)), Math.round(horizon)));
+        bot.say(sb.toString());
+        return first;
+    }
+
+    /** A place in words for the log: here, the village, down at some height, or how far. */
+    private String where(Bot bot, net.minecraft.core.BlockPos at) {
+        if (at == null) return "here";
+        net.minecraft.core.BlockPos here = bot.body().blockPosition();
+        double dx = at.getX() - here.getX(), dz = at.getZ() - here.getZ();
+        double d = Math.sqrt(dx * dx + dz * dz);
+        net.minecraft.core.BlockPos village = planner.village(bot);
+        if (village != null && village.distSqr(at) < 48 * 48) return "village";
+        if (at.getY() < here.getY() - 8 && d < 24) return "down to y " + at.getY();
+        if (d < 24) return "here";
+        return Math.round(d) + " m";
     }
 
     /**
@@ -1004,6 +1193,7 @@ public final class LockoutBrain implements BotBrain {
     public void respawned(Bot bot) {
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
+        openingWood = false;
         kitRetryAt = 0;
         openingTries = 0;
         targetIndex = -1;

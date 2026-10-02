@@ -70,8 +70,11 @@ public final class ObtainTask implements BotTask {
         // sight: the plan again, every few seconds, and the other way if it now comes out first.
         if (step instanceof MineTask m && m.searching() && stepPlan != null && ++recheck % 100 == 0) {
             ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, keep);
+            // (Only another source of the same thing: not off to something else the plan now
+            // puts first - halfway down a staircase for iron, back up for wood.)
             if (p instanceof ObtainPlanner.Step st && !st.key().equals(stepPlan.key())
-                    && st.task() instanceof MineTask && st.sources().stream().anyMatch(b -> b instanceof net.minecraft.world.level.block.Block block && planner.seen(bot, block) != null)) {
+                    && st.task() instanceof MineTask other && other.items().stream().anyMatch(m.items()::contains)
+                    && st.sources().stream().anyMatch(b -> b instanceof net.minecraft.world.level.block.Block block && planner.seen(bot, block) != null)) {
                 bot.navigator().stop();
                 bot.say("  other way now in sight: " + st.task().describe());
                 step = st.task();

@@ -125,6 +125,7 @@ public final class BotNavigator {
         cancelSearch();
         generation++;
         this.status = Status.MOVING;
+        tickedAt = bot.tickCount; // (a walk just set is not a walk left off)
     }
 
     private void cancelSearch() {

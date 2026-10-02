@@ -81,6 +81,29 @@ public final class ObtainPlanner {
     private Map<Block, Double> biomeHints = Map.of();
     private long scannedAt = -10_000, costsAt = -1;
     private Map<Item, Double> costs = Map.of();
+    /**
+     * Per item, beside its cost: the part of it that is searching (luck: a block not yet seen,
+     * a mob not yet met), and where the work for it mostly is (null: anywhere, here). See
+     * {@link #searchPart} and {@link #anchor}: what the brain makes its odds and its routes of.
+     */
+    private Map<Item, Double> searches = Map.of();
+    private Map<Item, BlockPos> anchors = Map.of();
+    /** Where the nearest seen one of each block and each mob is, where a biome's hint points, the village. */
+    private Map<Block, BlockPos> visiblePos = Map.of();
+    private Map<EntityType<?>, BlockPos> mobPos = Map.of();
+    private Map<Block, BlockPos> hintPos = Map.of();
+    private BlockPos villagePos, here;
+    /** Seconds until the monsters come out on the surface (0 at night). */
+    private double untilNight;
+
+    /** A way to one item: its effort, the searching part of it, and where the work is. */
+    private record Leaf(double cost, double search, BlockPos at) {
+        static final Leaf NONE = new Leaf(1e9, 0, null);
+
+        Leaf scaled(double f) {
+            return new Leaf(cost * f, search * f, at);
+        }
+    }
     private boolean craftOnly;
     private int budget;
     private final Map<List<Object>, Integer> impossible = new HashMap<>();
@@ -203,6 +226,8 @@ public final class ObtainPlanner {
     public <T> T assuming(Bot bot, Set<Item> held, java.util.function.Supplier<T> what) {
         refresh(bot);
         Map<Item, Double> saved = costs;
+        Map<Item, Double> savedSearches = searches;
+        Map<Item, BlockPos> savedAnchors = anchors;
         Set<Item> savedHeld = assumeHeld;
         assumeHeld = held;
         costs = computeCosts(bot);
@@ -211,6 +236,8 @@ public final class ObtainPlanner {
         } finally {
             assumeHeld = savedHeld;
             costs = saved;
+            searches = savedSearches;
+            anchors = savedAnchors;
         }
     }
 
@@ -238,6 +265,50 @@ public final class ObtainPlanner {
         return best >= INF ? INF : best * (count - have);
     }
 
+    /**
+     * Of {@link #estimate}: the part that is searching rather than known work - finding a block
+     * not seen yet, meeting a mob not met yet. That part is luck (it may come at once or take
+     * long); the rest (walks to things seen, crafting, smelting, digging to a known depth) is
+     * about as planned. The odds of being done in some time follow from the two.
+     */
+    public double searchPart(Bot bot, Collection<Item> items, int count) {
+        refresh(bot);
+        int have = countAny(bot.body(), Set.copyOf(items));
+        if (have >= count) return 0;
+        Item best = cheapestOf(items);
+        return best == null ? 0 : Math.min(cost(best), searches.getOrDefault(best, 0.0)) * (count - have);
+    }
+
+    /** Where the work for these items mostly is (a seen block, a village, a habitat, a depth), or null: here, anywhere. */
+    public BlockPos anchor(Bot bot, Collection<Item> items) {
+        refresh(bot);
+        Item best = cheapestOf(items);
+        return best == null ? null : anchors.get(best);
+    }
+
+    private Item cheapestOf(Collection<Item> items) {
+        Item best = null;
+        for (Item i : items) if (best == null || cost(i) < cost(best)) best = i;
+        return best == null || cost(best) >= INF ? null : best;
+    }
+
+    /** {@link #searchPart} and {@link #anchor} for one mob of a kind. */
+    public double mobSearch(Bot bot, EntityType<?> type, double unknown) {
+        refresh(bot);
+        return mobLeaf(type, BotKnowledge.get(bot.server()).mobEffort(type, unknown)).search();
+    }
+
+    public BlockPos mobAnchor(Bot bot, EntityType<?> type, double unknown) {
+        refresh(bot);
+        return mobLeaf(type, BotKnowledge.get(bot.server()).mobEffort(type, unknown)).at();
+    }
+
+    /** The nearest village it knows of (null: none). */
+    public BlockPos village(Bot bot) {
+        refresh(bot);
+        return villagePos;
+    }
+
     /** Rough effort to craft one of these items (from scratch, whatever is held). */
     public double estimateCraft(Bot bot, Collection<Item> items) {
         refresh(bot);
@@ -259,30 +330,43 @@ public final class ObtainPlanner {
 
     /** Seen: the way there. Not seen: the usual effort, and monsters mostly come out at night. */
     private double mobCost(EntityType<?> type, double effort) {
-        double c = landMobCost(type, effort);
+        return mobLeaf(type, effort).cost();
+    }
+
+    private Leaf mobLeaf(EntityType<?> type, double effort) {
+        Leaf l = landMobLeaf(type, effort);
         // Fish and squid: in the water, fast, hard to corner. A player only hunts them when there is nothing else.
         var cat = type.getCategory();
         boolean water = cat == net.minecraft.world.entity.MobCategory.WATER_CREATURE || cat == net.minecraft.world.entity.MobCategory.WATER_AMBIENT
                 || cat == net.minecraft.world.entity.MobCategory.UNDERGROUND_WATER_CREATURE;
-        return water ? c * 4 + 30 : c;
+        if (!water || l.cost() >= INF) return l;
+        return new Leaf(l.cost() * 4 + 30, l.search() * 4 + 30, l.at());
     }
 
-    private double landMobCost(EntityType<?> type, double effort) {
+    private Leaf landMobLeaf(EntityType<?> type, double effort) {
         Double seen = visibleMobs.get(type);
-        if (seen == null && isMissing(type)) return INF;
-        if (seen != null) return seen;
+        if (seen == null && isMissing(type)) return Leaf.NONE;
+        // In sight: a walk there and the fight, no luck needed.
+        if (seen != null) return new Leaf(seen, 0, mobPos.get(type));
         // Nether mobs only in the Nether, and the Overworld's not there.
-        if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return INF;
+        if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return Leaf.NONE;
         // One that lives somewhere in particular: the walk to the nearest such place it knows,
         // then the search there; not knowing any is a long search (horses are not in the snow).
+        double walk = 0;
+        BlockPos at = null;
         if (habitatBot != null && !MobHabitats.inHabitat(habitatBot, type)) {
             BlockPos home = MobHabitats.nearestKnown(habitatBot, type);
-            effort = home != null ? effort + Math.sqrt(home.distSqr(habitatBot.body().blockPosition())) / 4.0 : effort * 2.5;
+            if (home != null) {
+                walk = Math.sqrt(home.distSqr(habitatBot.body().blockPosition())) / 4.0;
+                at = home;
+            } else effort *= 2.5;
         }
         boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
-        // (In the Nether monsters are about at any hour.)
-        // (Nor down in a cave: dark there at noon, monsters about at any hour.)
-        return monster && !dark && !nether && !underground ? effort * 4 : effort;
+        // Monsters come out in the dark: on the surface by day that is a wait for the night (or
+        // a trip down into a cave, about three searches' worth); in the Nether and down in a cave
+        // it is dark at noon.
+        double wait = monster && !dark && !nether && !underground ? Math.min(untilNight, effort * 3) : 0;
+        return new Leaf(walk + wait + effort, effort, at);
     }
 
     // ---- looking around -----------------------------------------------------------------------
@@ -299,7 +383,9 @@ public final class ObtainPlanner {
         costsAt = now;
         scannedAt = now;
         Map<Block, Double> blocks = new IdentityHashMap<>();
+        Map<Block, BlockPos> positions = new IdentityHashMap<>();
         BlockPos c = bot.body().blockPosition();
+        here = c;
         // Seconds to dig one level of a staircase (two blocks of stone) with what it holds.
         double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -322,6 +408,7 @@ public final class ObtainPlanner {
                     // Only what it could have seen (common rock anywhere it digs is seen enough).
                     if (!BotWorld.COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
                     blocks.put(s.getBlock(), reach);
+                    positions.put(s.getBlock(), m.immutable());
                 }
             }
         }
@@ -330,29 +417,50 @@ public final class ObtainPlanner {
             BlockPos p = e.getValue();
             double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
             double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + vertical(p.getY() - c.getY(), digPerBlock);
-            blocks.merge(e.getKey(), reach, Math::min);
+            Double known = blocks.get(e.getKey());
+            if (known == null || reach < known) {
+                blocks.put(e.getKey(), reach);
+                positions.put(e.getKey(), p);
+            }
         }
         visibleBlocks = blocks;
+        visiblePos = positions;
         Map<EntityType<?>, Double> mobs = new HashMap<>();
+        Map<EntityType<?>, BlockPos> where = new HashMap<>();
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, new AABB(c).inflate(BotWorld.MOB_SIGHT),
                 e -> e.isAlive() && !(e instanceof Player) && BotWorld.seesMob(bot.body(), e))) {
-            mobs.merge(e.getType(), 5 + e.distanceTo(bot.body()) / 3.0, Math::min);
+            double reach = 5 + e.distanceTo(bot.body()) / 3.0;
+            Double known = mobs.get(e.getType());
+            if (known == null || reach < known) {
+                mobs.put(e.getType(), reach);
+                where.put(e.getType(), e.blockPosition());
+            }
         }
         visibleMobs = mobs;
+        mobPos = where;
         dark = level.isDarkOutside();
         underground = net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
         habitatBot = bot;
         long clock = level.getOverworldClockTime() % 24000;
         nightLeft = dark && clock >= 12000 ? (24000 - clock) / 20.0 : 0;
+        // (The first monsters of the night come a little after dusk.)
+        untilNight = dark ? 0 : clock < 13000 ? (13000 - clock) / 20.0 : (24000 - clock + 13000) / 20.0;
         nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
         // Villagers: how far the nearest village is, and which trades are there at which level.
         villageWalk = INF;
+        villagePos = null;
         villagerLevels.clear();
         if (!nether && level.dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             var seenVillager = bot.memory().lastSeen(level, net.minecraft.world.entity.EntityTypes.VILLAGER, c);
-            if (seenVillager != null) villageWalk = 10 + Math.sqrt(seenVillager.distSqr(c)) / 4;
+            if (seenVillager != null) {
+                villageWalk = 10 + Math.sqrt(seenVillager.distSqr(c)) / 4;
+                villagePos = seenVillager;
+            }
             var village = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot, net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "village"));
-            if (village != null) villageWalk = Math.min(villageWalk, 10 + Math.sqrt(village.spot().distSqr(c)) / 4);
+            if (village != null && 10 + Math.sqrt(village.spot().distSqr(c)) / 4 < villageWalk) {
+                villageWalk = 10 + Math.sqrt(village.spot().distSqr(c)) / 4;
+                villagePos = village.spot();
+            }
             for (var v : level.getEntitiesOfClass(net.minecraft.world.entity.npc.villager.Villager.class, new AABB(c).inflate(96), e -> e.isAlive() && !e.isBaby())) {
                 String prof = v.getVillagerData().profession().unwrapKey().map(k2 -> k2.identifier().getPath()).orElse("none");
                 villagerLevels.merge(prof, v.getVillagerData().level(), Math::max);
@@ -360,14 +468,21 @@ public final class ObtainPlanner {
         }
         // Biomes in view: what they are known for is a walk away.
         Map<Block, Double> hints = new IdentityHashMap<>();
+        Map<Block, BlockPos> hinted = new IdentityHashMap<>();
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
             double walk = 6 + Math.sqrt(e.getValue().distSqr(c)) / 4.0;
             for (String id : BotKnowledge.typicalOf(e.getKey().getPath())) {
                 Block b = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id));
-                if (b != net.minecraft.world.level.block.Blocks.AIR) hints.merge(b, walk, Math::min);
+                if (b == net.minecraft.world.level.block.Blocks.AIR) continue;
+                Double known = hints.get(b);
+                if (known == null || walk < known) {
+                    hints.put(b, walk);
+                    hinted.put(b, e.getValue());
+                }
             }
         }
         biomeHints = hints;
+        hintPos = hinted;
         costs = computeCosts(bot);
     }
 
@@ -376,6 +491,10 @@ public final class ObtainPlanner {
     private Map<Item, Double> computeCosts(Bot bot) {
         BotKnowledge k = BotKnowledge.get(bot.server());
         Map<Item, Double> cost = new IdentityHashMap<>();
+        Map<Item, Double> search = new IdentityHashMap<>();
+        Map<Item, BlockPos> at = new IdentityHashMap<>();
+        searches = search;
+        anchors = at;
         Set<Item> all = new HashSet<>(k.craftableItems());
         for (Item item : BuiltInRegistries.ITEM) {
             if (!k.blocksDropping(item).isEmpty() || !k.mobsDropping(item).isEmpty()) all.add(item);
@@ -383,17 +502,28 @@ public final class ObtainPlanner {
         // Made neither by a recipe nor dropped (see specialCost).
         all.addAll(List.of(Items.WATER_BUCKET, Items.LAVA_BUCKET, Items.OBSIDIAN));
         for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).all()) all.add(t.gives());
-        for (Item item : all) cost.put(item, rawCost(bot, k, item, cost));
+        for (Item item : all) put(item, rawLeaf(bot, k, item, cost), cost, search, at);
         // Relax over the recipes until nothing gets cheaper (a few rounds: recipe chains are short).
         for (int round = 0; round < 10; round++) {
             boolean changed = false;
             for (Item item : all) {
-                double best = cost.get(item);
-                if (best == 0) continue;
-                best = Math.min(best, rawCost(bot, k, item, cost));
-                for (BotKnowledge.Route r : k.routesTo(item)) best = Math.min(best, routeCost(r, cost));
-                if (best < cost.get(item) - 1e-6) {
-                    cost.put(item, best);
+                double now = cost.get(item);
+                if (now == 0) continue;
+                Leaf best = null;
+                Leaf raw = rawLeaf(bot, k, item, cost);
+                if (raw.cost() < now - 1e-6) {
+                    best = raw;
+                    now = raw.cost();
+                }
+                for (BotKnowledge.Route r : k.routesTo(item)) {
+                    Leaf via = routeLeaf(r, cost, search, at);
+                    if (via.cost() < now - 1e-6) {
+                        best = via;
+                        now = via.cost();
+                    }
+                }
+                if (best != null) {
+                    put(item, best, cost, search, at);
                     changed = true;
                 }
             }
@@ -402,30 +532,43 @@ public final class ObtainPlanner {
         return cost;
     }
 
+    private static void put(Item item, Leaf l, Map<Item, Double> cost, Map<Item, Double> search, Map<Item, BlockPos> at) {
+        cost.put(item, l.cost());
+        search.put(item, Math.min(l.cost(), l.search()));
+        if (l.at() != null) at.put(item, l.at());
+        else at.remove(item);
+    }
+
     private double rawCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
-        if (assumeHeld.contains(item)) return 0;
+        return rawLeaf(bot, k, item, cost).cost();
+    }
+
+    private Leaf rawLeaf(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
+        if (assumeHeld.contains(item)) return new Leaf(0, 0, null);
         int held = net.kasax.challengecraft.bot.BotInventory.count(bot.body(), item);
         // A tool (anything that does not stack) held is free for good; a material only as far as
         // it goes (one raw iron does not make a block of nine).
         if (held > 0 && (item.getDefaultMaxStackSize() == 1 || item == Items.CRAFTING_TABLE || item == Items.FURNACE
-                || item == Items.SMOKER || item == Items.BLAST_FURNACE)) return 0;
+                || item == Items.SMOKER || item == Items.BLAST_FURNACE)) return new Leaf(0, 0, null);
         double share = held <= 0 ? 1 : Math.max(0, 1 - held / 9.0);
-        if (share == 0) return 0;
-        return share * acquireCost(bot, k, item, cost);
+        if (share == 0) return new Leaf(0, 0, null);
+        return acquireLeaf(bot, k, item, cost).scaled(share);
     }
 
-    private double acquireCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
-        double best = INF;
+    private Leaf acquireLeaf(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
+        Leaf best = Leaf.NONE;
         for (BotKnowledge.Drop d : k.blocksDropping(item)) {
-            double c = blockCost(bot, k, d.block(), cost) / Math.max(0.05, d.count());
-            best = Math.min(best, c);
+            Leaf l = blockLeaf(bot, k, d.block(), cost).scaled(1 / Math.max(0.05, d.count()));
+            if (l.cost() < best.cost()) best = l;
         }
         for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
-            best = Math.min(best, mobCost(d.type(), d.effort()) / d.count());
+            Leaf l = mobLeaf(d.type(), d.effort()).scaled(1 / d.count());
+            if (l.cost() < best.cost()) best = l;
         }
-        best = Math.min(best, tradeCost(bot, item, cost));
-        best = Math.min(best, barterCost(bot, item, cost));
-        return Math.min(best, specialCost(bot, k, item, cost));
+        for (Leaf l : new Leaf[]{tradeLeaf(bot, item, cost), barterLeaf(bot, item, cost), specialLeaf(bot, k, item, cost)}) {
+            if (l.cost() < best.cost()) best = l;
+        }
+        return best;
     }
 
     /**
@@ -442,6 +585,16 @@ public final class ObtainPlanner {
      * admiring an ingot each), a gold piece to wear if it has none, finding a piglin.
      */
     private double barterCost(Bot bot, Item item, Map<Item, Double> cost) {
+        return barterLeaf(bot, item, cost).cost();
+    }
+
+    /** (What a piglin gives is luck: half of it counted as such.) */
+    private Leaf barterLeaf(Bot bot, Item item, Map<Item, Double> cost) {
+        double c = barterSeconds(bot, item, cost);
+        return c >= INF ? Leaf.NONE : new Leaf(c, c / 2, mobPos.get(net.minecraft.world.entity.EntityTypes.PIGLIN));
+    }
+
+    private double barterSeconds(Bot bot, Item item, Map<Item, Double> cost) {
         Double per = BARTER_GOLD.get(item);
         if (per == null || !nether) return INF;
         double gold = cost.getOrDefault(Items.GOLD_INGOT, INF);
@@ -465,6 +618,17 @@ public final class ObtainPlanner {
      * things, and the price.
      */
     private double tradeCost(Bot bot, Item item, Map<Item, Double> cost) {
+        return tradeLeaf(bot, item, cost).cost();
+    }
+
+    /** (Known work, but for a jobless villager taking the job site put down: luck, counted half.) */
+    private Leaf tradeLeaf(Bot bot, Item item, Map<Item, Double> cost) {
+        double c = tradeSeconds(bot, item, cost);
+        if (c >= INF) return Leaf.NONE;
+        return new Leaf(c, Math.min(c, 15 + nightLeft / 2), villagePos);
+    }
+
+    private double tradeSeconds(Bot bot, Item item, Map<Item, Double> cost) {
         if (villageWalk >= INF) return INF;
         double best = INF;
         for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).selling(item)) {
@@ -506,30 +670,61 @@ public final class ObtainPlanner {
 
     /** Things not made by a recipe nor dropped: filled buckets, obsidian from a lava pool. */
     private double specialCost(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
+        return specialLeaf(bot, k, item, cost).cost();
+    }
+
+    private Leaf specialLeaf(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
         if (item == Items.WATER_BUCKET || item == Items.LAVA_BUCKET) {
-            Double seen = visibleBlocks.get(item == Items.WATER_BUCKET ? Blocks.WATER : Blocks.LAVA);
+            Block fluid = item == Items.WATER_BUCKET ? Blocks.WATER : Blocks.LAVA;
+            Double seen = visibleBlocks.get(fluid);
+            double search = 0;
             // Water in the Overworld is never far, even when none is known: a short search.
-            if (seen == null && item == Items.WATER_BUCKET && !nether) seen = WATER_SEARCH;
-            return seen == null ? INF : seen + 3 + cost.getOrDefault(Items.BUCKET, INF);
+            if (seen == null && item == Items.WATER_BUCKET && !nether) {
+                seen = WATER_SEARCH;
+                search = WATER_SEARCH;
+            }
+            if (seen == null) return Leaf.NONE;
+            double bucket = cost.getOrDefault(Items.BUCKET, INF);
+            return new Leaf(seen + 3 + bucket, search + searches.getOrDefault(Items.BUCKET, 0.0), visiblePos.get(fluid));
         }
         if (item == Items.OBSIDIAN) {
             Double lava = visibleBlocks.get(Blocks.LAVA);
-            if (lava == null) return INF;
+            if (lava == null) return Leaf.NONE;
             double tool = toolCost(bot, k, Blocks.OBSIDIAN, cost);
             double water = cost.getOrDefault(Items.WATER_BUCKET, INF);
-            return lava + 14 + Math.min(tool, INF) / 10 + water / 10; // tools once for all ten
+            double c = lava + 14 + Math.min(tool, INF) / 10 + water / 10; // tools once for all ten
+            return new Leaf(c, searches.getOrDefault(Items.WATER_BUCKET, 0.0) / 10, visiblePos.get(Blocks.LAVA));
         }
-        return INF;
+        return Leaf.NONE;
     }
 
     private double blockCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
+        return blockLeaf(bot, k, block, cost).cost();
+    }
+
+    /**
+     * Seen (or remembered): a walk there, no luck needed. A biome known for it in view: a walk
+     * there and a little looking about. Neither: a search, all luck - for an ore, down where it
+     * is common (the place to work is then right below), for the rest anywhere about.
+     */
+    private Leaf blockLeaf(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         BlockState s = block.defaultBlockState();
-        if (isMissing(block)) return INF;
+        if (isMissing(block)) return Leaf.NONE;
         Double seen = visibleBlocks.get(block);
         double find = BotKnowledge.rarity(block, nether);
-        if (seen != null) find = Math.min(find, seen);
+        double search = find;
+        BlockPos at = null;
+        if (seen != null && seen <= find) {
+            find = seen;
+            search = 0;
+            at = visiblePos.get(block);
+        }
         Double hint = biomeHints.get(block);
-        if (hint != null) find = Math.min(find, hint + 10); // + finding it there
+        if (hint != null && hint + 10 < find) {
+            find = hint + 10; // + finding it there
+            search = 10;
+            at = hintPos.get(block);
+        }
         // Only far off, where it grows (snow beyond the desert): the walk there.
         if (seen == null && hint == null) {
             String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
@@ -538,21 +733,39 @@ public final class ObtainPlanner {
             for (var e : bot.farLeads.entrySet()) {
                 if (e.getKey().dimension().equals(dim) && e.getValue().contains(id)) nearest = Math.min(nearest, Math.sqrt(e.getKey().pos().distSqr(bot.body().blockPosition())));
             }
-            if (nearest < Double.MAX_VALUE) find = Math.max(find, nearest / 5 + 10);
+            if (nearest < Double.MAX_VALUE) {
+                find = Math.max(find, nearest / 5 + 10);
+                // (The walk there is known; finding it there is the luck.)
+                search = Math.min(find, 30 + 0.3 * find);
+            }
             // Only found in certain biomes, and none of them anywhere in view (24 chunks): far off,
             // a long walk into the unknown. (Snow from the plains is not fifteen seconds away.)
-            else if (!nether && BotKnowledge.biomeBound(block)) find = Math.max(find, FAR_BIOME);
+            else if (!nether && BotKnowledge.biomeBound(block)) {
+                find = Math.max(find, FAR_BIOME);
+                search = 0.8 * find;
+            }
+        }
+        // Not seen, dug for: the work is right below, at the depth where it is common.
+        if (at == null && here != null && search > 0) {
+            Integer depth = BotKnowledge.depth(block, here.getY());
+            if (depth != null && depth < here.getY() - 4) at = new BlockPos(here.getX(), depth, here.getZ());
         }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
-        return find + breakSeconds + toolCost(bot, k, block, cost);
+        Leaf tool = toolLeaf(bot, k, block, cost);
+        return new Leaf(find + breakSeconds + tool.cost(), search + tool.search(), at != null ? at : tool.at());
     }
 
     private double toolCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
+        return toolLeaf(bot, k, block, cost).cost();
+    }
+
+    private Leaf toolLeaf(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         BlockState s = block.defaultBlockState();
-        if (bot.tools().canHarvest(s)) return 0;
-        double best = INF;
-        for (Item t : k.harvestTools(block)) best = Math.min(best, cost.getOrDefault(t, INF));
-        return best;
+        if (bot.tools().canHarvest(s)) return new Leaf(0, 0, null);
+        Item best = null;
+        for (Item t : k.harvestTools(block)) if (best == null || cost.getOrDefault(t, INF) < cost.getOrDefault(best, INF)) best = t;
+        if (best == null || cost.getOrDefault(best, INF) >= INF) return Leaf.NONE;
+        return new Leaf(cost.get(best), searches.getOrDefault(best, 0.0), anchors.get(best));
     }
 
     private static double routeCost(BotKnowledge.Route r, Map<Item, Double> cost) {
@@ -563,6 +776,31 @@ public final class ObtainPlanner {
         }
         BotKnowledge.SmeltRoute s = (BotKnowledge.SmeltRoute) r;
         return cheapest(s.input(), cost) + 6;
+    }
+
+    /**
+     * {@link #routeCost} with the searching parts of the ingredients added up, and the place of
+     * the dearest ingredient that has one (the iron for the bucket: where the iron is).
+     */
+    private static Leaf routeLeaf(BotKnowledge.Route r, Map<Item, Double> cost, Map<Item, Double> search, Map<Item, BlockPos> at) {
+        List<Ingredient> ings = r instanceof BotKnowledge.CraftRoute c ? c.ingredients() : List.of(((BotKnowledge.SmeltRoute) r).input());
+        double sum = r instanceof BotKnowledge.CraftRoute ? 1 : 6, luck = 0, dearest = -1;
+        BlockPos where = null;
+        for (Ingredient i : ings) {
+            Item pick = null;
+            for (Item item : BotKnowledge.items(i)) if (pick == null || cost.getOrDefault(item, INF) < cost.getOrDefault(pick, INF)) pick = item;
+            double c = pick == null ? INF : cost.getOrDefault(pick, INF);
+            if (c >= INF) return Leaf.NONE;
+            sum += c;
+            luck += search.getOrDefault(pick, 0.0);
+            BlockPos a = at.get(pick);
+            if (a != null && c > dearest) {
+                dearest = c;
+                where = a;
+            }
+        }
+        int yield = r instanceof BotKnowledge.CraftRoute c ? c.yield() : 1;
+        return new Leaf(sum / yield, luck / yield, where);
     }
 
     private static double cheapest(Ingredient i, Map<Item, Double> cost) {
@@ -972,12 +1210,21 @@ public final class ObtainPlanner {
         }
         // Digging down for it: take cheap pickaxes along for the stone on the way, so the good one
         // (needed for the ore itself) does not wear out on it.
-        Integer digTo = cheapest == null || visibleBlocks.containsKey(cheapest) ? null
+        // (One seen close by and only a few wanted: walked to, no digging. Many wanted, or the
+        // one seen far off: the staircase down - the mine does that whatever was seen.)
+        Double seenAt = cheapest == null ? null : visibleBlocks.get(cheapest);
+        int wanted = count - sim.count(accept);
+        Integer digTo = cheapest == null || seenAt != null && seenAt < 20 && wanted < 3 ? null
                 : BotKnowledge.depth(cheapest, bot.body().blockPosition().getY());
-        // (Not for rock itself - the stone is what it is after - nor for a few levels down.)
-        if (digTo != null && !BotWorld.COMMON.contains(cheapest) && bot.body().blockPosition().getY() - digTo > 20
+        // (Not for rock itself - the stone is what it is after - nor for a few levels down, nor
+        // once down there: those are made up here, before the staircase, from the wood at hand.)
+        int levels = bot.body().blockPosition().getY() - (digTo == null ? 0 : digTo);
+        if (digTo != null && !BotWorld.COMMON.contains(cheapest) && levels > 20
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body())
                 && !accept.contains(Items.STONE_PICKAXE) && !visiting.contains(Items.STONE_PICKAXE)) {
-            int spare = digTo < 30 ? 2 : 1;
+            // A staircase takes three blocks a level, then a tunnel down there: a stone pickaxe
+            // lasts some 130 blocks.
+            int spare = Math.min(4, 1 + (levels * 3 + 60) / 130);
             if (sim.count(Set.of(Items.STONE_PICKAXE)) < spare) {
                 Set<Item> v = new HashSet<>(visiting);
                 v.addAll(accept);
