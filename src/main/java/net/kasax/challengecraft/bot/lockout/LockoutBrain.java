@@ -834,7 +834,9 @@ public final class LockoutBrain implements BotBrain {
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
         // Starving (six shanks and less: no sprinting, and on hard the hunger eats the hearts
         // away - a fall then kills): food first, whatever it costs.
-        if (level >= 12 && cost > (bare ? 180 : 25) || cost > (level <= 6 ? 900 : bare ? 240 : 90)) return false;
+        // (A stock while not hungry yet only if it is near - a cow in sight -, not a hunt across
+        // the country: the estimates of those run long.)
+        if (level >= 12 && cost > (bare ? 60 : 25) || cost > (level <= 6 ? 900 : bare ? 120 : 90)) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
         var lv = bot.body().level();
