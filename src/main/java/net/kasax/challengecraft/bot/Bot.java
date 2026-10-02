@@ -560,6 +560,18 @@ public final class Bot {
             }
         }
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
+        // Hit while swimming (a drowned, a guardian): ashore first - in the water it is slow, cannot
+        // crit, and every breath is short; a fight on land is won.
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && body.isInWater()
+                && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && !(top instanceof net.kasax.challengecraft.bot.task.NavGoalTask)) {
+            actions.reset();
+            say("attacked in the water: ashore first");
+            reflex(new net.kasax.challengecraft.bot.task.NavGoalTask("ashore, away from the " + attacker.getType().toShortString(),
+                    (lv, p) -> lv.getFluidState(p).isEmpty() && lv.getFluidState(p.below()).isEmpty()
+                            && !lv.getBlockState(p.below()).getCollisionShape(lv, p.below()).isEmpty(),
+                    b -> b.body().blockPosition(), 600));
+            return;
+        }
         boolean fromPillar = attacker != null && net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, attacker)
                 && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this);
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !fromPillar && (body.getHealth() > 7 || cornered)
