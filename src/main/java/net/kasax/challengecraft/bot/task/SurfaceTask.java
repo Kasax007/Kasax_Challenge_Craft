@@ -47,6 +47,17 @@ public final class SurfaceTask implements BotTask {
         return y;
     }
 
+    /**
+     * Really under a roof: a cave or a tunnel (no sky light at the head, well below the ground
+     * there). A valley, a ravine or a forest floor is not: the path search walks out of those.
+     */
+    public static boolean covered(BotPlayer body) {
+        ServerLevel level = (ServerLevel) body.level();
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        BlockPos head = body.blockPosition().above();
+        return level.getBrightness(net.minecraft.world.level.LightLayer.SKY, head) < 4 && head.getY() < ground(level, head.getX(), head.getZ()) - 3;
+    }
+
     /** {@link #underground(BotPlayer)} for feet at {@code feet}. */
     public static boolean underground(ServerLevel level, BlockPos feet) {
         // The Nether and the End have no sky and no surface to climb to.

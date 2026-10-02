@@ -240,6 +240,20 @@ public final class BotKnowledge {
         };
     }
 
+    /** Blocks that only grow or lie in certain biomes (none of those in view: they are far off). */
+    private static final java.util.Set<String> BIOME_BOUND = java.util.Set.of(
+            "snow", "snow_block", "ice", "packed_ice", "blue_ice", "powder_snow", "cactus", "dead_bush", "red_sand", "red_sandstone",
+            "terracotta", "mud", "mangrove_log", "mangrove_roots", "mycelium", "podzol", "bamboo", "cocoa", "melon", "jungle_log",
+            "acacia_log", "dark_oak_log", "cherry_log", "pale_oak_log", "pink_petals", "sweet_berry_bush", "lily_pad", "blue_orchid",
+            "emerald_ore", "allium", "orange_tulip", "red_tulip", "white_tulip", "pink_tulip", "sunflower");
+    // (The cave biomes' blocks - moss, dripstone, sculk, amethyst - are not here: they turn up
+    // underground anywhere, found by caving rather than by a walk to a biome.)
+
+    public static boolean biomeBound(Block block) {
+        String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+        return BIOME_BOUND.contains(id) || id.endsWith("_terracotta");
+    }
+
     /**
      * Blocks a biome is known for (by a word in the biome's name): once such a biome is in view,
      * finding them is a walk there rather than luck.

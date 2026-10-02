@@ -498,6 +498,9 @@ public final class ObtainPlanner {
     }
 
 
+    /** Seconds to reach a biome that is nowhere in view (beyond some 400 blocks, and looked for). */
+    private static final double FAR_BIOME = 600;
+
     /** Seconds to find some water when none is known (in the Overworld it is never far). */
     private static final double WATER_SEARCH = 90;
 
@@ -536,6 +539,9 @@ public final class ObtainPlanner {
                 if (e.getKey().dimension().equals(dim) && e.getValue().contains(id)) nearest = Math.min(nearest, Math.sqrt(e.getKey().pos().distSqr(bot.body().blockPosition())));
             }
             if (nearest < Double.MAX_VALUE) find = Math.max(find, nearest / 5 + 10);
+            // Only found in certain biomes, and none of them anywhere in view (24 chunks): far off,
+            // a long walk into the unknown. (Snow from the plains is not fifteen seconds away.)
+            else if (!nether && BotKnowledge.biomeBound(block)) find = Math.max(find, FAR_BIOME);
         }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         return find + breakSeconds + toolCost(bot, k, block, cost);

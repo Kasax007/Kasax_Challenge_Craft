@@ -37,10 +37,11 @@ public final class FarWalk {
         BlockPos feet = nav.feet();
         double dx = target.getX() - feet.getX(), dz = target.getZ() - feet.getZ(), flat = Math.sqrt(dx * dx + dz * dz);
         boolean near = flat <= NEAR;
-        // Down in a mine with the walk far over the land: up first.
+        // Down in a mine with the walk far over the land: up first. (A valley or a ravine is
+        // not a mine: the path search takes the way out of it.)
         // (Once up, not again for a while: a climb that ends at once is not to be repeated each tick.)
         long now = level.getGameTime();
-        if (!near && climb == null && now >= climbAgainAt && SurfaceTask.underground(bot.body())) climb = new SurfaceTask();
+        if (!near && climb == null && now >= climbAgainAt && SurfaceTask.covered(bot.body())) climb = new SurfaceTask();
         if (climb != null) {
             var r = climb.tick(bot);
             if (r == net.kasax.challengecraft.bot.BotTask.Result.RUNNING) return Status.MOVING;

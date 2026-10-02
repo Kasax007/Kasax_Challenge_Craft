@@ -236,7 +236,13 @@ final class BotCommands {
                                             double cost = planner.estimate(bot, java.util.Set.of(item), 1);
                                             var plan = planner.plan(bot, java.util.Set.of(item), 1);
                                             String first = plan instanceof net.kasax.challengecraft.bot.plan.ObtainPlanner.Step st ? st.task().describe() : plan.toString();
-                                            ok(ctx, String.format("%s: ~%.0f s, first %s", item, cost, first));
+                                            StringBuilder src = new StringBuilder();
+                                            for (var d : net.kasax.challengecraft.bot.plan.BotKnowledge.get(bot.server()).blocksDropping(item)) {
+                                                Double seen = planner.seen(bot, d.block());
+                                                src.append(' ').append(BuiltInRegistries.BLOCK.getKey(d.block()).getPath()).append('=')
+                                                        .append(seen == null ? "-" : String.format("%.0f", seen)).append('/').append(String.format("%.2f", d.count()));
+                                            }
+                                            ok(ctx, String.format("%s: ~%.0f s, first %s; blocks (seen s/count):%s", item, cost, first, src));
                                             return 1;
                                         }))))
                         .then(Commands.literal("nether").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
