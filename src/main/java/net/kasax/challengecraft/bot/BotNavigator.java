@@ -549,7 +549,9 @@ public final class BotNavigator {
             if (bot.onGround() && bot.horizontalCollision && !up) bot.jump = true;
             // A long straight run, open overhead: sprint-jumping, as players cover ground (a good
             // fifth faster than sprinting). Not with little food left, and lined up first.
-            if (far >= index + 3 && flat > 3.5 && bot.sprintNow && bot.onGround() && !up && !careful
+            // (Never by a drop: a jump that comes down a little aside goes over the edge - the
+            // Nether's ledges over the lava sea.)
+            if (far >= index + 3 && flat > 3.5 && bot.sprintNow && bot.onGround() && !up && !careful && !byDrop(feet)
                     && bot.getFoodData().getFoodLevel() > 6 && runningAlong(dx, dz) && jumpRoom) bot.jump = true;
         }
         // Stuck: no progress for a while.
@@ -827,6 +829,26 @@ public final class BotNavigator {
             }
         }
         return best;
+    }
+
+    /** A drop of more than three (or lava) beside the feet, to any side. */
+    private boolean byDrop(BlockPos feet) {
+        var level = bot.level();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                BlockPos q = feet.offset(dx, 0, dz);
+                if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) continue;
+                boolean ground = false;
+                for (int i = 1; i <= 4 && !ground; i++) {
+                    BlockPos r = q.below(i);
+                    if (level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA)) break;
+                    if (!level.getBlockState(r).getCollisionShape(level, r).isEmpty() || !level.getFluidState(r).isEmpty()) ground = true;
+                }
+                if (!ground) return true;
+            }
+        }
+        return false;
     }
 
     /** Why the last path was dropped, and how often paths were (for the status line). */
