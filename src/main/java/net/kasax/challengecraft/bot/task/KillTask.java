@@ -220,6 +220,7 @@ public final class KillTask implements BotTask {
                 }
                 body.strafe = 0.7f * strafeSide;
                 keepFooting(body);
+                if (awayFromEdge(body)) return Result.RUNNING;
                 // Alone with it: a jump as the arm comes back (at about half), so that the blow
                 // lands on the way down - a critical hit, half again as hard.
                 if (pack <= 1 && crit == 0 && strength >= 0.55f && body.onGround() && !body.isInWater() && hit < HIT - 0.2) {
@@ -390,6 +391,33 @@ public final class KillTask implements BotTask {
         if (body.forward < 0 && !footing(body, bx, bz)) body.forward = 0;
         if (body.strafe != 0 && !footing(body, cos * Math.signum(body.strafe), sin * Math.signum(body.strafe))) body.strafe = -body.strafe;
         if (body.strafe != 0 && !footing(body, cos * Math.signum(body.strafe), sin * Math.signum(body.strafe))) body.strafe = 0;
+    }
+
+    /**
+     * Fighting by an edge (a drop of more than two, lava under it - the Nether's ledges): a step
+     * in from it first, as a player keeps the wall at his back rather than the void, since every
+     * blow it takes throws it back. Returns whether it moved.
+     */
+    static boolean awayFromEdge(BotPlayer body) {
+        if (!body.onGround()) return false;
+        double vx = 0, vz = 0;
+        boolean edge = false;
+        for (int i = 0; i < 8; i++) {
+            double a = i * Math.PI / 4, dx = Math.cos(a), dz = Math.sin(a);
+            if (footing(body, dx, dz)) {
+                vx += dx;
+                vz += dz;
+            } else edge = true;
+        }
+        if (!edge || vx * vx + vz * vz < 0.01) return false;
+        double yaw = Math.toRadians(body.getYRot());
+        double sin = Math.sin(yaw), cos = Math.cos(yaw);
+        double len = Math.sqrt(vx * vx + vz * vz);
+        vx /= len;
+        vz /= len;
+        body.forward = (float) Mth.clamp(vx * -sin + vz * cos, -1, 1);
+        body.strafe = (float) Mth.clamp(vx * cos + vz * sin, -1, 1);
+        return true;
     }
 
     private static boolean footing(BotPlayer body, double dx, double dz) {
