@@ -344,7 +344,9 @@ public final class BarterTask implements BotTask {
         // down in the hole itself (in there, it is in with the piglin and cannot get out).
         if (!fromRim || !bot.navigator().feet().equals(rim)) {
             var drops = BotWorld.drops((ServerLevel) body.level(), body.blockPosition(), 5, (Set<Item>) null).stream()
-                    .filter(e -> !e.getItem().is(Items.GOLD_INGOT) || !fromRim)
+                    // (Gold up on the ground too: the one in the hole wants it, cannot get it, and
+                    // takes no more from the hand meanwhile - picked up, out of its sight.)
+                    .filter(e -> !e.getItem().is(Items.GOLD_INGOT) || !fromRim || hole != null && e.getY() >= hole.getY() + 2)
                     .filter(e -> !fromRim || hole == null || Math.abs(e.getBlockX() - hole.getX()) + Math.abs(e.getBlockZ() - hole.getZ()) > 0
                             || e.getY() >= hole.getY() + 2).toList();
             if (!drops.isEmpty() && !admiring() && body.distanceTo(drops.get(0)) > 1.2) {

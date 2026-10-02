@@ -338,6 +338,9 @@ public final class KillTask implements BotTask {
         // (Close by, the sword: a bow drawn at arm's length is a free hit for it - a magma cube
         // jumping about the lava's edge, a strider at the shore.)
         if (shotAt.contains(mob.getUUID()) || bot.body().distanceTo(mob) > 32 || bot.body().distanceTo(mob) < 5) return false;
+        // (Never at a magma cube or a slime: it leaps the distance while the bow is drawn, and
+        // splits into more anyway - the sword, ready, as it lands.)
+        if (mob instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob) return false;
         if (net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.ARROW) < 0) return false;
         Item weapon = net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.BOW) >= 0 ? Items.BOW
                 : net.kasax.challengecraft.bot.BotInventory.slotOf(bot.body(), Items.CROSSBOW) >= 0 ? Items.CROSSBOW : null;

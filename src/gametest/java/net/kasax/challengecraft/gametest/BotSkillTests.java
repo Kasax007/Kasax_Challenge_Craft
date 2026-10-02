@@ -52,6 +52,23 @@ public class BotSkillTests {
     }
 
     /**
+     * Eighteen raw iron (three minutes in one furnace): shared out over three furnaces, the two
+     * extra ones made from the cobblestone carried - done in a third of the time, all furnaces
+     * taken back along.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2000, skyAccess = true, padding = 8)
+    public void parallelSmelt(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "parallel_smelt");
+        a.spawn(20, FEET, 20, new ItemStack(Items.RAW_IRON, 18), new ItemStack(Items.COAL, 3), new ItemStack(Items.COBBLESTONE, 20),
+                new ItemStack(Items.FURNACE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.IRON_INGOT), 18), 2000,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.IRON_INGOT)) >= 18
+                        && ObtainPlanner.countAny(body, Set.of(Items.FURNACE)) >= 2
+                        && a.bot().current() == null);
+    }
+
+    /**
      * An iron vein in a rock with one ore showing, a lone ore a little farther on the other side: the
      * whole vein is taken (the ores behind the first come to light), the lone one left.
      */

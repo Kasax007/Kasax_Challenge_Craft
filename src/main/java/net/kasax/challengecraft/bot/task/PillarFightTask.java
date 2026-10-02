@@ -34,7 +34,9 @@ public final class PillarFightTask implements BotTask {
         boolean hoglin = m instanceof net.minecraft.world.entity.monster.hoglin.Hoglin || m instanceof net.minecraft.world.entity.monster.Zoglin;
         // (An enderman too: ten hearts and a half a blow on hard, and it cannot reach up there.)
         boolean enderman = m instanceof net.minecraft.world.entity.monster.Enderman;
-        if (!brute && !hoglin && !enderman) return false;
+        // (A wither skeleton: its blows wither, and a pillar is above its stone sword too.)
+        boolean wither = m instanceof net.minecraft.world.entity.monster.skeleton.WitherSkeleton;
+        if (!brute && !hoglin && !enderman && !wither) return false;
         // Well armed and armoured, at full health: a fight like any other.
         boolean diamondSword = body.getInventory().countItem(Items.DIAMOND_SWORD) + body.getInventory().countItem(Items.NETHERITE_SWORD) > 0;
         return !(diamondSword && body.getArmorValue() >= 15 && body.getHealth() >= 18);
