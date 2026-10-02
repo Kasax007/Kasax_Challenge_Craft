@@ -21,7 +21,8 @@ public final class PillarFightTask implements BotTask {
     private static final int MAX_TICKS = 1200;
     private final LivingEntity target;
     private BlockPos base;
-    private int ticks, placed, lastPlaced, placedAt;
+    private int ticks, placed, lastPlaced, placedAt, waiting;
+    private boolean shot;
 
     public PillarFightTask(LivingEntity target) {
         this.target = target;
@@ -95,6 +96,16 @@ public final class PillarFightTask implements BotTask {
                     .stream().findFirst().map(m -> (LivingEntity) m).orElse(null);
         }
         if (hitting == null) {
+            // Out of reach below (it will not come to the foot): arrows from up here, where it
+            // cannot get at it.
+            if (++waiting > 60 && !shot && target.distanceTo(body) < 24 && body.hasLineOfSight(target)
+                    && net.kasax.challengecraft.bot.BotInventory.slotOf(body, Items.ARROW) >= 0
+                    && net.kasax.challengecraft.bot.BotInventory.slotOf(body, Items.BOW) >= 0) {
+                shot = true;
+                java.util.UUID id = target.getUUID();
+                bot.interject(new ShootTask(Items.BOW, e -> e.getUUID().equals(id), 8));
+                return Result.RUNNING;
+            }
             body.lookAt(target.getEyePosition());
             // Gone off out of reach a long while (it lost interest): down and on.
             return ticks > 600 && target.distanceTo(body) > 8 ? Result.DONE : Result.RUNNING;
