@@ -973,6 +973,13 @@ public final class LockoutBrain implements BotBrain {
         // Longer than planned in earlier games or earlier tries: the extra is luck as well.
         luck = Math.min(mean, luck + Math.max(0, mean - plain));
         double h = hazard;
+        // Night on the surface: a tile done down below (ore, a cave's things) is out of it - the
+        // night's monsters are up here. So a player mines through the first nights.
+        var lv = bot.body().level();
+        if (at != null && lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
+                && at.getY() < lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()) - 8) {
+            h = Math.max(0.004, h - nightSurface(bot));
+        }
         if (type != null) h *= 1.5; // (a fight)
         if (g.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER
                 && bot.body().level().dimension() != net.minecraft.world.level.Level.NETHER) h += 0.03;
@@ -989,7 +996,7 @@ public final class LockoutBrain implements BotBrain {
         boolean underground = net.kasax.challengecraft.bot.task.SurfaceTask.underground(body);
         double h = 0.004;
         if (level.dimension() == net.minecraft.world.level.Level.NETHER) h += 0.03;
-        else if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && !underground) h += 0.015;
+        else if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && !underground) h += nightSurface(bot);
         if (underground) h += 0.006;
         int monsters = level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
                 net.minecraft.world.entity.LivingEntity::isAlive).size();
@@ -997,6 +1004,13 @@ public final class LockoutBrain implements BotBrain {
         h *= 1 - Math.min(0.5, body.getArmorValue() / 40.0);
         if (body.getHealth() < 10) h *= 1.8;
         return h;
+    }
+
+    /** The night's extra deaths per minute on the surface: twice as many without armour on hard. */
+    private static double nightSurface(Bot bot) {
+        var body = bot.body();
+        boolean bare = body.getArmorValue() < 8 && body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+        return bare ? 0.03 : 0.015;
     }
 
     /** Seconds to get from one place to another: walking, a staircase down, stairs up. */
