@@ -548,7 +548,9 @@ public final class Bot {
             }
         }
         int food = body.getFoodData().getFoodLevel();
-        boolean hurt = body.getHealth() < body.getMaxHealth() * 0.6f && food < 20;
+        // (On hard, topped up sooner: the hearts only come back with a full stomach, and two blows
+        // of a magma cube or a brute take twelve.)
+        boolean hurt = body.getHealth() < body.getMaxHealth() * (body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD ? 0.8f : 0.6f) && food < 20;
         // (Not with a monster at it: eating stands still for a second and a half. Unless starving.)
         if ((food <= 14 || hurt) && (food <= 4 || !targeted(8)) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();

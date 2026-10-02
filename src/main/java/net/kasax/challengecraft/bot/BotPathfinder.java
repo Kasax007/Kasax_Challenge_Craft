@@ -329,6 +329,9 @@ public final class BotPathfinder {
         else if (escapeLava && loaded(s.to().below()) && state(s.to().below()).is(Blocks.MAGMA_BLOCK)) c += 20;
         // Along the edge of lava: a slip, a knock-back, and it is in. Kept a block off where it can.
         else if (!escapeLava && besideLava(s.to())) c += LAVA_EDGE;
+        // Along the edge of a deep drop (a ledge, a cliff over the lava sea): a knock-back there
+        // is a long fall. A block in from the edge where there is room.
+        else if (!escapeLava && besideDrop(s.to())) c += DROP_EDGE;
         double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
             double ticks = breakTicks(state(b));
@@ -523,6 +526,23 @@ public final class BotPathfinder {
 
     private boolean lava(BlockPos p) {
         return loaded(p) && state(p).getFluidState().is(FluidTags.LAVA);
+    }
+
+    private static final double DROP_EDGE = 5;
+
+    private boolean besideDrop(BlockPos p) {
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos q = p.relative(d);
+            if (!loaded(q) || !state(q).getCollisionShape(NO_WORLD, q).isEmpty()) continue;
+            boolean ground = false;
+            for (int i = 1; i <= 6 && !ground; i++) {
+                BlockPos r = q.below(i);
+                if (!loaded(r) || lava(r)) break;
+                if (inWater(r) || solid(r)) ground = true;
+            }
+            if (!ground) return true;
+        }
+        return false;
     }
 
     /** Under {@code p}, lava before any ground, or no ground for forty blocks (a trench is no matter). */

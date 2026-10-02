@@ -860,6 +860,34 @@ public class BotStuntTests {
         });
     }
 
+    /** A big magma cube coming for it while it stands about (iron on, an iron sword): it fights back and lives. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void brawlMagmaCube(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "brawl_magma_cube");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var cube = EntityTypes.MAGMA_CUBE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        cube.setSize(4, true);
+        cube.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        cube.setPersistenceRequired();
+        level.addFreshEntity(cube);
+        a.spawn(16, FEET, 20, new ItemStack(Items.IRON_SWORD), new ItemStack(Items.COBBLESTONE, 32), new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 16));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1150), 1150, () -> {
+            if (body.getHealth() < low[0]) BotArena.LOG.info("[BOTTEST] brawl_magma_cube hit: hp {} doing {}", body.getHealth(), a.bot().status());
+            low[0] = Math.min(low[0], body.getHealth());
+            h.assertTrue(body.isAlive(), "brawl_magma_cube: dead");
+            var left = level.getEntitiesOfClass(net.minecraft.world.entity.monster.cubemob.MagmaCube.class, body.getBoundingBox().inflate(30), net.minecraft.world.entity.LivingEntity::isAlive);
+            if (!left.isEmpty()) return false;
+            BotArena.LOG.info("[BOTTEST] brawl_magma_cube lost {} health", 20 - low[0]);
+            return true;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {
