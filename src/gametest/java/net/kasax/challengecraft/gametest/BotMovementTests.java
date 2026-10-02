@@ -321,4 +321,15 @@ public class BotMovementTests {
             return net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.OAK_LOG)) >= 1;
         });
     }
+
+    /** Fallen into a lava pool (fire resistance on, so it lives to try): out the shortest way, not stuck in it. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void lavaEscape(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "lava_escape");
+        a.fill(17, GROUND, 17, 23, GROUND, 23, Blocks.LAVA);
+        a.spawn(20, GROUND, 20);
+        var body = a.bot().body();
+        body.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 1200));
+        a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 600, () -> a.near(30, FEET, 20, 1.6));
+    }
 }

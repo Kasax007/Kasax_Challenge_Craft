@@ -202,6 +202,9 @@ public final class BotPathfinder {
      * way that gets at least five blocks away, or null.
      */
     public Result search(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int maxNodes, long nanos) {
+        // Standing in lava already (fallen in): out through it is the way, however dear - the
+        // nearest ground clear of it.
+        escapeLava = loaded(start) && state(start).getFluidState().is(FluidTags.LAVA);
         long until = nanos == Long.MAX_VALUE ? Long.MAX_VALUE : System.nanoTime() + nanos;
         it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Node> nodes = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>();
@@ -311,6 +314,8 @@ public final class BotPathfinder {
         else c = flatCost * (diagonal ? Math.sqrt(2) : 1);
         // Digging while afloat is five times slower (not on the ground), with the head under
         // water five times more.
+        // (Every step through lava burns: by far the dearest way, only to get out.)
+        if (escapeLava && lava(s.to())) c += 40;
         double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
             double ticks = breakTicks(state(b));
@@ -497,9 +502,17 @@ public final class BotPathfinder {
     }
 
     /** Room for a body: no collision and nothing that hurts or holds. */
+    /** The search starts in lava: lava is crossed (at a high price) to get out of it. */
+    private boolean escapeLava;
+
+    private boolean lava(BlockPos p) {
+        return loaded(p) && state(p).getFluidState().is(FluidTags.LAVA);
+    }
+
     boolean clear(BlockPos p) {
         if (!loaded(p)) return false;
         BlockState s = state(p);
+        if (escapeLava && s.getFluidState().is(FluidTags.LAVA)) return true;
         if (s.getFluidState().is(FluidTags.LAVA) || dangerous(s)) return false;
         return s.getCollisionShape(NO_WORLD, p).isEmpty();
     }
@@ -516,7 +529,7 @@ public final class BotPathfinder {
 
     /** Whether feet at {@code p} stand on something (or swim). */
     boolean canStand(BlockPos p) {
-        if (inWater(p)) return true;
+        if (inWater(p) || escapeLava && lava(p)) return true;
         BlockPos below = p.below();
         if (!solid(below)) return false;
         BlockState s = state(below);

@@ -534,7 +534,11 @@ public final class BotNavigator {
         boolean nextCareful = next != null && (next.place() != null || !next.breaks().isEmpty());
         bot.sprintNow = !careful && !(nextCareful && flat < 1.2);
         diving = false;
-        if (bot.isInWater()) {
+        if (bot.isInLava()) {
+            // Out of lava: up and on, as fast as it goes there.
+            bot.jump = true;
+            bot.sprintNow = false;
+        } else if (bot.isInWater()) {
             swim(to, feet, flat, up);
         } else {
             // Up a step: jump once lined up and close (as Baritone does), never into a ceiling.
@@ -689,7 +693,8 @@ public final class BotNavigator {
         BlockPos to = step.to();
         for (BlockPos c : new BlockPos[]{to, to.above()}) {
             var st = level.getBlockState(c);
-            if (!st.getCollisionShape(level, c).isEmpty() || st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return false;
+            // (Lava is no place to step into - unless it is in it already and getting out.)
+            if (!st.getCollisionShape(level, c).isEmpty() || st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && !bot.isInLava()) return false;
         }
         boolean floor = !level.getBlockState(to.below()).getCollisionShape(level, to.below()).isEmpty()
                 || !level.getFluidState(to).isEmpty() || !level.getFluidState(to.below()).isEmpty();
