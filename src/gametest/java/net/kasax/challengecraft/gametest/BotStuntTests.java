@@ -897,6 +897,29 @@ public class BotStuntTests {
         });
     }
 
+    /** A fight with a zombie on a ledge over a deep drop: won without going over the edge. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void brawlOnLedge(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "brawl_on_ledge");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        // A pit all round a 4 x 4 ledge, eight deep.
+        a.fill(10, BotArena.GROUND - 8, 10, 30, BotArena.GROUND, 30, Blocks.AIR);
+        a.fill(18, BotArena.GROUND - 8, 18, 21, BotArena.GROUND, 21, Blocks.STONE);
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(21, FEET, 21)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        a.spawn(18, FEET, 18, new ItemStack(Items.IRON_SWORD));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1150), 1150, () -> {
+            // (Dug down after the zombie it knocked off, maybe: no matter. Fallen is what counts.)
+            h.assertTrue(body.fallDistance < 4, "brawl_on_ledge: fell off");
+            return !z.isAlive() || h.getTick() > 1100;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {

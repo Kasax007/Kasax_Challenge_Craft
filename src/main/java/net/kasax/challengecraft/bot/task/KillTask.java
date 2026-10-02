@@ -78,6 +78,8 @@ public final class KillTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
+        // (Crouching only while fighting by an edge: set again below each tick it is.)
+        bot.body().sneak = false;
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (collectTicks > 0) {
@@ -185,6 +187,8 @@ public final class KillTask implements BotTask {
             return Result.RUNNING;
         }
         if (hit <= HIT) {
+            // (Crouched while trading blows by an edge: the push of a blow does not carry it off.)
+            body.sneak = edgeNear(body);
             if (walking) {
                 bot.navigator().stop();
                 walking = false;
@@ -450,6 +454,16 @@ public final class KillTask implements BotTask {
         body.forward = (float) Mth.clamp(vx * -sin + vz * cos, -1, 1);
         body.strafe = (float) Mth.clamp(vx * cos + vz * sin, -1, 1);
         return true;
+    }
+
+    /** A drop or lava a step off to any side. */
+    static boolean edgeNear(BotPlayer body) {
+        if (!body.onGround()) return false;
+        for (int i = 0; i < 8; i++) {
+            double a = i * Math.PI / 4;
+            if (!footing(body, Math.cos(a), Math.sin(a))) return true;
+        }
+        return false;
     }
 
     private static boolean footing(BotPlayer body, double dx, double dz) {
