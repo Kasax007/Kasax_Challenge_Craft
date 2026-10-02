@@ -29,6 +29,7 @@ public final class BotFieldTest {
     private int index = -1, ticks, deaths, done;
     private float low;
     private boolean wasAlive = true;
+    private String lastStatus = "";
     private BlockPos netherStart, overworldStart;
     private final List<String> results = new ArrayList<>();
 
@@ -72,11 +73,17 @@ public final class BotFieldTest {
             return false;
         }
         ticks++;
-        if (!body.isAlive() && wasAlive) deaths++;
+        if (!body.isAlive() && wasAlive) {
+            deaths++;
+            var src = body.getLastDamageSource();
+            BotManager.LOG.info("[FIELDTEST]   {} died at {} ({}), last doing: {}", goal().id(), body.blockPosition().toShortString(),
+                    src == null ? "?" : src.getLocalizedDeathMessage(body).getString(), lastStatus);
+        }
+        if (body.isAlive() && ticks % 20 == 0) lastStatus = bot.status() + " | nav " + bot.navigator().debug();
+        if (ticks % 400 == 0) BotManager.LOG.info("[FIELDTEST]   {} {} s: at {}, hp {}, doing{}", goal().id(), ticks / 20,
+                body.blockPosition().toShortString(), Math.round(body.getHealth()), bot.status());
         wasAlive = body.isAlive();
         if (body.isAlive()) low = Math.min(low, body.getHealth());
-        if (ticks % 1200 == 0) BotManager.LOG.info("[FIELDTEST]   {} minute {}: at {} in {}, hp {}, doing{}", goal().id(), ticks / 1200,
-                body.blockPosition().toShortString(), body.level().dimension().identifier().getPath(), Math.round(body.getHealth()), bot.status());
         return false;
     }
 
@@ -92,13 +99,22 @@ public final class BotFieldTest {
     }
 
     private boolean finished(BotPlayer body) {
-        return claimed() || ticks >= ticksEach || deaths > 0 && body.isAlive() && ticks > 40;
+        return claimed() || ticks >= ticksEach || deaths > 0 && body.isAlive() && ticks > 40 || noWay();
+    }
+
+    /** The brain has known no way to the tile for half a minute. */
+    private int noWayTicks;
+
+    private boolean noWay() {
+        if (bot.brain() instanceof LockoutBrain b && b.noWay && bot.current() == null) noWayTicks++;
+        else noWayTicks = 0;
+        return noWayTicks > 600;
     }
 
     private void report(BotPlayer body) {
         boolean ok = claimed();
         if (ok) done++;
-        String what = ok ? "CLAIMED" : deaths > 0 ? "DIED" : "TIMEOUT";
+        String what = ok ? "CLAIMED" : deaths > 0 ? "DIED" : noWayTicks > 600 ? "NO-WAY" : "TIMEOUT";
         String line = String.format("%s %s in %d s, lowest hp %.0f, deaths %d", goal().id(), what, ticks / 20, low, deaths);
         results.add(goal().id() + " " + what + " " + ticks / 20 + "s");
         BotManager.LOG.info("[FIELDTEST] {} (last: {})", line, bot.status());
@@ -131,6 +147,7 @@ public final class BotFieldTest {
         bot.setBrain(new LockoutBrain(LockoutBrain.Difficulty.HARD).only(Set.of(g.id())));
         ticks = 0;
         deaths = 0;
+        noWayTicks = 0;
         wasAlive = true;
         low = body.getMaxHealth();
         BotManager.LOG.info("[FIELDTEST] {} start ({}) at {} in {}", g.id(), g.title().getString(), at.toShortString(), level.dimension().identifier().getPath());

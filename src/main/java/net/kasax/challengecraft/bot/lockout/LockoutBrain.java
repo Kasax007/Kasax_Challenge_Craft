@@ -94,6 +94,8 @@ public final class LockoutBrain implements BotBrain {
 
     /** Only these tiles count (a field test of one goal at a time); null: the whole board. */
     private Set<String> only;
+    /** In a field test: no way known to the tile (see {@link #only}). */
+    public boolean noWay;
     /** The dimension it is in, and when it last came through a portal (against going to and fro). */
     private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lastDimension;
     private long switchedAt = -100_000;
@@ -246,6 +248,14 @@ public final class LockoutBrain implements BotBrain {
         if (choices.isEmpty()) {
             choices = choices(bot, -1, true);
             if (!choices.isEmpty()) bot.say("only hard tiles left: trying the cheapest of them");
+        }
+        // A field test of one tile: no way to it is the answer, nothing else to do.
+        if (only != null) {
+            noWay = choices.isEmpty();
+            if (noWay) {
+                pause = 200;
+                return;
+            }
         }
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD
