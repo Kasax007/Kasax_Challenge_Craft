@@ -38,7 +38,12 @@ public final class PackTableTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
-        if (++ticks > 300) return Result.FAILED;
+        // (No way to it in fifteen seconds - up a staircase, behind the water: left behind for
+        // good, or every next step would come back to it.)
+        if (++ticks > 300) {
+            bot.ownTable = null;
+            return Result.FAILED;
+        }
         if (level.getBlockState(table).is(Blocks.CRAFTING_TABLE)) {
             if (!bot.actions().inReach(table)) {
                 if (!walking) {

@@ -745,6 +745,12 @@ public final class ObtainPlanner {
                 search = 0.8 * find;
             }
         }
+        // A cave biome's block not seen yet: after the walk to the biome, the way down into it
+        // and the looking about there (minutes, and luck).
+        if (seen == null && BotKnowledge.caveBiome(block)) {
+            find += 90;
+            search = Math.max(search, 0.7 * find);
+        }
         // Not seen, dug for: the work is right below, at the depth where it is common.
         if (at == null && here != null && search > 0) {
             Integer depth = BotKnowledge.depth(block, here.getY());
@@ -971,6 +977,8 @@ public final class ObtainPlanner {
                 // for (that walk can be a thousand blocks long); otherwise made.
                 boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
                 if (BotKnowledge.rarity(common, nether) >= 1000) mine.knownOnly();
+                // A cave biome's block: to the biome first, then down (not dug for right here).
+                if (BotKnowledge.caveBiome(common)) mine.digAtLead();
                 // Nether wart grows in fortresses only: to the fortress first (exploring for one).
                 if (nether && blocks.contains(Blocks.NETHER_WART) && !visibleBlocks.containsKey(Blocks.NETHER_WART)) {
                     var level = (net.minecraft.server.level.ServerLevel) bot.body().level();

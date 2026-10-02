@@ -340,6 +340,14 @@ public final class MineTask implements BotTask {
         return searching && target == null;
     }
 
+    private boolean digAtLead;
+
+    /** Down where the lead is (a cave biome under it), not right here. */
+    public MineTask digAtLead() {
+        this.digAtLead = true;
+        return this;
+    }
+
     /** Only where it is seen or remembered: no searching for it. */
     public MineTask knownOnly() {
         this.knownOnly = true;
@@ -368,9 +376,9 @@ public final class MineTask implements BotTask {
         BotNavigator nav = bot.navigator();
         // Ores: a cave first (walk through it and see what its walls show), a tunnel only when
         // there is no cave about or the caves had nothing.
-        if (depth != null && !cavesDone && !rock(level(bot))) return explore(bot);
+        if (depth != null && !cavesDone && !rock(level(bot)) && !(digAtLead && lead != null)) return explore(bot);
         if (depth == null && rock(level(bot))) return dig(bot);
-        if (depth != null) return dig(bot);
+        if (depth != null && !(digAtLead && lead != null)) return dig(bot);
         // Where they are known to be: go there first.
         if (lead != null) {
             // Far off: over the surface in legs (a path search straight there would dig through

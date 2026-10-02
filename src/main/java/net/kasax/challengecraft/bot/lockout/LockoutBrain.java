@@ -639,6 +639,12 @@ public final class LockoutBrain implements BotBrain {
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
         if (level >= 12 && cost > 25 || cost > 90) return false;
+        // At night on the surface a hunt across the fields is how a game is lost (and the cows
+        // are hard to see): only food close by, unless the hunger is getting serious.
+        var lv = bot.body().level();
+        boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
+        if (night && cost > 30 && level > 6) return false;
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
         nextErrand = "food";
         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));

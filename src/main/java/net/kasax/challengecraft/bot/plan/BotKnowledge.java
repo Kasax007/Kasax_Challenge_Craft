@@ -249,6 +249,18 @@ public final class BotKnowledge {
     // (The cave biomes' blocks - moss, dripstone, sculk, amethyst - are not here: they turn up
     // underground anywhere, found by caving rather than by a walk to a biome.)
 
+    /**
+     * Blocks of the cave biomes (dripstone caves, lush caves, the deep dark): only down in them,
+     * never on the surface above. Finding them is the walk to where the biome is, then the way
+     * down into it.
+     */
+    private static final Set<String> CAVE_BIOME = Set.of("pointed_dripstone", "dripstone_block", "moss_block", "moss_carpet",
+            "azalea", "flowering_azalea", "spore_blossom", "glow_lichen", "sculk", "sculk_vein", "sculk_sensor", "sculk_catalyst", "sculk_shrieker");
+
+    public static boolean caveBiome(Block block) {
+        return CAVE_BIOME.contains(BuiltInRegistries.BLOCK.getKey(block).getPath());
+    }
+
     public static boolean biomeBound(Block block) {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
         return BIOME_BOUND.contains(id) || id.endsWith("_terracotta");
@@ -301,6 +313,10 @@ public final class BotKnowledge {
             case "lapis_ore", "deepslate_lapis_ore", "deepslate", "tuff" -> -2;
             case "gold_ore", "deepslate_gold_ore" -> -18;
             case "redstone_ore", "deepslate_redstone_ore", "diamond_ore", "deepslate_diamond_ore" -> -53;
+            // (Where the cave biomes mostly are: the dripstone and lush caves well under the
+            // surface, the deep dark near the bottom.)
+            case "pointed_dripstone", "dripstone_block", "moss_block", "moss_carpet", "azalea", "flowering_azalea", "spore_blossom" -> 20;
+            case "sculk", "sculk_vein", "sculk_sensor", "sculk_catalyst", "sculk_shrieker" -> -40;
             default -> null;
         };
     }
