@@ -382,7 +382,8 @@ public final class Bot {
         }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         // (A fight inside a hunt or a sequence counts too.)
-        boolean fighting = BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.KillTask;
+        boolean fighting = BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.KillTask
+                || top instanceof net.kasax.challengecraft.bot.task.ShootTask && tasks.stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.KillTask);
         // Low on health with a monster close: get away first (and eat on the way), as a player
         // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
         // creeper about to blow: always away. (Cornered, with no way off: fight on, below.)
@@ -415,7 +416,8 @@ public final class Bot {
                     reflex(net.kasax.challengecraft.bot.task.ShieldUpTask.against((net.minecraft.world.entity.monster.Creeper) m));
                     return;
                 }
-                if (creeper || body.getHealth() <= (fighting ? 6 : 7)) {
+                boolean hard = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+                if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)) {
                     net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
                     // (That way was blocked last time: off to the side instead.)
                     if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
@@ -436,7 +438,9 @@ public final class Bot {
                     if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
                 }
                 actions.reset();
-                if (armed && body.getHealth() >= 10) {
+                // (On hard, a blast close by takes a dozen hearts and more: only at near full health.)
+                double needed = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD ? 16 : 10;
+                if (armed && body.getHealth() >= needed) {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(c).nearby(12));
                 } else {
                     net.minecraft.world.phys.Vec3 away = body.position().subtract(c.position()).normalize().scale(14);

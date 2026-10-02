@@ -435,6 +435,11 @@ public final class LockoutBrain implements BotBrain {
     }
 
     /** An open tile that is only to be had in the Nether. */
+    private static boolean hostile(String entityId) {
+        var type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.parse(entityId));
+        return type != null && type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
+    }
+
     private static boolean netherTilesOpen(Bot bot) {
         for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
             if (t.claimedBy() == null && t.goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) return true;
@@ -675,6 +680,11 @@ public final class LockoutBrain implements BotBrain {
         int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
         // The shield whenever there is an ingot about: the arrows and the creepers' blasts end in it.
         if (iron >= 1 && !has(body, Set.of(net.minecraft.world.item.Items.SHIELD))) return make(bot, net.minecraft.world.item.Items.SHIELD, "a shield");
+        // On hard, the chestplate next, iron for the board or not: most deaths are arrows,
+        // blasts and zombie blows, and a death costs minutes - more than mining eight iron again.
+        if (body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD && iron >= 8
+                && !has(body, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE,
+                net.minecraft.world.item.Items.NETHERITE_CHESTPLATE))) return make(bot, net.minecraft.world.item.Items.IRON_CHESTPLATE, "armour first on hard");
         for (boolean diamond : new boolean[]{false, true}) {
             int stock = diamond ? ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.DIAMOND)) : iron;
             int spare = stock - planner.demandFor(diamond ? net.minecraft.world.item.Items.DIAMOND : net.minecraft.world.item.Items.IRON_INGOT);
@@ -811,6 +821,9 @@ public final class LockoutBrain implements BotBrain {
         for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
             if (tile.claimedBy() != null || tile.index() == except) continue;
             if (only != null && !only.contains(tile.goal().id())) continue;
+            // Hurt: no going after monsters until the hearts are back (eaten, rested).
+            if (bot.body().getHealth() < 12 && tile.goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL
+                    && hostile(tile.goal().primaryTarget())) continue;
             if (last ? tries.getOrDefault(tile.goal().id(), 0) > MAX_TRIES : resting(tile.goal().id(), now)) continue;
             if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
             LockoutGoals.Option o;
