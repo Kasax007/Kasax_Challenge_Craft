@@ -21,10 +21,18 @@ public final class RaidTask implements BotTask {
     private BotTask loot;
     private boolean arrived;
     private int looted;
+    /** Blocks the board wants that a village may have about (its bell, hay, a bed). */
+    private final Set<net.minecraft.world.level.block.Block> wanted;
+    private VillageChoresTask chores;
 
     public RaidTask(ServerLevel level, String kind) {
+        this(level, kind, Set.of());
+    }
+
+    public RaidTask(ServerLevel level, String kind, Set<net.minecraft.world.level.block.Block> wanted) {
         this.kind = kind;
         this.visit = new VisitStructureTask(level, kind);
+        this.wanted = Set.copyOf(wanted);
     }
 
     @Override
@@ -52,7 +60,10 @@ public final class RaidTask implements BotTask {
             loot = new LootTask(c);
             return Result.RUNNING;
         }
-        return Result.DONE;
+        if (!kind.equals("village")) return Result.DONE;
+        // A village is more than its chests: see VillageChoresTask.
+        if (chores == null) chores = new VillageChoresTask(wanted);
+        return chores.tick(bot);
     }
 
     @Override

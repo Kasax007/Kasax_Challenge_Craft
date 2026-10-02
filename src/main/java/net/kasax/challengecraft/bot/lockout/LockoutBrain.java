@@ -150,7 +150,18 @@ public final class LockoutBrain implements BotBrain {
                 String key = kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
                 if (!raided.add(key)) continue;
                 bot.say("loot from the " + kind.replace('_', ' ') + " at " + seen.spot().toShortString());
-                start(bot, new net.kasax.challengecraft.bot.task.RaidTask(level, kind), 3600);
+                // What the board wants that may stand about there (the bell, a hay bale).
+                Set<net.minecraft.world.level.block.Block> blocks = new java.util.HashSet<>();
+                if (kind.equals("village")) {
+                    Set<net.minecraft.world.item.Item> items = new java.util.HashSet<>(planner.boardDemand.keySet());
+                    for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server()))
+                        if (t.claimedBy() == null) items.addAll(LockoutGoals.items(t.goal().targets()));
+                    for (var i : items) {
+                        if (i instanceof net.minecraft.world.item.BlockItem bi && !net.kasax.challengecraft.bot.BotWorld.COMMON.contains(bi.getBlock())
+                                && ObtainPlanner.countAny(bot.body(), Set.of(i)) == 0) blocks.add(bi.getBlock());
+                    }
+                }
+                start(bot, new net.kasax.challengecraft.bot.task.RaidTask(level, kind, blocks), kind.equals("village") ? 6000 : 3600);
                 return;
             }
         }
@@ -203,6 +214,9 @@ public final class LockoutBrain implements BotBrain {
         if (bastionRaid(bot)) return;
         // Night (or a cave, or the Nether), and several monsters wanted: one hunt for all of them.
         if (huntRound(bot)) return;
+        // Night with nothing to hunt: the night slept away in the bed it carries (fewer monsters
+        // on the way, the spawn set here), and the bed taken along again.
+        if (sleep(bot)) return;
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
@@ -323,13 +337,42 @@ public final class LockoutBrain implements BotBrain {
         long now = bot.body().level().getGameTime();
         if (now < huntRetryAt || !huntingTime(bot) || bot.body().getHealth() < 14) return false;
         Set<net.minecraft.world.entity.EntityType<?>> wanted = wantedMonsters(bot);
-        if (wanted.size() < 2) return false;
+        // At night on the surface even a single one: they come to it, the hunt is cheap now and
+        // dear by day. (In a cave at any time only for several: it is there to mine.)
+        var lv = bot.body().level();
+        boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
+        if (wanted.size() < (night ? 1 : 2)) return false;
         huntRetryAt = now + 6000; // (not straight back into it if it found nothing)
         long clock = bot.body().level().getOverworldClockTime() % 24000;
         long nightLeft = clock >= 12000 ? 24000 - clock : 0;
         long budgetTicks = Math.max(2400, Math.min(9000, nightLeft > 0 ? nightLeft : 4800));
-        bot.say("hunting time: one round for " + wanted.size() + " kinds of monster");
+        bot.say("hunting time: one round for " + wanted.size() + (wanted.size() == 1 ? " kind" : " kinds") + " of monster");
         start(bot, new net.kasax.challengecraft.bot.task.HuntRoundTask(() -> wantedMonsters(bot), () -> huntingTime(bot)), budgetTicks);
+        return true;
+    }
+
+    private long sleepRetryAt;
+
+    private boolean sleep(Bot bot) {
+        var level = bot.body().level();
+        long now = level.getGameTime();
+        if (now < sleepRetryAt || level.dimension() != net.minecraft.world.level.Level.OVERWORLD || !level.isDarkOutside()
+                || net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body())) return false;
+        net.minecraft.world.item.Item bed = null;
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) if (st.is(net.minecraft.tags.ItemTags.BEDS)) bed = st.getItem();
+        if (bed == null) return false;
+        // (Once a night: if the others stay up, it does not pass.)
+        long clock = level.getOverworldClockTime() % 24000;
+        sleepRetryAt = now + Math.max(600, 24000 - clock);
+        net.minecraft.world.item.Item placed = bed;
+        Set<net.minecraft.world.item.Item> beds = Set.of(placed);
+        bot.say("night and nothing to hunt: sleeping");
+        start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("sleep the night away", List.of(
+                () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(placed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0),
+                net.kasax.challengecraft.bot.task.SleepTask::new,
+                () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), beds,
+                        ObtainPlanner.countAny(bot.body(), beds) + 1).knownOnly())), 1200);
         return true;
     }
 

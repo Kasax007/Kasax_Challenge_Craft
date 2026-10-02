@@ -70,6 +70,49 @@ public class BotSkillTests {
                         && h.getBlockState(new net.minecraft.core.BlockPos(20, FEET, 25)).is(Blocks.IRON_ORE));
     }
 
+    /**
+     * In a village with chests done: the bell the board wants, a bed to carry, the ripe wheat
+     * field cut and baked into bread.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    public void villageChores(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "village_chores");
+        a.fill(10, GROUND, 26, 13, GROUND, 29, Blocks.FARMLAND);
+        a.fill(10, FEET, 26, 13, FEET, 29, Blocks.WHEAT.defaultBlockState().setValue(net.minecraft.world.level.block.CropBlock.AGE, 7));
+        var bed = Blocks.BED.red().defaultBlockState().setValue(net.minecraft.world.level.block.BedBlock.FACING, net.minecraft.core.Direction.NORTH);
+        a.fill(28, FEET, 13, 28, FEET, 13, bed.setValue(net.minecraft.world.level.block.BedBlock.PART, net.minecraft.world.level.block.state.properties.BedPart.FOOT));
+        a.fill(28, FEET, 12, 28, FEET, 12, bed.setValue(net.minecraft.world.level.block.BedBlock.PART, net.minecraft.world.level.block.state.properties.BedPart.HEAD));
+        a.fill(26, FEET, 28, 26, FEET, 28, Blocks.BELL);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.CRAFTING_TABLE));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.VillageChoresTask(Set.of(Blocks.BELL)), 3000,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.BELL)) > 0 && ObtainPlanner.countAny(body, Set.of(Blocks.BED.red().asItem())) > 0
+                        && ObtainPlanner.countAny(body, Set.of(Items.BREAD)) >= 4 && a.bot().current() == null);
+    }
+
+    /** Night, a bed in the pack: put down, slept in until morning, taken back. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void sleepNight(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "sleep_night");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set 14000");
+        var bed = Blocks.BED.red().asItem();
+        a.spawn(20, FEET, 20, new ItemStack(bed), new ItemStack(Items.STONE_AXE));
+        var body = a.bot().body();
+        boolean[] slept = {false};
+        a.run(new net.kasax.challengecraft.bot.task.SequenceTask("sleep", java.util.List.of(
+                        () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(bed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0),
+                        net.kasax.challengecraft.bot.task.SleepTask::new,
+                        () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of(bed), 1).knownOnly())),
+                1200, () -> {
+                    // (Other tests set the clock too: night kept until it lies down.)
+                    if (body.isSleeping()) slept[0] = true;
+                    if (!slept[0] && !level.isDarkOutside()) level.getServer().getCommands().performPrefixedCommand(
+                            level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set 14000");
+                    return slept[0] && ObtainPlanner.countAny(body, Set.of(bed)) > 0 && a.bot().current() == null;
+                });
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {
