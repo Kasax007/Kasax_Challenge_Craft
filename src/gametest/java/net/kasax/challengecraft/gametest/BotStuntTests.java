@@ -217,6 +217,8 @@ public class BotStuntTests {
         var sk = EntityTypes.SKELETON.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
         sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET, 32)));
         sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        // (A helmet: other tests set the clock to day, and it would burn.)
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
         h.getLevel().addFreshEntity(sk);
         a.spawn(20, FEET, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.DIRT, 8));
         a.bot().body().setHealth(5f);
@@ -390,6 +392,48 @@ public class BotStuntTests {
     @GameTest(environment = "challengecraft:melee", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
     public void creeperArmed(GameTestHelper h) {
         creeper(h, "creeper_armed", true);
+    }
+
+    /** A skeleton shooting at it: the arrows end in the shield (or the skeleton is dealt with), the bot whole. */
+    // (A batch of its own: the arrows would find the bots of the tests next door.)
+    @GameTest(environment = "challengecraft:archery", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
+    public void skeletonShield(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "skeleton_shield");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(32, FEET, 20)));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD));
+        // (The arena is small: what is checked is the arrow in the shield, the bot whole.)
+        var blocked = net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.DAMAGE_BLOCKED_BY_SHIELD);
+        int before = a.bot().body().getStats().getValue(blocked);
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(880), 880, () -> {
+            var body = a.bot().body();
+            if (body.getHealth() < 12) h.fail("shot: " + body.getHealth());
+            return body.getStats().getValue(blocked) > before && body.getHealth() >= 14 || !sk.isAlive();
+        });
+    }
+
+    /** Gunpowder wanted: the creeper is killed (not let go off), the bot little hurt. */
+    // (A batch of its own, well apart: an explosion would hurt the tests next door.)
+    @GameTest(environment = "challengecraft:demolition", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 90)
+    public void creeperKill(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "creeper_kill");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var c = EntityTypes.CREEPER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        c.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(30, FEET, 20)));
+        c.setPersistenceRequired();
+        level.addFreshEntity(c);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.CREEPER), java.util.Set.of(), 0, 1), 1200, () -> {
+            if (a.bot().body().getHealth() < 12) h.fail("hurt by the creeper: " + a.bot().body().getHealth());
+            if (!c.isAlive() && c.getHealth() > 0) h.fail("it went off");
+            return !c.isAlive();
+        });
     }
 
     /** The same with nothing to fight with: kept away from (alive at the end). */

@@ -526,8 +526,9 @@ public final class LockoutBrain implements BotBrain {
         record Step(net.minecraft.world.item.Item item, int iron, Set<net.minecraft.world.item.Item> better) {}
         var steps = List.of(
                 new Step(net.minecraft.world.item.Items.IRON_PICKAXE, 3, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE)),
-                new Step(net.minecraft.world.item.Items.IRON_SWORD, 2, Set.of(net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD)),
+                // (The shield before the sword: one ingot, and the skeletons' arrows end in it.)
                 new Step(net.minecraft.world.item.Items.SHIELD, 1, Set.of(net.minecraft.world.item.Items.SHIELD)),
+                new Step(net.minecraft.world.item.Items.IRON_SWORD, 2, Set.of(net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD)),
                 new Step(net.minecraft.world.item.Items.IRON_HELMET, 5, Set.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.DIAMOND_HELMET)),
                 new Step(net.minecraft.world.item.Items.IRON_BOOTS, 4, Set.of(net.minecraft.world.item.Items.IRON_BOOTS, net.minecraft.world.item.Items.DIAMOND_BOOTS)),
                 new Step(net.minecraft.world.item.Items.IRON_CHESTPLATE, 8, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)),

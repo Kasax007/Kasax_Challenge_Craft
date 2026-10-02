@@ -360,6 +360,33 @@ public final class Bot {
             return;
         }
         if (fighting) return;
+        // A shield in the pack goes into the off hand (nothing else lives there).
+        if (body.getOffhandItem().isEmpty()) {
+            int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.SHIELD);
+            if (slot >= 0) {
+                var inv = body.getInventory();
+                body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, inv.getItem(slot).copy());
+                inv.setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
+            }
+        }
+        // A bow drawn on it (skeleton, pillager): the shield up towards it until the arrow is in
+        // it; then, armed and well and the shooter not far, after it (it shoots again otherwise).
+        if (body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) && !(top instanceof net.kasax.challengecraft.bot.task.ShieldUpTask)) {
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(20),
+                    m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob
+                            && m.isUsingItem() && body.hasLineOfSight(m))) {
+                actions.reset();
+                boolean armed = false;
+                for (var st : body.getInventory().getNonEquipmentItems()) {
+                    if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+                }
+                if (armed && body.getHealth() >= 12 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
+                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(m.getType()), java.util.Set.of(), 0, 1).nearby(16));
+                }
+                interject(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
+                return;
+            }
+        }
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {

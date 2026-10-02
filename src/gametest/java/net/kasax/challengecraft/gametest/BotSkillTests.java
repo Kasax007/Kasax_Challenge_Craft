@@ -91,7 +91,8 @@ public class BotSkillTests {
     }
 
     /** Night, a bed in the pack: put down, slept in until morning, taken back. */
-    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    // (A batch of its own: it sets the clock to night, which the villagers next door would mind.)
+    @GameTest(environment = "challengecraft:night", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
     public void sleepNight(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "sleep_night");
         var level = h.getLevel();
@@ -105,10 +106,7 @@ public class BotSkillTests {
                         net.kasax.challengecraft.bot.task.SleepTask::new,
                         () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of(bed), 1).knownOnly())),
                 1200, () -> {
-                    // (Other tests set the clock too: night kept until it lies down.)
                     if (body.isSleeping()) slept[0] = true;
-                    if (!slept[0] && !level.isDarkOutside()) level.getServer().getCommands().performPrefixedCommand(
-                            level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set 14000");
                     return slept[0] && ObtainPlanner.countAny(body, Set.of(bed)) > 0 && a.bot().current() == null;
                 });
     }

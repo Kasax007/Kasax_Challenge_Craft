@@ -186,10 +186,12 @@ public final class MineTask implements BotTask {
         }
         bot.navigator().stop();
         walking = false;
+        net.minecraft.world.level.block.Block was = level.getBlockState(target).getBlock();
         if (bot.actions().breakTick(target)) {
             if (blocks.test(level.getBlockState(target))) {
                 skip.add(target); // refused (protected)
-            } else {
+            } else if (!BotWorld.COMMON.contains(was) && was != net.minecraft.world.level.block.Blocks.SAND && was != net.minecraft.world.level.block.Blocks.RED_SAND) {
+                // (Not rock and soil: those are everywhere, and following them digs a pit.)
                 for (BlockPos n : BlockPos.betweenClosed(target.offset(-1, -1, -1), target.offset(1, 1, 1))) {
                     if (blocks.test(level.getBlockState(n)) && !skip.contains(n)) vein.addFirst(n.immutable());
                 }
