@@ -215,7 +215,9 @@ public final class KillTask implements BotTask {
                 // Anything else: kept at the edge of reach - in reach of the sword, out of reach
                 // of its arms - and circled round meanwhile (side to side, a new side now and
                 // then or at a wall), as players fight: what comes at it walks into the blow.
-                double want = pack >= 2 ? 2.75 : 2.55;
+                // (A magma cube or a slime: at the very edge of reach, it leaps the gap.)
+                boolean cubeMob = target instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob;
+                double want = cubeMob ? 2.85 : pack >= 2 ? 2.75 : 2.55;
                 body.forward = (float) Mth.clamp((hit - want) * 2.5, -1, 1);
                 if (++strafeTicks > strafeFor || body.horizontalCollision) {
                     strafeSide = -strafeSide;
@@ -227,7 +229,7 @@ public final class KillTask implements BotTask {
                 if (awayFromEdge(body)) return Result.RUNNING;
                 // Alone with it: a jump as the arm comes back (at about half), so that the blow
                 // lands on the way down - a critical hit, half again as hard.
-                if (pack <= 1 && crit == 0 && strength >= 0.55f && body.onGround() && !body.isInWater() && hit < HIT - 0.2) {
+                if (!cubeMob && pack <= 1 && crit == 0 && strength >= 0.55f && body.onGround() && !body.isInWater() && hit < HIT - 0.2) {
                     body.jump = true;
                     crit = 1;
                     return Result.RUNNING;
@@ -246,7 +248,8 @@ public final class KillTask implements BotTask {
                 body.releaseUsingItem();
                 return Result.RUNNING;
             }
-            if (!creeper && pack <= 1 && crit == 0 && body.onGround() && !body.isInWater() && hit < HIT - 0.4 && opened) {
+            if (!creeper && !(target instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob)
+                    && pack <= 1 && crit == 0 && body.onGround() && !body.isInWater() && hit < HIT - 0.4 && opened) {
                 body.jump = true;
                 crit = 1;
                 return Result.RUNNING;

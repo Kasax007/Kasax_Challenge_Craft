@@ -506,7 +506,10 @@ public final class Bot {
                 return;
             }
         }
-        if (fighting || pillaring) return;
+        // (Backing off from something: not straight back into a fight with it - the retreat
+        // ends first; then, if it still comes, a fight.)
+        boolean retreating = retreat != null && tasks.contains(retreat);
+        if (fighting || pillaring || retreating) return;
         // A shield in the pack goes into the off hand (nothing else lives there).
         if (body.getOffhandItem().isEmpty()) {
             int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.SHIELD);

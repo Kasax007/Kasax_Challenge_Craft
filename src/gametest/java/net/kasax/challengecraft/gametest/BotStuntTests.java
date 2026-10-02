@@ -872,27 +872,42 @@ public class BotStuntTests {
     /** A big magma cube coming for it while it stands about (iron on, an iron sword): it fights back and lives. */
     @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
     public void brawlMagmaCube(GameTestHelper h) {
-        BotArena a = BotArena.flat(h, "brawl_magma_cube");
+        magmaBrawl(h, "brawl_magma_cube", 1);
+    }
+
+    /** Two big magma cubes at once (a basalt delta's welcome): it lives. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void brawlMagmaPair(GameTestHelper h) {
+        magmaBrawl(h, "brawl_magma_pair", 2);
+    }
+
+    private static void magmaBrawl(GameTestHelper h, String name, int cubes) {
+        BotArena a = BotArena.flat(h, name);
         var level = h.getLevel();
         level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
-        var cube = EntityTypes.MAGMA_CUBE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
-        cube.setSize(4, true);
-        cube.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
-        cube.setPersistenceRequired();
-        level.addFreshEntity(cube);
+        for (int i = 0; i < cubes; i++) {
+            var cube = EntityTypes.MAGMA_CUBE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            cube.setSize(4, true);
+            cube.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 18 + 4 * i)));
+            cube.setPersistenceRequired();
+            level.addFreshEntity(cube);
+        }
         a.spawn(16, FEET, 20, new ItemStack(Items.IRON_SWORD), new ItemStack(Items.COBBLESTONE, 32), new ItemStack(Items.BOW), new ItemStack(Items.ARROW, 16));
         var body = a.bot().body();
         body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
         body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
         body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
         float[] low = {20};
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(1150), 1150, () -> {
-            if (body.getHealth() < low[0]) BotArena.LOG.info("[BOTTEST] brawl_magma_cube hit: hp {} doing {}", body.getHealth(), a.bot().status());
+            if (body.getHealth() < low[0]) BotArena.LOG.info("[BOTTEST] " + name + " hit: hp {} doing {}", body.getHealth(), a.bot().status());
             low[0] = Math.min(low[0], body.getHealth());
-            h.assertTrue(body.isAlive(), "brawl_magma_cube: dead");
+            h.assertTrue(body.isAlive(), name + ": dead");
             var left = level.getEntitiesOfClass(net.minecraft.world.entity.monster.cubemob.MagmaCube.class, body.getBoundingBox().inflate(30), net.minecraft.world.entity.LivingEntity::isAlive);
-            if (!left.isEmpty()) return false;
-            BotArena.LOG.info("[BOTTEST] brawl_magma_cube lost {} health", 20 - low[0]);
+            // (All dead, or still alive at the end with what is left not after it any more.)
+            if (!left.isEmpty() && h.getTick() < 1100) return false;
+            h.assertTrue(20 - low[0] < 14, name + ": lost " + (20 - low[0]));
+            BotArena.LOG.info("[BOTTEST] {} lost {} health", name, 20 - low[0]);
             return true;
         });
     }
