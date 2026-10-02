@@ -92,6 +92,14 @@ public final class LockoutBrain implements BotBrain {
         this.difficulty = difficulty;
     }
 
+    /** Only these tiles count (a field test of one goal at a time); null: the whole board. */
+    private Set<String> only;
+
+    public LockoutBrain only(Set<String> goalIds) {
+        this.only = goalIds;
+        return this;
+    }
+
     @Override
     public void think(Bot bot) {
         MinecraftServer server = bot.server();
@@ -755,7 +763,9 @@ public final class LockoutBrain implements BotBrain {
         double cost = planner.estimate(bot, FOODS, have + 4);
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
-        if (level >= 12 && cost > 25 || cost > 90) return false;
+        // Starving (six shanks and less: no sprinting, and on hard the hunger eats the hearts
+        // away - a fall then kills): food first, whatever it costs.
+        if (level >= 12 && cost > 25 || cost > (level <= 6 ? 900 : 90)) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
         var lv = bot.body().level();
@@ -787,6 +797,7 @@ public final class LockoutBrain implements BotBrain {
         List<Choice> out = new ArrayList<>();
         for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
             if (tile.claimedBy() != null || tile.index() == except) continue;
+            if (only != null && !only.contains(tile.goal().id())) continue;
             if (last ? tries.getOrDefault(tile.goal().id(), 0) > MAX_TRIES : resting(tile.goal().id(), now)) continue;
             if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
             LockoutGoals.Option o;

@@ -225,6 +225,18 @@ final class BotCommands {
                                         .then(Commands.argument("difficulty", StringArgumentType.word())
                                                 .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.valueOf(
                                                         StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))))))
+                        .then(Commands.literal("fieldtest").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
+                                .then(Commands.argument("goals", StringArgumentType.string())
+                                        .then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))
+                                                .executes(ctx -> {
+                                                    // Board goals one at a time from the same start ([FIELDTEST] in the log).
+                                                    Bot bot = bot(ctx);
+                                                    if (bot == null) return 0;
+                                                    int n = BotFieldTest.start(bot, StringArgumentType.getString(ctx, "goals"),
+                                                            com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "seconds"));
+                                                    ok(ctx, bot.name + " field test: " + n + " goals");
+                                                    return n;
+                                                })))))
                         .then(Commands.literal("estimate").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .then(Commands.argument("item", StringArgumentType.word())
                                         .executes(ctx -> {
