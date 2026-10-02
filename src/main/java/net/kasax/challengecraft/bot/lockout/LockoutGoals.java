@@ -244,6 +244,18 @@ public final class LockoutGoals {
 
     private static Option nether(Bot bot, ObtainPlanner planner) {
         if (!overworld(bot)) return null;
+        // A portal standing lit already (the one it came back through, one in sight): the walk
+        // there, not a new one cast.
+        BlockPos lit = bot.senses().knownPortal(bot.body().blockPosition());
+        if (lit != null && !((ServerLevel) bot.body().level()).getBlockState(lit).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)
+                && ((ServerLevel) bot.body().level()).hasChunkAt(lit)) lit = null;
+        if (lit == null) lit = bot.memory().nearest((ServerLevel) bot.body().level(), bot.body().blockPosition(),
+                st -> st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL), Set.of());
+        if (lit != null) {
+            double walk = 8 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), lit)
+                    + Math.abs(lit.getY() - bot.body().getBlockY());
+            if (walk < 400) return new Option(walk, net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
+        }
         // The speedrunners' way is the way in: cast a portal at a lava pool. Mining obsidian only
         // when a diamond pickaxe is already in hand (or there is no lava known at all).
         Option cast = castPortal(bot, planner);

@@ -83,7 +83,7 @@ public final class NavBenchTask implements BotTask {
             swung = true;
             swings++;
         }
-        if (ticks % 200 == 0) BotManager.LOG.info("[NAVBENCH]   at {}: {}", bot.body().blockPosition().toShortString(), bot.navigator().debug());
+        if (ticks % 200 == 0) BotManager.LOG.info("[NAVBENCH]   at {}: {} [{}]", bot.body().blockPosition().toShortString(), bot.navigator().debug(), bot.status());
         FarWalk.Status s = walk.tick(bot, target, 3);
         boolean timeout = ticks > limit;
         if (s == FarWalk.Status.MOVING && !timeout) return Result.RUNNING;

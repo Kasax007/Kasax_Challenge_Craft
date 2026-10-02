@@ -259,6 +259,8 @@ public final class BotMemory {
                     BlockState st = chunk.getBlockState(p);
                     // Room to stand: air here and above, something under it.
                     if (!st.isAir() || !chunk.getBlockState(p.above()).isAir() || caveKept.contains(p)) continue;
+                    // (A floor to walk on, a block or two down: not the open dark of a chasm.)
+                    if (chunk.getBlockState(p.below()).isAir() && chunk.getBlockState(p.below(2)).isAir()) continue;
                     if (nether) continue; // (the Nether is one big cave: no use)
                     // A cave it can know of: its mouth (lit by the sky), or the one it is in.
                     if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, p) == 0
@@ -278,16 +280,28 @@ public final class BotMemory {
      * is common), none of {@code visited} within 10 blocks. Null when it knows of no such cave.
      */
     public BlockPos cave(ServerLevel level, BlockPos from, int wantY, double maxDistance, List<BlockPos> visited) {
+        return cave(level, from, wantY, 0, maxDistance, visited);
+    }
+
+    /**
+     * As {@link #cave(ServerLevel, BlockPos, int, double, List)}, with a band: any spot within
+     * {@code band} of the height it wants will do as well (the ore is found all through it: once
+     * there, the cave is walked on inside the band).
+     */
+    public BlockPos cave(ServerLevel level, BlockPos from, int wantY, int band, double maxDistance, List<BlockPos> visited) {
         List<BlockPos> list = caves.get(level.dimension());
         if (list == null) return null;
         BlockPos best = null;
         double bestScore = Double.MAX_VALUE;
         for (BlockPos p : list) {
-            // Only ones that get it a good way nearer the height it wants.
-            if (Math.abs(p.getY() - wantY) + 8 >= Math.abs(from.getY() - wantY)) continue;
+            // Only ones in the band, or a good way nearer it.
+            int off = Math.max(0, Math.abs(p.getY() - wantY) - band);
+            if (off > 0 && Math.abs(p.getY() - wantY) + 8 >= Math.abs(from.getY() - wantY)) continue;
+            // (Not down by the lava lakes at the bottom of the world.)
+            if (p.getY() < -55) continue;
             double d = Math.sqrt(p.distSqr(from));
             if (d > maxDistance) continue;
-            double score = d + 0.7 * Math.abs(p.getY() - wantY);
+            double score = d + 0.7 * off;
             if (score >= bestScore) continue;
             boolean seen = false;
             for (BlockPos v : visited) if (v.distSqr(p) < 100) { seen = true; break; }

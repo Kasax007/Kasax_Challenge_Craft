@@ -424,6 +424,18 @@ public final class BotPathfinder {
         if (abilities.mayBreak() && breakable(below) && canStand(below) && !liquidAround(below)) {
             out.add(new Step(below, List.of(below), null));
         }
+        // ... or through the floor into a hollow under it (a cave below): the block dug, and a
+        // short fall to the cave floor.
+        else if (abilities.mayBreak() && floor && breakable(below) && !liquidAround(below) && clear(below.below())) {
+            for (int fall = 1; fall <= MAX_FALL; fall++) {
+                BlockPos land = below.below(fall);
+                if (!clear(land) || inWater(land)) break;
+                if (canStand(land)) {
+                    out.add(new Step(land, List.of(below), null));
+                    break;
+                }
+            }
+        }
         // Swim up and down.
         // (Up into the air over the water is no place to be: afloat, the feet stay in the water.)
         if (swimming && (inWater(p.above()) || canStand(p.above())) && clear(p.above())) out.add(new Step(p.above(), List.of(), null));

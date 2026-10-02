@@ -112,6 +112,38 @@ public class BotSkillTests {
     }
 
     /**
+     * Night with another player about: Bob does not lie down while the other is up (the night
+     * would not pass), and would once the other is in bed.
+     */
+    // (A batch of its own: every bot in the world counts as a player who has to sleep.)
+    @GameTest(environment = "challengecraft:slumber", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void sleepWaitsForOthers(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "sleep_waits_for_others");
+        var level = h.getLevel();
+        var server = level.getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "time set 14000");
+        // (Every one of them asleep is needed: the usual "one in bed" rule would let it through.)
+        level.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.PLAYERS_SLEEPING_PERCENTAGE, 100, server);
+        var bed = Blocks.BED.red().asItem();
+        a.spawn(20, FEET, 20, new ItemStack(bed));
+        var other = net.kasax.challengecraft.bot.BotManager.spawn(server, "Other" + System.nanoTime() % 1000, level,
+                net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(10, FEET, 10)));
+        other.body().setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        other.body().getInventory().clearContent();
+        other.body().getInventory().add(new ItemStack(bed));
+        boolean awake = net.kasax.challengecraft.bot.lockout.LockoutBrain.nightWouldPass(a.bot());
+        if (awake) h.fail("would sleep with the other one up");
+        other.doNow(new net.kasax.challengecraft.bot.task.SequenceTask("to bed", java.util.List.of(
+                () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(bed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0),
+                net.kasax.challengecraft.bot.task.SleepTask::new)));
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(800), 900, () -> {
+            boolean ok = other.body().isSleeping() && net.kasax.challengecraft.bot.lockout.LockoutBrain.nightWouldPass(a.bot());
+            if (ok) net.kasax.challengecraft.bot.BotManager.remove(server, other);
+            return ok;
+        });
+    }
+
+    /**
      * Cobblestone on flat grass, no rock showing: a staircase down (not a shaft), and back up it
      * on foot - none of the cobblestone spent on climbing out.
      */

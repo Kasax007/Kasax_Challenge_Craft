@@ -756,7 +756,18 @@ public final class ObtainPlanner {
         // Not seen, dug for: the work is right below, at the depth where it is common.
         if (at == null && here != null && search > 0) {
             Integer depth = BotKnowledge.depth(block, here.getY());
-            if (depth != null && depth < here.getY() - 4) at = new BlockPos(here.getX(), depth, here.getZ());
+            if (depth != null && depth < here.getY() - 4) {
+                at = new BlockPos(here.getX(), depth, here.getZ());
+                // A cave known to reach down to that height: the way down is walked, and its
+                // walls show ore all along - much less looking about than a tunnel.
+                BlockPos cave = bot.memory().cave((net.minecraft.server.level.ServerLevel) bot.body().level(), here, depth, 12, 128, List.of());
+                if (cave != null && Math.abs(cave.getY() - depth) <= 12) {
+                    double cut = 0.4 * search;
+                    search -= cut;
+                    find -= cut;
+                    at = cave;
+                }
+            }
         }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         Leaf tool = toolLeaf(bot, k, block, cost);
@@ -1049,16 +1060,6 @@ public final class ObtainPlanner {
     public int demandFor(Item item) {
         Item raw = INGOT_RAW.get(item);
         return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0));
-    }
-
-    /**
-     * Ingots in the pack the board still needs: its demand less the raw ore carried (smelted
-     * later, that makes its own ingots).
-     */
-    public int ingotsSpokenFor(net.minecraft.world.entity.player.Player body, Item ingot) {
-        Item raw = INGOT_RAW.get(ingot);
-        int rawHeld = raw == null ? 0 : countAny(body, Set.of(raw));
-        return Math.max(0, demandFor(ingot) - rawHeld);
     }
 
     /** A far lead only if one was found before (no new biome search for blocks that are in sight). */

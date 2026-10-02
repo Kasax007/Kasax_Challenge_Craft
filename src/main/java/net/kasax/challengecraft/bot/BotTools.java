@@ -97,7 +97,9 @@ public final class BotTools {
         if (!harvests) score += 10_000;
         if (!s.isEmpty() && s.isDamageableItem()) {
             // A faster tool is worth it only when it saves real time: value tools by durability.
-            score += s.getMaxDamage() / 25.0;
+            // (Rock and soil, of which there is any amount: the cheapest tool that will do - the
+            // iron pickaxe is not worn down on deepslate while a stone one is about.)
+            score += s.getMaxDamage() / (BotWorld.COMMON.contains(state.getBlock()) ? 10.0 : 25.0);
             // Of two alike the more worn one first: used up one after the other (and gone), not
             // all worn down together to a pack of nearly broken ones.
             score += (s.getMaxDamage() - s.getDamageValue()) / (double) Math.max(1, s.getMaxDamage()) * 0.5;

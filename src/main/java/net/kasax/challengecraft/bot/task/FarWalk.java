@@ -20,7 +20,8 @@ public final class FarWalk {
     private boolean walking, legDirect;
     private int fails, side;
     private SurfaceTask climb;
-    private long climbAgainAt;
+    private long climbAgainAt, climbedAt;
+    private BlockPos climbedFrom;
     /** The nearest it has come (flat distance) and when: no headway for long is a stuck walk. */
     private double bestFlat;
     private long progressAt;
@@ -70,7 +71,14 @@ public final class FarWalk {
         // not a mine: the path search takes the way out of it.)
         // (Once up, not again for a while: a climb that ends at once is not to be repeated each tick.)
         long now = level.getGameTime();
-        if (!near && climb == null && now >= climbAgainAt && SurfaceTask.covered(bot.body())) climb = new SurfaceTask();
+        // (Not again where it climbed out a little while ago: an overhang the way leads under is
+        // not a mine, and climbing out of it again and again is a walk back and forth.)
+        boolean climbedHere = climbedFrom != null && climbedFrom.distSqr(feet) < 24 * 24 && now - climbedAt < 2400;
+        if (!near && climb == null && now >= climbAgainAt && !climbedHere && SurfaceTask.covered(bot.body())) {
+            climb = new SurfaceTask();
+            climbedFrom = feet;
+            climbedAt = now;
+        }
         if (climb != null) {
             var r = climb.tick(bot);
             if (r == net.kasax.challengecraft.bot.BotTask.Result.RUNNING) return Status.MOVING;

@@ -140,10 +140,15 @@ public final class LockoutBrain implements BotBrain {
                 && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
             boolean ironWanted = strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
+            // Only for what is wanted: iron (the kit, the board), food running low; a ruined
+            // portal for its obsidian and gold when the board or the way to the Nether wants them.
+            boolean foodLow = bot.body().getFoodData().getFoodLevel() < 12 && net.kasax.challengecraft.bot.task.EatTask.bestFood(bot.body()) < 0;
+            boolean portalWanted = planner.demandFor(net.minecraft.world.item.Items.OBSIDIAN) > 0 || planner.demandFor(net.minecraft.world.item.Items.GOLD_INGOT) > 0
+                    || planner.demandFor(net.minecraft.world.item.Items.FLINT_AND_STEEL) > 0 || netherTilesOpen(bot);
             for (String kind : List.of("shipwreck", "ruined_portal", "village")) {
                 int radius = switch (kind) {
-                    case "shipwreck" -> ironWanted ? 160 : 120;
-                    case "ruined_portal" -> 64;
+                    case "shipwreck" -> ironWanted ? 160 : foodLow ? 80 : 0;
+                    case "ruined_portal" -> portalWanted ? 64 : 0;
                     default -> ironWanted ? 160 : 0;
                 };
                 if (radius == 0) continue;
@@ -319,6 +324,7 @@ public final class LockoutBrain implements BotBrain {
     private static final Set<net.minecraft.world.item.Item> GOOD_PICKAXES = Set.of(net.minecraft.world.item.Items.STONE_PICKAXE,
             net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE);
     private long kitCheckAt;
+    private int ironSeen;
 
     private long huntRetryAt, strandedRetryAt;
 
@@ -380,18 +386,81 @@ public final class LockoutBrain implements BotBrain {
         net.minecraft.world.item.Item bed = null;
         for (var st : bot.body().getInventory().getNonEquipmentItems()) if (st.is(net.minecraft.tags.ItemTags.BEDS)) bed = st.getItem();
         if (bed == null) return false;
+        // Only when the night is no use: no open tile wants what comes out in the dark.
+        String wanted = nightTile(bot);
+        if (wanted != null) {
+            sleepRetryAt = now + 1200;
+            return false;
+        }
+        // And with others about, only if lying down really ends the night: enough of them in
+        // bed already (the game's "players sleeping percentage", with it counted).
+        if (!nightWouldPass(bot)) {
+            sleepRetryAt = now + 200;
+            return false;
+        }
         // (Once a night: if the others stay up, it does not pass.)
         long clock = level.getOverworldClockTime() % 24000;
         sleepRetryAt = now + Math.max(600, 24000 - clock);
         net.minecraft.world.item.Item placed = bed;
         Set<net.minecraft.world.item.Item> beds = Set.of(placed);
-        bot.say("night and nothing to hunt: sleeping");
+        bot.say("night, and nothing on the board wants it: sleeping");
         start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("sleep the night away", List.of(
                 () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(placed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0),
                 net.kasax.challengecraft.bot.task.SleepTask::new,
                 () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), beds,
                         ObtainPlanner.countAny(bot.body(), beds) + 1).knownOnly())), 1200);
         return true;
+    }
+
+    /** An open tile that is only to be had in the Nether. */
+    private static boolean netherTilesOpen(Bot bot) {
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() == null && t.goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) return true;
+        }
+        return false;
+    }
+
+    private static final Set<String> NIGHT_MOBS = Set.of("zombie", "skeleton", "spider", "creeper", "enderman", "witch", "phantom",
+            "drowned", "stray", "husk", "zombie_villager", "slime", "bogged");
+    private static final Set<String> NIGHT_DROPS = Set.of("gunpowder", "bone", "bone_meal", "bone_block", "string", "ender_pearl", "ender_eye",
+            "spider_eye", "fermented_spider_eye", "rotten_flesh", "arrow", "slime_ball", "slime_block", "phantom_membrane", "glowstone_dust",
+            "tipped_arrow");
+
+    /** An open tile that the night serves (its monsters, what they drop, the phantoms): its id, or null. */
+    private String nightTile(Bot bot) {
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() != null) continue;
+            var g = t.goal();
+            String id = g.id();
+            String target;
+            try {
+                target = net.minecraft.resources.Identifier.parse(g.primaryTarget()).getPath();
+            } catch (RuntimeException e) {
+                target = "";
+            }
+            if (g.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL && NIGHT_MOBS.contains(target)) return id;
+            if (NIGHT_DROPS.contains(target)) return id;
+            if (id.contains("phantom") || id.contains("skeleton") || id.contains("shield") || id.contains("arrow") || id.contains("slime")
+                    || id.contains("sniper")) return id;
+        }
+        return null;
+    }
+
+    /**
+     * Whether its lying down would end the night: alone, yes; with others in the Overworld, only
+     * if enough of them (by the game rule) are in bed already, it counted in.
+     */
+    public static boolean nightWouldPass(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        int players = 0, asleep = 0;
+        for (var p : level.players()) {
+            if (p.isSpectator()) continue;
+            players++;
+            if (p.isSleeping() && p != bot.body()) asleep++;
+        }
+        int pct = level.getGameRules().get(net.minecraft.world.level.gamerules.GameRules.PLAYERS_SLEEPING_PERCENTAGE);
+        int needed = Math.max(1, (int) Math.ceil(players * pct / 100.0));
+        return asleep + 1 >= needed;
     }
 
     /** Every pickaxe it has nearly used up (under a tenth left). */
@@ -470,6 +539,13 @@ public final class LockoutBrain implements BotBrain {
 
     private boolean keepKit(Bot bot) {
         long now = bot.body().level().getGameTime();
+        // Iron come by (a vein on the way, a chest): looked at now, not in half a minute.
+        int ironNow = ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+        if (ironNow > ironSeen) {
+            kitCheckAt = 0;
+            upgradeRetryAt = 0;
+        }
+        ironSeen = ironNow;
         if (now < kitCheckAt) return false;
         kitCheckAt = now + 600; // (a try now and then, not again at once if it fails)
         var body = bot.body();
@@ -538,8 +614,10 @@ public final class LockoutBrain implements BotBrain {
         var body = bot.body();
         long now = body.level().getGameTime();
         if (now < upgradeRetryAt) return false;
-        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT));
-        int spare = iron - planner.ingotsSpokenFor(body, net.minecraft.world.item.Items.IRON_INGOT);
+        // Iron beyond what the board will want (ingots and raw ore alike: the ore is smelted on
+        // the way to whatever it becomes).
+        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+        int spare = iron - planner.demandFor(net.minecraft.world.item.Items.IRON_INGOT);
         if (spare < 1) return false;
         record Step(net.minecraft.world.item.Item item, int iron, Set<net.minecraft.world.item.Item> better) {}
         var steps = List.of(
@@ -547,10 +625,12 @@ public final class LockoutBrain implements BotBrain {
                 // (The shield before the sword: one ingot, and the skeletons' arrows end in it.)
                 new Step(net.minecraft.world.item.Items.SHIELD, 1, Set.of(net.minecraft.world.item.Items.SHIELD)),
                 new Step(net.minecraft.world.item.Items.IRON_SWORD, 2, Set.of(net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD)),
-                new Step(net.minecraft.world.item.Items.IRON_HELMET, 5, Set.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.DIAMOND_HELMET)),
-                new Step(net.minecraft.world.item.Items.IRON_BOOTS, 4, Set.of(net.minecraft.world.item.Items.IRON_BOOTS, net.minecraft.world.item.Items.DIAMOND_BOOTS)),
-                new Step(net.minecraft.world.item.Items.IRON_CHESTPLATE, 8, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)),
-                new Step(net.minecraft.world.item.Items.IRON_LEGGINGS, 7, Set.of(net.minecraft.world.item.Items.IRON_LEGGINGS, net.minecraft.world.item.Items.DIAMOND_LEGGINGS)));
+                // Armour by protection per ingot as it comes: the chest (six points), the legs
+                // (five), the boots, the helmet.
+                new Step(net.minecraft.world.item.Items.IRON_CHESTPLATE, 8, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE, net.minecraft.world.item.Items.NETHERITE_CHESTPLATE)),
+                new Step(net.minecraft.world.item.Items.IRON_LEGGINGS, 7, Set.of(net.minecraft.world.item.Items.IRON_LEGGINGS, net.minecraft.world.item.Items.DIAMOND_LEGGINGS, net.minecraft.world.item.Items.NETHERITE_LEGGINGS)),
+                new Step(net.minecraft.world.item.Items.IRON_BOOTS, 4, Set.of(net.minecraft.world.item.Items.IRON_BOOTS, net.minecraft.world.item.Items.DIAMOND_BOOTS, net.minecraft.world.item.Items.NETHERITE_BOOTS)),
+                new Step(net.minecraft.world.item.Items.IRON_HELMET, 5, Set.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.DIAMOND_HELMET, net.minecraft.world.item.Items.NETHERITE_HELMET)));
         for (Step st : steps) {
             boolean has = ObtainPlanner.countAny(body, st.better()) > 0;
             for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
@@ -558,7 +638,12 @@ public final class LockoutBrain implements BotBrain {
                 if (st.better().contains(body.getItemBySlot(slot).getItem())) has = true;
             }
             if (has) continue;
-            if (spare < st.iron()) return false; // (in this order: not armour before the pickaxe)
+            // (Not enough for this one: the next that is affordable - boots now, the chest
+            // later - except that nothing comes before the pickaxe.)
+            if (spare < st.iron()) {
+                if (st.item() == net.minecraft.world.item.Items.IRON_PICKAXE) return false;
+                continue;
+            }
             upgradeRetryAt = now + 2400;
             bot.say("iron to spare (" + spare + "): " + ObtainPlanner.name(st.item()));
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(st.item()), 1, planner), 1200);
@@ -1088,8 +1173,10 @@ public final class LockoutBrain implements BotBrain {
             }
             bot.welcomeExplosion = open;
         }
-        if (++checkTicks % 20 != 0 || targetIndex < 0) return;
-        if (checkTicks % 40 == 0 && sideTask == null) takeChances(bot);
+        if (++checkTicks % 20 != 0) return;
+        // Chances on the way (a chest, flowers the board wants) on errands too, not only on goals.
+        if (checkTicks % 40 == 0 && sideTask == null && (targetIndex >= 0 || running != null && bot.current() != null)) takeChances(bot);
+        if (targetIndex < 0) return;
         MinecraftServer server = bot.server();
         if (!Chal_40_LockoutBingo.isRunning(server)) {
             drop(bot);

@@ -255,6 +255,7 @@ public final class MineTask implements BotTask {
             }
             target = null;
             collectTicks = 60;
+            lastFind = searchTicks;
             idle = 0;
         } else if (++idle > 400) {
             skip.add(target);
@@ -492,11 +493,23 @@ public final class MineTask implements BotTask {
      * so a cave is only still worth it as the quick way down: walking down a cave beats digging a
      * staircase. Two spots, nearer the wanted height each, then the tunnel from there.
      */
-    private static final int MAX_CAVE_SPOTS = 2;
+    /** Spots of a cave walked inside the ore's band before the yield says: enough of this one. */
+    private static final int MAX_BAND_SPOTS = 14;
+    /** Searching this long in the band without finding any: the caves here are done. */
+    private static final int DRY_TICKS = 1800;
     private final List<BlockPos> caveVisited = new java.util.ArrayList<>();
     private BlockPos caveSpot;
     private boolean cavesDone;
-    private int caveTicks;
+    private int caveTicks, bandSpots, lastFind;
+
+    /** How far above and below the wanted height the ore is common (iron, coal and the like widely; diamonds narrowly). */
+    private int band() {
+        for (Item i : items) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(i).getPath();
+            if (id.contains("diamond") || id.contains("redstone") || id.contains("gold")) return 10;
+        }
+        return 16;
+    }
 
     /**
      * Down a cave towards the wanted height (each spot reached also shows more of the world: the
@@ -507,15 +520,20 @@ public final class MineTask implements BotTask {
         ServerLevel level = (ServerLevel) bot.body().level();
         BotNavigator nav = bot.navigator();
         if (caveSpot == null) {
-            if (caveVisited.size() >= MAX_CAVE_SPOTS) return caveGiveUp(bot, "deep enough by cave");
-            caveSpot = bot.memory().cave(level, nav.feet(), depth, caveVisited.isEmpty() ? 96 : 48, caveVisited);
-            if (caveSpot == null) return caveGiveUp(bot, "no cave about");
-            // Only a cave that gets it nearer the height it wants (not one up a hill).
-            if (Math.abs(caveSpot.getY() - depth) + 6 >= Math.abs(nav.feet().getY() - depth)) {
+            int band = band();
+            boolean inBand = Math.abs(nav.feet().getY() - depth) <= band;
+            // In the band, the cave walked on spot by spot (each shows its walls: what is in
+            // them is mined as it comes into sight), until it stops paying.
+            if (inBand && (bandSpots >= MAX_BAND_SPOTS || searchTicks - lastFind > DRY_TICKS)) return caveGiveUp(bot, "the caves here are done");
+            caveSpot = bot.memory().cave(level, nav.feet(), depth, band, caveVisited.isEmpty() ? 128 : 64, caveVisited);
+            if (caveSpot == null) return caveGiveUp(bot, inBand ? "no more cave here" : "no cave about");
+            // Out of the band: only a cave that gets it nearer the height it wants (not one up a hill).
+            if (!inBand && Math.abs(caveSpot.getY() - depth) > band && Math.abs(caveSpot.getY() - depth) + 6 >= Math.abs(nav.feet().getY() - depth)) {
                 caveSpot = null;
                 return caveGiveUp(bot, "no cave lower down");
             }
-            bot.say("down through a cave for " + what + " (to " + caveSpot.toShortString() + ")");
+            if (inBand) bandSpots++;
+            bot.say((inBand ? "on through the cave for " : "down through a cave for ") + what + " (to " + caveSpot.toShortString() + ")");
             // Remember the way in: the spot it went underground from, to get out the same way.
             if (bot.caveEntry == null && !SurfaceTask.underground(bot.body())) bot.caveEntry = nav.feet();
             nav.goStandNear(caveSpot, 2);
@@ -570,6 +588,12 @@ public final class MineTask implements BotTask {
             if (down && !safeStep(level, digBlocks, digTo)) {
                 if (shortDrop(level, digBlocks, digTo)) {
                     // (The landing is wherever it comes down: the step is taken from there.)
+                    // Broken into a cave: that is walked first, as any cave found.
+                    if (depth != null && cavesDone) {
+                        cavesDone = false;
+                        bandSpots = 0;
+                        lastFind = searchTicks;
+                    }
                 } else {
                     List<BlockPos> along = List.of(ahead, ahead.above());
                     if (safeStep(level, along, ahead)) {
