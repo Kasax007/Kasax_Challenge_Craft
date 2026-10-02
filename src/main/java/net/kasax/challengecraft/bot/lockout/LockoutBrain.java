@@ -513,7 +513,7 @@ public final class LockoutBrain implements BotBrain {
             int logs = ObtainPlanner.countAny(body, LOGS);
             bot.say("spare wood (" + woodPlanks(body) + " planks' worth)");
             nextErrand = "wood";
-            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + 6, planner), 1800);
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + 8, planner), 1800);
             return true;
         }
         return false;
@@ -579,11 +579,13 @@ public final class LockoutBrain implements BotBrain {
         // chest or a boat): one stop at the trees instead of a walk back for every few logs.
         if (openingStep == 0 && !openingWood) {
             openingWood = true;
-            if (woodPlanks(bot.body()) < 20) {
+            // (The opening's tools take about twelve planks; the spare stock wants twelve after.)
+            if (woodPlanks(bot.body()) < 28) {
                 int logs = ObtainPlanner.countAny(bot.body(), LOGS);
-                bot.say("opening: wood for everything (" + (logs + (20 - woodPlanks(bot.body()) + 3) / 4) + " logs)");
+                int more = (28 - woodPlanks(bot.body()) + 3) / 4;
+                bot.say("opening: wood for everything (" + (logs + more) + " logs)");
                 nextErrand = "wood";
-                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + (20 - woodPlanks(bot.body()) + 3) / 4, planner), 1800);
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(LOGS, logs + more, planner), 1800);
                 return true;
             }
         }
@@ -946,7 +948,7 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null
-                && runningExtensions < 4 && runningFrom != null && horizontal(runningFrom, bot.body().blockPosition()) > 60) {
+                && runningExtensions < 2 && runningFrom != null && horizontal(runningFrom, bot.body().blockPosition()) > 60) {
             // Still on its way somewhere (the forest on the horizon): not stuck, more time.
             runningExtensions++;
             runningSince = now;
