@@ -246,7 +246,8 @@ public final class LockoutBrain implements BotBrain {
         // Down in the Nether with no way back known: obsidian for a frame of its own (a ruined
         // portal's, mined with a diamond pickaxe), rather than standing about.
         if (choices.isEmpty() && bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER
-                && LockoutGoals.wayBack(bot) == null && bot.body().level().getGameTime() >= strandedRetryAt) {
+                && LockoutGoals.wayBack(bot) == null && bot.senses().knownPortal(bot.body().blockPosition()) == null
+                && bot.body().level().getGameTime() >= strandedRetryAt) {
             strandedRetryAt = bot.body().level().getGameTime() + 6000;
             bot.say("no way back known: obsidian for a portal of my own");
             start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("a way back home", List.of(
@@ -564,8 +565,7 @@ public final class LockoutBrain implements BotBrain {
         int blocks = 0;
         for (var st : body.getInventory().getNonEquipmentItems()) if (net.kasax.challengecraft.bot.BotActions.THROWAWAY.contains(st.getItem())) blocks += st.getCount();
         if (blocks < 12 && now >= blocksRetryAt) {
-            var stone = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER
-                    ? Set.of(net.minecraft.world.item.Items.NETHERRACK) : Set.of(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.COBBLED_DEEPSLATE, net.minecraft.world.item.Items.DIRT);
+            var stone = net.kasax.challengecraft.bot.BotActions.buildingBlocks(bot.body().level());
             bot.say("few blocks left (" + blocks + "): a stack to build with");
             nextErrand = "blocks";
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
@@ -610,46 +610,73 @@ public final class LockoutBrain implements BotBrain {
 
     private long upgradeRetryAt, bundleRetryAt;
 
+    private record Gear(net.minecraft.world.item.Item item, int cost, Set<net.minecraft.world.item.Item> better) {
+    }
+
+    /** Better than iron, then the same in diamond: what counts as having a piece already. */
+    private static Set<net.minecraft.world.item.Item> orBetter(String piece, boolean diamond) {
+        Set<net.minecraft.world.item.Item> out = new java.util.HashSet<>();
+        for (String mat : diamond ? new String[]{"diamond", "netherite"} : new String[]{"iron", "diamond", "netherite"}) {
+            out.add(net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(mat + "_" + piece)));
+        }
+        return out;
+    }
+
+    /** The order gear is made in: the pickaxe, the sword, then armour by protection per ingot (chest, legs, boots, helmet). */
+    private static List<Gear> gear(boolean diamond) {
+        String mat = diamond ? "diamond" : "iron";
+        List<Gear> out = new ArrayList<>();
+        int[] costs = {3, 2, 8, 7, 4, 5};
+        String[] pieces = {"pickaxe", "sword", "chestplate", "leggings", "boots", "helmet"};
+        for (int i = 0; i < pieces.length; i++) {
+            out.add(new Gear(net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(mat + "_" + pieces[i])),
+                    costs[i], orBetter(pieces[i], diamond)));
+        }
+        return out;
+    }
+
+    private static boolean has(net.minecraft.world.entity.player.Player body, Set<net.minecraft.world.item.Item> any) {
+        if (ObtainPlanner.countAny(body, any) > 0) return true;
+        for (var slot : net.minecraft.world.entity.EquipmentSlot.values()) if (any.contains(body.getItemBySlot(slot).getItem())) return true;
+        return false;
+    }
+
+    /**
+     * Iron or diamonds come by beyond what the board will want: made into gear, as a player does
+     * - the shield first (one ingot, always worth it), then the pickaxe, the sword and the armour
+     * piece by piece, whatever is affordable; the same again in diamond.
+     */
     private boolean upgrade(Bot bot) {
         var body = bot.body();
         long now = body.level().getGameTime();
         if (now < upgradeRetryAt) return false;
-        // Iron beyond what the board will want (ingots and raw ore alike: the ore is smelted on
-        // the way to whatever it becomes).
+        // Ingots and raw ore alike: the ore is smelted on the way to whatever it becomes.
         int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
-        int spare = iron - planner.demandFor(net.minecraft.world.item.Items.IRON_INGOT);
-        if (spare < 1) return false;
-        record Step(net.minecraft.world.item.Item item, int iron, Set<net.minecraft.world.item.Item> better) {}
-        var steps = List.of(
-                new Step(net.minecraft.world.item.Items.IRON_PICKAXE, 3, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE, net.minecraft.world.item.Items.NETHERITE_PICKAXE)),
-                // (The shield before the sword: one ingot, and the skeletons' arrows end in it.)
-                new Step(net.minecraft.world.item.Items.SHIELD, 1, Set.of(net.minecraft.world.item.Items.SHIELD)),
-                new Step(net.minecraft.world.item.Items.IRON_SWORD, 2, Set.of(net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD)),
-                // Armour by protection per ingot as it comes: the chest (six points), the legs
-                // (five), the boots, the helmet.
-                new Step(net.minecraft.world.item.Items.IRON_CHESTPLATE, 8, Set.of(net.minecraft.world.item.Items.IRON_CHESTPLATE, net.minecraft.world.item.Items.DIAMOND_CHESTPLATE, net.minecraft.world.item.Items.NETHERITE_CHESTPLATE)),
-                new Step(net.minecraft.world.item.Items.IRON_LEGGINGS, 7, Set.of(net.minecraft.world.item.Items.IRON_LEGGINGS, net.minecraft.world.item.Items.DIAMOND_LEGGINGS, net.minecraft.world.item.Items.NETHERITE_LEGGINGS)),
-                new Step(net.minecraft.world.item.Items.IRON_BOOTS, 4, Set.of(net.minecraft.world.item.Items.IRON_BOOTS, net.minecraft.world.item.Items.DIAMOND_BOOTS, net.minecraft.world.item.Items.NETHERITE_BOOTS)),
-                new Step(net.minecraft.world.item.Items.IRON_HELMET, 5, Set.of(net.minecraft.world.item.Items.IRON_HELMET, net.minecraft.world.item.Items.DIAMOND_HELMET, net.minecraft.world.item.Items.NETHERITE_HELMET)));
-        for (Step st : steps) {
-            boolean has = ObtainPlanner.countAny(body, st.better()) > 0;
-            for (var slot : new net.minecraft.world.entity.EquipmentSlot[]{net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
-                    net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET, net.minecraft.world.entity.EquipmentSlot.OFFHAND}) {
-                if (st.better().contains(body.getItemBySlot(slot).getItem())) has = true;
+        // The shield whenever there is an ingot about: the arrows and the creepers' blasts end in it.
+        if (iron >= 1 && !has(body, Set.of(net.minecraft.world.item.Items.SHIELD))) return make(bot, net.minecraft.world.item.Items.SHIELD, "a shield");
+        for (boolean diamond : new boolean[]{false, true}) {
+            int stock = diamond ? ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.DIAMOND)) : iron;
+            int spare = stock - planner.demandFor(diamond ? net.minecraft.world.item.Items.DIAMOND : net.minecraft.world.item.Items.IRON_INGOT);
+            if (spare < 1) continue;
+            for (Gear g : gear(diamond)) {
+                if (has(body, g.better())) continue;
+                // (Not enough for this one: the next that is affordable - boots now, the chest
+                // later - except that nothing comes before the pickaxe.)
+                if (spare < g.cost()) {
+                    if (g.item() == net.minecraft.world.item.Items.IRON_PICKAXE) break;
+                    continue;
+                }
+                return make(bot, g.item(), (diamond ? "diamonds" : "iron") + " to spare (" + spare + ")");
             }
-            if (has) continue;
-            // (Not enough for this one: the next that is affordable - boots now, the chest
-            // later - except that nothing comes before the pickaxe.)
-            if (spare < st.iron()) {
-                if (st.item() == net.minecraft.world.item.Items.IRON_PICKAXE) return false;
-                continue;
-            }
-            upgradeRetryAt = now + 2400;
-            bot.say("iron to spare (" + spare + "): " + ObtainPlanner.name(st.item()));
-            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(st.item()), 1, planner), 1200);
-            return true;
         }
         return false;
+    }
+
+    private boolean make(Bot bot, net.minecraft.world.item.Item item, String why) {
+        upgradeRetryAt = bot.body().level().getGameTime() + 2400;
+        bot.say(why + ": " + ObtainPlanner.name(item));
+        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 1200);
+        return true;
     }
 
     /** At least this much cobblestone and this much wood (in planks) on hand, always. */
@@ -1196,6 +1223,19 @@ public final class LockoutBrain implements BotBrain {
         for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
             if (tile.index() == targetIndex && tile.claimedBy() != null) {
                 boolean ours = tile.claimedBy() == Chal_40_LockoutBingo.teamOf(server, bot.id);
+                // Ours, and in the middle of an ore vein (the diamonds: the tile wanted one, the
+                // tools and the armour want the rest): the vein first, as an errand of its own.
+                if (ours && BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.MineTask m && m.veinOpen(bot)) {
+                    bot.say("got " + targetId + "; the rest of the vein too");
+                    targetIndex = -1;
+                    targetId = null;
+                    goalTask = null;
+                    running = bot.current();
+                    runningSince = bot.body().level().getGameTime();
+                    runningBudget = 1200;
+                    runningExtensions = 2; // (no more time than that)
+                    return;
+                }
                 bot.say(ours ? "got " + targetId : targetId + " was taken, moving on");
                 drop(bot);
                 pause = difficulty.pauseTicks;

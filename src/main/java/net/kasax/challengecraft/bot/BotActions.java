@@ -23,7 +23,21 @@ public final class BotActions {
     /** Blocks the bot happily spends on pillars and bridges. */
     public static final Set<net.minecraft.world.item.Item> THROWAWAY = Set.of(Items.DIRT, Items.COBBLESTONE,
             Items.COBBLED_DEEPSLATE, Items.NETHERRACK, Items.STONE, Items.ANDESITE, Items.DIORITE, Items.GRANITE,
-            Items.TUFF, Items.COARSE_DIRT, Items.BLACKSTONE, Items.END_STONE);
+            Items.TUFF, Items.COARSE_DIRT, Items.BLACKSTONE, Items.END_STONE, Items.BASALT, Items.SMOOTH_BASALT);
+
+    /** What there is to build with where it stands: the Nether's rock kinds there, else stone and soil. */
+    public static Set<net.minecraft.world.item.Item> buildingBlocks(net.minecraft.world.level.Level level) {
+        return level.dimension() == net.minecraft.world.level.Level.NETHER
+                ? Set.of(Items.NETHERRACK, Items.BLACKSTONE, Items.BASALT)
+                : Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.DIRT);
+    }
+
+    /** Building blocks carried. */
+    public static int buildingBlocks(BotPlayer body) {
+        int n = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) if (THROWAWAY.contains(st.getItem())) n += st.getCount();
+        return n;
+    }
 
     /** Reach within which the bot works on a block (a player has 4.5). */
     public static final double REACH = 4.3;

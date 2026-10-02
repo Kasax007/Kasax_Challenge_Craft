@@ -330,6 +330,20 @@ public final class Bot {
             reflex(new net.kasax.challengecraft.bot.task.AirTask());
             return;
         }
+        // In lava, or on magma: out onto cool ground before anything else.
+        if (net.kasax.challengecraft.bot.task.LavaEscapeTask.burning(this) && !(top instanceof net.kasax.challengecraft.bot.task.LavaEscapeTask)) {
+            actions.reset();
+            reflex(new net.kasax.challengecraft.bot.task.LavaEscapeTask());
+            return;
+        }
+        // On fire (out of lava, through a fire): put out at once - water poured at its feet from
+        // the bucket and taken back, or into water close by - before it burns away the hearts.
+        if (body.isOnFire() && !body.isInLava() && !body.hasEffect(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE)
+                && !(top instanceof net.kasax.challengecraft.bot.task.ExtinguishTask) && net.kasax.challengecraft.bot.task.ExtinguishTask.possible(this)) {
+            actions.reset();
+            reflex(new net.kasax.challengecraft.bot.task.ExtinguishTask());
+            return;
+        }
         // Sunk into powder snow by mistake (not on purpose for a tile): out, before it freezes.
         if (body.isInPowderSnow && body.getTicksFrozen() > 20 && !(top instanceof net.kasax.challengecraft.bot.task.SnowEscapeTask)
                 && !(top instanceof net.kasax.challengecraft.bot.task.PowderSnowTask)) {
@@ -501,6 +515,7 @@ public final class Bot {
 
     /** Cheap, for every tick: a creeper hissing within five blocks, or a monster out for it within three. */
     private boolean dangerClose() {
+        if (body.isOnFire() && !body.isInLava()) return true;
         for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(5), net.minecraft.world.entity.LivingEntity::isAlive)) {
             if (m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0) return true;
             if (m.getTarget() == body && m.distanceTo(body) < 3) return true;
@@ -631,14 +646,18 @@ public final class Bot {
         BotBundles.stash(this, keepItems, 3);
         free = BotBundles.freeSlots(body);
         if (free >= 2) return;
-        // Still full: what is no use to anything on the board goes.
-        for (int i = 0; i < inv.size() && free < 3; i++) {
-            var st = inv.get(i);
-            if (st.isEmpty() || !clutter(st)) continue;
-            // (Gone for good: dropped at its feet it would be picked up again at once.)
-            inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
-            say("pack full: threw away " + st.getCount() + " " + st.getItem().toString().replace("minecraft:", ""));
-            free++;
+        // Still full: what is no use to anything on the board goes, the cheapest first (rotten
+        // flesh, seeds, saplings before an odd block), never what is worth something.
+        for (int cheap = 0; cheap < 2 && free < 3; cheap++) {
+            throwawaySeen = 0;
+            for (int i = 0; i < inv.size() && free < 3; i++) {
+                var st = inv.get(i);
+                if (st.isEmpty() || !clutter(st) || (cheap == 0 && !cheap(st))) continue;
+                // (Gone for good: dropped at its feet it would be picked up again at once.)
+                inv.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+                say("pack full: threw away " + st.getCount() + " " + st.getItem().toString().replace("minecraft:", ""));
+                free++;
+            }
         }
         body.getInventory().setChanged();
     }
@@ -658,11 +677,32 @@ public final class Bot {
                 || id.equals("flint") || id.equals("flint_and_steel") || id.equals("gunpowder") || id.equals("obsidian") || id.equals("ender_pearl")
                 || id.equals("crafting_table") || id.equals("furnace") || id.equals("blaze_rod") || id.equals("quartz")
                 || st.is(net.minecraft.tags.ItemTags.LOGS) || st.is(net.minecraft.tags.ItemTags.PLANKS)) return false;
+        // Worth something whatever the board says (trading, bartering, armour, the Nether's riches).
+        if (VALUABLE.stream().anyMatch(id::contains)) return false;
         // Building blocks: a stack stays (the first one met), the rest is clutter.
-        return !BotActions.THROWAWAY.contains(item) || ++throwawaySeen > 1;
+        // (Counted over all kinds: 27 blackstone thrown away beside a stack of netherrack left too
+        // few for the pillar up to the portal.)
+        return !BotActions.THROWAWAY.contains(item) || BotActions.buildingBlocks(body) - st.getCount() >= 64 && ++throwawaySeen > 1;
     }
 
     private int throwawaySeen;
+
+    /** Parts of item names never thrown away to make room. */
+    private static final java.util.List<String> VALUABLE = java.util.List.of(
+            "gold", "netherite", "ancient_debris", "bundle", "leather", "book", "map", "eye", "shulker", "totem",
+            "pearl", "rod", "tear", "star", "shard", "wart", "slime", "honey", "amethyst", "crying_obsidian", "bed",
+            "shield", "saddle", "bow", "arrow", "copper", "iron", "lapis", "blaze", "powder", "magma_cream", "bone",
+            "feather", "paper", "sugar_cane", "wool", "spyglass", "compass", "clock", "potion", "scute", "trident",
+            "nautilus", "heart", "echo", "trim", "sherd", "egg", "head", "skull", "_ore", "clay", "glass", "brick");
+
+    /** What a player throws first: worthless scraps. */
+    private static boolean cheap(net.minecraft.world.item.ItemStack st) {
+        String id = st.getItem().toString().replace("minecraft:", "");
+        return id.equals("rotten_flesh") || id.endsWith("_seeds") || id.endsWith("sapling") || id.equals("poisonous_potato")
+                || id.equals("spider_eye") || id.equals("dead_bush") || id.equals("short_grass") || id.equals("fern")
+                || id.equals("kelp") || id.equals("seagrass") || id.equals("pointed_dripstone") || id.equals("moss_carpet")
+                || BotActions.THROWAWAY.contains(st.getItem());
+    }
 
     public void say(String text) {
         if (verbose) BotManager.debug(body, text);

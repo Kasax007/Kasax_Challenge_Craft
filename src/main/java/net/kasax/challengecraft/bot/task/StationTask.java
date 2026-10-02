@@ -32,6 +32,13 @@ abstract class StationTask implements BotTask {
         this.item = item;
     }
 
+    /** Whether this works at a crafting table (and needs one there). */
+    boolean usesTable() {
+        return block == Blocks.CRAFTING_TABLE && needsStation();
+    }
+
+    private boolean fetched;
+
     /** Whether this task needs the station at all (a 2×2 recipe does not). */
     protected boolean needsStation() {
         return true;
@@ -47,6 +54,14 @@ abstract class StationTask implements BotTask {
             walking = false;
             if (station == null) {
                 if (BotInventory.slotOf(bot.body(), item) < 0) {
+                    // (The one the plan counted on is out of reach now - left behind on the way,
+                    // walked off from in a fight: a new one made, as a player does, once.)
+                    if (!fetched) {
+                        fetched = true;
+                        bot.say("no " + block.getName().getString() + " at hand: making one");
+                        bot.interject(new ObtainTask(Set.of(item), 1));
+                        return Result.RUNNING;
+                    }
                     bot.say("no " + block.getName().getString() + " to use");
                     return Result.FAILED;
                 }

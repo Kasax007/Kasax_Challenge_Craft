@@ -40,6 +40,16 @@ public final class ThroughPortalTask implements BotTask {
             Result r = build.tick(bot);
             return r == Result.FAILED ? failed(bot) : r;
         }
+        // Out of blocks to climb or bridge with on the way (a pillar up to a portal on a ledge):
+        // a stack of the rock about first, then on.
+        if (fetch != null) {
+            Result r = fetch.tick(bot);
+            if (r == Result.RUNNING) return r;
+            fetch = null;
+            walking = legging = false;
+            if (r == Result.FAILED && ++fetchFails > 2) return failed(bot);
+            return Result.RUNNING;
+        }
         if (portal == null || !level.getBlockState(portal).is(Blocks.NETHER_PORTAL)) {
             portal = BotWorld.nearest(level, bot.body().blockPosition(), 64, 24, s -> s.is(Blocks.NETHER_PORTAL), false, Set.of());
             walking = false;
@@ -64,7 +74,10 @@ public final class ThroughPortalTask implements BotTask {
                     }
                     BotNavigator.Status s = bot.navigator().tick();
                     if (s != BotNavigator.Status.MOVING) legging = false;
-                    if (s == BotNavigator.Status.FAILED) legFails++;
+                    if (s == BotNavigator.Status.FAILED) {
+                        legFails++;
+                        fetchBlocks(bot, level);
+                    }
                     return Result.RUNNING;
                 }
                 // Obsidian carried: build the frame; else, with the buckets, cast one at a lava pool.
@@ -93,7 +106,24 @@ public final class ThroughPortalTask implements BotTask {
         }
         BotNavigator.Status s = bot.navigator().tick();
         if (s != BotNavigator.Status.MOVING) walking = false;
+        if (s == BotNavigator.Status.FAILED) {
+            fetchBlocks(bot, level);
+            // (The portal in sight but no way there, over and over: the known way, through the rock.)
+            if (++walkFails > 8) return failed(bot);
+        }
         return Result.RUNNING;
+    }
+
+    private BotTask fetch;
+    private int fetchFails, walkFails;
+
+    /** No way found and few blocks left: very likely the way needs blocks (a pillar, a bridge). */
+    private void fetchBlocks(Bot bot, ServerLevel level) {
+        int have = net.kasax.challengecraft.bot.BotActions.buildingBlocks(bot.body());
+        if (have >= 24 || fetchFails > 2) return;
+        var kinds = net.kasax.challengecraft.bot.BotActions.buildingBlocks(level);
+        bot.say("few blocks (" + have + ") for the way to the portal: a stack of " + kinds.iterator().next().toString().replace("minecraft:", "") + " and the like first");
+        fetch = new ObtainTask(kinds, ObtainPlanner.countAny(bot.body(), kinds) + 32);
     }
 
     /** Remembered for a while, so the Overworld tiles are not tried (and failed) again at once. */

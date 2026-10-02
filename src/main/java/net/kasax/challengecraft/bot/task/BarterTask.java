@@ -334,10 +334,19 @@ public final class BarterTask implements BotTask {
             enter(Stage.LURE);
             return Result.RUNNING;
         }
-        // Loot about (thrown up out of the hole, or next to it in the open): picked up.
+        // A trade done (it held the gold a while, and threw the goods): counted, whatever comes next.
+        if (admiring()) admiredSeen = true;
+        else if (admiredSeen) {
+            admiredSeen = false;
+            trades++;
+        }
+        // Loot about (thrown up out of the hole, or next to it in the open): picked up - not from
+        // down in the hole itself (in there, it is in with the piglin and cannot get out).
         if (!fromRim || !bot.navigator().feet().equals(rim)) {
             var drops = BotWorld.drops((ServerLevel) body.level(), body.blockPosition(), 5, (Set<Item>) null).stream()
-                    .filter(e -> !e.getItem().is(Items.GOLD_INGOT) || !fromRim).toList();
+                    .filter(e -> !e.getItem().is(Items.GOLD_INGOT) || !fromRim)
+                    .filter(e -> !fromRim || hole == null || Math.abs(e.getBlockX() - hole.getX()) + Math.abs(e.getBlockZ() - hole.getZ()) > 0
+                            || e.getY() >= hole.getY() + 2).toList();
             if (!drops.isEmpty() && !admiring() && body.distanceTo(drops.get(0)) > 1.2) {
                 if (!walking || stageTicks % 20 == 0) {
                     bot.navigator().goPickUp(drops.get(0));
@@ -354,15 +363,10 @@ public final class BarterTask implements BotTask {
         }
         walking = false;
         if (admiring()) {
-            admiredSeen = true;
             body.lookAt(piglin.getEyePosition());
             return Result.RUNNING;
         }
-        if (admiredSeen) {
-            admiredSeen = false;
-            trades++;
-            if (satisfied(body)) return Result.RUNNING; // (done at the next tick, after the pick-up)
-        }
+        if (satisfied(body)) return Result.RUNNING; // (done at the next tick, after the pick-up)
         double reach = body.distanceTo(piglin);
         if (reach > 3.0) {
             if (fromRim) return Result.RUNNING;

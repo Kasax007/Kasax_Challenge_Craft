@@ -848,4 +848,27 @@ public class BotStuntTests {
             return hit[0] && body.getHealth() < body.getMaxHealth();
         });
     }
+
+    /** On fire with a water bucket: water poured at its feet, the fire out, the water back in the bucket. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void extinguishBucket(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "extinguish_bucket");
+        a.spawn(20, FEET, 20, new ItemStack(Items.WATER_BUCKET));
+        var body = a.bot().body();
+        body.igniteForSeconds(8);
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(250), 300, () ->
+                !body.isOnFire() && net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.WATER_BUCKET)) > 0
+                        && body.getHealth() >= 18);
+    }
+
+    /** On fire, no bucket, a pond a few steps off: into the water. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void extinguishPond(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "extinguish_pond");
+        a.fill(24, BotArena.GROUND, 19, 25, BotArena.GROUND, 21, Blocks.WATER);
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        body.igniteForSeconds(8);
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(250), 300, () -> !body.isOnFire() && body.getHealth() >= 16);
+    }
 }

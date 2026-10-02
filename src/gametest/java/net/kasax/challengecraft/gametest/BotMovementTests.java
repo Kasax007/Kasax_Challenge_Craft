@@ -332,4 +332,74 @@ public class BotMovementTests {
         body.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 1200));
         a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 600, () -> a.near(30, FEET, 20, 1.6));
     }
+
+    /** A chest on the bottom of a pool six deep (a shipwreck's): dived down to, looted, back up. */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void underwaterChest(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "underwater_chest");
+        a.fill(14, GROUND - 6, 14, 30, GROUND, 30, Blocks.WATER);
+        a.fill(22, GROUND - 6, 22, 22, GROUND - 6, 22, Blocks.CHEST);
+        var chestPos = a.abs(22, GROUND - 6, 22);
+        if (h.getLevel().getBlockEntity(chestPos) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity c) c.setItem(0, new ItemStack(Items.IRON_INGOT, 5));
+        a.spawn(8, FEET, 22);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.LootTask(chestPos), 900,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.IRON_INGOT)) >= 5);
+    }
+    /** Fallen into lava while idle (no fire resistance): the reflex gets it out at once, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void lavaReflex(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "lava_reflex");
+        a.fill(16, GROUND, 16, 24, GROUND, 24, Blocks.LAVA);
+        a.spawn(18, GROUND, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(280), 300, () -> {
+            h.assertTrue(body.isAlive(), "burnt");
+            return !body.isInLava() && body.onGround() && !(a.bot().current() instanceof net.kasax.challengecraft.bot.task.LavaEscapeTask)
+                    && body.getHealth() >= 12;
+        });
+    }
+
+    /** Standing on a field of magma: off it onto plain ground, not stuck ("no moves"). */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void magmaReflex(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "magma_reflex");
+        a.fill(15, GROUND, 15, 25, GROUND, 25, Blocks.MAGMA_BLOCK);
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(280), 300, () -> {
+            h.assertTrue(body.isAlive(), "burnt");
+            return body.onGround() && !h.getLevel().getBlockState(body.getOnPos()).is(Blocks.MAGMA_BLOCK);
+        });
+    }
+
+    /** A way along a lava lake's edge with room to spare: kept a block off the lava. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void lavaEdgeKeptOff(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "lava_edge_kept_off");
+        a.fill(8, GROUND, 18, 32, GROUND, 18, Blocks.LAVA);
+        a.spawn(8, FEET, 19);
+        var body = a.bot().body();
+        boolean[] edge = {false};
+        a.run(new GoToTask(a.abs(32, FEET, 19), 1.5), 600, () -> {
+            var feet = body.blockPosition();
+            for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                if (h.getLevel().getBlockState(feet.relative(d).below()).is(Blocks.LAVA) && feet.getX() > a.abs(10, 0, 0).getX()
+                        && feet.getX() < a.abs(30, 0, 0).getX()) h.assertTrue(false, "along the lava's edge at " + feet.toShortString() + " (y " + body.getY() + ")");
+            }
+            h.assertTrue(!body.isInLava(), "into the lava");
+            return a.bot().current() == null && body.getX() > a.abs(30, 0, 0).getX() && !edge[0];
+        });
+    }
+    /** Clay on the bed of a river two deep (and none on land): dived for and dug. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void riverClay(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "river_clay");
+        a.fill(18, GROUND - 2, 10, 24, GROUND - 2, 30, Blocks.CLAY);
+        a.fill(18, GROUND - 1, 10, 24, GROUND, 30, Blocks.WATER);
+        a.spawn(14, FEET, 20, new ItemStack(Items.WOODEN_SHOVEL));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.ObtainTask(java.util.Set.of(Items.CLAY_BALL), 8), 1600,
+                () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.CLAY_BALL)) >= 8);
+    }
 }

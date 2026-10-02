@@ -511,7 +511,9 @@ public final class BotNavigator {
                 && next.to().getY() == to.getY() && to.getY() == feet.getY()
                 && Integer.signum(next.to().getX() - to.getX()) == Integer.signum(to.getX() - feet.getX())
                 && Integer.signum(next.to().getZ() - to.getZ()) == Integer.signum(to.getZ() - feet.getZ());
-        if (flat < 0.3 && Math.abs(bot.getY() - to.getY()) < 0.7 || feet.equals(to) && (flat < 0.45 || straightOn && flat < 0.9)) {
+        // (Swimming under the surface along a way laid on top of it: over the step is at the step.)
+        boolean swumOver = bot.isInWater() && flat < 0.6 && bot.level().getFluidState(to).is(net.minecraft.tags.FluidTags.WATER) && bot.getY() <= to.getY() + 0.7;
+        if (flat < 0.3 && Math.abs(bot.getY() - to.getY()) < 0.7 || swumOver || feet.equals(to) && (flat < 0.45 || straightOn && flat < 0.9)) {
             advance();
             return status;
         }
@@ -570,12 +572,42 @@ public final class BotNavigator {
      */
     private void swim(BlockPos to, BlockPos feet, double flat, boolean up) {
         var level = bot.level();
+        // (Sprinting with the head above the water, the body neither sinks nor swims: it glides
+        // along the top as if walking on the water. Only under the surface is it a swim.)
+        boolean under = bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+        bot.sprintNow = false;
+        bot.sinkInWater = false;
         boolean deep = level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()
                 || bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
-        boolean outOnto = up || !level.getFluidState(to).is(net.minecraft.tags.FluidTags.WATER);
-        if (deep && !outOnto && flat > 1.2 && bot.getAirSupply() > bot.getMaxAirSupply() / 3 && openAbove(feet) && openAbove(to)) {
+        // (A step "up" to a water cell is only the path keeping to the top of the water: not a
+        // bank to climb out onto.)
+        boolean outOnto = !level.getFluidState(to).is(net.minecraft.tags.FluidTags.WATER);
+        up = up && outOnto;
+        // Down to where the way goes (a chest on the sea floor, the far side of a sunken ledge):
+        // dived to, head first, sprint-swimming - not floating on top kicking.
+        double drop = bot.getY() - to.getY();
+        if (!outOnto && drop > 0.4 && bot.getAirSupply() > bot.getMaxAirSupply() / 4) {
             diving = true;
-            bot.sprintNow = true;
+            bot.sprintNow = under;
+            bot.sinkInWater = !under;
+            bot.jump = false;
+            bot.forward = 1f;
+            float pitch = (float) Mth.clamp(Math.toDegrees(Math.atan2(drop, Math.max(flat, 0.3))), 20, 85);
+            bot.setXRot(pitch);
+            return;
+        }
+        // (The way going on through the water a few steps more: a crossing, swum - not a step
+        // or two to the bank, bobbed.)
+        int wet = 0;
+        for (int k = index; k < Math.min(path.size(), index + 5); k++) {
+            if (!level.getFluidState(path.get(k).to()).is(net.minecraft.tags.FluidTags.WATER)) break;
+            wet++;
+        }
+        if (deep && !outOnto && (flat > 1.2 || wet >= 4) && bot.getAirSupply() > bot.getMaxAirSupply() / 3 && openAbove(feet) && openAbove(to)) {
+            diving = true;
+            bot.sprintNow = under;
+            // (Head under first: pressed down, as a player ducks under to swim.)
+            bot.sinkInWater = !under;
             bot.jump = false;
             if (bot.isSwimming()) {
                 // Along the surface (the eyes come out, it breathes) or down to where the path goes.

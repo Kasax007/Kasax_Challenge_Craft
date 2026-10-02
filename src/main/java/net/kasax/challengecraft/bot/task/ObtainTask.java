@@ -66,7 +66,8 @@ public final class ObtainTask implements BotTask {
             }
             ObtainPlanner.Step st = (ObtainPlanner.Step) p;
             // Off to something else than crafting: take the table along first.
-            if (!(st.task() instanceof StationTask) && PackTableTask.worth(bot)) {
+            // (A furnace is no table: smelting means a wait and a walk, the table along first.)
+            if (!(st.task() instanceof StationTask station && station.usesTable()) && PackTableTask.worth(bot)) {
                 step = new PackTableTask(bot.ownTable);
                 stepPlan = null;
                 return Result.RUNNING;

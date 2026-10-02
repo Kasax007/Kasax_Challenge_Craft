@@ -358,6 +358,51 @@ public class BotSkillTests {
         a.run(new LavaPortalTask(h.getLevel(), null), 3600, () -> a.bot().body().level().dimension() == Level.NETHER);
     }
 
+    /**
+     * The cast cut short halfway (called away), then a new cast: the frame begun is finished,
+     * not a second one started beside it.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 4800, skyAccess = true, padding = 8)
+    public void castPortalResumed(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "cast_portal_resumed");
+        a.fill(24, GROUND, 4, 27, GROUND, 7, Blocks.LAVA);
+        a.spawn(20, FEET, 20, new ItemStack(Items.BUCKET), new ItemStack(Items.WATER_BUCKET),
+                new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.DIRT, 20), new ItemStack(Items.COBBLESTONE, 8));
+        java.util.function.IntSupplier obsidian = () -> {
+            int n = 0;
+            for (int x = 0; x < 40; x++) for (int y = GROUND - 2; y < FEET + 8; y++) for (int z = 0; z < 40; z++)
+                if (h.getBlockState(new net.minecraft.core.BlockPos(x, y, z)).is(Blocks.OBSIDIAN)) n++;
+            return n;
+        };
+        int[] most = {0};
+        a.run(new net.kasax.challengecraft.bot.BotTask() {
+            net.kasax.challengecraft.bot.BotTask first = new LavaPortalTask(h.getLevel(), null), second;
+
+            @Override
+            public Result tick(net.kasax.challengecraft.bot.Bot bot) {
+                if (second == null) {
+                    first.tick(bot);
+                    if (h.getTick() % 10 == 0 && obsidian.getAsInt() >= 4) {
+                        bot.navigator().stop();
+                        bot.body().stopInputs();
+                        second = new LavaPortalTask(h.getLevel(), null);
+                    }
+                    return Result.RUNNING;
+                }
+                return second.tick(bot);
+            }
+
+            @Override
+            public String describe() {
+                return "cast, called away, cast again";
+            }
+        }, 4800, () -> {
+            if (h.getTick() % 20 == 0) most[0] = Math.max(most[0], obsidian.getAsInt());
+            if (most[0] > 11) h.fail("a second frame: " + most[0] + " obsidian");
+            return a.bot().body().level().dimension() == Level.NETHER;
+        });
+    }
+
     /** The pool in a cave, no flat room anywhere near: room dug out, then the portal cast. */
     @GameTest(structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 8)
     public void castPortalDug(GameTestHelper h) {

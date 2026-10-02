@@ -249,7 +249,11 @@ public final class MineTask implements BotTask {
                 skip.add(target); // refused (protected)
             } else if (!BotWorld.COMMON.contains(was) && was != net.minecraft.world.level.block.Blocks.SAND && was != net.minecraft.world.level.block.Blocks.RED_SAND) {
                 // (Not rock and soil: those are everywhere, and following them digs a pit.)
-                for (BlockPos n : BlockPos.betweenClosed(target.offset(-1, -1, -1), target.offset(1, 1, 1))) {
+                // (Diamonds, gold, emeralds lie scattered with a block between: two out for those.)
+                int r = was == net.minecraft.world.level.block.Blocks.DIAMOND_ORE || was == net.minecraft.world.level.block.Blocks.DEEPSLATE_DIAMOND_ORE
+                        || was == net.minecraft.world.level.block.Blocks.GOLD_ORE || was == net.minecraft.world.level.block.Blocks.DEEPSLATE_GOLD_ORE
+                        || was == net.minecraft.world.level.block.Blocks.EMERALD_ORE || was == net.minecraft.world.level.block.Blocks.DEEPSLATE_EMERALD_ORE ? 2 : 1;
+                for (BlockPos n : BlockPos.betweenClosed(target.offset(-r, -r, -r), target.offset(r, r, r))) {
                     if (blocks.test(level.getBlockState(n)) && !skip.contains(n)) vein.addFirst(n.immutable());
                 }
             }
@@ -312,6 +316,11 @@ public final class MineTask implements BotTask {
     }
 
     /** An ore of the vein being taken still in the wall a few steps away. */
+    /** Ore of the vein being taken still close by (or just broken and lying about). */
+    public boolean veinOpen(Bot bot) {
+        return collectTicks > 0 || veinNear((ServerLevel) bot.body().level(), bot);
+    }
+
     private boolean veinNear(ServerLevel level, Bot bot) {
         BlockPos feet = bot.body().blockPosition();
         for (BlockPos v : vein) {
@@ -445,13 +454,16 @@ public final class MineTask implements BotTask {
     private boolean worthIt(ServerLevel level, Bot bot, BlockPos p) {
         // Under water: diving and digging there (five times slower) is not worth it while there
         // are others on dry land.
-        if (!bot.actions().inReach(p)) {
+        // (Not so for what lies under shallow water as a rule - clay on a river bed - or once a
+        // while has gone by with nothing found on land: then it is dived for.)
+        boolean diveFor = shallowWater(level, p) && (level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CLAY) || searchTicks > 600);
+        if (!bot.actions().inReach(p) && !diveFor) {
             for (Direction d : Direction.values()) {
                 if (d != Direction.DOWN && !level.getFluidState(p.relative(d)).isEmpty()) return false;
             }
         }
         // Below a river or a lake: the way down is through the water. Others first.
-        if (!bot.actions().inReach(p) && p.getY() < bot.body().getBlockY()) {
+        if (!bot.actions().inReach(p) && !diveFor && p.getY() < bot.body().getBlockY()) {
             for (int y = p.getY() + 1; y <= Math.min(p.getY() + 24, bot.body().getBlockY() + 2); y++) {
                 if (!level.getFluidState(new BlockPos(p.getX(), y, p.getZ())).isEmpty()) return false;
             }
@@ -475,6 +487,17 @@ public final class MineTask implements BotTask {
         // (Under a roof there is no surface to be near: the Nether's blocks are all "inside".)
         if (level.dimensionType().hasCeiling()) return Math.abs(p.getY() - bot.body().getBlockY()) <= 24;
         return p.getY() >= level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ()) - 6;
+    }
+
+    /** Water over it, at most four deep (a river bed, a pond: dived to and dug in a breath). */
+    private static boolean shallowWater(ServerLevel level, BlockPos p) {
+        int deep = 0;
+        BlockPos q = p.above();
+        while (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) {
+            if (++deep > 4) return false;
+            q = q.above();
+        }
+        return deep > 0 && level.getBlockState(q).isAir();
     }
 
     private static ServerLevel level(Bot bot) {

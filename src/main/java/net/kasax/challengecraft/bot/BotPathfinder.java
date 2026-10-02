@@ -204,7 +204,9 @@ public final class BotPathfinder {
     public Result search(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int maxNodes, long nanos) {
         // Standing in lava already (fallen in): out through it is the way, however dear - the
         // nearest ground clear of it.
-        escapeLava = loaded(start) && state(start).getFluidState().is(FluidTags.LAVA);
+        // (Or on magma, which burns as long as it is stood on: off it, whatever the way.)
+        escapeLava = loaded(start) && state(start).getFluidState().is(FluidTags.LAVA)
+                || loaded(start.below()) && state(start.below()).is(Blocks.MAGMA_BLOCK);
         long until = nanos == Long.MAX_VALUE ? Long.MAX_VALUE : System.nanoTime() + nanos;
         it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Node> nodes = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>();
@@ -316,6 +318,10 @@ public final class BotPathfinder {
         // water five times more.
         // (Every step through lava burns: by far the dearest way, only to get out.)
         if (escapeLava && lava(s.to())) c += 40;
+        // Out on magma (only when escaping): it burns at every step too.
+        else if (escapeLava && loaded(s.to().below()) && state(s.to().below()).is(Blocks.MAGMA_BLOCK)) c += 20;
+        // Along the edge of lava: a slip, a knock-back, and it is in. Kept a block off where it can.
+        else if (!escapeLava && besideLava(s.to())) c += LAVA_EDGE;
         double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
             double ticks = breakTicks(state(b));
@@ -509,6 +515,17 @@ public final class BotPathfinder {
         return loaded(p) && state(p).getFluidState().is(FluidTags.LAVA);
     }
 
+    /** Extra ticks for a step with lava right beside it (at the feet or a block lower). */
+    private static final double LAVA_EDGE = 8;
+
+    private boolean besideLava(BlockPos p) {
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos q = p.relative(d);
+            if (lava(q) || lava(q.below())) return true;
+        }
+        return false;
+    }
+
     boolean clear(BlockPos p) {
         if (!loaded(p)) return false;
         BlockState s = state(p);
@@ -524,7 +541,7 @@ public final class BotPathfinder {
     private boolean solid(BlockPos p) {
         if (!loaded(p)) return false;
         BlockState s = state(p);
-        return !s.getCollisionShape(NO_WORLD, p).isEmpty() && !dangerous(s);
+        return !s.getCollisionShape(NO_WORLD, p).isEmpty() && (!dangerous(s) || escapeLava && s.is(Blocks.MAGMA_BLOCK));
     }
 
     /** Whether feet at {@code p} stand on something (or swim). */
@@ -533,7 +550,7 @@ public final class BotPathfinder {
         BlockPos below = p.below();
         if (!solid(below)) return false;
         BlockState s = state(below);
-        return !s.is(Blocks.MAGMA_BLOCK) && !s.is(BlockTags.FENCES) && !s.is(BlockTags.WALLS) && !s.is(Blocks.CACTUS);
+        return (escapeLava || !s.is(Blocks.MAGMA_BLOCK)) && !s.is(BlockTags.FENCES) && !s.is(BlockTags.WALLS) && !s.is(Blocks.CACTUS);
     }
 
     private static boolean dangerous(BlockState s) {

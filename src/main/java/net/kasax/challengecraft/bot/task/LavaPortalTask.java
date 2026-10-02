@@ -133,6 +133,8 @@ public final class LavaPortalTask implements BotTask {
         BlockPos pool = near != null && lavaSource(level, near) ? near
                 : net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 24, 12, s -> s.getFluidState().is(FluidTags.LAVA) && s.getFluidState().isSource(), false, Set.of());
         if (pool == null) return fail(bot, "no lava pool");
+        // A frame begun here before (cut short, the bot called away): finished, not cast anew.
+        if (resume(bot, level, pool)) return Result.RUNNING;
         List<BlockPos> sources = new ArrayList<>();
         for (BlockPos q : BlockPos.betweenClosed(pool.offset(-10, -3, -10), pool.offset(10, 3, 10))) if (lavaSource(level, q)) sources.add(q.immutable());
         if (sources.size() < 10) return fail(bot, "only " + sources.size() + " lava sources here");
@@ -173,8 +175,70 @@ public final class LavaPortalTask implements BotTask {
         return Result.RUNNING;
     }
 
+    /**
+     * Looks for a frame of its own begun near the pool (four obsidian blocks at least where a
+     * frame's cells are, the rest still open): if there is one, it is taken up from where it stopped.
+     */
+    private boolean resume(Bot bot, ServerLevel level, BlockPos pool) {
+        int best = 3 * 20 + 20;
+        BlockPos bestOrigin = null;
+        Direction bestAhead = null;
+        for (BlockPos q : BlockPos.betweenClosed(pool.offset(-12, -4, -12), pool.offset(12, 4, 12))) {
+            if (!level.getBlockState(q).is(Blocks.OBSIDIAN) || !level.getBlockState(q.above()).isAir() && !level.getBlockState(q.above()).is(Blocks.OBSIDIAN)) continue;
+            // (Taken as the frame's bottom left cell, x 1 y 0, in every facing.)
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                Direction a = d.getClockWise();
+                BlockPos o = q.relative(a.getOpposite());
+                int set = 0;
+                boolean fits = true;
+                for (int[] c : FRAME) {
+                    BlockPos f = o.relative(a, c[0]).above(c[1]);
+                    var st = level.getBlockState(f);
+                    if (st.is(Blocks.OBSIDIAN)) set++;
+                    else if (!st.isAir() && !st.getFluidState().is(FluidTags.WATER)) fits = false;
+                }
+                // (The same frame seen from behind reads the same: the side with the mould wall
+                // - the blocks every bucket was poured against - is the back.)
+                int wall = 0;
+                for (int[] c : FRAME) {
+                    BlockPos back = o.relative(a, c[0]).above(c[1]).relative(d, 1);
+                    if (!level.getBlockState(back).getCollisionShape(level, back).isEmpty()) wall++;
+                }
+                set = set * 20 + wall;
+                if (!fits || set <= best) continue;
+                // Its inside open (or water), the standing spot in front reachable ground.
+                BlockPos stand = o.relative(a).above().relative(d, -2);
+                if (!standable(level, stand) || badSites.contains(stand.asLong())) continue;
+                best = set;
+                bestOrigin = o.immutable();
+                bestAhead = d;
+            }
+        }
+        if (bestOrigin == null || best / 20 >= FRAME.length) return false;
+        origin = bestOrigin;
+        ahead = bestAhead;
+        across = ahead.getClockWise();
+        stand = origin.relative(across).above().relative(ahead, -2);
+        bot.say("the frame begun at " + origin.toShortString() + " (" + best / 20 + " of " + FRAME.length + " set): finishing it");
+        stage = Stage.GO;
+        walking = false;
+        return true;
+    }
+
+    /** Running water beside the spot or its head: it pushes, and the pool is right there. */
+    private static boolean flowingBeside(ServerLevel level, BlockPos p) {
+        for (BlockPos q : new BlockPos[]{p, p.above()}) {
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                var fs = level.getFluidState(q.relative(d));
+                if (fs.is(FluidTags.WATER) && !fs.isSource()) return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean standable(ServerLevel level, BlockPos p) {
         if (!level.getFluidState(p).isEmpty() || !level.getFluidState(p.above()).isEmpty()) return false;
+        if (flowingBeside(level, p)) return false;
         if (level.getBlockState(p.below()).getCollisionShape(level, p.below()).isEmpty() || !level.getFluidState(p.below()).isEmpty()) return false;
         return clearable(level, p) && clearable(level, p.above());
     }
@@ -272,8 +336,16 @@ public final class LavaPortalTask implements BotTask {
                 for (int x = 0; x < 4; x++) {
                     if (corner(x, y, dz)) continue;
                     BlockPos q = at(x, y, dz);
+                    // (Water left standing in it from a cast cut short: back into the bucket.)
+                    if (level.getFluidState(q).is(FluidTags.WATER) && level.getFluidState(q).isSource()
+                            && BotInventory.slotOf(bot.body(), Items.BUCKET) >= 0 && ++tries < 60) {
+                        use(bot, level, Items.BUCKET, Vec3.atCenterOf(q));
+                        return Result.RUNNING;
+                    }
                     if (!level.getFluidState(q).isEmpty()) return replan(bot, "a fluid ran into the frame");
                     if (level.getBlockState(q).getCollisionShape(level, q).isEmpty()) continue;
+                    // (The frame's own obsidian, cast before: stays.)
+                    if (dz == 0 && frameCell(x, y) && level.getBlockState(q).is(Blocks.OBSIDIAN)) continue;
                     if (++tries > 600) return replan(bot, "can't dig " + q.toShortString());
                     bot.actions().breakTick(q);
                     return Result.RUNNING;
@@ -439,7 +511,7 @@ public final class LavaPortalTask implements BotTask {
         if (!canScoop(level, body, eye, lavaTarget, 4.2)) {
             if (!walking) {
                 BlockPos target = lavaTarget;
-                bot.navigator().setGoal(p -> level.getFluidState(p).isEmpty() && canScoop(level, body,
+                bot.navigator().setGoal(p -> level.getFluidState(p).isEmpty() && !flowingBeside(level, p) && canScoop(level, body,
                         new Vec3(p.getX() + 0.5, p.getY() + 1.62, p.getZ() + 0.5), target, 4.0), target);
                 walking = true;
             }
@@ -464,6 +536,11 @@ public final class LavaPortalTask implements BotTask {
     private Result refillWater(Bot bot, ServerLevel level) {
         sub = new FillBucketTask(FluidTags.WATER);
         return Result.RUNNING;
+    }
+
+    private static boolean frameCell(int x, int y) {
+        for (int[] c : FRAME) if (c[0] == x && c[1] == y) return true;
+        return false;
     }
 
     private boolean inFrame(BlockPos q) {
@@ -554,6 +631,7 @@ public final class LavaPortalTask implements BotTask {
         bot.tools().select(slot);
         bot.body().lookAt(at);
         bot.body().gameMode.useItem(bot.body(), level, bot.body().getMainHandItem(), InteractionHand.MAIN_HAND);
+        bot.body().swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
     }
 
     /**
@@ -618,6 +696,8 @@ public final class LavaPortalTask implements BotTask {
         bot.tools().select(slot);
         bot.body().lookAt(at);
         bot.body().gameMode.useItem(bot.body(), level, bot.body().getMainHandItem(), InteractionHand.MAIN_HAND);
+        // (The arm moves with it, as anyone watching would expect: the bucket really poured.)
+        bot.body().swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
     }
 
     /** How many sites it gave up on before the one it cast at. */

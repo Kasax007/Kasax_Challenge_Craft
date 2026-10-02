@@ -75,8 +75,15 @@ public final class Explorer {
             // height it is at instead, on something to stand on (else it tunnels through the
             // netherrack under the roof, a pickaxe a minute).
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-            nav.goNear(level.dimensionType().hasCeiling() ? legToward(level, nav.feet(), new BlockPos(p.getX(), nav.feet().getY(), p.getZ()), 40)
-                    : level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p), 6);
+            BlockPos leg = level.dimensionType().hasCeiling() ? legToward(level, nav.feet(), new BlockPos(p.getX(), nav.feet().getY(), p.getZ()), 40)
+                    : level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
+            // (A leg ending far down - a chasm, the sea floor, the void - is no leg: another way.)
+            if (leg.getY() < nav.feet().getY() - 24) {
+                heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
+                bot.exploreHeading = heading;
+                return BotTask.Result.RUNNING;
+            }
+            nav.goNear(leg, 6);
             walking = true;
         }
         BotNavigator.Status s = nav.tick();

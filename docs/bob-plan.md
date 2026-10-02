@@ -913,3 +913,176 @@ Anlass: Rückmeldung vom Spieler:
 | Zombie-Trio | 0 bis 3 (Streuung über mehrere Läufe) |
 
 **90 Minuten, Live-Seed, alter Stand (vor dieser Runde):** 14 Felder, 1 Tod.
+
+## 15. Runde 9: Zwei Stunden live zugeschaut – Befunde und der Plan für einen klügeren Bob
+
+Anlass: ein zweistündiger Live-Test mit Kommentaren des Zuschauers. Die Befunde stehen in 15.1,
+was davon sofort behoben ist in 15.2, der Plan für die nächsten Runden in 15.3.
+
+### 15.1 Befunde aus dem Log (mit Ursache)
+
+| Beobachtung | Ursache im Code |
+| --- | --- |
+| Läuft und schwimmt durch Lava, verbrennt nicht | Nach dem ersten Tod unverwundbar: der Respawn lief am Client-Befehl vorbei (`waitingForRespawn` blieb gesetzt). |
+| Im Nether in Lava gefallen, steht still („Lava on Lava“, hunderte Fehlversuche) | Kein Lava-Reflex; die Suche aus der Lava fand bei großem Lavasee keinen Teilweg. |
+| „Air on Magma Block, no moves“ | Magma galt als gefährlicher Block: vom Magma aus gab es gar keinen Zug. |
+| Geht dicht an Lavarändern entlang | Kein Aufschlag für Schritte neben Lava; ein Rückstoß reicht. |
+| Kann „auf Wasser laufen“, hängt beim Schiffswrack im Wasser | Sprinten mit dem Kopf über Wasser hebt das Absinken auf, ohne zu schwimmen. |
+| Wirft Antiken Schutt, Bündel, Goldnuggets, Goldblöcke und Leder weg | Die „nutzlos“-Liste kannte nur Erze, Barren und Holz als wertvoll. |
+| Wirft 27 Schwarzstein weg, hat danach zu wenig Blöcke für die Säule zum Portal | Bausteine wurden je Sorte gezählt, nicht insgesamt. |
+| „found no netherrack“ in der Bastion | Suchte nur Netherrack; Schwarzstein und Basalt ringsum zählten nicht als Baustoff. |
+| „no way back known“, obwohl das Portal bekannt ist | Nach einem gescheiterten Rückweg galt das Portal 2 Minuten lang als „unbekannt“; Bob wollte ein neues Portal bauen. |
+| Turmbau zum Portal ohne Blöcke, dann Stillstand | Der Rückweg holte nie Blöcke nach und zählte seine Fehlschläge nicht. |
+| Bartern: Bob hebt das Gold wieder auf, Handel stockt | Beim Aufsammeln der Beute stieg Bob in das Loch zum Piglin und kam nicht mehr heraus; abgeschlossene Tauschhandel wurden nicht gezählt. |
+| Baut bei fast jedem Schritt eine neue Werkbank | Die Werkbank blieb beim Schmelzen stehen (der Ofen galt als „Werkbank-Schritt“) und war danach zu weit weg. |
+| „no Crafting Table to use“ → „no known way to get furnace“ | Der Plan zählte eine Werkbank in 32 Blöcken; beim Schritt war sie außer Reichweite, und der Schritt brach ab statt eine neue zu machen. |
+| Blumentopf: Ton im Fluss nie abgebaut | Blöcke neben Wasser galten pauschal als „nicht lohnend“. |
+| Fernrohr: „found no amethyst_shard“ | Amethyst kommt fast nur in Geoden vor; Bob kennt weder ihre Höhe noch ihre Erkennungszeichen. |
+| Bastion: Brutes hätten ihn mehrfach getötet | Kein Taktikbuch je Gegner; Bob kämpft jeden Mob gleich im Nahkampf. |
+| Portalguss: „only 9 lava sources“, „frame cell 5 would not set“, „takes too long“ | Fast fertiger Rahmen wurde nicht wieder aufgenommen; fließendes Wasser schob Bob in die Lava. |
+| Rüstung trotz genug Eisen nicht gebaut; Diamanten nicht ganz abgebaut | `upgrade()` brach beim ersten nicht bezahlbaren Teil ab; Diamant-Adern wurden nicht ganz ausgehoben. |
+
+### 15.2 Sofort behoben (diese Runde)
+
+- **Unverwundbarkeit:** Respawn über den Client-Befehl (Test `hurtable_after_death`).
+- **Lava:**
+  - Lava-Reflex `LavaEscapeTask`: raus auf festen, kühlen Boden, direkt springend, wenn er nah
+    ist, sonst über eine Suche durch die Lava (Tests `lava_reflex`, `lava_escape`).
+  - Magma: Wer darauf steht, darf darüber (mit Aufschlag) herunter (Test `magma_reflex`).
+  - Aufschlag von 8 Ticks für jeden Schritt direkt neben Lava: Bob hält einen Block Abstand
+    (Test `lava_edge_kept_off`).
+- **Feuer löschen:** `ExtinguishTask` gießt Wasser aus dem Eimer und schöpft es wieder, oder geht
+  ins nahe Wasser (Tests `extinguish_bucket`, `extinguish_pond`).
+- **Schwimmen:** Sprint nur mit dem Kopf unter Wasser, gezieltes Abtauchen (Tests
+  `underwater_chest`, `lake_swim`).
+- **Inventar:**
+  - Was wertvoll ist (Gold, Netherit, Schutt, Bündel, Leder, Perlen, Lohe, Amethyst, Ton, Glas
+    und vieles mehr) wird nie weggeworfen.
+  - Zuerst geht Wertloses (Samen, Setzlinge, Kleinkram).
+  - Bausteine bleiben zusammen mindestens 64.
+- **Nether-Rückweg:**
+  - Baustoff im Nether ist Netherrack, Schwarzstein oder Basalt.
+  - Der Rückweg holt Blöcke nach, wenn kein Weg gefunden wird und weniger als 24 da sind.
+  - Nach 8 Fehlschlägen gibt der Rückweg auf, statt endlos zu suchen.
+  - „Kein Weg zurück“ gilt erst, wenn wirklich kein Portal bekannt ist.
+- **Bartern:** Bob steigt beim Aufsammeln nie ins Loch; Tauschhandel werden sofort gezählt (Test
+  `barter_in_hole` wieder grün).
+- **Werkbank:** wird auch vor dem Schmelzen eingepackt (Reichweite 16 Blöcke). Fehlt die geplante
+  Werkbank oder der Ofen, macht Bob einmal einen neuen, statt den Schritt abzubrechen.
+- **Ton:** Ton unter flachem Wasser (bis 4 tief) wird getaucht und abgebaut, anderes nach 30 s
+  vergeblicher Suche an Land (Test `river_clay`).
+- **Portal:** Ein angefangener Rahmen wird fortgesetzt; Stellplätze neben fließendem Wasser sind
+  tabu (Test `cast_portal_resumed`).
+- **Ausrüstung:**
+  - Schild zuerst.
+  - Danach Eisen- und später Diamant-Ausrüstung aus dem Überschuss über den Brett-Bedarf.
+  - Was nicht bezahlbar ist, wird übersprungen statt abzubrechen.
+  - Diamant-, Gold- und Smaragd-Adern werden ganz abgebaut, auch über das Ziel hinaus.
+
+### 15.3 Der Plan: Bob klüger machen
+
+Reihenfolge nach Wirkung auf „volles Brett in 90 min, ohne zu sterben“. Jede Stufe mit Tests,
+Benchmarks und einem Bericht.
+
+**Stufe A – Überleben zuerst (Gefahrenmodell)**
+
+1. **Gefahrenkarte** je Chunk:
+   - Lava, Magma, Feuer, Abgründe über 4 Blöcke, fließendes Wasser neben Lava, Pulverschnee;
+   - gespeist aus dem Weltblick (`BotMemory`).
+2. **Risiko statt Verbot im A\*:** Jeder Schritt kostet Zeit plus Risiko × Gewicht. Das Gewicht
+   steigt mit wenig Herzen, ohne Feuerresistenz und im Nether.
+3. **Nether-Brücken:**
+   - Über Lava nur schleichend, mit Seitenblöcken.
+   - Kein Sprint-Springen in Lavanähe.
+   - Bei Kämpfen am Rand zuerst einen Block hinter sich setzen.
+4. **Weitere Reflexe:**
+   - Ghast-Feuerball abwehren (vorhanden, ausbauen);
+   - Fall stoppen (Wassereimer, schon da; dazu Heuballen und Leiter);
+   - Ersticken im Kies;
+   - Lava, die aus der Decke fließt (beim Graben sofort zumauern).
+5. **Globaler Fortschrittswächter:**
+   - Keine Bewegung und keine Inventaränderung über 60 s → Notfallprogramm: lokale Flucht,
+     Ziel wechseln, Fehler protokollieren.
+   - Gleiche Fehlermeldung mehr als 5-mal → exponentielles Warten statt Spam.
+
+**Stufe B – Kampf mit Köpfchen (Taktikbuch je Gegner)**
+
+1. **Je Gegnertyp eine Taktik:**
+
+   | Gegner | Taktik |
+   | --- | --- |
+   | Piglin-Brute | Nie ohne Schild und Rüstung in den Nahkampf. Lieber meiden, Säule 3 hoch und Bogen, oder Engpass mit Schild. |
+   | Piglin | Goldrüstung, keine Truhen und kein Gold abbauen in Sichtweite, bei Wut Rückzug hinter eine Tür oder Mauer. |
+   | Hoglin | Warped Fungus hält ihn fern, sonst Säule und von oben schlagen (Rückstoß nach oben ist harmlos). |
+   | Lohe | Deckung hinter Blöcken, Schild gegen Feuerbälle, Schneebälle wenn vorhanden. |
+   | Wither-Skelett | 2 hohe Lücke, Schwert, nie offen in Gruppen. |
+   | Ghast | Feuerball zurückschlagen, Bogen. |
+   | Enderman | Nicht ansehen; im Kampf unter einen 2-hohen Überhang. |
+   | Gruppen | Engpass suchen, Sweep-Schläge. |
+
+2. **Kampf oder Ausweichen** nach erwarteter Schadensbilanz (Gegner-DPS × Kampfzeit gegen
+   Umweg), nicht „immer kämpfen“.
+3. **Ausrüstung vor gefährlichen Orten:**
+   - Vor Bastion und Festung prüfen: Schild, Rüstung, Essen und Blöcke.
+   - Fehlt etwas, kommt es als Vorbereitungsschritt in die Route.
+
+**Stufe C – Nether wie ein Speedrunner**
+
+1. **Portal-Netz im Gedächtnis:**
+   - Beide Seiten jedes Portals, umgerechnet 1:8.
+   - Der Rückweg ist immer bekannt, die Brotkrumenspur liegt als Rückfallweg bereit.
+2. **Reise-Check vor jeder Nether-Reise:** 64 Blöcke, Essen, Feuerzeug, Goldrüstung, Wassereimer
+   (für die Oberwelt), Schild.
+3. **Bastion-Plan:**
+   - Typ erkennen (Brücke, Schatz, Ställe, Wohnungen).
+   - Brutes zählen; über Dach oder Wall zum Ziel.
+   - Gezielt Truhen, Fluchtweg vorher festlegen.
+4. **Bartern im Akkord:** Loch-Falle, ein Barren nach dem anderen, Beute einsammeln ohne den
+   Piglin zu stören; mehrere Piglins parallel.
+5. **Festung finden:** Blickrichtung der Nether-Biome, Netherziegel in Sicht, Lohe-Spawner merken.
+
+**Stufe D – Wissen und Wahrnehmung**
+
+1. **Amethyst-Geoden:**
+   - Erkennungszeichen: Kalzit- und glatte Basalt-Schale in Höhlenwänden und an Hängen.
+   - Höhe: −64 bis 30.
+   - Gefundene Geoden ins Gedächtnis.
+2. **Strukturen per Sicht:** Schiffswrack, Ozeanruine, Geode, Ruinenportal, Iglu und Pyramide aus
+   typischen Blöcken erkennen, mit Merkzettel „unterwegs mitnehmen“.
+3. **Blockvorkommen je Biom und Höhe** (Ton in Flüssen und Sümpfen, Sand an Stränden, Kürbisse,
+   Bienen in Blumenwäldern) als Suchhinweise im Planer.
+4. **Unterwasser-Ressourcen:** Ton, Sand, Kies, Seegras und Korallen als gleichwertige Quelle
+   (Tauchen mit Luftplanung).
+
+**Stufe E – Planen wie ein Profi**
+
+1. **Stationen mitführen:** Werkbank und Ofen bleiben im Gepäck.
+   - Schmelzen läuft parallel: Erz einlegen, weiterarbeiten, später abholen (spart pro Spiel
+     mehrere Minuten).
+2. **Einkaufsliste über mehrere Ziele** (schon da), dazu Material-Reservierung: Was für ein
+   geplantes Feld gebraucht wird, wird nicht für Ausrüstung verbraucht.
+3. **Tag/Nacht-Kalender:** Nachtfelder (Phantom, Spinne, Skelett) gebündelt in die Nacht,
+   Tagfelder in den Tag; Schlafen nur nach Abschnitt 14.
+4. **Gegner im Mehrspieler:** Felder, die der Gegner gleich holt, nicht mehr anfangen; Felder
+   blockieren, die er braucht.
+
+**Stufe F – Lernen aus Erfahrung**
+
+1. **Episoden-Gedächtnis über Spiele hinweg:** Erfolgsrate und Zeit je Taktik und Ort, z. B.
+   „Brücke über Lava 3× gescheitert“. Daraus entstehen automatisch Strafkosten im Planer.
+2. **Fehlerkatalog aus den Logs:** Jede Abbruchmeldung zählt mit Ursache. Die häufigsten fünf
+   werden in der nächsten Runde behoben.
+
+**Stufe G – Testen wie ein Weltmeister**
+
+1. **Feld-Matrix:** Für jedes Brettfeld (Oberwelt und Nether) ein Szenario-Test mit Erfolgsrate
+   und Zeit. Ein nächtlicher Lauf erzeugt eine Tabelle; rote Felder kommen zuerst dran.
+2. **Nether-Testwelt:** Bob startet mit Kit direkt im Nether (Bastion, Festung, Lavasee,
+   Seelensandtal), jedes Nether-Feld einzeln.
+3. **Replay aus Live-Logs:** Seed, Position und Inventar aus dem Log nachstellen, um eine
+   Live-Panne als Test zu wiederholen.
+4. **Benchmarks:** 6 Seeds × 90 min auf HARD, je zwei parallel. Neu dazu: Tode, Schaden pro
+   Minute und Zeit je Kategorie.
+
+**Abnahme der Runde:** 0 Tode in 6 × 90 min, kein Stillstand länger als 60 s, ≥ 20 Felder im
+Schnitt, und jedes Nether-Feld einzeln zu ≥ 80 % im Test.

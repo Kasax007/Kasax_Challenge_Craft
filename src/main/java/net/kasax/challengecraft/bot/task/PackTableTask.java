@@ -28,7 +28,7 @@ public final class PackTableTask implements BotTask {
     public static boolean worth(Bot bot) {
         BlockPos t = bot.ownTable;
         if (t == null) return false;
-        if (t.distSqr(bot.body().blockPosition()) > 8 * 8 || !bot.body().level().getBlockState(t).is(Blocks.CRAFTING_TABLE)) {
+        if (t.distSqr(bot.body().blockPosition()) > 16 * 16 || !bot.body().level().getBlockState(t).is(Blocks.CRAFTING_TABLE)) {
             bot.ownTable = null; // left behind for good, or gone
             return false;
         }

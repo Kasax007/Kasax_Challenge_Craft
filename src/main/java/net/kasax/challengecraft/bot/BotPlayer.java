@@ -70,6 +70,8 @@ public class BotPlayer extends ServerPlayer {
         this.setShiftKeyDown(sneak);
         this.setSprinting((sprintWhenRunning || sprintNow || hurry) && forward > 0.8f && !sneak && getFoodData().getFoodLevel() > 6 && !isUsingItem());
         super.tick();
+        // (A client does this for its player on the sneak key in water; a bot has none.)
+        if (sinkInWater && isInWater()) goDownInWater();
         // A client player is ticked by its network handler; a bot has none, so tick it here.
         this.doTick();
         // What the network handler does after each movement packet: the chunk tickets follow the
@@ -84,6 +86,9 @@ public class BotPlayer extends ServerPlayer {
         return false;
     }
 
+    /** Pressed down in water (what a client's sneak key does there): it goes under. */
+    public boolean sinkInWater;
+
     /** Releases all keys. */
     public void stopInputs() {
         forward = 0;
@@ -91,6 +96,7 @@ public class BotPlayer extends ServerPlayer {
         jump = false;
         sneak = false;
         sprintNow = false;
+        sinkInWater = false;
         setSprinting(false);
     }
 
