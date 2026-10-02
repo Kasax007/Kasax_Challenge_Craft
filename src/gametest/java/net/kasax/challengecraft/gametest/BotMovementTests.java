@@ -273,4 +273,18 @@ public class BotMovementTests {
         a.spawn(10, FEET, 10, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.BREAD, 8));
         a.run(new GoToTask(a.abs(30, FEET, 10), 1.5), 360, () -> a.near(30, FEET, 10, 1.6));
     }
+
+    /** Sunk into a pit of powder snow on the way: dug out, and on to where it was going, little hurt. */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void powderSnowPit(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "powder_snow_pit");
+        a.fill(19, GROUND - 2, 19, 21, GROUND, 21, Blocks.POWDER_SNOW);
+        a.fill(20, GROUND - 2, 20, 20, FEET, 20, Blocks.POWDER_SNOW);
+        a.spawn(20, GROUND - 2, 20, new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.DIRT, 16));
+        var body = a.bot().body();
+        a.run(new GoToTask(a.abs(28, FEET, 20), 1), 900, () -> {
+            if (body.getHealth() < 16) h.fail("frozen: " + body.getHealth());
+            return a.near(28, FEET, 20, 1.5);
+        });
+    }
 }

@@ -284,6 +284,13 @@ public final class Bot {
             interject(new net.kasax.challengecraft.bot.task.AirTask());
             return;
         }
+        // Sunk into powder snow by mistake (not on purpose for a tile): out, before it freezes.
+        if (body.isInPowderSnow && body.getTicksFrozen() > 20 && !(top instanceof net.kasax.challengecraft.bot.task.SnowEscapeTask)
+                && !(top instanceof net.kasax.challengecraft.bot.task.PowderSnowTask)) {
+            actions.reset();
+            interject(new net.kasax.challengecraft.bot.task.SnowEscapeTask());
+            return;
+        }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
         // Low on health with a monster close: get away first (and eat on the way), as a player
