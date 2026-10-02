@@ -484,7 +484,9 @@ public final class MineTask implements BotTask {
             // walk to a lone ore after the other over the hills, but down to where they are
             // common and mined there in one go - unless the next one is a short walk.
             int left = count - ObtainPlanner.countAny(bot.body(), items);
-            if (left >= 3) return walk <= Math.min(dig, 25);
+            // (A minute's walk to ore seen in a cave wall still beats a tunnel at the depth: it
+            // takes minutes to come across a vein that way, and a seen one is seldom alone.)
+            if (left >= 3) return walk <= Math.min(dig, 60);
             return walk <= dig;
         }
         if (Math.abs(p.getY() - bot.body().getBlockY()) <= 8) return true;
