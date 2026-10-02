@@ -395,7 +395,9 @@ public final class Bot {
         if (!recent) retreatFails = 0;
         boolean cornered = recent && retreatFails >= 2;
         if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask) && !cornered) {
-            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(6), net.minecraft.world.entity.LivingEntity::isAlive)) {
+            // (Any enemy, not only the Monster kind: magma cubes and slimes are not of it.)
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
+                    e -> e.isAlive() && e instanceof net.minecraft.world.entity.monster.Enemy)) {
                 boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0;
                 // A tile wants an explosion survived: at full health, let it go off a few blocks away
                 // (about five blocks off: on hard some four hearts, at full health only).
@@ -423,7 +425,9 @@ public final class Bot {
                 boolean hard = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
                 // Low with something at it that only strikes close (a zombie that keeps
                 // coming, wherever it runs): three blocks up, out of reach, and eat up there.
+                // (Not from a magma cube or a slime: they leap that high - away from those instead.)
                 if (!creeper && body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0) && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)
+                        && !(m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob)
                         && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this)) {
                     actions.reset();
                     navigator.stop();
@@ -431,7 +435,9 @@ public final class Bot {
                     reflex(net.kasax.challengecraft.bot.task.HideTask.upward());
                     return;
                 }
-                if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)) {
+                // (From a magma cube sooner: they come in families, each split another two blows.)
+                if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
+                        + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0)) {
                     net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
                     // (That way was blocked last time: off to the side instead.)
                     if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
