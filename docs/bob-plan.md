@@ -800,3 +800,116 @@ Probeläufe über 20 Minuten auf dem Seed aus dem Live-Test:
 | Probe 4 | 3 | starke Streuung: Spitzhacke auf der Treppe zerbrochen, Höhle unter der Treppe; beides danach behoben |
 
 90-Minuten-Läufe auf mehreren Seeds folgen unten.
+
+## 14. Runde 8: Navigation mit Weitblick, Kampf ohne Schaden, Nacht und Höhlen
+
+Anlass: Rückmeldung vom Spieler:
+
+- Fackeln sind unnötig, ein Profi stellt keine.
+- Bob soll besser kämpfen (Abstand, Bewegung) und keinen Schaden nehmen.
+- Aus gefundenem Eisen soll er bessere Waffe und Rüstung machen.
+- Schlafen nur, wenn keine Aufgabe die Nacht braucht und im Mehrspieler die anderen liegen.
+- Große Höhlen statt Strip-Mining.
+- Ein Review der Entscheidungslogik und des A*, der zu kurz vorausschaut.
+
+### 14.1 A*-Review: Befunde
+
+- Die Suche las nur 7 Chunks (~112 Blöcke) um den Start. Alles dahinter galt als Wand.
+- Weite Wege liefen Bob deshalb in Stücken, die gierig nach Luftlinie gewählt wurden. Es gab
+  keine Grobplanung.
+- `FarWalk` wich nach Fehlschlägen zufällig um ±60° aus. Folgen waren Sackgassen und Pendeln.
+- Die „Bevorzugung des alten Pfads“ war wirkungslos: Beim Neuplanen war der Pfad immer schon
+  verworfen.
+- Die Suche stoppte nach Zeit statt nach Knoten. Unter Last wurden die Wege dadurch schlechter,
+  und Tests wackelten.
+- Ziele wählte Bob nach Luftlinie (der Baum jenseits des Flusses). Planer und Route schätzten
+  Wege mit Luftlinie/4.
+- In der Ausführung zielte Bob auf jede Blockmitte (Zickzack) und sprang nicht im Sprint.
+
+### 14.2 Umsetzung
+
+- **Grobkarte (`BotTerrain`)**:
+  - Zellen von 4×4 Blöcken aus den Höhenkarten der geladenen Chunks (bis 24 Chunks Sicht).
+  - Je Zelle: Boden, Wassertiefe, Gefahren, Rauheit und Blätterdach.
+  - Ein Dijkstra auf einem eigenen Thread liefert das Restkostenfeld zum Ziel.
+- **Feiner A***:
+  - Heuristik `max(Luftlinie, 0,85·Restkosten − Schlupf)`.
+  - Teilpfad und Schnellsuche folgen damit dem echten Weg um Seen und Buchten.
+  - Bleibt Bob stecken, wird die Zelle teurer und der Weg neu gerechnet.
+- **Pfad-Gedächtnis**: Nach einem Abbruch bevorzugt die nächste Suche den Rest des alten Weges.
+- **Budgets**: Knotenzahl statt Zeit, fastutil-Maps.
+- **Mehrere Kandidaten** (`goNearAny`): Der A* findet selbst den billigsten erreichbaren Block.
+  Genutzt in `MineTask`.
+- **Laufen**:
+  - Schnur ziehen, also gerade auf den fernsten begehbaren der nächsten Schritte zu.
+  - Sprint-Springen auf freien Geraden: 6,8 statt 5,6 Blöcke/s im Test.
+- **Neuer Zug**: durch den Boden in eine Höhle darunter graben und hineinfallen.
+- **Wegzeiten**: Planer, Route und Strukturziele rechnen mit der Wegzeit über die Karte
+  (Reisezeitfeld ab Bob, mit gelerntem Faktor) statt mit Luftlinie/4.
+- **Explorer**: Er geht in die Richtung mit dem meisten noch nie gesehenen Land.
+- **Kampf**:
+  - Abstand halten (Auge bis Hitbox, Reichweite 2,85).
+  - Beim Nachladen im Kreis gehen.
+  - Den Sprung so starten, dass der Schlag als Crit beim Fallen trifft.
+  - Rück- und Seitschritte nur auf Boden.
+  - Gezielt der Angreifer, nicht der nächste Mob seiner Art.
+  - Zuerst zuschlagen.
+  - Schild gegen einen Creeper, der zu nah zischt.
+  - Kein Essen und kein Aufräumen unter Angriff.
+  - Das Gehirn wartet, solange ein Reflex läuft.
+- **Eisen**:
+  - Übriges Eisen (über dem Brett-Bedarf, Barren und Roherz) geht in dieser Reihenfolge in
+    Schild, Schwert, Brust, Beine, Stiefel und Helm.
+  - Was nicht reicht, wird übersprungen.
+  - Geprüft wird sofort, wenn Eisen dazukommt.
+- **Schlafen**: Nur wenn
+  - kein offenes Feld die Nacht braucht (Nachtmonster, ihre Drops, Phantom, Skelett und andere),
+  - und die Nacht durch Bobs Schlaf wirklich vergeht (Spielregel `playersSleepingPercentage`, die
+    anderen liegen schon).
+- **Höhlen**:
+  - Im Erzband (±16, Diamant/Redstone/Gold ±10) läuft Bob die Höhle Punkt für Punkt ab, bis 14
+    Punkte erreicht sind oder 90 s nichts gefunden wurde.
+  - Gräbt sich eine Treppe in eine Höhle, wird diese zuerst erkundet.
+  - Höhlenpunkte brauchen einen Boden.
+  - Der Planer rechnet weniger Suchzeit, wenn eine bekannte Höhle das Band erreicht.
+  - Für Gestein nimmt Bob die billigste Spitzhacke.
+- **Routing**:
+  - Plünderungen nur bei Bedarf (Eisen, Essen; Portal-Ruine bei Obsidian-, Gold- oder
+    Nether-Bedarf).
+  - Gelegenheiten am Weg auch bei Nebenaufgaben.
+  - Ein bekanntes, brennendes Portal wird wiederverwendet.
+- **Phase-0-Korrekturen**:
+  - Fackeln entfernt.
+  - Kit-Bedarf („hat eines“) korrigiert.
+  - Barren-Bedarf über Roherz.
+  - Eröffnungsversuche zählen je Werkzeug.
+  - Drop-Tabelle mit genug Würfen.
+  - Lohe planbar.
+  - Gesehenes gilt nicht als „fehlend“.
+  - Das Gedächtnis behält Gesehenes beim Neu-Scan.
+  - Timer werden nach dem Respawn zurückgesetzt.
+  - Gelernt wird nur aus echten Feldzeiten (ohne Stellvertreter, Uhr steht bei Nebenaufgaben).
+  - Verlängerung nur bei Fortschritt.
+  - Statt Leerlauf versucht Bob die billigsten schweren Felder.
+
+### 14.3 Messungen
+
+**Navigation** (Navbench v2, 30 feste Ziele um den Spawn, 50–400 Blöcke):
+
+| Seed | Stand | erreicht | Blöcke/s | Umweg | Pendler | ohne Weg |
+| --- | --- | --- | --- | --- | --- | --- |
+| Live | alt | 25/30 | 1,77 | 1,42 | 40 | 4 |
+| Live | neu | 29/30 | 2,98 | 1,23 | 7 | 0 |
+| 77 | alt | 11/11, dann Sturztod | 3,00 | 1,34 | 2 | 0 |
+| 77 | neu | 30/30 | 3,45 (erste 11: 3,65) | 1,20 | 3 | 0 |
+
+**Kampf auf HARD**, Steinschwert, Herzen verloren:
+
+| Gegner | Herzen verloren |
+| --- | --- |
+| Zombie | 0 |
+| Baby-Zombie | 0 |
+| Spinne | 0 |
+| Zombie-Trio | 0 bis 3 (Streuung über mehrere Läufe) |
+
+**90 Minuten, Live-Seed, alter Stand (vor dieser Runde):** 14 Felder, 1 Tod.
