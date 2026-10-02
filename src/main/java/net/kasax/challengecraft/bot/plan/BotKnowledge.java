@@ -154,7 +154,10 @@ public final class BotKnowledge {
     private void indexDrops(ServerLevel level) {
         BlockPos pos = level.getRespawnData().pos();
         ItemStack tool = new ItemStack(Items.DIAMOND_PICKAXE);
-        final int rolls = 12;
+        // (Enough rolls for the one-in-ten things to show every time: flint from gravel was
+        // missing from one start in four with a dozen.)
+        final int rolls = 400;
+        long started = System.nanoTime();
         for (Block block : BuiltInRegistries.BLOCK) {
             BlockState state = block.defaultBlockState();
             if (state.isAir() || !state.getFluidState().isEmpty() && state.getCollisionShape(level, pos).isEmpty()) continue;
@@ -164,16 +167,30 @@ public final class BotKnowledge {
             // A dozen rolls would never see one; these are rolled until they show.)
             int n = state.is(net.minecraft.tags.BlockTags.LEAVES) ? 4000 : rolls;
             try {
+                // (Most blocks drop the same every time: sixty rolls show that, and only the
+                // ones that vary are rolled on.)
+                Map<Item, Integer> first = null;
+                boolean varies = false;
                 for (int i = 0; i < n; i++) {
+                    Map<Item, Integer> one = new HashMap<>();
                     for (ItemStack s : Block.getDrops(state, level, pos, null, null, tool)) {
                         got.merge(s.getItem(), s.getCount(), Integer::sum);
+                        one.merge(s.getItem(), s.getCount(), Integer::sum);
+                    }
+                    if (first == null) first = one;
+                    else if (!varies && !first.equals(one)) varies = true;
+                    if (i == 59 && !varies && n == rolls) {
+                        n = 60;
+                        break;
                     }
                 }
             } catch (RuntimeException e) {
                 continue;
             }
-            got.forEach((item, c) -> drops.computeIfAbsent(item, k -> new ArrayList<>()).add(new Drop(block, c / (double) n)));
+            final int rolled = n;
+            got.forEach((item, c) -> drops.computeIfAbsent(item, k -> new ArrayList<>()).add(new Drop(block, c / (double) rolled)));
         }
+        net.kasax.challengecraft.bot.BotManager.LOG.info("[Bot] drops indexed in {} ms", (System.nanoTime() - started) / 1_000_000);
     }
 
     /**
@@ -365,7 +382,8 @@ public final class BotKnowledge {
         mob(EntityTypes.GHAST, 200, Items.GHAST_TEAR, 0.5, Items.GUNPOWDER, 1.0);
         mob(EntityTypes.HOGLIN, 90, Items.PORKCHOP, 3.0, Items.LEATHER, 0.5);
         mob(EntityTypes.STRIDER, 90, Items.STRING, 3.0);
-        mob(EntityTypes.BLAZE, 600, Items.BLAZE_ROD, 0.5);
+        // (The fortress found, a spawner gives one every half minute: the search is most of it.)
+        mob(EntityTypes.BLAZE, 250, Items.BLAZE_ROD, 0.5);
         mob(EntityTypes.WITHER_SKELETON, 700, Items.COAL, 0.33, Items.BONE, 1.0);
     }
 

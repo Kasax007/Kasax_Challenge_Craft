@@ -206,7 +206,10 @@ public final class LockoutBrain implements BotBrain {
         if (strategist.wantsIron() && bot.body().level().getGameTime() >= kitRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             for (var item : List.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.BUCKET)) {
                 if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
-                kitRetryAt = bot.body().level().getGameTime() + 1200; // (not again at once if this fails)
+                // (Not again at once if this fails, and each failure waits longer; four, and the
+                // kit is left to the tiles that need it.)
+                if (kitTries >= 4) break;
+                kitRetryAt = bot.body().level().getGameTime() + (1200L << Math.min(3, kitTries++));
                 bot.say("investing: " + ObtainPlanner.name(item) + " (the plan wants the iron kit)");
                 start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 4800);
                 return;
@@ -222,6 +225,12 @@ public final class LockoutBrain implements BotBrain {
         if (sleep(bot)) return;
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
+        // Only dear tiles left (over half an hour, by the estimate) or ones that ran over a while
+        // ago: the cheapest of them all the same - standing about never fills the board.
+        if (choices.isEmpty()) {
+            choices = choices(bot, -1, true);
+            if (!choices.isEmpty()) bot.say("only hard tiles left: trying the cheapest of them");
+        }
         // Nothing (more) to do down here: back to the Overworld, where most goals are.
         if (choices.isEmpty() && bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD
                 && LockoutGoals.wayBack(bot) != null) {
@@ -257,9 +266,13 @@ public final class LockoutBrain implements BotBrain {
         goalTask = pick.option().task().get();
         starts.merge(pick.tile().goal().id(), 1, Integer::sum);
         goalStarted = bot.body().level().getGameTime();
+        goalPaused = 0;
         goalBudget = budget(pick.option().cost(), 1200, 9000);
         goalEstimate = pick.option().cost();
-        goalFirstEstimate = pick.option().cost() / GoalExperience.factor(pick.tile().goal().id());
+        // (The plain estimate: before what experience and overruns added, else each overrun
+        // would be measured against a figure that already had the last one in it.)
+        goalFirstEstimate = pick.plain();
+        goalProxy = pick.option().proxy();
         goalGoal = pick.tile().goal();
         extensions = 0;
         stalls = 0;
@@ -482,16 +495,6 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
             return true;
         }
-        // Torches for the dark down there (a coal and a stick make four): with coal in the pack
-        // to spare, a few made now - the mines are lit as it goes (see Bot.lightTheWay).
-        int torches = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.TORCH));
-        int coal = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.COAL, net.minecraft.world.item.Items.CHARCOAL));
-        if (torches < 4 && coal >= 2 && now >= torchRetryAt && body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
-            torchRetryAt = now + 2400;
-            bot.say("torches for the mines");
-            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.TORCH), torches + 8, planner), 400);
-            return true;
-        }
         // The pack filling up and no bundle yet: one (string and leather), for the odds and ends.
         if (net.kasax.challengecraft.bot.BotBundles.bundle(body) == null && net.kasax.challengecraft.bot.BotBundles.freeSlots(body) <= 8
                 && now >= bundleRetryAt) {
@@ -529,14 +532,14 @@ public final class LockoutBrain implements BotBrain {
         return false;
     }
 
-    private long upgradeRetryAt, bundleRetryAt, torchRetryAt;
+    private long upgradeRetryAt, bundleRetryAt;
 
     private boolean upgrade(Bot bot) {
         var body = bot.body();
         long now = body.level().getGameTime();
         if (now < upgradeRetryAt) return false;
         int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT));
-        int spare = iron - planner.boardDemand.getOrDefault(net.minecraft.world.item.Items.IRON_INGOT, 0);
+        int spare = iron - planner.ingotsSpokenFor(body, net.minecraft.world.item.Items.IRON_INGOT);
         if (spare < 1) return false;
         record Step(net.minecraft.world.item.Item item, int iron, Set<net.minecraft.world.item.Item> better) {}
         var steps = List.of(
@@ -603,6 +606,7 @@ public final class LockoutBrain implements BotBrain {
             Set<net.minecraft.world.item.Item> want = OPENING.get(openingStep);
             if (ObtainPlanner.countAny(bot.body(), want) > 0) {
                 openingStep++;
+                openingTries = 0; // (each tool its own tries)
                 continue;
             }
             if (openingTries++ > 2) { // could not (no stone anywhere?): play on without
@@ -620,6 +624,7 @@ public final class LockoutBrain implements BotBrain {
     private int openingTries;
     private boolean openingWood;
     private long netherRetryAt, kitRetryAt;
+    private int kitTries;
     private int netherFails;
 
     private boolean needsFood(Bot bot) {
@@ -657,16 +662,24 @@ public final class LockoutBrain implements BotBrain {
 
     /** Every open tile the bot knows how to do, with its way and effort from here. */
     private List<Choice> choices(Bot bot, int except) {
+        return choices(bot, except, false);
+    }
+
+    /**
+     * {@code last}: when nothing else is left - tiles resting after an overrun count again, and
+     * so do ones dearer than the usual limit (only those done but never counted stay out).
+     */
+    private List<Choice> choices(Bot bot, int except, boolean last) {
         MinecraftServer server = bot.server();
         long now = server.overworld().getGameTime();
         List<Choice> out = new ArrayList<>();
         for (Chal_40_LockoutBingo.BoardTile tile : Chal_40_LockoutBingo.board(server)) {
             if (tile.claimedBy() != null || tile.index() == except) continue;
-            if (resting(tile.goal().id(), now)) continue;
+            if (last ? tries.getOrDefault(tile.goal().id(), 0) > MAX_TRIES : resting(tile.goal().id(), now)) continue;
             if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
             LockoutGoals.Option o;
             try {
-                o = LockoutGoals.plan(bot, planner, tile.goal());
+                o = last ? LockoutGoals.planAny(bot, planner, tile.goal()) : LockoutGoals.plan(bot, planner, tile.goal());
             } catch (RuntimeException e) {
                 o = null;
             }
@@ -675,7 +688,7 @@ public final class LockoutBrain implements BotBrain {
             // What earlier games taught about this tile (it always takes three times as long...).
             if (o != null) {
                 double f = GoalExperience.factor(tile.goal().id());
-                if (f != 1) o = new LockoutGoals.Option(o.cost() * f, o.task(), o.yields());
+                if (f != 1) o = o.costing(o.cost() * f);
             }
             // Ran over its time before: believed somewhat less - unless things have changed since (a
             // new tool, a village found: the fresh estimate is well below the one that failed).
@@ -686,7 +699,7 @@ public final class LockoutBrain implements BotBrain {
                 overrunEstimate.remove(tile.goal().id());
                 over = 0;
             }
-            if (o != null && over > 0) o = new LockoutGoals.Option(o.cost() * (1 + 0.5 * over) + 20 * over, o.task(), o.yields());
+            if (o != null && over > 0) o = o.costing(o.cost() * (1 + 0.5 * over) + 20 * over);
             if (o != null) out.add(new Choice(tile, o, plain));
         }
         return out;
@@ -905,7 +918,20 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long goalStarted, goalBudget, sideStarted, sideBudget;
+    /** Ticks of the goal's time spent on side trips (chances on the way): not counted as the goal's. */
+    private long goalPaused;
+
+    /** Ticks the goal itself has taken so far. */
+    private long goalElapsed(long now) {
+        return now - goalStarted - goalPaused;
+    }
+
+    private double goalSeconds(long now) {
+        return goalElapsed(now) / 20.0;
+    }
     private double goalEstimate, goalFirstEstimate;
+    /** The goal's task is only the way to the tile (see {@link LockoutGoals.Option#proxy}): nothing learnt from it. */
+    private boolean goalProxy;
     private net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal goalGoal;
     private int extensions, stalls;
     /** How often each goal ran over its time: its estimates are trusted that much less. */
@@ -942,6 +968,25 @@ public final class LockoutBrain implements BotBrain {
     private final Map<String, Integer> errandOverruns = new HashMap<>();
     private long blocksRetryAt;
 
+    /** What is left of the running errand, in seconds, when it was started or last given more time. */
+    private double runningLeft = Double.MAX_VALUE;
+
+    /** What is left of the running errand now (for getting things: the planner's estimate), or null if it cannot be told. */
+    private Double errandLeft(Bot bot) {
+        if (!(running instanceof net.kasax.challengecraft.bot.task.ObtainTask o)) return null;
+        double left = planner.estimate(bot, o.items(), o.count());
+        return left >= 1e8 ? null : left;
+    }
+
+    /** The errand has come on: clearly less left than before (or, for one that cannot say, a good way walked). */
+    private boolean errandProgress(Bot bot) {
+        Double left = errandLeft(bot);
+        if (left == null) return runningFrom != null && horizontal(runningFrom, bot.body().blockPosition()) > 60;
+        boolean progress = left < runningLeft * 0.85;
+        runningLeft = left;
+        return progress;
+    }
+
     private void start(Bot bot, BotTask task, long budgetTicks) {
         errand = nextErrand;
         nextErrand = null;
@@ -950,6 +995,9 @@ public final class LockoutBrain implements BotBrain {
         runningBudget = budgetTicks;
         runningFrom = bot.body().blockPosition();
         runningExtensions = 0;
+        runningLeft = Double.MAX_VALUE;
+        Double left = errandLeft(bot);
+        if (left != null) runningLeft = left;
         bot.doNow(task);
     }
 
@@ -964,8 +1012,9 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null
-                && runningExtensions < 2 && runningFrom != null && horizontal(runningFrom, bot.body().blockPosition()) > 60) {
-            // Still on its way somewhere (the forest on the horizon): not stuck, more time.
+                && runningExtensions < 2 && errandProgress(bot)) {
+            // Getting there (what is left of it clearly less than before): more time. Walking
+            // about without getting nearer is not that.
             runningExtensions++;
             runningSince = now;
             runningFrom = bot.body().blockPosition();
@@ -991,7 +1040,7 @@ public final class LockoutBrain implements BotBrain {
             pause = 100;
             return;
         }
-        if (goalTask != null && targetId != null && now - goalStarted > goalBudget) {
+        if (goalTask != null && targetId != null && goalElapsed(now) > goalBudget) {
             // Well on the way (half way down to the ore, say): what is left is worth finishing.
             // By the situation, not the clock: what is left of this one against the best other
             // thing to do from here (deep down next to where redstone lies, a walk back up to the
@@ -1002,7 +1051,7 @@ public final class LockoutBrain implements BotBrain {
             if (!progress) stalls++;
             // (Without progress, what has taken long already is likely to take long still: at
             // least half the time spent so far is believed left, however small the estimate.)
-            double spentSeconds = (now - goalStarted) / 20.0;
+            double spentSeconds = goalSeconds(now);
             double believed = (stalls > 0 ? Math.max(left, 0.5 * spentSeconds) : left) * (1 + 0.6 * stalls);
             double other = Double.MAX_VALUE;
             if (extensions < 8 && left < Double.MAX_VALUE / 4) {
@@ -1011,7 +1060,7 @@ public final class LockoutBrain implements BotBrain {
             if (extensions < 8 && left < Double.MAX_VALUE / 4 && (progress && stalls < 3 || believed + 15 < other)) {
                 extensions++;
                 goalEstimate = left;
-                goalBudget = now - goalStarted + budget(left, 600, 6000);
+                goalBudget = goalElapsed(now) + budget(left, 600, 6000);
                 bot.say("still on " + targetId + ", ~" + Math.round(left) + " s left"
                         + (other < Double.MAX_VALUE ? " (next best ~" + Math.round(other) + " s)" : ""));
                 return;
@@ -1020,7 +1069,7 @@ public final class LockoutBrain implements BotBrain {
             overruns.merge(targetId, 1, Integer::sum);
             overrunEstimate.put(targetId, goalFirstEstimate);
             // (For next games too: at least this long, and it was not even done.)
-            GoalExperience.record(targetId, goalFirstEstimate, 1.5 * (now - goalStarted) / 20.0, 0.5);
+            if (!goalProxy) GoalExperience.record(targetId, goalFirstEstimate, 1.5 * goalSeconds(now), 0.5);
             restUntil.put(targetId, now + REST_TICKS);
             drop(bot);
             return;
@@ -1173,6 +1222,8 @@ public final class LockoutBrain implements BotBrain {
     @Override
     public void finished(Bot bot, BotTask task, boolean success) {
         if (task == sideTask) {
+            // (The goal's clock stood still meanwhile: the side trip is not the goal's time.)
+            if (goalTask != null) goalPaused += bot.body().level().getGameTime() - sideStarted;
             if (!success && sideId != null) restUntil.put(sideId, bot.body().level().getGameTime() + REST_TICKS);
             if (!success && sideWant != null) wantRest.put(sideWant, bot.body().level().getGameTime() + 6000);
             sideTask = null;
@@ -1184,7 +1235,7 @@ public final class LockoutBrain implements BotBrain {
         long now = bot.body().level().getGameTime();
         if (success) {
             // Learnt for next time: how long it really took against the plain estimate.
-            if (targetId != null && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, (now - goalStarted) / 20.0);
+            if (targetId != null && !goalProxy && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now));
             // The game counts it within a second (it checks inventories once a second): wait for
             // that instead of starting on the same tile again.
             // If it never counts (the goal wants something else than the bot thought), give up on it.
@@ -1213,6 +1264,7 @@ public final class LockoutBrain implements BotBrain {
         openingStep = 0; // the tools are gone with the rest
         openingWood = false;
         kitRetryAt = 0;
+        kitTries = 0;
         openingTries = 0;
         targetIndex = -1;
         goalTask = null;

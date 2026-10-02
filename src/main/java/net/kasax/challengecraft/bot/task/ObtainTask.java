@@ -40,6 +40,15 @@ public final class ObtainTask implements BotTask {
         this.craftOnly = craftOnly;
     }
 
+    /** What it gets, and how many in all. */
+    public Set<Item> items() {
+        return items;
+    }
+
+    public int count() {
+        return count;
+    }
+
     /** Items not to use up while getting these (see {@link ObtainPlanner#plan(Bot, java.util.Collection, int, boolean, Set)}). */
     public ObtainTask keeping(Set<Item> keep) {
         this.keep = Set.copyOf(keep);

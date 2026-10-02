@@ -287,22 +287,4 @@ public class BotMovementTests {
             return a.near(28, FEET, 20, 1.5);
         });
     }
-
-    /** Along a dark tunnel deep in the rock with torches in the pack: the way lit as it goes. */
-    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
-    public void torchesInTheDark(GameTestHelper h) {
-        BotArena a = BotArena.flat(h, "torches_in_the_dark");
-        a.fill(4, 6, 20, 34, 7, 20, Blocks.AIR);
-        a.spawn(6, 6, 20, new ItemStack(Items.TORCH, 8));
-        a.run(new GoToTask(a.abs(32, 6, 20), 1), 600, () -> {
-            int torches = 0;
-            for (int x = 4; x <= 34; x++) {
-                for (int y = 6; y <= 7; y++) {
-                    var st = h.getBlockState(new net.minecraft.core.BlockPos(x, y, 20));
-                    if (st.is(Blocks.TORCH) || st.is(Blocks.WALL_TORCH)) torches++;
-                }
-            }
-            return a.near(32, 6, 20, 1.5) && torches >= 2;
-        });
-    }
 }

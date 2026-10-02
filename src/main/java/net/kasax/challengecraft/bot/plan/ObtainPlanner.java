@@ -709,8 +709,9 @@ public final class ObtainPlanner {
      */
     private Leaf blockLeaf(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         BlockState s = block.defaultBlockState();
-        if (isMissing(block)) return Leaf.NONE;
         Double seen = visibleBlocks.get(block);
+        // (Given up on as missing, but in sight now: it is there after all.)
+        if (seen == null && isMissing(block)) return Leaf.NONE;
         double find = BotKnowledge.rarity(block, nether);
         double search = find;
         BlockPos at = null;
@@ -993,7 +994,7 @@ public final class ObtainPlanner {
             // pickaxe and the shears): one furnace, one wait, instead of three trips to it.
             case SMELT -> {
                 BotKnowledge.SmeltRoute r = (BotKnowledge.SmeltRoute) p.data();
-                int later = boardDemand.getOrDefault(r.result(), 0) - countAny(bot.body(), Set.of(r.result()));
+                int later = demandFor(r.result()) - countAny(bot.body(), Set.of(r.result()));
                 yield new SmeltTask(r, Math.max(total, Math.min(total + 16, later)));
             }
             case FILL -> new net.kasax.challengecraft.bot.task.FillBucketTask(p.data() == Items.LAVA_BUCKET
@@ -1038,6 +1039,26 @@ public final class ObtainPlanner {
 
     /** Raw materials the open tiles want in all (set by the game plan): mined in bulk when in a vein. */
     public final Map<Item, Integer> boardDemand = new HashMap<>();
+
+    /** The raw ore an ingot is smelted from (the board's demand is kept in raw ore). */
+    private static final Map<Item, Item> INGOT_RAW = Map.of(Items.IRON_INGOT, Items.RAW_IRON, Items.GOLD_INGOT, Items.RAW_GOLD,
+            Items.COPPER_INGOT, Items.RAW_COPPER);
+
+    /** How many of {@code item} the board will want in all: an ingot counts what is wanted of its raw ore too. */
+    public int demandFor(Item item) {
+        Item raw = INGOT_RAW.get(item);
+        return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0));
+    }
+
+    /**
+     * Ingots in the pack the board still needs: its demand less the raw ore carried (smelted
+     * later, that makes its own ingots).
+     */
+    public int ingotsSpokenFor(net.minecraft.world.entity.player.Player body, Item ingot) {
+        Item raw = INGOT_RAW.get(ingot);
+        int rawHeld = raw == null ? 0 : countAny(body, Set.of(raw));
+        return Math.max(0, demandFor(ingot) - rawHeld);
+    }
 
     /** A far lead only if one was found before (no new biome search for blocks that are in sight). */
     private static BlockPos farLeadStandBy(Bot bot, Set<Block> blocks) {
@@ -1182,7 +1203,7 @@ public final class ObtainPlanner {
         int tried = 0;
         for (Way w : ways) {
             // Ways that need things the bot won't find (storage blocks, the Nether) are no ways.
-            if (w.cost() >= MAX_WAY_COST || tried++ >= 6) break;
+            if (w.cost() > MAX_WAY_COST || tried++ >= 6) break;
             Sim before = sim.copy();
             String why = switch (w.kind()) {
                 case MINE -> mine(bot, k, sim, accept, count, w, depth, visiting);

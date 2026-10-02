@@ -154,18 +154,28 @@ public final class BotMemory {
             LevelChunk chunk = level.getChunkSource().getChunkNow(cx + dx, cz + dz);
             if (chunk == null) continue;
             done.put(key, now);
-            scan(level, chunk, at);
-            scanCaves(level, chunk, at);
+            java.util.Set<BlockPos> kept = scan(level, chunk, at);
+            scanCaves(level, chunk, at, kept);
             return;
         }
     }
 
-    private void scan(ServerLevel level, LevelChunk chunk, BlockPos at) {
+    /** Reads a chunk again; what it remembers there and is still there is kept (and returned). */
+    private java.util.Set<BlockPos> scan(ServerLevel level, LevelChunk chunk, BlockPos at) {
         Map<Block, List<BlockPos>> known = blocks.computeIfAbsent(level.dimension(), k -> new IdentityHashMap<>());
         net.minecraft.world.phys.Vec3 eye = new net.minecraft.world.phys.Vec3(at.getX() + 0.5, at.getY() + 1.62, at.getZ() + 0.5);
-        // Forget what was there: it is read afresh.
+        // Forget only what is gone (dug, burnt, flowed away): what it saw from down in a cave
+        // stays known, though it is not in sight from up here.
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
-        for (List<BlockPos> list : known.values()) list.removeIf(p -> (p.getX() >> 4) == (x0 >> 4) && (p.getZ() >> 4) == (z0 >> 4));
+        java.util.Set<BlockPos> kept = new java.util.HashSet<>();
+        for (Map.Entry<Block, List<BlockPos>> e : known.entrySet()) {
+            e.getValue().removeIf(p -> {
+                if ((p.getX() >> 4) != (x0 >> 4) || (p.getZ() >> 4) != (z0 >> 4)) return false;
+                if (!chunk.getBlockState(p).is(e.getKey())) return true;
+                kept.add(p);
+                return false;
+            });
+        }
         LevelChunkSection[] sections = chunk.getSections();
         for (int si = 0; si < sections.length; si++) {
             LevelChunkSection section = sections[si];
@@ -177,6 +187,7 @@ public final class BotMemory {
                         BlockState s = section.getBlockState(x, y, z);
                         if (!interesting(s)) continue;
                         BlockPos p = new BlockPos(x0 + x, y0 + y, z0 + z);
+                        if (kept.contains(p)) continue;
                         // Only what can be seen: next to air or water (a cave wall, the ground),
                         // not ore buried in the rock - that is what caves and tunnels are for.
                         // And only from where a player would see it: from the open air, or close
@@ -187,6 +198,7 @@ public final class BotMemory {
                 }
             }
         }
+        return kept;
     }
 
     private static boolean exposed(ServerLevel level, LevelChunk chunk, BlockPos p) {
@@ -211,10 +223,16 @@ public final class BotMemory {
     private final Map<ResourceKey<Level>, List<BlockPos>> caves = new HashMap<>();
     private static final int CAVE_CAP = 1200;
 
-    private void scanCaves(ServerLevel level, LevelChunk chunk, BlockPos at) {
+    private void scanCaves(ServerLevel level, LevelChunk chunk, BlockPos at, java.util.Set<BlockPos> kept) {
         List<BlockPos> list = caves.computeIfAbsent(level.dimension(), k -> new ArrayList<>());
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
-        list.removeIf(p -> (p.getX() >> 4) == (x0 >> 4) && (p.getZ() >> 4) == (z0 >> 4));
+        // (Cave points seen before stay, while the cave is still there: in sight or not now.)
+        java.util.Set<BlockPos> caveKept = new java.util.HashSet<>();
+        list.removeIf(p -> {
+            if ((p.getX() >> 4) != (x0 >> 4) || (p.getZ() >> 4) != (z0 >> 4)) return false;
+            if (!chunk.getBlockState(p).isAir() || !caveKept.add(p)) return true;
+            return false;
+        });
         boolean nether = level.dimension() == Level.NETHER;
         // Water at the surface, one column in sixteen (rivers, lakes, the sea): where a bucket is
         // filled. (All of it would be far too much to keep.)
@@ -224,7 +242,7 @@ public final class BotMemory {
                 int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
                 BlockPos w = new BlockPos(x0 + x, top, z0 + z);
                 var fs = chunk.getBlockState(w).getFluidState();
-                if (fs.isSource() && fs.is(net.minecraft.tags.FluidTags.WATER)) add(known, Blocks.WATER, w, at);
+                if (fs.isSource() && fs.is(net.minecraft.tags.FluidTags.WATER) && !kept.contains(w)) add(known, Blocks.WATER, w, at);
             }
         }
         for (int x = 1; x < 16; x += 4) {
@@ -234,7 +252,7 @@ public final class BotMemory {
                     BlockPos p = new BlockPos(x0 + x, y, z0 + z);
                     BlockState st = chunk.getBlockState(p);
                     // Room to stand: air here and above, something under it.
-                    if (!st.isAir() || !chunk.getBlockState(p.above()).isAir()) continue;
+                    if (!st.isAir() || !chunk.getBlockState(p.above()).isAir() || caveKept.contains(p)) continue;
                     if (nether) continue; // (the Nether is one big cave: no use)
                     // A cave it can know of: its mouth (lit by the sky), or the one it is in.
                     if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, p) == 0

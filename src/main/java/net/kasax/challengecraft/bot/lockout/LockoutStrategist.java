@@ -146,9 +146,9 @@ final class LockoutStrategist {
         boolean ironWanted = ironKit || planner.boardDemand.containsKey(Items.RAW_IRON);
         if (ironWanted) {
             int kit = 0;
-            if (!holds(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE))) kit += 3;
-            if (ironKit && !holds(bot, Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET))) kit += 3;
-            if (!holds(bot, Set.of(Items.SHIELD)) && bot.body().getOffhandItem().getItem() != Items.SHIELD) kit += 1;
+            if (!holdsAny(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE))) kit += 3;
+            if (ironKit && !holdsAny(bot, Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET))) kit += 3;
+            if (!holdsAny(bot, Set.of(Items.SHIELD)) && bot.body().getOffhandItem().getItem() != Items.SHIELD) kit += 1;
             if (kit > 0) planner.boardDemand.merge(Items.RAW_IRON, kit, Integer::sum);
         }
         // Fuel for all that smelting: coal, picked up on the way (a player does not burn the logs
@@ -284,6 +284,12 @@ final class LockoutStrategist {
         return out;
     }
 
+    /** Carries one of these at least (any kind of pickaxe that will do, say). */
+    private static boolean holdsAny(Bot bot, Set<Item> items) {
+        return ObtainPlanner.countAny(bot.body(), items) > 0;
+    }
+
+    /** Carries every one of these. */
     private static boolean holds(Bot bot, Set<Item> items) {
         for (Item i : items) if (ObtainPlanner.countAny(bot.body(), Set.of(i)) == 0) return false;
         return true;

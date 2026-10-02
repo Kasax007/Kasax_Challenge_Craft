@@ -53,9 +53,22 @@ public final class LockoutGoals {
      * what the bot will hold afterwards (the goal's items and everything made on the way: the
      * furnace, the pickaxe, spare iron), for planning which goal to do next.
      */
-    public record Option(double cost, Supplier<BotTask> task, Supplier<Set<Item>> yields) {
+    /**
+     * {@code proxy}: the task is only the way towards the tile (into the Nether, back through the
+     * portal), not the tile itself: how long it takes says nothing about the tile.
+     */
+    public record Option(double cost, Supplier<BotTask> task, Supplier<Set<Item>> yields, boolean proxy) {
+        public Option(double cost, Supplier<BotTask> task, Supplier<Set<Item>> yields) {
+            this(cost, task, yields, false);
+        }
+
         Option(double cost, Supplier<BotTask> task) {
-            this(cost, task, Set::of);
+            this(cost, task, Set::of, false);
+        }
+
+        /** The same at another cost (believed dearer, say), still a proxy if it was one. */
+        public Option costing(double c) {
+            return new Option(c, task, yields, proxy);
         }
     }
 
@@ -85,6 +98,12 @@ public final class LockoutGoals {
         return o == null || o.cost() > MAX_COST ? null : o;
     }
 
+    /** As {@link #plan}, however dear (for when nothing cheaper is left on the board). */
+    public static Option planAny(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
+        Option o = option(bot, planner, goal);
+        return o == null || o.cost() >= INF / 2 ? null : o;
+    }
+
     private static Option option(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         // A Nether tile from up here: the way in first (a portal cast and walked through); once
         // there, the tile is planned for what it is. (Without this, no Nether tile ever looks doable
@@ -101,7 +120,7 @@ public final class LockoutGoals {
                 Option home = fetchFromNether(bot, planner, goal, trip);
                 if (home != null) return home;
             }
-            return new Option(trip.cost() + 90, trip.task(), trip.yields());
+            return new Option(trip.cost() + 90, trip.task(), trip.yields(), true);
         }
         // An Overworld tile from down in the Nether: back through the portal first (the tile is
         // planned for real once up there). Nether tiles come first that way, then home.
@@ -109,7 +128,7 @@ public final class LockoutGoals {
                 && goal.category() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER) {
             if (goal.type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.DIMENSION) return null;
             Double back = wayBack(bot);
-            return back == null ? null : new Option(back + 150, net.kasax.challengecraft.bot.task.ThroughPortalTask::new);
+            return back == null ? null : new Option(back + 150, net.kasax.challengecraft.bot.task.ThroughPortalTask::new, Set::of, true);
         }
         Option here = basic(bot, planner, goal);
         if (here != null || !overworld(bot)) return here;
@@ -130,7 +149,7 @@ public final class LockoutGoals {
         Option there = planner.inNether(bot, () -> basic(bot, planner, goal));
         Option trip = nether(bot, planner);
         if (trip == null) return null;
-        if (there != null) return new Option(trip.cost() + there.cost() + 60, trip.task(), trip.yields());
+        if (there != null) return new Option(trip.cost() + there.cost() + 60, trip.task(), trip.yields(), true);
         return fetchFromNether(bot, planner, goal, trip);
     }
 
