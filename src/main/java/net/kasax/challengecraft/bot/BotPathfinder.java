@@ -521,9 +521,11 @@ public final class BotPathfinder {
     private boolean besideLava(BlockPos p) {
         for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
             BlockPos q = p.relative(d);
-            if (lava(q) || lava(q.below())) return true;
+            // (At the feet, a block lower, and at the head: a lavafall beside the way.)
+            if (lava(q) || lava(q.below()) || lava(q.above())) return true;
         }
-        return false;
+        // Lava overhead (a ceiling pocket, the foot of a lavafall): one broken block from a shower.
+        return lava(p.above(2)) || lava(p.above(3));
     }
 
     boolean clear(BlockPos p) {

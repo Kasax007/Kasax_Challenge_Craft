@@ -281,7 +281,10 @@ public final class KillTask implements BotTask {
         // a step aside each time its bow is drawn full (the arrow goes where it stood), as a
         // player closes in on one. Then the blows, with the jump for the critical hit.
         boolean shooter = target instanceof net.minecraft.world.entity.monster.RangedAttackMob;
-        if (shooter && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target)) {
+        // (Straight runs only over safe ground: the way to it checked a few steps ahead for a
+        // drop or lava - else the path search, which knows the way round.)
+        boolean openGround = groundTo(body, target);
+        if (shooter && openGround && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target)) {
             if (walking) {
                 bot.navigator().stop();
                 walking = false;
@@ -297,7 +300,7 @@ public final class KillTask implements BotTask {
             return Result.RUNNING;
         }
         // Close and on about the same level: just run at it. Otherwise path there.
-        if (dist < 6 && Math.abs(target.getY() - body.getY()) < 1.5 || direct > 0) {
+        if (openGround && (dist < 6 && Math.abs(target.getY() - body.getY()) < 1.5 || direct > 0)) {
             direct--;
             if (walking) {
                 bot.navigator().stop();
@@ -383,14 +386,40 @@ public final class KillTask implements BotTask {
      * (and the side switched), at an edge sneaking.
      */
     static void keepFooting(BotPlayer body) {
-        if (body.forward >= 0 && body.strafe == 0) return;
+        if (body.forward == 0 && body.strafe == 0) return;
         double yaw = Math.toRadians(body.getYRot());
         double sin = Math.sin(yaw), cos = Math.cos(yaw);
+        // (Forward too: closing in on something that stands by a drop walks off it.)
+        if (body.forward > 0 && !footing(body, -sin, cos)) body.forward = 0;
         // (The game's own: forward is (-sin, cos), to the left (cos, sin).)
         double bx = -sin * Math.min(0, body.forward), bz = cos * Math.min(0, body.forward);
         if (body.forward < 0 && !footing(body, bx, bz)) body.forward = 0;
         if (body.strafe != 0 && !footing(body, cos * Math.signum(body.strafe), sin * Math.signum(body.strafe))) body.strafe = -body.strafe;
         if (body.strafe != 0 && !footing(body, cos * Math.signum(body.strafe), sin * Math.signum(body.strafe))) body.strafe = 0;
+    }
+
+    /** Firm, safe ground all the way along the straight line to it (one step in four checked). */
+    private static boolean groundTo(BotPlayer body, LivingEntity target) {
+        double dx = target.getX() - body.getX(), dz = target.getZ() - body.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1) return true;
+        var level = body.level();
+        for (double t = 0.8; t < Math.min(len, 16); t += 0.8) {
+            BlockPos at = BlockPos.containing(body.getX() + dx / len * t, body.getY() + 0.2, body.getZ() + dz / len * t);
+            boolean firm = false;
+            for (int dy = 0; dy <= 3; dy++) {
+                BlockPos q = at.below(dy);
+                var st = level.getBlockState(q);
+                if (st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) || st.is(net.minecraft.world.level.block.Blocks.FIRE)
+                        || st.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK) && dy == 1) return false;
+                if (dy > 0 && !st.getCollisionShape(level, q).isEmpty()) {
+                    firm = true;
+                    break;
+                }
+            }
+            if (!firm) return false;
+        }
+        return true;
     }
 
     /**
