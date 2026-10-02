@@ -881,7 +881,7 @@ public final class BotNavigator {
         ServerLevel level = (ServerLevel) bot.level();
         BotPathfinder.WorldView view = BotPathfinder.WorldView.capture(level, from, VIEW_CHUNKS);
         BotPathfinder.Abilities abilities = new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(),
-                tools.snapshot(), bot.getFoodData().getFoodLevel() > 6);
+                tools.snapshot(), bot.getFoodData().getFoodLevel() > 6, BotActions.buildingBlocks(bot));
         // (Searching again from where it stands: the rest of the way it was on is kept to,
         // where it still goes - no swinging between two ways that cost about the same.)
         java.util.Set<Long> favoured = new java.util.HashSet<>();

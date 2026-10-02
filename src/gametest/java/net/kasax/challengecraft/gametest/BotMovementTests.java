@@ -402,4 +402,21 @@ public class BotMovementTests {
         a.run(new net.kasax.challengecraft.bot.task.ObtainTask(java.util.Set.of(Items.CLAY_BALL), 8), 1600,
                 () -> net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.CLAY_BALL)) >= 8);
     }
+    /** A trench two wide over lava and nothing to bridge with: no leap over it (one short is death). */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void noLeapOverLava(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "no_leap_over_lava");
+        a.fill(18, GROUND - 6, 0, 19, GROUND, 39, Blocks.AIR);
+        a.fill(18, GROUND - 7, 0, 19, GROUND - 7, 39, Blocks.LAVA);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        boolean[] crossed = {false};
+        a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 900, () -> {
+            h.assertTrue(!body.isInLava(), "into the lava");
+            if (body.getX() > a.abs(20, 0, 0).getX()) crossed[0] = true;
+            h.assertTrue(!crossed[0], "leapt over the lava");
+            // (Given up, or still looking for another way: either way alive and on this side.)
+            return (a.bot().current() == null || h.getTick() > 800) && body.isAlive();
+        });
+    }
 }

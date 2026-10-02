@@ -35,11 +35,18 @@ public final class BotPathfinder {
      * takes it to break (from a copy of its tools, so the search can run off the server thread),
      * and whether it sprints (enough food).
      */
-    public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint) {
+    public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint, int blocks) {
         public Abilities(boolean mayBreak, boolean mayPillar, BotTools tools) {
-            this(mayBreak, mayPillar, tools::breakTicks, true);
+            this(mayBreak, mayPillar, tools::breakTicks, true, 64);
+        }
+
+        public Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint) {
+            this(mayBreak, mayPillar, breakTicks, sprint, 64);
         }
     }
+
+    /** Blocks it takes to bridge a way over a deadly drop at all (a bridge left half-built is a fall). */
+    private static final int BRIDGE_BLOCKS = 12;
 
     // ---- costs, in ticks, from the game's own movement (the numbers Baritone works out) -------
 
@@ -364,7 +371,7 @@ public final class BotPathfinder {
             if (flat != null && canStand(t)) out.add(new Step(t, flat, null));
             // Bridge: nothing to stand on there, so put a block under it (sneaking at the edge).
             if (abilities.mayPillar() && !swimming && flat != null && flat.isEmpty() && !canStand(t) && (floor || canStand(p))
-                    && clear(t.below()) && !inWater(t.below())) {
+                    && clear(t.below()) && !inWater(t.below()) && (abilities.blocks() >= BRIDGE_BLOCKS || !deadlyBelow(t))) {
                 out.add(new Step(t, List.of(), t.below()));
             }
             // One up: head room above us, and room at the target one higher.
@@ -399,6 +406,9 @@ public final class BotPathfinder {
                 for (int gap = 1; gap <= 3; gap++) {
                     BlockPos over = p.offset(dx * gap, 0, dz * gap);
                     if (!clear(over) || !clear(over.above()) || !clear(over.above(2)) || canStand(over)) break;
+                    // (Not over the void or lava: a leap fallen short is the end - the Nether's
+                    // ledges over the lava sea. A short drop below is no matter.)
+                    if (deadlyBelow(over)) break;
                     BlockPos land = p.offset(dx * (gap + 1), 0, dz * (gap + 1));
                     if (canStand(land) && clear(land.above()) && clear(land.above(2)) && !inWater(land)) {
                         out.add(new Step(land, List.of(), null, true));
@@ -513,6 +523,17 @@ public final class BotPathfinder {
 
     private boolean lava(BlockPos p) {
         return loaded(p) && state(p).getFluidState().is(FluidTags.LAVA);
+    }
+
+    /** Under {@code p}, lava before any ground, or no ground for forty blocks (a trench is no matter). */
+    private boolean deadlyBelow(BlockPos p) {
+        for (int i = 1; i <= 40; i++) {
+            BlockPos q = p.below(i);
+            if (!loaded(q)) return i <= 4;
+            if (lava(q)) return true;
+            if (inWater(q) || solid(q)) return false;
+        }
+        return true;
     }
 
     /** Extra ticks for a step with lava right beside it (at the feet or a block lower). */
