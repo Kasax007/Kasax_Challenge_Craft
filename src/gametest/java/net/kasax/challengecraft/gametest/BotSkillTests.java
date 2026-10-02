@@ -52,20 +52,31 @@ public class BotSkillTests {
     }
 
     /**
-     * Eighteen raw iron (three minutes in one furnace): shared out over three furnaces, the two
-     * extra ones made from the cobblestone carried - done in a third of the time, all furnaces
-     * taken back along.
+     * Eighteen raw iron (three minutes in one furnace) and coal for it with one piece to spare:
+     * shared out over two furnaces, the extra one made from the cobblestone carried - done in
+     * about half the time, both furnaces taken back along.
      */
-    @GameTest(structure = STRUCTURE, maxTicks = 2000, skyAccess = true, padding = 8)
+    @GameTest(structure = STRUCTURE, maxTicks = 2600, skyAccess = true, padding = 8)
     public void parallelSmelt(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "parallel_smelt");
         a.spawn(20, FEET, 20, new ItemStack(Items.RAW_IRON, 18), new ItemStack(Items.COAL, 3), new ItemStack(Items.COBBLESTONE, 20),
                 new ItemStack(Items.FURNACE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.STONE_PICKAXE));
         var body = a.bot().body();
-        a.run(new ObtainTask(Set.of(Items.IRON_INGOT), 18), 2000,
+        a.run(new ObtainTask(Set.of(Items.IRON_INGOT), 18), 2600,
                 () -> ObtainPlanner.countAny(body, Set.of(Items.IRON_INGOT)) >= 18
                         && ObtainPlanner.countAny(body, Set.of(Items.FURNACE)) >= 2
                         && a.bot().current() == null);
+    }
+
+    /** Sixteen raw iron and just two coal (sixteen smelts, none to spare): one furnace, all smelted. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3800, skyAccess = true, padding = 8)
+    public void parallelSmeltTightFuel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "parallel_smelt_tight_fuel");
+        a.spawn(20, FEET, 20, new ItemStack(Items.RAW_IRON, 16), new ItemStack(Items.COAL, 2), new ItemStack(Items.COBBLESTONE, 20),
+                new ItemStack(Items.FURNACE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.IRON_INGOT), 16), 3800,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.IRON_INGOT)) >= 16 && a.bot().current() == null);
     }
 
     /**

@@ -10,6 +10,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 
+import java.util.List;
+
 /**
  * Smelts {@code count} items in a furnace (one nearby, or its own put down): puts the input and
  * enough fuel in, waits beside it, takes out what is done — like a player standing at the
@@ -59,10 +61,31 @@ public final class SmeltTask extends StationTask {
         // ores in a minute, one in three (eight cobblestone each, there are always some about).
         Result side = spread(bot, level, furnace);
         if (side != null) return side;
-        for (var e : extras) {
-            if (level.getBlockEntity(e) instanceof AbstractFurnaceBlockEntity f) {
-                takeOutput(body, f);
-                if (++extraFuelCheck % 40 == 0 && !f.getItem(IN).isEmpty() && f.getItem(FUEL).isEmpty()) loadFuel(body, f, f.getItem(IN).getCount());
+        List<AbstractFurnaceBlockEntity> all = new java.util.ArrayList<>();
+        all.add(furnace);
+        for (var e : extras) if (level.getBlockEntity(e) instanceof AbstractFurnaceBlockEntity f) all.add(f);
+        for (var f : all) if (f != furnace) takeOutput(body, f);
+        // Now and then: a furnace gone cold with ore still in it gets fuel - from the pack, from
+        // another one's spare - or, with none anywhere, its ore goes into one still burning.
+        if (all.size() > 1 && ++extraFuelCheck % 40 == 0) {
+            for (var f : all) {
+                if (f.getItem(IN).isEmpty() || !f.getItem(FUEL).isEmpty() || isLit(f)) continue;
+                if (loadFuel(body, f, f.getItem(IN).getCount())) continue;
+                for (var g : all) if (g != f && f.getItem(FUEL).isEmpty()) shareFuel(g, f, f.getItem(IN).getCount());
+                if (!f.getItem(FUEL).isEmpty()) continue;
+                for (var g : all) {
+                    if (g == f || !isLit(g) && g.getItem(FUEL).isEmpty()) continue;
+                    ItemStack in = f.getItem(IN), into = g.getItem(IN);
+                    if (!into.isEmpty() && !ItemStack.isSameItemSameComponents(into, in)) continue;
+                    int n = Math.min(in.getCount(), in.getMaxStackSize() - into.getCount());
+                    if (n <= 0) continue;
+                    if (into.isEmpty()) g.setItem(IN, in.copyWithCount(n));
+                    else into.grow(n);
+                    in.shrink(n);
+                    f.setChanged();
+                    g.setChanged();
+                    break;
+                }
             }
         }
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
@@ -139,7 +162,16 @@ public final class SmeltTask extends StationTask {
     private Result spread(Bot bot, ServerLevel level, AbstractFurnaceBlockEntity furnace) {
         BotPlayer body = bot.body();
         int waiting = furnace.getItem(IN).getCount();
-        int want = Math.min(2, count / 6);
+        // (Every furnace lights a piece of fuel of its own, and what a piece has left when its
+        // share is done is lost: no more furnaces than pieces, the shares whole pieces' worth.)
+        ItemStack mainFuel = furnace.getItem(FUEL);
+        double per = mainFuel.isEmpty() ? 0 : BotKnowledge.fuelValue(mainFuel);
+        double smelts = mainFuel.isEmpty() ? 0 : per * mainFuel.getCount() + (isLit(furnace) ? per : 0);
+        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
+            if (!st.isEmpty() && !route.input().test(st) && !st.is(route.result()) && BotKnowledge.fuelValue(st) > 0) smelts += BotKnowledge.fuelValue(st) * st.getCount();
+        }
+        int pieces = per <= 0 ? 0 : (int) (smelts / per);
+        int want = Math.min(Math.min(2, count / 6), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
         if (extras.size() >= want || waiting < 6 || extraTries > 3) return null;
         if (body.getInventory().countItem(Items.FURNACE) == 0) {
             // (Eight cobblestone and a table: a few seconds. Without the stone, one furnace it is.)
@@ -162,27 +194,37 @@ public final class SmeltTask extends StationTask {
         extras.add(at);
         // Its share: of what still waits, an even part for each furnace there will be.
         int share = waiting / (want + 1 - (extras.size() - 1));
+        if (per >= 2) share = Math.max((int) per, (int) (share / per) * (int) per);
+        if (share >= waiting) {
+            extraTries = 99; // (the furnace stands empty; it is taken back along at the end)
+            return null;
+        }
         ItemStack in = furnace.getItem(IN);
         extra.setItem(IN, in.copyWithCount(share));
         in.shrink(share);
         furnace.setChanged();
-        if (!loadFuel(body, extra, share)) {
-            // (The fuel all went into the first one: its share moved across.)
-            ItemStack fuel = furnace.getItem(FUEL);
-            double per = fuel.isEmpty() ? 0 : BotKnowledge.fuelValue(fuel);
-            if (per > 0) {
-                // (A lit one has its fire going already: its last piece may go too.)
-                int n = Math.min(fuel.getCount() - (isLit(furnace) ? 0 : 1), (int) Math.ceil(share / per));
-                if (n > 0) {
-                    extra.setItem(FUEL, fuel.copyWithCount(n));
-                    fuel.shrink(n);
-                }
-            }
-        }
+        // (The fuel all went into the first one: its share moved across.)
+        if (!loadFuel(body, extra, share)) shareFuel(furnace, extra, share);
         extra.setChanged();
         furnace.setChanged();
         bot.say("another furnace for the batch (" + share + " of " + count + " in it)");
         return Result.RUNNING;
+    }
+
+    /** Fuel for {@code items} moved from one furnace to another (the first keeps what it needs). */
+    private static void shareFuel(AbstractFurnaceBlockEntity from, AbstractFurnaceBlockEntity to, int items) {
+        ItemStack fuel = from.getItem(FUEL);
+        double per = fuel.isEmpty() ? 0 : BotKnowledge.fuelValue(fuel);
+        if (per <= 0 || !to.getItem(FUEL).isEmpty() && !ItemStack.isSameItemSameComponents(to.getItem(FUEL), fuel)) return;
+        // (What the first still has to smelt keeps its share; a lit one has its fire going already.)
+        int keep = (int) Math.ceil(from.getItem(IN).getCount() / per) - (isLit(from) ? 1 : 0);
+        int n = Math.min(fuel.getCount() - Math.max(0, keep), (int) Math.ceil(items / per));
+        if (n <= 0) return;
+        if (to.getItem(FUEL).isEmpty()) to.setItem(FUEL, fuel.copyWithCount(n));
+        else to.getItem(FUEL).grow(n);
+        fuel.shrink(n);
+        from.setChanged();
+        to.setChanged();
     }
 
     private static boolean isLit(AbstractFurnaceBlockEntity furnace) {
