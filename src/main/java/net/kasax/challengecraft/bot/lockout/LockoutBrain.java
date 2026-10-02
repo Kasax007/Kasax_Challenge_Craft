@@ -482,6 +482,16 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 24, planner), 1800);
             return true;
         }
+        // Torches for the dark down there (a coal and a stick make four): with coal in the pack
+        // to spare, a few made now - the mines are lit as it goes (see Bot.lightTheWay).
+        int torches = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.TORCH));
+        int coal = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.COAL, net.minecraft.world.item.Items.CHARCOAL));
+        if (torches < 4 && coal >= 2 && now >= torchRetryAt && body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            torchRetryAt = now + 2400;
+            bot.say("torches for the mines");
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.TORCH), torches + 8, planner), 400);
+            return true;
+        }
         // The pack filling up and no bundle yet: one (string and leather), for the odds and ends.
         if (net.kasax.challengecraft.bot.BotBundles.bundle(body) == null && net.kasax.challengecraft.bot.BotBundles.freeSlots(body) <= 8
                 && now >= bundleRetryAt) {
@@ -519,7 +529,7 @@ public final class LockoutBrain implements BotBrain {
         return false;
     }
 
-    private long upgradeRetryAt, bundleRetryAt;
+    private long upgradeRetryAt, bundleRetryAt, torchRetryAt;
 
     private boolean upgrade(Bot bot) {
         var body = bot.body();

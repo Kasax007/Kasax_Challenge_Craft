@@ -265,7 +265,24 @@ public final class Bot {
      * Things a player does without thinking about them, whatever the plan: hit back at a monster
      * that attacks, eat when hungry.
      */
-    private int shooterCheckAt;
+    private int shooterCheckAt, torchCheck;
+
+    private void lightTheWay() {
+        var level = body.level();
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD || body.isInWater() || actions.isBreaking()) return;
+        if (BotInventory.slotOf(body, net.minecraft.world.item.Items.TORCH) < 0) return;
+        net.minecraft.core.BlockPos feet = body.blockPosition();
+        if (level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, feet) >= 6
+                || level.getBrightness(net.minecraft.world.level.LightLayer.SKY, feet.above()) >= 6) return;
+        if (!net.kasax.challengecraft.bot.task.SurfaceTask.underground(body)) return;
+        for (net.minecraft.core.BlockPos p : net.minecraft.core.BlockPos.betweenClosed(feet.offset(-6, -3, -6), feet.offset(6, 3, 6))) {
+            var st = level.getBlockState(p);
+            if (st.is(net.minecraft.world.level.block.Blocks.TORCH) || st.is(net.minecraft.world.level.block.Blocks.WALL_TORCH)) return;
+        }
+        int slot = body.getInventory().getSelectedSlot();
+        actions.placeNearby(net.minecraft.world.item.Items.TORCH);
+        body.getInventory().setSelectedSlot(slot);
+    }
 
     private void reflexes() {
         if (reflexCooldown-- > 0) return;
@@ -279,6 +296,9 @@ public final class Bot {
         if (armorCheck % 10 == 0 && !keepItems.isEmpty() && BotBundles.freeSlots(body) >= 3
                 && BotBundles.countInside(body, keepItems) > 0) BotBundles.unpack(this, keepItems);
         BotTask top = tasks.peek();
+        // Down in the dark (a cave, its own tunnel): a torch every few steps, as a player lights
+        // the way - monsters do not spawn in the light, and it is the way back too.
+        if (++torchCheck % 4 == 0) lightTheWay();
         // Running out of air with water over the head that swimming up does not get out of: to
         // the nearest air first, whatever else is going on.
         // (A lid over the head, no water above it to swim up through: at once, while there is air.)

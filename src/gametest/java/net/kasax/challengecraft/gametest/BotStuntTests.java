@@ -418,7 +418,7 @@ public class BotStuntTests {
     }
 
     /** A skeleton, no shield: run at it dodging the arrows, killed with the sword, the bot not badly hurt. */
-    @GameTest(environment = "challengecraft:archery", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
+    @GameTest(environment = "challengecraft:duel", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
     public void skeletonDuel(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "skeleton_duel");
         var level = h.getLevel();
