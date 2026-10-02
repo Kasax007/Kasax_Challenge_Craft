@@ -1086,3 +1086,50 @@ Benchmarks und einem Bericht.
 
 **Abnahme der Runde:** 0 Tode in 6 × 90 min, kein Stillstand länger als 60 s, ≥ 20 Felder im
 Schnitt, und jedes Nether-Feld einzeln zu ≥ 80 % im Test.
+
+### 15.4 Umsetzung und Messungen (Runde 9, Teil 2)
+
+**Neue Messwerkzeuge:**
+
+- **Feldtest** (`scripts/bot/fieldtest.sh <seed> <ziele|KATEGORIE> [s]`): jedes Brettfeld einzeln,
+  mit gleicher Ausrüstung und gleichem Startpunkt (Nether-Felder im Nether), das echte Gehirn
+  spielt nur für dieses Feld. Ergebnis je Feld: CLAIMED, TIMEOUT, NO-WAY oder DIED, dazu Zeit,
+  niedrigste HP, Todesort und Todesursache.
+- `brawl_*`-GameTests für Brute, Hoglin, Enderman und Magmawürfel; Lava-, Magma- und Kantentests.
+
+**Nether-Feldtest (40 Felder, 300 s je Feld, Live-Seed):**
+
+| Stand | geholt | Tode | häufigste Todesursache |
+| --- | --- | --- | --- |
+| vor den Fixes | 13 | 19 | Lava (10), Magmawürfel (4), Stürze (3) |
+| nach Lava-, Sprung- und Brückenregeln | 17 | 8 | Magmawürfel (4) |
+
+Gefundene und behobene Ursachen:
+
+- Sprünge über Lücken mit Lava oder Leere darunter, Brücken über Lava mit einem einzigen Block.
+- Essen mitten in der Lava (andere Reflexe liefen während der Flucht weiter).
+- Direkte Sprints auf Gegner über Kanten; kein Blick auf den Boden beim Vorwärtsschritt im Kampf.
+- Bogen gegen springende Magmawürfel auf kurze Distanz.
+- Magmawürfel und Schleime galten nicht als „Monster“: Bob ist vor ihnen nie geflohen.
+- Seelensand, Seelenerde und Basalt wurden „überall“ gegraben statt in ihrem Biom gesucht.
+
+**90 min auf dem Live-Seed (HARD), ehrliche Werte ohne Unverwundbarkeit:**
+
+| Stand | Felder | Tode |
+| --- | --- | --- |
+| e11e9fc | 9 | 7 |
+| mit Rüstung, Essen und Kampfregeln | 11 | 5 |
+
+**Weitere Neuerungen:**
+
+- Paralleles Schmelzen: bis zu drei Öfen, 18 Eisen in gut einer Minute statt drei.
+- Säulen-Taktik (3 hoch) gegen Brute, Hoglin, Enderman und Wither-Skelett, mit Pfeilen von oben.
+- Bei wenig Herzen mit Nahkämpfern: Säule hoch und dort essen.
+- Vorrat an Essen auf HARD; Reise-Check vor dem Nether (64 Blöcke, Essen).
+- Nachts ohne Rüstung zählen Felder unter Tage als sicherer: Bob gräbt durch die ersten Nächte.
+
+**Offen (nächste Schritte):**
+
+1. Eisen schneller finden: Höhlen statt Tunnel bei y 14 (Phase 4 ausbauen).
+2. Magmawürfel in Basaltdeltas: Biom meiden oder Taktik gegen Gruppen.
+3. Zombies in der ersten Nacht mit Steinschwert: Rückzug unter die Erde vor dem Kampf.
