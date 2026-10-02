@@ -589,11 +589,16 @@ public final class BotNavigator {
     /** Why the last path was dropped, and how often paths were (for the status line). */
     private String dropped = "-";
     private int drops;
+    /** Paths dropped, by reason, and ticks stood waiting for a search (for the benchmarks). */
+    public final java.util.Map<String, Integer> dropReasons = new java.util.TreeMap<>();
+    public int waitTicks;
 
     /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
     private void dropPath(String why) {
         dropped = why;
         drops++;
+        // (By reason, for the navigation benchmark: the coordinates cut off.)
+        dropReasons.merge(why.split(" ")[0], 1, Integer::sum);
         path = null;
         partial = false;
         cancelSearch();
@@ -601,6 +606,7 @@ public final class BotNavigator {
 
     /** Waiting for a search: standing still (in water keeping the head up). */
     private void holdStill() {
+        waitTicks++;
         bot.stopInputs();
         if (bot.isInWater()) bot.jump = true;
         diving = false;
