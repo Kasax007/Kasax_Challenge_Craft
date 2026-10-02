@@ -1133,3 +1133,165 @@ Gefundene und behobene Ursachen:
 1. Eisen schneller finden: Höhlen statt Tunnel bei y 14 (Phase 4 ausbauen).
 2. Magmawürfel in Basaltdeltas: Biom meiden oder Taktik gegen Gruppen.
 3. Zombies in der ersten Nacht mit Steinschwert: Rückzug unter die Erde vor dem Kampf.
+
+## 16. Runde 10: Methodisch klüger – Analyse, Bewertung, Rangfolge
+
+Anlass: Bob überlebt besser, kommt aber nicht über 9–11 Felder in 90 Minuten. Bevor neue
+Funktionen entstehen, wird gemessen, warum nicht, und jede Idee wird nach denselben Kriterien
+bewertet.
+
+### 16.1 Was die Messungen zeigen (letzter 90-min-Lauf, Live-Seed, HARD)
+
+- **Nur 11 Ziele angefangen** in 90 Minuten. Die übrige Zeit floss in Erledigungen, Ausflüge
+  und Tode.
+- **7 Tode**, und nach jedem lief die **ganze Eröffnung neu** (Holz, Werkbank, vier
+  Steinwerkzeuge): siebenmal.
+- **27 Minuten** auf „Eisenspitzhacke“, die erste kam nach 17 Minuten.
+- **Schwein reiten:** 2,3 min geschätzt, 9,2 min gebraucht.
+- **Ertrunkener:** dreimal angefangen, dreimal gescheitert, 7,5 min.
+- **12 Nebenausflüge** („unterwegs noch Kohle/Eisen“) endeten im Zeitlimit.
+- **Nether-Feldtest:** Lava bleibt die häufigste Todesursache, danach Magmawürfel und Stürze. Die
+  Stürze waren laut Fall-Protokoll zu kurz geratene Sprünge.
+
+### 16.2 Was Bob eigentlich zurückhält (Ursachenanalyse)
+
+Fünfmal „warum?“ für jeden großen Zeitverlust führt immer wieder auf dieselben fünf Wurzeln:
+
+1. **Bob sieht nicht voraus.** Er handelt auf den Zustand *jetzt*: Reflexe prüfen alle 10 Ticks,
+   die Bewegung kennt nur den nächsten Schritt. Wohin ihn der eigene Schwung, ein Sprung oder ein
+   Rückstoß in einer halben Sekunde trägt, berechnet niemand – Lava und Kanten fallen erst auf,
+   wenn er schon drin ist.
+2. **Viele kleine Entscheider ohne gemeinsamen Maßstab.** Das Gehirn ist eine Kaskade („wer zuerst
+   ‚ich will' ruft, gewinnt“): Essen, Gold, Eröffnung, Ausrüstung, Plünderung, Nether-Phase,
+   Investition, Jagd, Schlaf, dann erst die Felder. Dazu kommen Reflexe und Ausflüge mit eigenen
+   Zeitgrenzen. Niemand vergleicht „5 min Eisen“ mit „2 min Feld“ in derselben Währung. Daraus
+   entstehen Schleifen, Zeitlimits und gegenseitiges Unterbrechen.
+3. **Kein Gedächtnis für eigenes Scheitern** im laufenden Spiel: Dieselbe Aufgabe am selben Ort
+   scheitert dreimal gleich.
+4. **Ein Tod ist zu teuer:** Nach jedem Tod beginnt alles von vorn. Jede Unsicherheit wird so zum
+   großen Verlust.
+5. **Eisen als Engpass:** Ohne Eisen kein Eimer, kein Schild, keine Rüstung, kein Nether. Der Weg
+   dorthin ist ein Tunnel statt der Höhlen.
+
+### 16.3 Bewertung
+
+**Kriterien:**
+
+- **K1 Tempo:** mehr Felder je 90 min.
+- **K2 Überleben:** weniger Tode.
+- **K3 Breite:** wie viele gemessene Probleme gelöst werden; aus der Matrix.
+- **K4 Aufwand:** 10 = gering.
+- **K5 Regressionsrisiko:** 10 = gering.
+- **K6 Messbarkeit:** 10 = gut testbar.
+
+#### Paarvergleich der Kriterien
+
+| | K1 | K2 | K3 | K4 | K5 | K6 | Summe | Gewicht |
+|---|---|---|---|---|---|---|---|---|
+| K1 Tempo | – | 1 | 2 | 2 | 2 | 2 | 9 | 30 % |
+| K2 Überleben | 1 | – | 2 | 2 | 2 | 2 | 9 | 30 % |
+| K3 Breite | 0 | 0 | – | 1 | 2 | 2 | 5 | 17 % |
+| K4 Aufwand | 0 | 0 | 1 | – | 1 | 1 | 3 | 10 % |
+| K5 Risiko | 0 | 0 | 0 | 1 | – | 1 | 2 | 7 % |
+| K6 Messbarkeit | 0 | 0 | 0 | 1 | 1 | – | 2 | 7 % |
+
+(2 = Zeile wichtiger als Spalte, 1 = gleich wichtig, 0 = weniger wichtig.)
+
+#### Probleme mit Gewicht (verlorene Minuten je 90-min-Spiel, aus den Messungen)
+
+| Nr. | Problem | Gewicht |
+|---|---|---|
+| P1 | Tode durch Mobs (Oberwelt: Zombie, Skelett, Creeper, Ertrunkener, Enderman) | 12 |
+| P2 | Tode durch Lava und Feuer (Oberwelt 2/Lauf, Nether 5 von 40 Feldern) | 12 |
+| P3 | Tode durch Stürze (zu kurze Sprünge, Rückstoß an Kanten) | 8 |
+| P4 | Nach jedem Tod alles neu (Eröffnung 7× in 90 min) | 15 |
+| P5 | Eisen zu langsam (Eisenspitzhacke nach 17 min, 27 min auf der Aufgabe) | 10 |
+| P6 | Nebenausflüge laufen ins Zeitlimit (12× in 90 min) | 8 |
+| P7 | Fehlschlag-Schleifen (Ertrunkener 3× gescheitert, Schwein 9 statt 2 min) | 12 |
+| P8 | Falsche Zeitschätzungen → falsche Reihenfolge | 6 |
+| P9 | Grundressourcen langsam (8 min für Akazienholz) | 5 |
+| P10 | Reflex-Konflikte (Kampf↔Rückzug, Essen in Lava, Stapel) | 5 |
+| P11 | Wissenslücken (Festung der Endportale, Beton, Brauen im Nether) | 4 |
+| P12 | Kein Essen dabei (oft 0 Essen im Inventar) | 4 |
+| P13 | Nether-Gelände (Basaltdeltas, Lavaseen, Magmawürfel-Gruppen) | 8 |
+
+#### Problem-Lösungs-Matrix (Wirkung 0–3, Spalten = Probleme)
+
+| Lösung | P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8 | P9 | P10 | P11 | P12 | P13 | Abdeckung |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| L1 |  | 3 | 3 |  |  |  |  |  |  | 1 |  |  | 2 | 81 |
+| L2 | 3 |  | 1 |  |  |  |  |  |  | 1 |  |  | 1 | 57 |
+| L3 |  |  |  | 1 | 1 | 3 | 2 | 2 |  | 2 |  | 2 |  | 103 |
+| L4 |  |  |  |  |  | 2 | 3 | 1 |  |  |  |  |  | 58 |
+| L5 | 1 | 1 | 1 | 3 |  |  |  |  |  |  |  |  |  | 77 |
+| L6 | 2 |  |  | 1 |  |  |  |  |  | 2 |  | 3 |  | 61 |
+| L7 |  |  |  |  | 3 |  |  |  | 1 |  |  |  |  | 35 |
+| L8 |  |  |  |  |  | 1 | 1 | 3 |  |  |  |  |  | 38 |
+| L9 |  | 2 | 1 |  |  |  |  |  |  |  |  |  | 3 | 56 |
+| L10 | 3 |  |  |  |  |  |  |  |  |  |  |  | 1 | 44 |
+| L11 |  |  |  |  |  |  |  |  |  |  | 3 |  |  | 12 |
+| L12 |  |  |  |  |  | 1 |  |  | 3 |  |  |  |  | 23 |
+| L13 |  |  |  |  |  |  | 1 |  |  | 1 |  |  |  | 17 |
+
+(Abdeckung = Σ Wirkung × Problemgewicht.)
+
+#### Nutzwertanalyse (Noten 1–10, K3 aus der Abdeckung)
+
+| Rang | Lösung | K1 | K2 | K3 | K4 | K5 | K6 | Nutzwert |
+|---|---|---|---|---|---|---|---|---|
+| 1 | **L1** Gefahrensinn + Bewegungswächter: eigene Bewegung 0,5 s vorausberechnen, Lava/Abgrund/Feuer-Veto in jedem Tick | 6 | 9 | 8 | 6 | 6 | 9 | **7.43** |
+| 2 | **L3** Großhirn: ein Entscheider mit gemeinsamer Währung (Felder/Minute × Überleben) für Ziele, Erledigungen, Ausflüge, Bedürfnisse; Bindung statt Hin und Her | 9 | 6 | 10 | 2 | 3 | 6 | **6.97** |
+| 3 | **L2** Bedrohungsvorhersage: Laufwege, Creeper-Zündung, Bogenspannung, Projektile im Flug → vorher ausweichen | 5 | 8 | 6 | 4 | 6 | 8 | **6.23** |
+| 4 | **L6** Zustands-Modi (Sicher / Erholen / Ausrüsten / Arbeiten) mit Lebens-, Essens- und Ausrüstungsbudget | 5 | 8 | 6 | 5 | 6 | 6 | **6.20** |
+| 5 | **L5** Tod-Analyse + schlauer Neustart: Ursache merken, Sachen holen wenn sicher, nur nötige Werkzeuge neu, Bett als Spawn | 8 | 3 | 8 | 7 | 7 | 6 | **6.20** |
+| 6 | **L9** Nether-Gefahrenkarte (Biome, Lavaseen, Wege drumherum) | 5 | 7 | 6 | 5 | 7 | 7 | **6.03** |
+| 7 | **L10** Taktikbuch je Gegner ausbauen (Ertrunkener, Skelett in Deckung, Creeper, Gruppen) | 4 | 7 | 5 | 6 | 7 | 9 | **5.80** |
+| 8 | **L4** Fehlschlag-Gedächtnis + Schleifenwächter: gleiche Sache am gleichen Ort gescheitert → Pause, Alternative | 7 | 3 | 6 | 7 | 8 | 7 | **5.70** |
+| 9 | **L7** Höhlen-Bergbau + Erzkarte (gesehene Erze, Höhlenränder, breite Bänder) | 7 | 2 | 4 | 5 | 6 | 7 | **4.73** |
+| 10 | **L8** Lernende Schätzungen (Plan gegen Ist je Aufgabenart, schon im laufenden Spiel) | 6 | 1 | 4 | 6 | 7 | 5 | **4.17** |
+| 11 | **L13** Szenario-Testbank (Live-Pannen als Tests, Feldmatrix je Nacht) | 3 | 3 | 2 | 5 | 10 | 10 | **3.97** |
+| 12 | **L12** Grundressourcen gebündelt (Holz/Stein einmal richtig, Baumgruppen statt Einzelbäume) | 4 | 0 | 3 | 7 | 8 | 7 | **3.40** |
+| 13 | **L11** Wissenslücken schließen (Festung der Endportale, Beton, Brauen) | 4 | 0 | 2 | 6 | 9 | 8 | **3.27** |
+
+### 16.4 Entscheidung und Reihenfolge
+
+Die drei Spitzenreiter greifen die Wurzeln 1 und 2 an. Sie werden zuerst gebaut, jeweils mit
+Tests, Feldtest und Benchmark davor und danach:
+
+1. **L1 Gefahrensinn und Bewegungswächter** (Wurzel 1).
+   - Eine Gefahrenkarte um Bob (Lava, Feuer, Magma, Abgründe) wird jeden Tick nachgeführt.
+   - Ein Wächter rechnet Bobs eigene Bewegung aus Schwung und Eingaben eine halbe Sekunde voraus,
+     bevor sie ausgeführt wird.
+   - Führt sie in Lava, Feuer oder über einen Abgrund, wird sie verboten: Gegensteuern, an
+     Kanten ducken, kein Sprung. Das gilt egal, welche Aufgabe gerade steuert.
+   - Die Karte verteuert außerdem Wege, Rückzüge und Kampfpositionen in Lavanähe.
+2. **L3 Großhirn** (Wurzel 2), zusammen mit **L6 Zustands-Modi** und **L4 Fehlschlag-Gedächtnis**:
+   - Alle Kandidaten – Felder, Erledigungen, Ausflüge und Bedürfnisse – werden in einer Währung
+     bewertet: erwartete Felder pro Minute, mal Überlebenschance, plus Dringlichkeit.
+   - Ein einziger Entscheider wählt.
+   - Er bleibt beim Gewählten, solange es Fortschritt macht und nicht deutlich (30 %) Besseres
+     da ist.
+   - Was scheitert, kommt ins Gedächtnis (Art, Ziel, Ort) und wird erst nach einer Pause wieder
+     versucht, mit wachsender Pause.
+   - Der Zustand (Herzen, Essen, Rüstung, Nacht, Bedrohung) setzt einen Modus, der die Gewichte
+     verschiebt.
+3. **L2 Bedrohungsvorhersage** (Wurzel 1): Laufwege der Mobs, Bogenspannung, Creeper-Zündung und
+   Projektile werden vorausberechnet; Bob weicht aus, bevor der Treffer kommt.
+4. Danach in Rangfolge:
+   - **L5** schlauer Neustart (Wurzel 4);
+   - **L9** Nether-Gefahrenkarte, aufbauend auf L1;
+   - **L10** Taktikbuch;
+   - **L7** Höhlen-Bergbau (Wurzel 5);
+   - **L8** lernende Schätzungen;
+   - **L13** Szenario-Testbank;
+   - **L12** Grundressourcen gebündelt;
+   - **L11** Wissenslücken.
+
+Alle offenen Punkte aus den Abschnitten 14 und 15 (Höhlen, Nacht, Routing, Taktikbuch,
+Nether-Plan, Feld-Matrix) sind in L1–L13 aufgegangen und behalten ihre Einzelschritte.
+
+**Abnahme je Stufe:**
+
+- Feldtest Nether: weniger Tode je Feld.
+- 90 min auf 3 Seeds (Durchschnitt, nicht ein einzelner Lauf): mehr Felder, weniger Tode.
+- Die GameTest-Suite bleibt grün.
