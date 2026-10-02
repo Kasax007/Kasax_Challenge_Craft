@@ -35,13 +35,14 @@ public final class BotPathfinder {
      * takes it to break (from a copy of its tools, so the search can run off the server thread),
      * and whether it sprints (enough food).
      */
-    public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint, int blocks) {
+    public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint, int blocks,
+                            boolean wary) {
         public Abilities(boolean mayBreak, boolean mayPillar, BotTools tools) {
-            this(mayBreak, mayPillar, tools::breakTicks, true, 64);
+            this(mayBreak, mayPillar, tools::breakTicks, true, 64, false);
         }
 
         public Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint) {
-            this(mayBreak, mayPillar, breakTicks, sprint, 64);
+            this(mayBreak, mayPillar, breakTicks, sprint, 64, false);
         }
     }
 
@@ -411,7 +412,11 @@ public final class BotPathfinder {
                     if (!clear(over) || !clear(over.above()) || !clear(over.above(2)) || canStand(over)) break;
                     // (Not over the void or lava: a leap fallen short is the end - the Nether's
                     // ledges over the lava sea. A short drop below is no matter.)
-                    if (deadlyBelow(over)) break;
+                    // (And a leap that falls short is no small thing in the field either: only
+                    // over a drop that is harmless, or for a one-block gap a moderate one.)
+                    // (Wary - in the Nether, where the ground is crumbling netherrack and the mobs
+                    // push: wider gaps only over a drop that does no harm.)
+                    if (deadlyBelow(over) || dropBelow(over) > (!abilities.wary() ? 12 : gap == 1 ? 8 : 4)) break;
                     BlockPos land = p.offset(dx * (gap + 1), 0, dz * (gap + 1));
                     if (canStand(land) && clear(land.above()) && clear(land.above(2)) && !inWater(land)) {
                         out.add(new Step(land, List.of(), null, true));
@@ -543,6 +548,16 @@ public final class BotPathfinder {
             if (!ground) return true;
         }
         return false;
+    }
+
+    /** How far down to the first ground (or water) under {@code p}; 99 when none for forty. */
+    private int dropBelow(BlockPos p) {
+        for (int i = 1; i <= 40; i++) {
+            BlockPos q = p.below(i);
+            if (!loaded(q)) return 99;
+            if (inWater(q) || solid(q)) return i - 1;
+        }
+        return 99;
     }
 
     /** Under {@code p}, lava before any ground, or no ground for forty blocks (a trench is no matter). */
