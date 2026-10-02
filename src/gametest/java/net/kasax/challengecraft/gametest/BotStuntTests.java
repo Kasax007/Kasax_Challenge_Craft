@@ -834,6 +834,12 @@ public class BotStuntTests {
         brawlFromPillar(h, "brawl_hoglin", EntityTypes.HOGLIN);
     }
 
+    /** An enderman provoked (stared at): from a pillar as well, where its arms do not reach. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlEnderman(GameTestHelper h) {
+        brawlFromPillar(h, "brawl_enderman", EntityTypes.ENDERMAN);
+    }
+
     private static void brawlFromPillar(GameTestHelper h, String name, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type) {
         BotArena a = BotArena.flat(h, name);
         var level = h.getLevel();
@@ -847,6 +853,8 @@ public class BotStuntTests {
         level.addFreshEntity(brute);
         a.spawn(16, FEET, 20, new ItemStack(Items.IRON_SWORD), new ItemStack(Items.COBBLESTONE, 16));
         var body = a.bot().body();
+        // (An enderman only comes for one that has stared at it.)
+        if (brute instanceof net.minecraft.world.entity.monster.Enderman) h.runAfterDelay(5, () -> brute.setTarget(body));
         float[] low = {body.getHealth()};
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(1500), 1500, () -> {
             if (body.getHealth() < low[0]) BotArena.LOG.info("[BOTTEST] " + name + " hit: hp {} bot {} y {} brute {} y {} by {}", body.getHealth(),
@@ -854,7 +862,8 @@ public class BotStuntTests {
                     body.getLastDamageSource() == null ? "-" : body.getLastDamageSource().getMsgId());
             low[0] = Math.min(low[0], body.getHealth());
             if (20 - low[0] > 7) h.fail(name + ": lost " + (20 - low[0]) + " health");
-            if (brute.isAlive()) return false;
+            // (An enderman that cannot get at it teleports away: safe is enough.)
+            if (brute.isAlive() && !(brute instanceof net.minecraft.world.entity.monster.Enderman && h.getTick() > 1200)) return false;
             BotArena.LOG.info("[BOTTEST] {} lost {} health", name, 20 - low[0]);
             return true;
         });

@@ -125,7 +125,10 @@ public final class LockoutBrain implements BotBrain {
             bot.lastDeath = null;
             long age = bot.body().level().getGameTime() - d.time();
             double dist = Math.sqrt(d.pos().distSqr(bot.body().blockPosition()));
-            if (d.recoverable() && d.dimension() == bot.body().level().dimension() && age < 3600 && dist < 350
+            // (Not back into the dark with bare hands, to whatever killed it there - unless close.)
+            var lv = bot.body().level();
+            boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside();
+            if (d.recoverable() && d.dimension() == bot.body().level().dimension() && age < 3600 && dist < (night ? 40 : 350)
                     && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE)) == 0) {
                 bot.say("back for my things at " + d.pos().toShortString() + " (" + Math.round(dist) + " blocks)");
                 start(bot, new net.kasax.challengecraft.bot.task.RecoverTask(d.pos()), 600 + (long) (dist * 8));
@@ -779,16 +782,19 @@ public final class LockoutBrain implements BotBrain {
             var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
             if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
         }
-        // Nobody hunts for food with a full stomach: only once hunger has started to bite.
+        // Nobody hunts for food with a full stomach and some in the pack: only once hunger has
+        // started to bite - or with next to nothing left to eat (on hard the hearts only come
+        // back with a full stomach: without food every fight is one hurt more till the last).
         int level = bot.body().getFoodData().getFoodLevel();
-        if (points >= 16 || level >= 17) return false;
+        boolean bare = points < 8;
+        if (points >= 16 || level >= 17 && !bare) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = planner.estimate(bot, FOODS, have + 4);
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
         // Starving (six shanks and less: no sprinting, and on hard the hunger eats the hearts
         // away - a fall then kills): food first, whatever it costs.
-        if (level >= 12 && cost > 25 || cost > (level <= 6 ? 900 : 90)) return false;
+        if (level >= 12 && cost > (bare ? 180 : 25) || cost > (level <= 6 ? 900 : bare ? 240 : 90)) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
         var lv = bot.body().level();
