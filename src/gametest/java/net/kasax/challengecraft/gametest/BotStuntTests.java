@@ -821,4 +821,31 @@ public class BotStuntTests {
     public void brawlZombieTrio(GameTestHelper h) {
         brawl(h, "brawl_zombie_trio", 8, EntityTypes.ZOMBIE, new int[]{26, 18}, EntityTypes.ZOMBIE, new int[]{26, 22}, EntityTypes.ZOMBIE, new int[]{24, 26});
     }
+
+    /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
+    @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
+    public void hurtableAfterDeath(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "hurtable_after_death");
+        var level = h.getLevel();
+        a.spawn(20, FEET, 20);
+        var first = a.bot().body();
+        boolean[] killed = {false}, hit = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(650), 700, () -> {
+            // (Once in for good, as a player that has played a while.)
+            if (!killed[0]) {
+                if (!first.connection.hasClientLoaded()) return false;
+                killed[0] = true;
+                first.kill(level);
+                return false;
+            }
+            var body = a.bot().body();
+            if (body == first || !body.isAlive()) return false;
+            // (Three seconds after coming back, as the game allows a player to load the world.)
+            if (!hit[0] && body.tickCount > 80) {
+                hit[0] = true;
+                body.hurtServer((net.minecraft.server.level.ServerLevel) body.level(), body.level().damageSources().generic(), 4f);
+            }
+            return hit[0] && body.getHealth() < body.getMaxHealth();
+        });
+    }
 }

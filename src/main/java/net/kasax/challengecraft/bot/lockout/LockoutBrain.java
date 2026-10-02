@@ -1005,6 +1005,8 @@ public final class LockoutBrain implements BotBrain {
     private long goalStarted, goalBudget, sideStarted, sideBudget;
     /** Ticks of the goal's time spent on side trips (chances on the way): not counted as the goal's. */
     private long goalPaused;
+    /** The chest of the side trip on, if it is one. */
+    private net.minecraft.core.BlockPos sideChest;
 
     /** Ticks the goal itself has taken so far. */
     private long goalElapsed(long now) {
@@ -1093,7 +1095,15 @@ public final class LockoutBrain implements BotBrain {
             bot.say("that takes too long, back to the goal");
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
             if (sideWant != null) wantRest.put(sideWant, now + 6000);
-            drop(bot);
+            if (sideChest != null) lootedIn.put("chest@" + sideChest.toShortString(), 99);
+            // (Only the side trip ends: the goal underneath goes on, its clock having stood still.)
+            if (goalTask != null) goalPaused += now - sideStarted;
+            BotTask side = sideTask;
+            sideTask = null;
+            sideWant = null;
+            sideId = null;
+            sideChest = null;
+            bot.cancel(side);
             return;
         }
         if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null
@@ -1236,11 +1246,14 @@ public final class LockoutBrain implements BotBrain {
             net.minecraft.resources.Identifier in = bot.senses().structureAt(c);
             if (in == null || !WORTH_LOOTING.stream().anyMatch(w -> in.getPath().startsWith(w))) continue;
             if (lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 0, Integer::sum) >= 3) continue;
+            // (One it could not get at before: not again.)
+            if (lootedIn.getOrDefault("chest@" + c.toShortString(), 0) > 0) continue;
             chest = c;
             lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 1, Integer::sum);
             break;
         }
         if (chest != null) {
+            sideChest = chest;
             sideTask = new net.kasax.challengecraft.bot.task.LootTask(chest);
             sideStarted = bot.body().level().getGameTime();
             sideBudget = 900;

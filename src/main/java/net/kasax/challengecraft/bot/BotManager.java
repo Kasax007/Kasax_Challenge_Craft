@@ -92,12 +92,13 @@ public final class BotManager {
                     bot.lastDeath = new Bot.Death(body.level().dimension(), body.blockPosition(), body.level().getGameTime(), !gone);
                 }
                 if (body.deathTime >= RESPAWN_DELAY) {
-                    ServerPlayer reborn = server.getPlayerList().respawn(body, false, Entity.RemovalReason.KILLED);
-                    // What the network handler does with a client's respawn request: it acts for
-                    // the new body from now on. (Left on the dead one, every teleport after, the
-                    // portal's included, moved the corpse: the bot came out in the Nether at its
-                    // Overworld coordinates, with no portal there.)
-                    reborn.connection.player = reborn;
+                    // The way a client asks to respawn (the respawn button): the network handler
+                    // respawns it, acts for the new body from then on, and forgets that it was
+                    // waiting for the respawn. (Respawned past it, the game went on waiting, and
+                    // kept the bot from all harm for the rest of the game - in lava unharmed.)
+                    body.connection.handleClientCommand(new net.minecraft.network.protocol.game.ServerboundClientCommandPacket(
+                            net.minecraft.network.protocol.game.ServerboundClientCommandPacket.Action.PERFORM_RESPAWN));
+                    ServerPlayer reborn = body.connection.player;
                     if (reborn instanceof BotPlayer b) bot.attach(b);
                     if (bot.brain() != null) bot.brain().respawned(bot);
                 }

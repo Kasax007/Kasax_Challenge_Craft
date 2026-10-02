@@ -162,7 +162,22 @@ public final class Bot {
         body.stopInputs();
     }
 
-    /** Runs {@code task} first, then returns to what was going on. */
+    /**
+     * Ends {@code task} and whatever was put on top of it, without a word to the brain: what was
+     * going on underneath goes on (its walk taken up again).
+     */
+    public void cancel(BotTask task) {
+        if (task == null || !tasks.contains(task)) return;
+        while (!tasks.isEmpty()) {
+            BotTask t = tasks.pop();
+            if (t == task) break;
+        }
+        navigator.stop();
+        actions.reset();
+        body.stopInputs();
+        navigator.resumeFor(tasks.peek());
+    }
+
     /** What the reflexes put on top (a fight, a retreat, the shield): the brain leaves the stack alone meanwhile. */
     private BotTask reflexTask;
 
@@ -176,6 +191,7 @@ public final class Bot {
         return reflexTask != null && tasks.contains(reflexTask);
     }
 
+    /** Runs {@code task} first, then returns to what was going on. */
     public void interject(BotTask task) {
         // (The walk of what was on top is kept, and taken up again once this is done.)
         navigator.suspend(tasks.peek());
