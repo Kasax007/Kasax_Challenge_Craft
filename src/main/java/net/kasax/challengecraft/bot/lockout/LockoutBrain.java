@@ -793,6 +793,31 @@ public final class LockoutBrain implements BotBrain {
      * a matter of seconds right here (the cow for "milk a cow" walking by, the sugar cane at the
      * river bank). Done in between, then back to the goal.
      */
+    /** One more of the kinds an "N different kinds" tile wants, if one is a few steps away. */
+    private boolean collectDistinctNearby(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() != null || t.goal().type() != net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.INVENTORY_SET) continue;
+            Set<net.minecraft.world.item.Item> kinds = LockoutGoals.items(t.goal().targets());
+            Set<net.minecraft.world.item.Item> held = new java.util.HashSet<>();
+            for (var st : bot.body().getInventory().getNonEquipmentItems()) if (kinds.contains(st.getItem())) held.add(st.getItem());
+            if (held.size() >= Math.max(1, t.goal().amount())) continue;
+            net.minecraft.core.BlockPos at = net.kasax.challengecraft.bot.BotWorld.nearest(level, bot.body().blockPosition(), 8, 4,
+                    st -> kinds.contains(st.getBlock().asItem()) && !held.contains(st.getBlock().asItem()), true, Set.of());
+            if (at == null) continue;
+            net.minecraft.world.item.Item item = level.getBlockState(at).getBlock().asItem();
+            sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner);
+            sideId = null;
+            sideWant = item;
+            sideStarted = bot.body().level().getGameTime();
+            sideBudget = 300;
+            bot.say("on the way: " + ObtainPlanner.name(item) + " for " + t.goal().title().getString());
+            bot.interject(sideTask);
+            return true;
+        }
+        return false;
+    }
+
     private void takeChances(Bot bot) {
         if (bot.current() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
         // Chests worth a detour: where the good loot is (iron in a shipwreck, flint and steel and
@@ -834,7 +859,9 @@ public final class LockoutBrain implements BotBrain {
         // river on the way, the iron ore in the cave wall).
         for (var want : strategist.wants().entrySet()) {
             net.minecraft.world.item.Item item = want.getKey();
-            if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
+            // (Until the board's whole demand is in the pack: twenty-four raw iron wanted, the one
+            // ore right here is taken though one is held already.)
+            if (ObtainPlanner.countAny(bot.body(), Set.of(item)) >= Math.max(1, planner.boardDemand.getOrDefault(item, 1))) continue;
             if (wantRest.getOrDefault(item, 0L) > bot.body().level().getGameTime()) continue;
             if (item == net.minecraft.world.item.Items.FLINT && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.FLINT_AND_STEEL)) > 0) continue;
             net.minecraft.world.level.block.Block source = want.getValue();
@@ -850,6 +877,9 @@ public final class LockoutBrain implements BotBrain {
             bot.interject(sideTask);
             return;
         }
+        // A tile that wants several different things (three kinds of flower): one more kind right
+        // beside the way is a few seconds, and a third of that tile done.
+        if (collectDistinctNearby(bot)) return;
         for (Choice c : choices(bot, targetIndex)) {
             // A few seconds' work, or a monster wanted for a tile right there in sight (the spider
             // in the cave it is mining in, the creeper met on a night walk): taken along.

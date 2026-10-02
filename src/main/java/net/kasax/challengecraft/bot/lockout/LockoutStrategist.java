@@ -140,6 +140,17 @@ final class LockoutStrategist {
             int amount = g.type() == LockoutBingoGoalType.ITEM_AMOUNT ? Math.max(1, g.amount()) : 1;
             demand(k, first, amount, 0, planner.boardDemand);
         }
+        // Fuel for all that smelting: coal, picked up on the way (a player does not burn the logs
+        // it worked for). About one coal per eight items.
+        int smelt = 0;
+        for (var e : planner.boardDemand.entrySet()) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(e.getKey()).getPath();
+            if (id.startsWith("raw_") && !id.endsWith("_block")) smelt += e.getValue();
+        }
+        if (smelt > 0) {
+            planner.boardDemand.merge(Items.COAL, (smelt + 7) / 8 + 1, Math::max);
+            wants.putIfAbsent(Items.COAL, net.minecraft.world.level.block.Blocks.COAL_ORE);
+        }
         if (!planner.boardDemand.isEmpty()) notes.add("shopping list " + planner.boardDemand.entrySet().stream()
                 .map(e -> e.getValue() + " " + ObtainPlanner.name(e.getKey())).toList());
 
