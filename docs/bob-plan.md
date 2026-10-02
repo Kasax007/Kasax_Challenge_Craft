@@ -677,3 +677,126 @@ bricht nur ab, wenn die Lage sich wirklich verschlechtert.
   und nachher.
 - Benchmarks laufen in eigenen Arbeitskopien parallel zur Entwicklung (zwei Server, eigene Ports).
 - Ergebnisse und Abweichungen hier im Dokument.
+
+## 13. Runde 7: Graben wie ein Spieler, Chancen statt Zahlen, Routen nach Ort
+
+Anlass: Rückmeldung vom Spieler nach dem Live-Test:
+
+- Bruchstein aus einem 1×1-Schacht, aus dem Bob sich mit genau diesem Bruchstein wieder
+  herausbaut;
+- eine Eisenader nur halb abgebaut, obwohl Schild und Eimer noch Eisen brauchen;
+- Erz-Hüpfen an der Oberfläche statt gezieltem Graben;
+- Kampf gegen Skelette und Creeper;
+- der Wunsch nach Wahrscheinlichkeiten und nach Routen gebündelt nach Ort.
+
+### 13.1 Kampf
+
+- **Skelette**:
+  - Bob läuft im Sprint direkt hin, mit einem Seitschritt, sobald der Bogen voll gespannt ist
+    (der Pfeil fliegt dorthin, wo er stand);
+  - in Reichweite folgen die Schläge mit Sprung-Crit;
+  - bewaffnet und gesund greift Bob an; den Schild hebt er nur, wenn er nicht kämpft;
+  - Messung, 1 gegen 1 auf HARD: vorher 12–16 s Kampf, ~12 HP übrig; jetzt ~5 s, ~16 HP übrig.
+- **Creeper**:
+  - Bob schlägt knapp außerhalb der drei Blöcke zu, ab denen der Creeper zischt (der Arm
+    erreicht den Körper, nicht die Mitte);
+  - der Sprint-Schlag wirft ihn zurück;
+  - solange der Arm sich erholt, hält Bob Abstand;
+  - Messung: 5 von 5 getötet, keine Explosion, 4–15 s.
+- Neue Tests: `skeletonDuel`, `skeletonShield`, `creeperKill`. Kampftests mit echten Mobs und
+  Tests, die die Uhr verstellen, laufen in eigenen Test-Umgebungen.
+
+### 13.2 Graben
+
+- **Gestein** (Bruchstein, Erde) kommt nur noch aus einer trockenen, hellen Wand auf Körperhöhe,
+  nie unter den eigenen Füßen weg. Gibt es keine Wand, gräbt Bob eine **Treppe** nach unten; sie
+  ist zugleich der Rückweg zu Fuß. Test: 20 Bruchstein in ~23 s, kein Block verbaut.
+- **Abstieg zu Erzen** ist immer eine Treppe, kein Schacht:
+  - Trifft die Treppe auf eine Höhle, lässt Bob sich höchstens 3 Blöcke hinunterfallen, sonst
+    gräbt er auf gleicher Höhe weiter.
+  - Ersatz-Steinspitzhacken plant er nach Blockzahl ein (3 pro Ebene), oben vor dem Abstieg.
+  - Zerbricht die Spitzhacke unten, baut er sofort eine neue.
+- **Ganze Adern**: Eine Erzader wird immer leer gemacht, auch über die gewünschte Menge hinaus.
+  Der Eisenbedarf des Kits (Spitzhacke, Eimer, Schild) steht mit auf der Einkaufsliste.
+- **Gezielt statt hüpfen**: Werden noch 3 oder mehr Erze gebraucht, ist ein gemerktes einzelnes Erz
+  nur einen kurzen Weg wert (bis ~25 s). Sonst geht Bob dorthin, wo das Erz häufig ist (Höhle oder
+  Treppe auf Erz-Höhe).
+- Neue Tests: `cobbleStairs`, `cobbleFromWall`, `veinBeyondCount`, `digIntoCave`.
+
+### 13.3 Chancen statt einer Zahl (B1)
+
+Der Planer führt zu jedem Item drei Werte statt einem:
+
+| Wert | Was er ausdrückt |
+| --- | --- |
+| **Kosten** | erwartete Sekunden |
+| **Suchanteil** | der Teil davon, der Glück ist: ein Block noch nicht gesehen, ein Mob noch nicht getroffen |
+| **Ankerort** | wo die Arbeit liegt: gesehener Block, Dorf, Lebensraum eines Mobs, Tiefe eines Erzes, oder „hier“ |
+
+Woraus die Werte kommen:
+
+- **Gesehenes**: ein Weg, also sicher.
+- **Biom in Sicht, das für den Block bekannt ist**: Weg plus kurze Suche.
+- **Nichts davon**: Suche nach Seltenheit; bei Erzen liegt der Ankerort auf Erz-Höhe unter Bob.
+- **Monster**:
+  - an der Oberfläche bei Tag zählt die Wartezeit bis zur Nacht (sicher) plus die Suche;
+  - unter Tage und im Nether ist es jederzeit dunkel.
+- **Handel**: das Dorf ist der Ankerort; ein arbeitsloser Dorfbewohner, der einen Arbeitsplatz
+  annehmen muss, ist zur Hälfte Glück.
+- **Tauschhandel mit Piglins**: zur Hälfte Glück.
+
+Ein Ziel wird so zu einer Verteilung: der sichere Teil plus eine exponentiell verteilte Suche.
+Daraus folgt die Chance, innerhalb der Zeit fertig zu sein, die das Ziel bekäme:
+P(fertig in t) = 1 − e^(−(t − sicher)/Suche).
+
+Zwei Zusätze:
+
+- **Erfahrung**: Was ein Ziel in früheren Spielen oder Versuchen länger gedauert hat, zählt
+  ebenfalls als Glücksanteil.
+- **Todesrisiko pro Minute**, abhängig von Nacht, Nether, Monstern in der Nähe, Rüstung und HP:
+  Ein Tod kostet etwa 150 s; Kampfziele zählen 1,5-fach, Nether-Ziele von der Oberwelt aus
+  bekommen den Nether-Zuschlag.
+
+Chat-Beispiel: `goal: Ring a Bell (~71 s, of that ~71 s luck, 95% within 213 s, ...)`.
+
+### 13.4 Routen nach Ort (B3)
+
+- **Suche**: Das nächste Ziel ist der erste Schritt der besten Route durch die nächsten bis zu
+  4 Ziele. Gesucht wird per Beam-Search über Reihenfolgen der zehn schnellsten Felder.
+- **Kosten je Abschnitt**: der Weg vom Ende des vorigen Abschnitts zum Ankerort, plus die eigene
+  Arbeit.
+- **Wertung**: erwartete Felder pro Sekunde. Pro Abschnitt zählen die Erfolgschance (fertig vor
+  dem Abbruch, ohne Tod) sowie die erwartete Zeit mit Abbruch und Todeskosten.
+- **Bündelung**: Was das erste Ziel in der Hand lässt (z. B. die Eisenspitzhacke für Redstone),
+  macht die folgenden billiger. Ziele am selben Ort (Glocke, Brot und Bibliothekar im Dorf;
+  Redstone und Diamanten auf einer Abstiegstour) kommen dadurch zusammen.
+- Chat-Beispiel: `route: craft_dropper [village] ... (0.7 tiles/min; craft_dropper 100% within 264 s)`.
+
+### 13.5 Weitere Befunde aus Probeläufen (behoben)
+
+- **Lange Wege**: haben einen Fortschritts-Wächter. Nach 45 s ohne Annäherung geht Bob an die
+  Oberfläche oder nimmt einen Seitenschlag; nach drei Versuchen gibt er auf. Vorher: 9 Minuten
+  Pendeln auf dem Weg ins Dorf.
+- **Plan-Kontrolle**: Die Prüfung, ob eine andere Quelle in Sicht ist, wechselt nur noch zu einer
+  anderen Quelle **desselben** Items. Vorher: mitten auf der Eisentreppe wieder nach oben, um Holz
+  zu holen.
+- **Nacht**: keine Plünderzüge zu Strukturen; nachts ist ein Dorf voller Zombies.
+- **Eröffnung**: Holz für 28 Bretter auf einmal; der Holz-Nachschub holt 8 Stämme.
+  Nebenaufgaben werden höchstens zweimal verlängert.
+- **Navigator**: Ein liegengebliebener Weg wird vor dem nächsten Task-Tick beendet. Vorher hielt
+  Bob die letzten Tasten weiter gedrückt, und eine selbst steuernde Aufgabe bekam ihre Eingaben
+  gelöscht.
+- **Pulverschnee**: Bob gräbt sich frei. Fluchtwege führen nicht über Klippen.
+- **Biome**: Stony Peaks gelten nicht mehr als Schnee-Biom.
+
+### 13.6 Messungen
+
+Probeläufe über 20 Minuten auf dem Seed aus dem Live-Test:
+
+| Lauf | Felder | Was den Unterschied machte |
+| --- | --- | --- |
+| Probe 2 | 2 | Eisen-Kit und Dorfweg-Pendeln fraßen 16 Minuten |
+| Probe 3 | 6 | Pendeln behoben, Holz für die ganze Eröffnung |
+| Probe 4 | 3 | starke Streuung: Spitzhacke auf der Treppe zerbrochen, Höhle unter der Treppe; beides danach behoben |
+
+90-Minuten-Läufe auf mehreren Seeds folgen unten.
