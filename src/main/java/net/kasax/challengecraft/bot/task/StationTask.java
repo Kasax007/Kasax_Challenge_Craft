@@ -103,7 +103,8 @@ abstract class StationTask implements BotTask {
         return work(bot);
     }
 
-    private BlockPos placedHere, niche;
+    protected BlockPos placedHere;
+    private BlockPos niche;
     private boolean carved;
 
     /** A block beside the feet to take out for room: breakable, a floor under it, nothing liquid by it. */

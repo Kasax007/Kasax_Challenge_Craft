@@ -20,8 +20,8 @@ public final class SmeltTask extends StationTask {
 
     private final BotKnowledge.SmeltRoute route;
     private final int count;
-    private int target = -1, waited;
-    private boolean loaded;
+    private int target = -1, waited, breakTicks;
+    private boolean loaded, takingBack, tookBack;
 
     public SmeltTask(BotKnowledge.SmeltRoute route, int count) {
         super(Blocks.FURNACE, Items.FURNACE);
@@ -30,14 +30,20 @@ public final class SmeltTask extends StationTask {
     }
 
     @Override
+    protected boolean needsStation() {
+        return !takingBack;
+    }
+
+    @Override
     protected Result work(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
+        if (takingBack) return takeBack(bot, level);
         if (!(level.getBlockEntity(station) instanceof AbstractFurnaceBlockEntity furnace)) return Result.FAILED;
         if (target < 0) target = ObtainPlanner.countAny(body, java.util.Set.of(route.result())) + count;
 
         takeOutput(body, furnace);
-        if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return Result.DONE;
+        if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
 
         if (!loaded) {
             loaded = true;
@@ -56,9 +62,32 @@ public final class SmeltTask extends StationTask {
             }
         }
         if (furnace.getItem(IN).isEmpty() && furnace.getItem(OUT).isEmpty()) {
-            return Result.DONE; // all smelted and taken, even if fewer than planned
+            return finish(bot, furnace); // all smelted and taken, even if fewer than planned
         }
         return waited > count * 220 + 600 ? Result.FAILED : Result.RUNNING;
+    }
+
+    /**
+     * Done here. The furnace it put down itself goes back into the pack (a pickaxe gets it back in
+     * a moment), as a player carries it from one smelting to the next instead of making another.
+     * One with input still in it stays where it is.
+     */
+    private Result finish(Bot bot, AbstractFurnaceBlockEntity furnace) {
+        if (tookBack || placedHere == null || !placedHere.equals(station) || !furnace.getItem(IN).isEmpty()) return Result.DONE;
+        boolean pickaxe = false;
+        for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (s.is(net.minecraft.tags.ItemTags.PICKAXES)) pickaxe = true;
+        if (!pickaxe) return Result.DONE;
+        takingBack = true;
+        return Result.RUNNING;
+    }
+
+    private Result takeBack(Bot bot, ServerLevel level) {
+        if (tookBack) return Result.DONE;
+        if (++breakTicks > 200 || !bot.actions().inReach(station)) return Result.DONE;
+        if (!bot.actions().breakTick(station)) return Result.RUNNING;
+        tookBack = true;
+        bot.interject(new CollectDropsTask(station, 2, 100));
+        return Result.RUNNING;
     }
 
     private static boolean isLit(AbstractFurnaceBlockEntity furnace) {

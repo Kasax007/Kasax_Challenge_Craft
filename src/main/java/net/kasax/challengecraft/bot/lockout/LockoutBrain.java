@@ -274,7 +274,11 @@ public final class LockoutBrain implements BotBrain {
 
     private static final List<Set<net.minecraft.world.item.Item>> OPENING = List.of(
             Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE),
-            Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE));
+            Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE),
+            // The full kit a player keeps: a sword for what comes at night, a shovel for sand,
+            // gravel and snow (both cost two cobblestone and a stick at the same table).
+            Set.of(net.minecraft.world.item.Items.STONE_SWORD, net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD),
+            Set.of(net.minecraft.world.item.Items.STONE_SHOVEL, net.minecraft.world.item.Items.IRON_SHOVEL, net.minecraft.world.item.Items.DIAMOND_SHOVEL));
 
     /** Works through the opening; returns whether it started a step of it. */
     private static final Set<net.minecraft.world.item.Item> PICKAXES = Set.of(net.minecraft.world.item.Items.WOODEN_PICKAXE, net.minecraft.world.item.Items.STONE_PICKAXE,

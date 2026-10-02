@@ -32,6 +32,25 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(a.bot().body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
+    /**
+     * Three ingots wanted now, six on the board: all six smelted in one go with coal (not the
+     * planks), and the furnace taken back along.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void batchSmelt(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "batch_smelt");
+        a.spawn(20, FEET, 20, new ItemStack(Items.RAW_IRON, 6), new ItemStack(Items.COAL, 2), new ItemStack(Items.OAK_PLANKS, 8),
+                new ItemStack(Items.FURNACE), new ItemStack(Items.STONE_PICKAXE));
+        var planner = new ObtainPlanner();
+        planner.boardDemand.put(Items.IRON_INGOT, 6);
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.IRON_INGOT), 3, planner), 1600,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.IRON_INGOT)) >= 6
+                        && ObtainPlanner.countAny(body, Set.of(Items.FURNACE)) > 0
+                        && ObtainPlanner.countAny(body, Set.of(Items.OAK_PLANKS)) == 8
+                        && a.bot().current() == null);
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {

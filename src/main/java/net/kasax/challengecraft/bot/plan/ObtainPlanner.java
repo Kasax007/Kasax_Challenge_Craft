@@ -741,7 +741,13 @@ public final class ObtainPlanner {
             }
             case KILL -> new KillTask((Set<EntityType<?>>) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total, 0);
             case CRAFT -> new CraftTask((BotKnowledge.CraftRoute) p.data(), total);
-            case SMELT -> new SmeltTask((BotKnowledge.SmeltRoute) p.data(), total);
+            // Everything the board will want of it in one go (the ingots for the bucket, the
+            // pickaxe and the shears): one furnace, one wait, instead of three trips to it.
+            case SMELT -> {
+                BotKnowledge.SmeltRoute r = (BotKnowledge.SmeltRoute) p.data();
+                int later = boardDemand.getOrDefault(r.result(), 0) - countAny(bot.body(), Set.of(r.result()));
+                yield new SmeltTask(r, Math.max(total, Math.min(total + 16, later)));
+            }
             case FILL -> new net.kasax.challengecraft.bot.task.FillBucketTask(p.data() == Items.LAVA_BUCKET
                     ? net.minecraft.tags.FluidTags.LAVA : net.minecraft.tags.FluidTags.WATER);
             case CAST -> new net.kasax.challengecraft.bot.task.MakeObsidianTask(countAny(bot.body(), Set.of(Items.OBSIDIAN)) + total);
