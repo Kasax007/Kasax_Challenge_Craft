@@ -130,7 +130,8 @@ public final class BotFieldTest {
         ServerLevel level = nether ? server.getLevel(Level.NETHER) : server.overworld();
         BlockPos at;
         if (nether) {
-            if (netherStart == null) netherStart = safeSpot(level, new BlockPos(0, 64, 0));
+            // (Checked again each time: a pillar or a lid from the last goal may stand there now.)
+            if (netherStart == null || !standable(level, netherStart)) netherStart = safeSpot(level, new BlockPos(0, 64, 0));
             at = netherStart;
         } else {
             at = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, overworldStart);
