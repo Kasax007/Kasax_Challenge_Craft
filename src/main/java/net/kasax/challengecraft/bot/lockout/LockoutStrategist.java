@@ -149,10 +149,8 @@ final class LockoutStrategist {
             if (!holdsAny(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE))) kit += 3;
             if (ironKit && !holdsAny(bot, Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET))) kit += 3;
             if (!holdsAny(bot, Set.of(Items.SHIELD)) && bot.body().getOffhandItem().getItem() != Items.SHIELD) kit += 1;
-            // (The chestplate on hard: the arrows, the creepers and the zombies at night are what
-            // ends games - eight iron in the same trip, as the pickaxe's.)
-            boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
-            if (hard && !wearsAny(bot, Set.of(Items.IRON_CHESTPLATE, Items.DIAMOND_CHESTPLATE, Items.NETHERITE_CHESTPLATE))) kit += 8;
+            // (Not the chestplate's eight too: eighteen ores at once made the first iron trip
+            // twice as long - the chestplate comes from the iron as it turns up, see upgrade().)
             if (kit > 0) planner.boardDemand.merge(Items.RAW_IRON, kit, Integer::sum);
         }
         // Fuel for all that smelting: coal, picked up on the way (a player does not burn the logs
@@ -261,10 +259,6 @@ final class LockoutStrategist {
             }
             return; // (the first recipe: the usual one)
         }
-    }
-
-    private static boolean wearsAny(Bot bot, Set<Item> items) {
-        return items.contains(bot.body().getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem()) || holdsAny(bot, items);
     }
 
     /** A kit item is made from this tile's item (the iron ingot for the iron kit, say). */
