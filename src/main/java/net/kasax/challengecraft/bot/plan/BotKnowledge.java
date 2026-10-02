@@ -281,7 +281,9 @@ public final class BotKnowledge {
         if (biome.contains("lush")) out.addAll(List.of("moss_block", "azalea", "clay", "spore_blossom"));
         if (biome.contains("dripstone")) out.addAll(List.of("pointed_dripstone", "dripstone_block"));
         if (biome.contains("deep_dark")) out.addAll(List.of("sculk", "sculk_vein"));
-        if (biome.contains("peaks") || biome.contains("slopes") || biome.contains("grove")) out.addAll(List.of("snow_block", "ice", "packed_ice", "emerald_ore"));
+        // (Stony peaks are bare rock: emeralds, but no snow.)
+        if ((biome.contains("peaks") && !biome.contains("stony")) || biome.contains("slopes") || biome.contains("grove")) out.addAll(List.of("snow", "snow_block", "ice", "packed_ice"));
+        if (biome.contains("peaks") || biome.contains("slopes") || biome.contains("grove")) out.add("emerald_ore");
         if (biome.contains("dappled")) out.addAll(List.of("poplar_log"));
         return out;
     }
