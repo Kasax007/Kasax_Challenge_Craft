@@ -245,6 +245,7 @@ public final class LockoutBrain implements BotBrain {
         goalFirstEstimate = pick.option().cost() / GoalExperience.factor(pick.tile().goal().id());
         goalGoal = pick.tile().goal();
         extensions = 0;
+        stalls = 0;
         String reason = strategist.why(pick.tile().goal().id());
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, "
                 + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
@@ -651,7 +652,7 @@ public final class LockoutBrain implements BotBrain {
     private long goalStarted, goalBudget, sideStarted, sideBudget;
     private double goalEstimate, goalFirstEstimate;
     private net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal goalGoal;
-    private int extensions;
+    private int extensions, stalls;
     /** How often each goal ran over its time: its estimates are trusted that much less. */
     private final java.util.Map<String, Integer> overruns = new java.util.HashMap<>();
     /** The (plain) estimate a goal had when it ran over: a much lower one later means things changed. */
@@ -737,12 +738,24 @@ public final class LockoutBrain implements BotBrain {
         }
         if (goalTask != null && targetId != null && now - goalStarted > goalBudget) {
             // Well on the way (half way down to the ore, say): what is left is worth finishing.
+            // By the situation, not the clock: what is left of this one against the best other
+            // thing to do from here (deep down next to where redstone lies, a walk back up to the
+            // village is never the better deal). Each round without visible progress counts the
+            // estimate as less believable, so a goal that only claims to be close loses out in the end.
             double left = remaining(bot);
-            if (extensions < 2 && left < goalEstimate * 0.7) {
+            boolean progress = left < goalEstimate * 0.85;
+            if (!progress) stalls++;
+            double believed = left * (1 + 0.6 * stalls);
+            double other = Double.MAX_VALUE;
+            if (extensions < 8 && left < Double.MAX_VALUE / 4) {
+                for (Choice c : choices(bot, targetIndex)) other = Math.min(other, c.option().cost() - strategist.bonus(c.tile().goal().id()));
+            }
+            if (extensions < 8 && left < Double.MAX_VALUE / 4 && (progress && stalls < 3 || believed + 15 < other)) {
                 extensions++;
                 goalEstimate = left;
                 goalBudget = now - goalStarted + budget(left, 600, 6000);
-                bot.say("still on " + targetId + ", ~" + Math.round(left) + " s left");
+                bot.say("still on " + targetId + ", ~" + Math.round(left) + " s left"
+                        + (other < Double.MAX_VALUE ? " (next best ~" + Math.round(other) + " s)" : ""));
                 return;
             }
             bot.say(targetId + " takes too long, something else first");
