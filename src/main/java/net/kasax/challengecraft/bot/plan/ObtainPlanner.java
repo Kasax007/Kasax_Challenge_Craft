@@ -676,6 +676,8 @@ public final class ObtainPlanner {
         if (why != null) return new Stuck(why);
         if (sim.steps.isEmpty()) return new Have();
         Pending first = sim.steps.get(0);
+        if (Boolean.getBoolean("bob.debugPlan")) net.kasax.challengecraft.bot.BotManager.LOG.info("[Bot] plan for {} x{}: {}", names(accept), count,
+                sim.steps.stream().map(st -> st.kind() + " " + st.key() + " x" + st.amount()).toList());
         // Everything from the surface first, then down: a digger that comes back up for wood or
         // wool loses minutes. (Gathering needs no other step first, only tools it already has.)
         if (digsDown(bot, first)) {
@@ -972,7 +974,9 @@ public final class ObtainPlanner {
         // (needed for the ore itself) does not wear out on it.
         Integer digTo = cheapest == null || visibleBlocks.containsKey(cheapest) ? null
                 : BotKnowledge.depth(cheapest, bot.body().blockPosition().getY());
-        if (digTo != null && !accept.contains(Items.STONE_PICKAXE) && !visiting.contains(Items.STONE_PICKAXE)) {
+        // (Not for rock itself - the stone is what it is after - nor for a few levels down.)
+        if (digTo != null && !BotWorld.COMMON.contains(cheapest) && bot.body().blockPosition().getY() - digTo > 20
+                && !accept.contains(Items.STONE_PICKAXE) && !visiting.contains(Items.STONE_PICKAXE)) {
             int spare = digTo < 30 ? 2 : 1;
             if (sim.count(Set.of(Items.STONE_PICKAXE)) < spare) {
                 Set<Item> v = new HashSet<>(visiting);

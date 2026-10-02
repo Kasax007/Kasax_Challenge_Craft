@@ -84,9 +84,12 @@ public final class MineTask implements BotTask {
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         int have = ObtainPlanner.countAny(bot.body(), items);
-        if (have >= count) return Result.DONE;
+        // An ore vein is taken whole, whatever the count: the rest is right there now, and a
+        // trip back for it later (the shield, the bucket) costs minutes.
+        boolean veinLeft = collectTicks > 0 || veinNear(level, bot);
+        if (have >= count && !veinLeft) return Result.DONE;
         // Enough for now, more only for later (other tiles want it too): while it is right here.
-        if (have >= needed && collectTicks <= 0 && (target == null ? !nearbyMore(level, bot) : target.distSqr(bot.body().blockPosition()) > 12 * 12)) return Result.DONE;
+        if (have >= needed && collectTicks <= 0 && !veinLeft && (target == null ? !nearbyMore(level, bot) : target.distSqr(bot.body().blockPosition()) > 12 * 12)) return Result.DONE;
 
         // Pick up what fell.
         if (collectTicks > 0) {
@@ -117,6 +120,22 @@ public final class MineTask implements BotTask {
                 while (target == null && !vein.isEmpty()) {
                     BlockPos v = vein.poll();
                     if (!skip.contains(v) && blocks.test(level.getBlockState(v))) target = v;
+                }
+                if (target == null && rock(level)) {
+                    // Rock and soil: from a wall at its own level (a hillside, a cave wall, the
+                    // tunnel it digs), never from under its own feet - that is a shaft it then has
+                    // to build its way out of with the very blocks it dug. No wall about: a
+                    // staircase down (see dig), which is also the way back up.
+                    // (Once on the staircase, only the staircase: a wall block beside it could be
+                    // one of its steps, and the way back up would be gone.)
+                    // (At body height, feet and head, as a tunnel is dug: not the ceiling, where
+                    // it reaches up badly and the drops fall who knows where.)
+                    if (!rockStairs) target = wallRock(level, bot);
+                    if (target == null) {
+                        if (!rockStairs) bot.say("no rock at hand for " + what + ": a staircase down");
+                        rockStairs = true;
+                        return search(bot);
+                    }
                 }
                 if (target == null) target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
                 // Nothing right here: somewhere it has been past (or seen from afar).
@@ -207,6 +226,57 @@ public final class MineTask implements BotTask {
         return Result.RUNNING;
     }
 
+    private Boolean rock;
+    private boolean rockStairs;
+
+    /** Gathering rock or soil (cobblestone, deepslate, netherrack, dirt): found everywhere. */
+    private boolean rock(ServerLevel level) {
+        if (rock == null) {
+            rock = false;
+            for (net.minecraft.world.level.block.Block b : BotWorld.COMMON) {
+                if (b != net.minecraft.world.level.block.Blocks.BEDROCK && blocks.test(b.defaultBlockState())) rock = true;
+            }
+        }
+        return rock;
+    }
+
+    /**
+     * The nearest rock in a wall at body height (feet or head), dry: not one with water next to
+     * it (digging in the wet is five times slower, and the water follows into the tunnel).
+     */
+    private BlockPos wallRock(ServerLevel level, Bot bot) {
+        BlockPos feet = bot.body().blockPosition();
+        Set<BlockPos> wet = new HashSet<>();
+        for (int i = 0; i < 8; i++) {
+            Set<BlockPos> ignore = new HashSet<>(skip);
+            ignore.addAll(wet);
+            BlockPos low = BotWorld.nearest(level, feet, 8, 0, blocks, true, ignore);
+            BlockPos high = BotWorld.nearest(level, feet.above(), 8, 0, blocks, true, ignore);
+            BlockPos p = low == null ? high : high == null ? low : low.distSqr(feet) <= high.distSqr(feet) ? low : high;
+            if (p == null) return null;
+            boolean dry = true;
+            for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) dry = false;
+            if (dry) return p;
+            wet.add(p);
+        }
+        return null;
+    }
+
+    /** An ore of the vein being taken still in the wall a few steps away. */
+    private boolean veinNear(ServerLevel level, Bot bot) {
+        BlockPos feet = bot.body().blockPosition();
+        for (BlockPos v : vein) {
+            BlockState s = level.getBlockState(v);
+            if (!skip.contains(v) && blocks.test(s) && ore(s) && v.distSqr(feet) <= 36) return true;
+        }
+        return false;
+    }
+
+    private static boolean ore(BlockState s) {
+        return s.is(net.minecraft.tags.BlockTags.ORES) || s.is(net.minecraft.world.level.block.Blocks.NETHER_GOLD_ORE)
+                || s.is(net.minecraft.world.level.block.Blocks.NETHER_QUARTZ_ORE) || s.is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS);
+    }
+
     private boolean knownOnly;
     /** Blocks of the vein (or tree) being taken, seen next to the ones broken: next in line. */
     private final java.util.ArrayDeque<BlockPos> vein = new java.util.ArrayDeque<>();
@@ -268,7 +338,8 @@ public final class MineTask implements BotTask {
         BotNavigator nav = bot.navigator();
         // Ores: a cave first (walk through it and see what its walls show), a tunnel only when
         // there is no cave about or the caves had nothing.
-        if (depth != null && !cavesDone) return explore(bot);
+        if (depth != null && !cavesDone && !rock(level(bot))) return explore(bot);
+        if (depth == null && rock(level(bot))) return dig(bot);
         if (depth != null) return dig(bot);
         // Where they are known to be: go there first.
         if (lead != null) {
@@ -331,6 +402,11 @@ public final class MineTask implements BotTask {
             double dx = p.getX() - feet.getX(), dz = p.getZ() - feet.getZ();
             double walk = Math.sqrt(dx * dx + dz * dz) / 2.5 + Math.abs(p.getY() - feet.getY());
             double dig = Math.max(0, feet.getY() - depth) + 60;
+            // Many still wanted (eleven iron for the pickaxe, the bucket and the shield): not one
+            // walk to a lone ore after the other over the hills, but down to where they are
+            // common and mined there in one go - unless the next one is a short walk.
+            int left = count - ObtainPlanner.countAny(bot.body(), items);
+            if (left >= 3) return walk <= Math.min(dig, 25);
             return walk <= dig;
         }
         if (Math.abs(p.getY() - bot.body().getBlockY()) <= 8) return true;
@@ -404,6 +480,8 @@ public final class MineTask implements BotTask {
 
     private List<BlockPos> digBlocks;
     private BlockPos digTo;
+    /** The height the staircase goes down to (the ore's, or a few levels for rock). */
+    private Integer digDepth;
     private int stepTicks, turns, moves;
 
     /**
@@ -414,23 +492,18 @@ public final class MineTask implements BotTask {
     private Result dig(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
         BotNavigator nav = bot.navigator();
-        if (searchTicks % 600 == 0) bot.say("digging for " + what + ": at " + nav.feet().toShortString() + ", heading " + heading.getName() + ", y " + depth + " wanted");
+        if (searchTicks % 600 == 0) bot.say("digging for " + what + ": at " + nav.feet().toShortString() + ", heading " + heading.getName() + ", y " + (digDepth != null ? digDepth : depth) + " wanted");
         if (digTo == null) {
             BlockPos feet = nav.feet();
-            boolean down = feet.getY() > depth;
+            if (digDepth == null) digDepth = depth != null ? depth : feet.getY() - 8;
+            boolean down = feet.getY() > digDepth;
             BlockPos ahead = feet.relative(heading);
             stepTicks = 0;
-            // Down: a shaft (one block per level) where the block under it is solid ground and
-            // nothing liquid is near; otherwise a staircase, which never drops into the unknown.
-            if (down && safeStep(level, List.of(feet.below()), feet.below())) {
-                digTo = feet.below();
-                // Also whatever low thing the bot stands in (snow, a slab), or it never drops.
-                digBlocks = level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
-                        ? List.of(feet.below()) : List.of(feet, feet.below());
-            } else {
-                digTo = down ? ahead.below() : ahead;
-                digBlocks = down ? List.of(ahead.above(), ahead, ahead.below()) : List.of(ahead, ahead.above());
-            }
+            // Down: a staircase (head, feet and one below ahead, then a step down into it), never
+            // a shaft: it never drops into the unknown, it yields three blocks a level, and it is
+            // the way back up afterwards - walked, not built with the blocks just dug.
+            digTo = down ? ahead.below() : ahead;
+            digBlocks = down ? List.of(ahead.above(), ahead, ahead.below()) : List.of(ahead, ahead.above());
             if (!safeStep(level, digBlocks, digTo)) {
                 digTo = null;
                 heading = heading.getClockWise();

@@ -98,4 +98,6 @@ tasks.matching { it.name == 'runGameTest' }.configureEach {
 // Only some scenarios: ./gradlew runGameTest -PbotTest=pool
 loom.runs.matching { it.name == 'gameTest' }.configureEach {
 	if (project.hasProperty('botTest')) vmArg "-Dfabric-api.gametest.filter=${project.property('botTest')}"
+	// Every plan the planner makes, step by step, in the log: ./gradlew runGameTest -PbotDebugPlan
+	if (project.hasProperty('botDebugPlan')) vmArg "-Dbob.debugPlan=true"
 }

@@ -140,6 +140,17 @@ final class LockoutStrategist {
             int amount = g.type() == LockoutBingoGoalType.ITEM_AMOUNT ? Math.max(1, g.amount()) : 1;
             demand(k, first, amount, 0, planner.boardDemand);
         }
+        // The kit's iron too, not only the board's: the iron pickaxe, the bucket the plan invests
+        // in, and a shield (one ingot, and the arrows end in it) - mined in the same trip, from
+        // the same vein, instead of a second trip down for the last few.
+        boolean ironWanted = ironKit || planner.boardDemand.containsKey(Items.RAW_IRON);
+        if (ironWanted) {
+            int kit = 0;
+            if (!holds(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE))) kit += 3;
+            if (ironKit && !holds(bot, Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET))) kit += 3;
+            if (!holds(bot, Set.of(Items.SHIELD)) && bot.body().getOffhandItem().getItem() != Items.SHIELD) kit += 1;
+            if (kit > 0) planner.boardDemand.merge(Items.RAW_IRON, kit, Integer::sum);
+        }
         // Fuel for all that smelting: coal, picked up on the way (a player does not burn the logs
         // it worked for). About one coal per eight items.
         int smelt = 0;

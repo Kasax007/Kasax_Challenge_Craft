@@ -111,6 +111,48 @@ public class BotSkillTests {
                 });
     }
 
+    /**
+     * Cobblestone on flat grass, no rock showing: a staircase down (not a shaft), and back up it
+     * on foot - none of the cobblestone spent on climbing out.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void cobbleStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "cobble_stairs");
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.SequenceTask("cobble and back", java.util.List.of(
+                        () -> new ObtainTask(Set.of(Items.COBBLESTONE), 20),
+                        () -> new net.kasax.challengecraft.bot.task.GoToTask(a.abs(20, FEET, 20), 1))), 2400,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.COBBLESTONE)) >= 20 && a.near(20, FEET, 20, 1.5) && a.bot().current() == null);
+    }
+
+    /** A rock wall at hand: the cobblestone comes out of the wall, the ground it stands on stays whole. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void cobbleFromWall(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "cobble_from_wall");
+        a.fill(23, FEET, 14, 26, FEET + 3, 26, Blocks.STONE);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.COBBLESTONE), 12), 1600, () -> {
+            if (body.getY() < a.abs(0, FEET, 0).getY() - 0.5) h.fail("dug down instead of into the wall");
+            return ObtainPlanner.countAny(body, Set.of(Items.COBBLESTONE)) >= 12 && a.bot().current() == null;
+        });
+    }
+
+    /** Three iron wanted, a vein of six in the rock: all six taken while there. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void veinBeyondCount(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "vein_beyond_count");
+        a.fill(24, FEET, 17, 27, FEET + 2, 21, Blocks.STONE);
+        a.fill(24, FEET, 19, 25, FEET, 19, Blocks.IRON_ORE);
+        a.fill(25, FEET + 1, 19, 26, FEET + 1, 19, Blocks.IRON_ORE);
+        a.fill(26, FEET, 19, 26, FEET, 20, Blocks.IRON_ORE);
+        a.spawn(20, FEET, 19, new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.RAW_IRON), 3), 1600,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 6 && a.bot().current() == null);
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {
