@@ -112,7 +112,13 @@ public final class MineTask implements BotTask {
                 scanCooldown = 20;
                 // (Not the ones found out of reach a little while ago, by this task or another.)
                 skip.addAll(bot.unreachable());
-                target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
+                // The rest of the vein first: what was just broken showed its neighbours (a player
+                // takes the whole cluster in front of him, not the one ten blocks off next).
+                while (target == null && !vein.isEmpty()) {
+                    BlockPos v = vein.poll();
+                    if (!skip.contains(v) && blocks.test(level.getBlockState(v))) target = v;
+                }
+                if (target == null) target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
                 // Nothing right here: somewhere it has been past (or seen from afar).
                 if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 // Things from the surface (logs, sand) seen deep down (a mineshaft's beams) are not
@@ -183,6 +189,10 @@ public final class MineTask implements BotTask {
         if (bot.actions().breakTick(target)) {
             if (blocks.test(level.getBlockState(target))) {
                 skip.add(target); // refused (protected)
+            } else {
+                for (BlockPos n : BlockPos.betweenClosed(target.offset(-1, -1, -1), target.offset(1, 1, 1))) {
+                    if (blocks.test(level.getBlockState(n)) && !skip.contains(n)) vein.addFirst(n.immutable());
+                }
             }
             target = null;
             collectTicks = 60;
@@ -196,6 +206,8 @@ public final class MineTask implements BotTask {
     }
 
     private boolean knownOnly;
+    /** Blocks of the vein (or tree) being taken, seen next to the ones broken: next in line. */
+    private final java.util.ArrayDeque<BlockPos> vein = new java.util.ArrayDeque<>();
 
     /**
      * No way to it: it, and the rest of the same tree or ore vein (connected, a few dozen at most),

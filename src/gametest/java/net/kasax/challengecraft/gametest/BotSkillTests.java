@@ -51,6 +51,25 @@ public class BotSkillTests {
                         && a.bot().current() == null);
     }
 
+    /**
+     * An iron vein in a rock with one ore showing, a lone ore a little farther on the other side: the
+     * whole vein is taken (the ores behind the first come to light), the lone one left.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void wholeVein(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "whole_vein");
+        a.fill(24, FEET, 17, 27, FEET + 2, 21, Blocks.STONE);
+        a.fill(24, FEET, 19, 24, FEET, 19, Blocks.IRON_ORE);
+        a.fill(25, FEET, 19, 25, FEET + 1, 19, Blocks.IRON_ORE);
+        a.fill(26, FEET, 19, 26, FEET, 20, Blocks.IRON_ORE);
+        a.fill(20, FEET, 25, 20, FEET, 25, Blocks.IRON_ORE);
+        a.spawn(20, FEET, 19, new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new ObtainTask(Set.of(Items.RAW_IRON), 5), 1600,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 5 && a.bot().current() == null
+                        && h.getBlockState(new net.minecraft.core.BlockPos(20, FEET, 25)).is(Blocks.IRON_ORE));
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {
