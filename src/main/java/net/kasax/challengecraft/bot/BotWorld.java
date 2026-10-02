@@ -56,6 +56,46 @@ public final class BotWorld {
         return best;
     }
 
+    /**
+     * Up to {@code n} matching blocks within {@code radius} (vertical ±{@code height}), nearest
+     * first by the straight line (which one is nearest by the way there is the path search's
+     * business: see {@link BotNavigator#goNearAny}).
+     */
+    public static List<BlockPos> nearestN(ServerLevel level, BlockPos center, int radius, int height, Predicate<BlockState> match,
+                                          boolean exposedOnly, Set<BlockPos> ignore, int n) {
+        List<BlockPos> all = new java.util.ArrayList<>();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int cx0 = (center.getX() - radius) >> 4, cx1 = (center.getX() + radius) >> 4;
+        int cz0 = (center.getZ() - radius) >> 4, cz1 = (center.getZ() + radius) >> 4;
+        int y0 = Math.max(level.getMinY(), center.getY() - height), y1 = Math.min(level.getMaxY() - 1, center.getY() + height);
+        for (int cx = cx0; cx <= cx1; cx++) {
+            for (int cz = cz0; cz <= cz1; cz++) {
+                if (level.getChunkSource().getChunkNow(cx, cz) == null) continue;
+                int x0 = Math.max(cx << 4, center.getX() - radius), x1 = Math.min((cx << 4) + 15, center.getX() + radius);
+                int z0 = Math.max(cz << 4, center.getZ() - radius), z1 = Math.min((cz << 4) + 15, center.getZ() + radius);
+                for (int x = x0; x <= x1; x++) {
+                    for (int z = z0; z <= z1; z++) {
+                        for (int y = y0; y <= y1; y++) {
+                            BlockState s = level.getBlockState(m.set(x, y, z));
+                            if (s.isAir() || !match.test(s) || ignore.contains(m)) continue;
+                            all.add(m.immutable());
+                        }
+                    }
+                }
+            }
+        }
+        all.sort(Comparator.comparingDouble(p -> p.distSqr(center)));
+        List<BlockPos> out = new java.util.ArrayList<>();
+        net.minecraft.world.phys.Vec3 eye = new net.minecraft.world.phys.Vec3(center.getX() + 0.5, center.getY() + 1.62, center.getZ() + 0.5);
+        for (BlockPos p : all) {
+            if (out.size() >= n) break;
+            BlockState s = level.getBlockState(p);
+            if (exposedOnly && !(COMMON.contains(s.getBlock()) ? exposed(level, p) : seen(level, p, eye))) continue;
+            out.add(p);
+        }
+        return out;
+    }
+
     /** Rock and soil: wherever it digs there is some, no need to have seen it. */
     public static final Set<net.minecraft.world.level.block.Block> COMMON = Set.of(net.minecraft.world.level.block.Blocks.STONE,
             net.minecraft.world.level.block.Blocks.DEEPSLATE, net.minecraft.world.level.block.Blocks.DIRT, net.minecraft.world.level.block.Blocks.GRASS_BLOCK,

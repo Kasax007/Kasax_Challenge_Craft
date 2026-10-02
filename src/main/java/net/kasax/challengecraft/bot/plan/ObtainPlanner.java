@@ -357,7 +357,7 @@ public final class ObtainPlanner {
         if (habitatBot != null && !MobHabitats.inHabitat(habitatBot, type)) {
             BlockPos home = MobHabitats.nearestKnown(habitatBot, type);
             if (home != null) {
-                walk = Math.sqrt(home.distSqr(habitatBot.body().blockPosition())) / 4.0;
+                walk = net.kasax.challengecraft.bot.BotTerrain.walkSeconds(habitatBot, habitatBot.body().blockPosition(), home);
                 at = home;
             } else effort *= 2.5;
         }
@@ -415,8 +415,8 @@ public final class ObtainPlanner {
         // And what it remembers from further away (read from the chunks it has been near).
         for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c, unreachable).entrySet()) {
             BlockPos p = e.getValue();
-            double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
-            double reach = 4 + Math.sqrt(dx * dx + dz * dz) / 3.5 + vertical(p.getY() - c.getY(), digPerBlock);
+            // (By the way there over the land, not the straight line: across the bay is not near.)
+            double reach = 4 + 1.15 * net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, c, p) + vertical(p.getY() - c.getY(), digPerBlock);
             Double known = blocks.get(e.getKey());
             if (known == null || reach < known) {
                 blocks.put(e.getKey(), reach);
@@ -453,12 +453,13 @@ public final class ObtainPlanner {
         if (!nether && level.dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             var seenVillager = bot.memory().lastSeen(level, net.minecraft.world.entity.EntityTypes.VILLAGER, c);
             if (seenVillager != null) {
-                villageWalk = 10 + Math.sqrt(seenVillager.distSqr(c)) / 4;
+                villageWalk = 10 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, c, seenVillager);
                 villagePos = seenVillager;
             }
             var village = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot, net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "village"));
-            if (village != null && 10 + Math.sqrt(village.spot().distSqr(c)) / 4 < villageWalk) {
-                villageWalk = 10 + Math.sqrt(village.spot().distSqr(c)) / 4;
+            double viaMap = village == null ? Double.MAX_VALUE : 10 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, c, village.spot());
+            if (village != null && viaMap < villageWalk) {
+                villageWalk = viaMap;
                 villagePos = village.spot();
             }
             for (var v : level.getEntitiesOfClass(net.minecraft.world.entity.npc.villager.Villager.class, new AABB(c).inflate(96), e -> e.isAlive() && !e.isBaby())) {
@@ -470,7 +471,7 @@ public final class ObtainPlanner {
         Map<Block, Double> hints = new IdentityHashMap<>();
         Map<Block, BlockPos> hinted = new IdentityHashMap<>();
         for (Map.Entry<net.minecraft.resources.Identifier, BlockPos> e : bot.senses().biomes().entrySet()) {
-            double walk = 6 + Math.sqrt(e.getValue().distSqr(c)) / 4.0;
+            double walk = 6 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, c, e.getValue());
             for (String id : BotKnowledge.typicalOf(e.getKey().getPath())) {
                 Block b = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id));
                 if (b == net.minecraft.world.level.block.Blocks.AIR) continue;

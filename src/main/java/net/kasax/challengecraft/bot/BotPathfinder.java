@@ -9,7 +9,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -108,7 +107,7 @@ public final class BotPathfinder {
 
     private final WorldView world;
     private final Abilities abilities;
-    private final Map<Long, BlockState> cache = new HashMap<>();
+    private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<BlockState> cache = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
     private final Map<BlockState, Double> breakCache = new java.util.IdentityHashMap<>();
     private final double flatCost;
 
@@ -128,6 +127,38 @@ public final class BotPathfinder {
         this.favoured = path;
         return this;
     }
+
+    /**
+     * The large view's way to the goal (see {@link BotTerrain}): what is left from each cell. Far
+     * from the goal it steers the search instead of the straight line, so the best partial way
+     * runs along the real way round, not into the bay the straight line crosses.
+     */
+    private BotTerrain.Field guide;
+    /** How near the goal is good enough (reach): taken off the straight-line estimate. */
+    private double near;
+
+    public BotPathfinder guided(BotTerrain.Field guide) {
+        this.guide = guide;
+        return this;
+    }
+
+    /** Several places, any of which will do (the heuristic: the nearest of them). */
+    private List<BlockPos> targets;
+
+    public BotPathfinder toAnyOf(List<BlockPos> targets) {
+        this.targets = targets == null || targets.size() < 2 ? null : List.copyOf(targets);
+        return this;
+    }
+
+    public BotPathfinder near(double range) {
+        this.near = Math.max(0, range - 1);
+        return this;
+    }
+
+    /** Within this of the goal the large view is too coarse: the straight line steers. */
+    private static final double GUIDE_NEAR = 32;
+    /** Off the large view's figure: half a cell's walk and some (it is cell to cell, the search block to block). */
+    private static final double GUIDE_SLACK = BotTerrain.CELL * SPRINT * 1.5;
 
     private double breakTicks(BlockState s) {
         return breakCache.computeIfAbsent(s, abilities.breakTicks()::applyAsDouble);
@@ -172,7 +203,7 @@ public final class BotPathfinder {
      */
     public Result search(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int maxNodes, long nanos) {
         long until = nanos == Long.MAX_VALUE ? Long.MAX_VALUE : System.nanoTime() + nanos;
-        Map<Long, Node> nodes = new HashMap<>();
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Node> nodes = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>();
         Node first = new Node(start);
         first.f = heuristic(start, target);
@@ -206,7 +237,12 @@ public final class BotPathfinder {
             for (Step s : moves(n.pos, n.step != null && n.step.place() != null && n.step.place().equals(n.pos.below()))) {
                 double cost = cost(n.pos, s) + (avoid.contains(s.to().asLong()) ? 400 : 0);
                 if (favoured.contains(s.to().asLong())) cost *= 0.5;
-                Node m = nodes.computeIfAbsent(s.to().asLong(), k -> new Node(s.to()));
+                long key = s.to().asLong();
+                Node m = nodes.get(key);
+                if (m == null) {
+                    m = new Node(s.to());
+                    nodes.put(key, m);
+                }
                 if (m.closed) continue;
                 double g = n.g + cost;
                 if (m.parent != null && g >= m.g) continue;
@@ -237,9 +273,24 @@ public final class BotPathfinder {
     }
 
     private double heuristic(BlockPos a, BlockPos b) {
+        if (targets != null) {
+            double best = Double.MAX_VALUE;
+            for (BlockPos t : targets) best = Math.min(best, estimate(a, t));
+            return best;
+        }
+        return estimate(a, b);
+    }
+
+    private double estimate(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dy = a.getY() - b.getY(), dz = a.getZ() - b.getZ();
+        double flat = Math.sqrt(dx * dx + dz * dz);
         // Up costs a jump a block, down a short fall (Baritone's way of weighing height).
-        return Math.sqrt(dx * dx + dz * dz) * flatCost + (dy < 0 ? -dy * (JUMP_ONE + 1) : dy * FALL[2] / 2);
+        double straight = Math.max(0, flat - near) * flatCost + (dy < 0 ? -dy * (JUMP_ONE + 1) : dy * FALL[2] / 2);
+        if (guide != null && flat > GUIDE_NEAR) {
+            double g = guide.ticks(a.getX(), a.getZ());
+            if (g >= 0) return Math.max(straight, 0.85 * g - GUIDE_SLACK);
+        }
+        return straight;
     }
 
     private double cost(BlockPos from, Step s) {

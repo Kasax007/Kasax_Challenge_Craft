@@ -115,6 +115,12 @@ public final class BotMemory {
         }
     }
 
+    /** Whether it has had this chunk in view at some time (read it). */
+    public boolean wasScanned(ResourceKey<Level> dimension, int cx, int cz) {
+        Map<Long, Long> done = scanned.get(dimension);
+        return done != null && done.containsKey(ChunkPos.pack(cx, cz));
+    }
+
     /** One chunk a tick: the nearest one not read yet (or not for a while), ring by ring. */
     private void scanNextChunk(ServerLevel level, BlockPos at, long now) {
         Map<Long, Long> done = scanned.computeIfAbsent(level.dimension(), k -> new HashMap<>());

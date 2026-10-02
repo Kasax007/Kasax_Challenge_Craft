@@ -2,6 +2,7 @@ package net.kasax.challengecraft.bot.task;
 
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotNavigator;
+import net.kasax.challengecraft.bot.BotTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -58,7 +59,12 @@ public final class FarWalk {
             nav.stop();
             walking = false;
             if (SurfaceTask.underground(bot.body())) climb = new SurfaceTask();
-            else side = stalls % 2 == 1 ? 1 : -1;
+            else if (BotTerrain.usable(level)) {
+                // The large view's way led into something it could not see (a cliff between two
+                // cells, a ravine): there believed dearer, and the way worked out afresh.
+                nav.terrain.penalize(feet, 400);
+                nav.rethinkWay();
+            } else side = stalls % 2 == 1 ? 1 : -1;
         }
         // Down in a mine with the walk far over the land: up first. (A valley or a ravine is
         // not a mine: the path search takes the way out of it.)
@@ -98,9 +104,13 @@ public final class FarWalk {
             if (legDirect) return Status.ARRIVED;
             return Status.MOVING;
         }
-        // No way this time: aside, or (at the end) as near as it got.
+        // No way this time: aside, or (at the end) as near as it got. (With the large view: that
+        // spot believed dearer, and its way round worked out again; aside only under a roof.)
         if (++fails > MAX_FAILS) return Status.FAILED;
-        side = bot.body().getRandom().nextBoolean() ? 1 : -1;
+        if (BotTerrain.usable(level)) {
+            nav.terrain.penalize(feet, 300);
+            nav.rethinkWay();
+        } else side = bot.body().getRandom().nextBoolean() ? 1 : -1;
         if (legDirect && flat <= range + 3) return Status.ARRIVED;
         return Status.MOVING;
     }

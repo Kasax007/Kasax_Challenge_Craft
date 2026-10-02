@@ -28,6 +28,7 @@ public final class NavBenchTask implements BotTask {
     private net.minecraft.world.phys.Vec3 last;
     private java.util.Map<String, Integer> dropsAtStart;
     private java.util.Random random;
+    private BlockPos centre;
 
     public NavBenchTask(int count, int min, int max) {
         this.count = count;
@@ -49,15 +50,15 @@ public final class NavBenchTask implements BotTask {
                         Math.round(100 * sumWait / Math.max(1, sumTicks)), sumSwings, bot.navigator().failures, bot.navigator().dropReasons);
                 return Result.DONE;
             }
-            double a = 0, d = 0;
-            BlockPos flat = null;
-            // (Only where the world is loaded: the ground elsewhere reads as the bottom of the world.)
-            for (int i = 0; i < 50 && (flat == null || !level.hasChunkAt(flat)); i++) {
-                a = random.nextDouble() * Math.PI * 2;
-                d = min + random.nextDouble() * (max - min);
-                flat = bot.body().blockPosition().offset((int) (Math.cos(a) * d), 0, (int) (Math.sin(a) * d));
-            }
+            // Round the world's spawn, from the seed: the same spots whatever way it went before
+            // (two versions walk the same ways). The ground is generated there if need be.
+            if (centre == null) centre = level.getRespawnData().pos();
+            double a = random.nextDouble() * Math.PI * 2;
+            double d = min + random.nextDouble() * (max - min);
+            BlockPos flat = centre.offset((int) (Math.cos(a) * d), 0, (int) (Math.sin(a) * d));
+            level.getChunk(flat);
             target = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, flat);
+            d = Math.sqrt(bot.body().blockPosition().distSqr(target));
             from = bot.body().blockPosition();
             ticks = 0;
             limit = (int) (d / 2.0 * 20) + 600; // two blocks a second, and some

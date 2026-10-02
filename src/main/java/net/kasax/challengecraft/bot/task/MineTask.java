@@ -13,6 +13,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,6 +44,8 @@ public final class MineTask implements BotTask {
     private Direction heading;
     private Explorer explorer;
     private BlockPos lead, approaching;
+    /** The few in sight it is on its way to, any one of which will do (null: just the target). */
+    private List<BlockPos> candidates;
     private int approachTicks, leadFails, sideStep;
 
     /** Mine until the bot holds {@code count} of the {@code items} together. */
@@ -137,15 +140,28 @@ public final class MineTask implements BotTask {
                         return search(bot);
                     }
                 }
-                if (target == null) target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
+                candidates = null;
+                if (target == null) {
+                    // The nearest few in sight: which of them is really nearest (by the way there,
+                    // not the straight line) the path search finds out (see goNearAny).
+                    // (Things from the surface - logs, sand - seen deep down, a mineshaft's beams,
+                    // are not worth digging fifty blocks for: those are left out, see worthIt.)
+                    List<BlockPos> seen = new ArrayList<>();
+                    for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip, 12)) {
+                        // (A trunk from the bottom: that one is in reach from the ground.)
+                        for (int i = 0; i < 12 && blocks.test(level.getBlockState(p.below())) && !skip.contains(p.below()); i++) p = p.below();
+                        if (!seen.contains(p) && worthIt(level, bot, p)) seen.add(p);
+                    }
+                    if (!seen.isEmpty()) {
+                        target = seen.get(0);
+                        if (seen.size() > 1) candidates = seen;
+                    }
+                }
                 // Nothing right here: somewhere it has been past (or seen from afar).
                 if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
-                // Things from the surface (logs, sand) seen deep down (a mineshaft's beams) are not
-                // worth digging fifty blocks for: those are left for ones up here.
                 for (int i = 0; i < 8 && target != null && !worthIt(level, bot, target); i++) {
                     skip.add(target);
-                    target = BotWorld.nearest(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip);
-                    if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
+                    target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 }
                 if (target != null && !worthIt(level, bot, target)) target = null;
             }
@@ -189,7 +205,8 @@ public final class MineTask implements BotTask {
                 return Result.RUNNING;
             }
             if (!walking) {
-                bot.navigator().goNear(target, 3.6);
+                if (candidates != null) bot.navigator().goNearAny(candidates, 3.6);
+                else bot.navigator().goNear(target, 3.6);
                 walking = true;
             }
             // Much longer than the way there should take: this one is not to be had; another.
@@ -211,6 +228,12 @@ public final class MineTask implements BotTask {
                 walking = false;
             } else if (s == BotNavigator.Status.ARRIVED) {
                 walking = false;
+                // (Of the few it set out for, the one the way led to.)
+                if (candidates != null) {
+                    BlockPos r = bot.navigator().reached();
+                    if (r != null) target = r;
+                    candidates = null;
+                }
                 if (!bot.actions().inReach(target)) {
                     giveUp(bot, target);
                     target = null;

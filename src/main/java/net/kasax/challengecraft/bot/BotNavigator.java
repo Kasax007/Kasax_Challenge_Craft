@@ -18,13 +18,17 @@ public final class BotNavigator {
     public enum Status { IDLE, MOVING, ARRIVED, FAILED }
 
     /** A search on the server thread (goals that look at the world): nodes, and at most this long. */
+    // (The node counts are the limit, so the same world gives the same way however busy the
+    // machine is; the times only stop a search that would hold up the server.)
     private static final int BUDGET = 40000;
-    private static final long SYNC_NANOS = 25_000_000L;
+    private static final long SYNC_NANOS = 60_000_000L;
     /** A search on a worker thread (plain position goals): first try, and the longer one if that found nothing. */
     private static final int QUICK_NODES = 8000;
-    private static final long QUICK_NANOS = 8_000_000L;
+    private static final long QUICK_NANOS = 30_000_000L;
     private static final int ASYNC_NODES = 200_000, ASYNC_NODES_HARD = 600_000;
-    private static final long ASYNC_NANOS = 300_000_000L, ASYNC_NANOS_HARD = 1_500_000_000L;
+    private static final long ASYNC_NANOS = 1_200_000_000L, ASYNC_NANOS_HARD = 6_000_000_000L;
+    /** Goals further than this (flat) are walked by the large view's way (see {@link BotTerrain}). */
+    private static final int GUIDE_FROM = 48;
     /** Chunks around the start a search may read (beyond is unknown: a leg's end, planned on from there). */
     private static final int VIEW_CHUNKS = 7;
     private static final int STUCK_TICKS = 40;
@@ -35,6 +39,13 @@ public final class BotNavigator {
     /** Path searches off the server thread (as Baritone plans while the player walks). */
     private static final java.util.concurrent.ExecutorService SEARCH = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "bot-path-search");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** The large view's searches: a thread of their own (a path search may wait on one, never the other way). */
+    private static final java.util.concurrent.ExecutorService TERRAIN = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "bot-terrain");
         t.setDaemon(true);
         return t;
     });
@@ -66,6 +77,19 @@ public final class BotNavigator {
     private boolean diving;
     /** Allow digging and building on the way. */
     public boolean mayBreak = true, mayPillar = true;
+    /** The land in the large, for far goals and the planner's walking times. */
+    public final BotTerrain terrain = new BotTerrain();
+    /** The large view's way to the current far goal, being worked out or done (null: none). */
+    private java.util.concurrent.Future<BotTerrain.Field> guideJob;
+    private long guideAt;
+    private BlockPos guideCenter;
+    /** What the large view said the walk would take, and when that was (to learn how long walks really take). */
+    private double walkEstimate;
+    private int walkEstimateAt;
+    /** How near is near enough for the goal (reach), for the search's estimate. */
+    private double near;
+    /** What was left of a path dropped (stuck, the world changed): the next search keeps to it where it can. */
+    private java.util.Set<Long> rest;
 
     public BotNavigator(BotPlayer bot, BotTools tools, BotActions actions) {
         this.bot = bot;
@@ -82,11 +106,67 @@ public final class BotNavigator {
         setGoal(p -> p.equals(feet), feet, true);
     }
 
+    /** The large view's way to the far goal is to be worked out again (somewhere on it got stuck). */
+    public void rethinkWay() {
+        guideJob = null;
+    }
+
+    /** The large view's way from {@code from} to the current goal, as points every {@code every} cells (for the log). */
+    public java.util.List<BlockPos> wayPoints(int every) {
+        if (guideJob == null || !guideJob.isDone()) return java.util.List.of();
+        try {
+            return guideJob.get().route(feet(), every);
+        } catch (Exception e) {
+            return java.util.List.of();
+        }
+    }
+
     /** Go within {@code range} blocks of {@code pos} (to work on it or pick something up). */
     public void goNear(BlockPos pos, double range) {
         double r2 = range * range;
         // Measured from the eyes, which is what reach is about.
         setGoal(p -> Vec3.atCenterOf(p).add(0, 1.12, 0).distanceToSqr(Vec3.atCenterOf(pos)) <= r2, pos, true);
+        near = range;
+    }
+
+    /**
+     * Within reach ({@code range}, from the eyes) of any one of {@code targets}: the search finds
+     * the one cheapest to get to (over the river or up the cliff is not near, however close it
+     * looks). Which one it was: {@link #reached()} once arrived.
+     */
+    public void goNearAny(List<BlockPos> targets, double range) {
+        if (targets.size() == 1) {
+            goNear(targets.get(0), range);
+            return;
+        }
+        double r2 = range * range;
+        List<Vec3> centres = targets.stream().map(Vec3::atCenterOf).toList();
+        setGoal(p -> {
+            Vec3 eye = Vec3.atCenterOf(p).add(0, 1.12, 0);
+            for (Vec3 c : centres) if (eye.distanceToSqr(c) <= r2) return true;
+            return false;
+        }, targets.get(0), true);
+        near = range;
+        anyOf = List.copyOf(targets);
+    }
+
+    /** The places of {@link #goNearAny}, while that is the goal. */
+    private List<BlockPos> anyOf;
+
+    /** Of the places of {@link #goNearAny}, the one in reach from where it stands (null if none). */
+    public BlockPos reached() {
+        if (anyOf == null) return null;
+        Vec3 eye = Vec3.atCenterOf(feet()).add(0, 1.12, 0);
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (BlockPos t : anyOf) {
+            double d = eye.distanceToSqr(Vec3.atCenterOf(t));
+            if (d < bestD) {
+                bestD = d;
+                best = t;
+            }
+        }
+        return best;
     }
 
     /** Stand within {@code range} blocks of {@code pos}, measured at the feet (being there, not reaching it). */
@@ -96,6 +176,7 @@ public final class BotNavigator {
             double dx = p.getX() - pos.getX(), dz = p.getZ() - pos.getZ();
             return dx * dx + dz * dz <= r2 && Math.abs(p.getY() - pos.getY()) <= dy;
         }, pos, true);
+        near = range;
     }
 
     /** Close enough to an item lying about to pick it up (it may hover or lie on a slab). */
@@ -122,6 +203,11 @@ public final class BotNavigator {
         this.replans = 0;
         this.noWay = 0;
         this.avoid.clear();
+        this.near = 0;
+        this.anyOf = null;
+        this.rest = null;
+        this.guideJob = null;
+        this.walkEstimate = 0;
         cancelSearch();
         generation++;
         this.status = Status.MOVING;
@@ -187,7 +273,7 @@ public final class BotNavigator {
         BotPathfinder.Step st = path.get(index);
         return "step " + index + "/" + path.size() + " to " + st.to().toShortString() + (st.breaks().isEmpty() ? "" : " breaking " + st.breaks())
                 + (st.place() == null ? "" : " placing") + " y " + String.format("%.2f", bot.getY()) + " water " + bot.isInWater()
-                + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans + " drops " + drops + " (" + dropped + ")";
+                + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans + " drops " + drops + " (" + dropped + ")" + (guideJob != null ? " guided" : "");
     }
 
     /** Whether the step being walked leads down (into deeper water, say). */
@@ -209,6 +295,8 @@ public final class BotNavigator {
         BlockPos feet = feet();
         if (goal.test(feet) && bot.onGround() || goal.test(feet) && bot.isInWater()) {
             bot.stopInputs();
+            if (walkEstimate > 0) terrain.walked(bot.tickCount - walkEstimateAt, walkEstimate);
+            walkEstimate = 0;
             status = Status.ARRIVED;
             return status;
         }
@@ -373,9 +461,50 @@ public final class BotNavigator {
             holdStill();
             return status;
         }
-        Vec3 aim = new Vec3(to.getX() + 0.5, to.getY(), to.getZ() + 0.5);
+        // Running straight across: past a step it is level with, the steps up to there are done.
+        int far = straightRun(feet);
+        // (The run cuts corners: not every step's block is stood on. The step nearest to where
+        // it is now is where it has got to.)
+        {
+            int nearest = index;
+            double nd = Double.MAX_VALUE;
+            // (Over the next few steps of plain walking on about its level: a jump may carry it
+            // past the end of the run it set out on.)
+            int upTo = far;
+            for (int k = far + 1; k < Math.min(path.size(), index + 7); k++) {
+                BotPathfinder.Step st = path.get(k);
+                if (!st.breaks().isEmpty() || st.place() != null || st.leap() || Math.abs(st.to().getY() - feet.getY()) > 1) break;
+                // (Not round a corner: only one it could walk straight to from here.)
+                if (lineClear(bot.getX(), bot.getZ(), st.to().getX() + 0.5, st.to().getZ() + 0.5, st.to().getY()) == 0) break;
+                upTo = k;
+            }
+            for (int k = index; k <= upTo; k++) {
+                BlockPos p = path.get(k).to();
+                double ex = p.getX() + 0.5 - bot.getX(), ez = p.getZ() + 0.5 - bot.getZ(), e = ex * ex + ez * ez;
+                if (e < nd) {
+                    nd = e;
+                    nearest = k;
+                }
+            }
+            if (nearest > index) {
+                while (index < nearest) advance();
+                return status;
+            }
+        }
+        // Aimed at the furthest of the next steps it can run to in a straight line (no zigzag
+        // from block middle to block middle on a slanting way).
+        BlockPos aimAt = path.get(far).to();
+        Vec3 aim = new Vec3(aimAt.getX() + 0.5, aimAt.getY(), aimAt.getZ() + 0.5);
         double dx = aim.x - bot.getX(), dz = aim.z - bot.getZ();
         double flat = Math.sqrt(dx * dx + dz * dz);
+        if (far > index) {
+            // (The current step itself, for arriving: where it stands is level with the run.)
+            double sx = to.getX() + 0.5 - bot.getX(), sz = to.getZ() + 0.5 - bot.getZ();
+            if (Math.sqrt(sx * sx + sz * sz) < 0.6) {
+                advance();
+                return status;
+            }
+        }
         BotPathfinder.Step next = index + 1 < path.size() ? path.get(index + 1) : null;
         // Straight on after this one: no need to come to the middle of the block first.
         boolean straightOn = next != null && next.breaks().isEmpty() && next.place() == null && !next.leap()
@@ -412,6 +541,10 @@ public final class BotNavigator {
             bot.jump = up && flat < 1.2 && headRoom(feet);
             // Walking into something on the flat: a lip (a slab, a path block), hopped over.
             if (bot.onGround() && bot.horizontalCollision && !up) bot.jump = true;
+            // A long straight run, open overhead: sprint-jumping, as players cover ground (a good
+            // fifth faster than sprinting). Not with little food left, and lined up first.
+            if (far >= index + 3 && flat > 3.5 && bot.sprintNow && bot.onGround() && !up && !careful
+                    && bot.getFoodData().getFoodLevel() > 6 && runningAlong(dx, dz) && jumpRoom) bot.jump = true;
         }
         // Stuck: no progress for a while.
         double d = flat + Math.abs(bot.getY() - to.getY());
@@ -464,6 +597,79 @@ public final class BotNavigator {
         BlockPos q = p;
         for (int i = 0; i < 6 && level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER); i++) q = q.above();
         return level.getFluidState(q).isEmpty() && level.getBlockState(q).getCollisionShape(level, q).isEmpty();
+    }
+
+    /** Whether the straight run found by {@link #straightRun} has head room for jumping all along. */
+    private boolean jumpRoom;
+
+    /**
+     * The furthest of the next few steps it can run to in a straight line from where it is: all
+     * of them plain walking on the level it stands on, and the line itself (the body's width of
+     * it) over ground, with room for the body, nothing harmful, no water. The current step if none.
+     */
+    private int straightRun(BlockPos feet) {
+        // (In the air, mid-jump: the run found on the ground still holds - aiming back at the
+        // step it has flown past would turn it round.)
+        if (!bot.isInWater() && !bot.onGround() && runTo > index && runTo < path.size() && path.get(runTo).to().getY() == path.get(index).to().getY()) return runTo;
+        jumpRoom = false;
+        runTo = index;
+        if (bot.isInWater() || !bot.onGround()) return index;
+        int best = index;
+        boolean room = false;
+        for (int k = index; k < Math.min(path.size(), index + 7); k++) {
+            BotPathfinder.Step st = path.get(k);
+            if (!st.breaks().isEmpty() || st.place() != null || st.leap() || st.to().getY() != feet.getY()) break;
+            if (k == index) continue;
+            int r = lineClear(bot.getX(), bot.getZ(), st.to().getX() + 0.5, st.to().getZ() + 0.5, feet.getY());
+            if (r == 0) break;
+            best = k;
+            room = r == 2;
+        }
+        jumpRoom = room;
+        runTo = best;
+        return best;
+    }
+
+    /** The end of the straight run last found on the ground. */
+    private int runTo;
+
+    /** 0: the line cannot be run; 1: it can; 2: it can, jumping too (room three blocks up). */
+    private int lineClear(double x0, double z0, double x1, double z1, int y) {
+        var level = bot.level();
+        double dx = x1 - x0, dz = z1 - z0, len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1e-3) return 1;
+        double ux = dx / len, uz = dz / len;
+        boolean jump = true;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (double t = 0; t <= len; t += 0.25) {
+            for (double side : new double[] {-0.31, 0, 0.31}) {
+                double px = x0 + ux * t - uz * side, pz = z0 + uz * t + ux * side;
+                int bx = Mth.floor(px), bz = Mth.floor(pz);
+                for (int h = 0; h <= 2; h++) {
+                    var st = level.getBlockState(m.set(bx, y + h, bz));
+                    boolean open = st.getCollisionShape(level, m).isEmpty() && st.getFluidState().isEmpty()
+                            && !st.is(net.minecraft.tags.BlockTags.FIRE) && !st.is(net.minecraft.world.level.block.Blocks.SWEET_BERRY_BUSH)
+                            && !st.is(net.minecraft.world.level.block.Blocks.POWDER_SNOW) && !st.is(net.minecraft.world.level.block.Blocks.COBWEB)
+                            && !st.is(net.minecraft.tags.BlockTags.PRESSURE_PLATES);
+                    if (!open) {
+                        if (h < 2) return 0;
+                        jump = false;
+                    }
+                }
+                var ground = level.getBlockState(m.set(bx, y - 1, bz));
+                if (ground.getCollisionShape(level, m).isEmpty() || ground.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK)
+                        || ground.is(net.minecraft.world.level.block.Blocks.CACTUS)) return 0;
+            }
+        }
+        return jump ? 2 : 1;
+    }
+
+    /** Already running along (dx, dz) at speed: lined up for a jump that lands on the line. */
+    private boolean runningAlong(double dx, double dz) {
+        var v = bot.getDeltaMovement();
+        double speed = Math.sqrt(v.x * v.x + v.z * v.z), len = Math.sqrt(dx * dx + dz * dz);
+        if (speed < 0.1 || len < 1e-3) return false; // (on the ground: what friction leaves of it)
+        return (v.x * dx + v.z * dz) / (speed * len) > 0.97;
     }
 
     /** Room over the head to jump: nothing solid two blocks above the feet. */
@@ -595,6 +801,10 @@ public final class BotNavigator {
 
     /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
     private void dropPath(String why) {
+        if (path != null && index < path.size()) {
+            rest = new java.util.HashSet<>();
+            for (int i = index; i < path.size(); i++) rest.add(path.get(i).to().asLong());
+        }
         dropped = why;
         drops++;
         // (By reason, for the navigation benchmark: the coordinates cut off.)
@@ -635,9 +845,15 @@ public final class BotNavigator {
         BotPathfinder.WorldView view = BotPathfinder.WorldView.capture(level, from, VIEW_CHUNKS);
         BotPathfinder.Abilities abilities = new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(),
                 tools.snapshot(), bot.getFoodData().getFoodLevel() > 6);
+        // (Searching again from where it stands: the rest of the way it was on is kept to,
+        // where it still goes - no swinging between two ways that cost about the same.)
         java.util.Set<Long> favoured = new java.util.HashSet<>();
         if (!ahead && path != null) for (int i = index; i < path.size(); i++) favoured.add(path.get(i).to().asLong());
-        BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured);
+        else if (!ahead && rest != null) favoured.addAll(rest);
+        if (!ahead) for (long a : avoid) favoured.remove(a);
+        BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf);
+        var guideFuture = guide(level, from);
+        if (guideFuture != null && guideFuture.isDone()) finder.guided(guideOf(guideFuture));
         Predicate<BlockPos> g = goal;
         BlockPos t = target;
         boolean hard = noWay > 0;
@@ -658,8 +874,47 @@ public final class BotNavigator {
         pendingGeneration = generation;
         pendingFrom = from;
         pendingFinder = finder;
-        pending = SEARCH.submit(() -> finder.search(from, g, t, hard ? ASYNC_NODES_HARD : ASYNC_NODES, hard ? ASYNC_NANOS_HARD : ASYNC_NANOS));
+        pending = SEARCH.submit(() -> {
+            // (The large view first, if it is still being worked out: a few milliseconds.)
+            if (guideFuture != null) finder.guided(guideOf(guideFuture));
+            return finder.search(from, g, t, hard ? ASYNC_NODES_HARD : ASYNC_NODES, hard ? ASYNC_NANOS_HARD : ASYNC_NANOS);
+        });
         return true;
+    }
+
+    /**
+     * The large view's way to a far goal (on the surface, not under a roof), started on the
+     * worker thread if not there yet or old (it has gone far since): null for near goals.
+     */
+    private java.util.concurrent.Future<BotTerrain.Field> guide(ServerLevel level, BlockPos from) {
+        if (!pureGoal || !BotTerrain.usable(level)) return null;
+        double dx = target.getX() - from.getX(), dz = target.getZ() - from.getZ();
+        if (dx * dx + dz * dz < GUIDE_FROM * GUIDE_FROM) return guideJob;
+        long now = level.getGameTime();
+        if (guideJob == null || now - guideAt > 600 && guideCenter.distSqr(from) > 64 * 64) {
+            BotTerrain.Grid grid = terrain.grid(level, from, target, BotWorld.viewChunks(level));
+            BlockPos goalAt = target;
+            guideJob = TERRAIN.submit(() -> grid.field(goalAt, true));
+            guideAt = now;
+            guideCenter = from;
+        }
+        if (walkEstimate == 0 && guideJob.isDone()) {
+            BotTerrain.Field f = guideOf(guideJob);
+            double t = f == null ? -1 : f.ticks(from.getX(), from.getZ());
+            if (t > 0) {
+                walkEstimate = t;
+                walkEstimateAt = bot.tickCount;
+            }
+        }
+        return guideJob;
+    }
+
+    private static BotTerrain.Field guideOf(java.util.concurrent.Future<BotTerrain.Field> f) {
+        try {
+            return f.get();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private BlockPos pendingFrom;
@@ -704,6 +959,7 @@ public final class BotNavigator {
         } else {
             path = new java.util.ArrayList<>(r.steps());
             index = 0;
+            runTo = 0;
             stepTicks = 0;
             stuck = 0;
             lastDistance = Double.MAX_VALUE;

@@ -797,11 +797,11 @@ public final class LockoutBrain implements BotBrain {
     }
 
     /** Seconds to get from one place to another: walking, a staircase down, stairs up. */
-    private static double travel(net.minecraft.core.BlockPos a, net.minecraft.core.BlockPos b) {
+    private static double travel(Bot bot, net.minecraft.core.BlockPos a, net.minecraft.core.BlockPos b) {
         if (a == null || b == null) return 0;
-        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
         int dy = b.getY() - a.getY();
-        return Math.sqrt(dx * dx + dz * dz) / 4.0 + (dy < 0 ? -dy * 1.2 : dy * 0.8);
+        // (From where it stands: over the land as it lies; between later stops, the straight line.)
+        return net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, a, b) + (dy < 0 ? -dy * 1.2 : dy * 0.8);
     }
 
     /** One way through the next few tiles: in order, where it ends, the tiles expected, the seconds. */
@@ -862,8 +862,8 @@ public final class LockoutBrain implements BotBrain {
                     }
                     // Its own work (its estimate is from here, the walk there included), and the
                     // walk from where the route stands.
-                    double work = Math.max(0.3 * mean, mean - travel(here, o.at()));
-                    double walk = travel(r.at(), o.at());
+                    double work = Math.max(0.3 * mean, mean - travel(bot, here, o.at()));
+                    double walk = travel(bot, r.at(), o.at());
                     Odds leg = new Odds(work + walk, Math.min(luck, work), o.at(), o.hazard());
                     double horizon = budget(leg.mean(), 600, 9000) / 20.0;
                     double secs = leg.spent(horizon);

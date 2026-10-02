@@ -270,7 +270,7 @@ public final class LockoutGoals {
         // A pool under the open sky it knows of (casting down in a cave costs minutes a try).
         BlockPos open = openPool(bot);
         if (open == null) return null;
-        double lava = 5 + Math.sqrt(open.distSqr(bot.body().blockPosition())) / 4.0;
+        double lava = 5 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), open);
         Set<Item> blocks = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
         boolean water = ObtainPlanner.countAny(bot.body(), Set.of(Items.WATER_BUCKET)) > 0;
         double cost = planner.estimate(bot, Set.of(Items.WATER_BUCKET), 1)
@@ -980,7 +980,7 @@ public final class LockoutGoals {
         boolean nether = goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER;
         if (nether != (bot.body().level().dimension() == Level.NETHER)) return null;
         BlockPos seen = bot.senses().biome(id);
-        double cost = seen != null ? 3 + Math.sqrt(seen.distSqr(bot.body().blockPosition())) / 4.0 : unseenEffort(goal);
+        double cost = seen != null ? 3 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), seen) : unseenEffort(goal);
         return new Option(cost, () -> new GoToBiomeTask(id));
     }
 
@@ -991,7 +991,7 @@ public final class LockoutGoals {
         if (path.equals("stronghold") && overworld(bot)) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
             var seen = VisitStructureTask.nearest(bot, VisitStructureTask.resolve(level, goal.primaryTarget()));
-            if (seen != null) return new Option(5 + Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4.0, () -> new VisitStructureTask(level, goal.primaryTarget()));
+            if (seen != null) return new Option(5 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), seen.spot()), () -> new VisitStructureTask(level, goal.primaryTarget()));
             double eyes = planner.estimate(bot, Set.of(Items.ENDER_EYE), 6);
             if (eyes >= INF) return null;
             return new Option(eyes + 700, () -> new SequenceTask("find the stronghold", List.of(
@@ -1011,7 +1011,7 @@ public final class LockoutGoals {
         if (ids.isEmpty()) return null;
         BotSenses.SeenStructure seen = VisitStructureTask.nearest(bot, ids);
         double cost;
-        if (seen != null) cost = 5 + Math.sqrt(seen.spot().distSqr(bot.body().blockPosition())) / 4.0;
+        if (seen != null) cost = 5 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), seen.spot());
         else if (SURFACE_STRUCTURES.contains(path)) cost = unseenEffort(goal);
         else if (path.equals("mineshaft")) cost = 420;
         else if (path.equals("trial_chambers")) cost = 700;

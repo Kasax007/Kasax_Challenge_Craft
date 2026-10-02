@@ -287,4 +287,38 @@ public class BotMovementTests {
             return a.near(28, FEET, 20, 1.5);
         });
     }
+
+    /**
+     * A long straight run over open flat ground: sprint-jumping, as players cover ground - well
+     * under the time sprinting takes (34 blocks: about 121 ticks sprinting, 96 sprint-jumping).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void sprintJumpRun(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "sprint_jump_run");
+        a.spawn(3, FEET, 20, new ItemStack(Items.BREAD, 8));
+        var body = a.bot().body();
+        boolean[] jumped = {false};
+        a.run(new GoToTask(a.abs(37, FEET, 20), 1), 112, () -> {
+            if (body.getY() > a.abs(0, FEET, 0).getY() + 0.5) jumped[0] = true;
+            return a.near(37, FEET, 20, 1.6) && jumped[0];
+        });
+    }
+
+    /**
+     * Two trees: one across a wide river (nearer as the crow flies), one on this bank (further
+     * off, but a plain walk). The one nearer by the way is taken.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void nearestByWay(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "nearest_by_way");
+        a.fill(7, GROUND - 3, 0, 17, GROUND, 39, Blocks.WATER);
+        a.fill(19, FEET, 20, 19, FEET + 3, 20, Blocks.OAK_LOG);
+        a.fill(5, FEET, 36, 5, FEET + 3, 36, Blocks.OAK_LOG);
+        a.spawn(5, FEET, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.ObtainTask(java.util.Set.of(Items.OAK_LOG), 1), 1200, () -> {
+            if (!h.getBlockState(new net.minecraft.core.BlockPos(19, FEET, 20)).is(Blocks.OAK_LOG)) h.fail("went across the river");
+            return net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body, java.util.Set.of(Items.OAK_LOG)) >= 1;
+        });
+    }
 }

@@ -3,6 +3,7 @@ package net.kasax.challengecraft.bot.task;
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.BotTask;
+import net.kasax.challengecraft.bot.BotWorld;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -64,7 +65,7 @@ public final class Explorer {
                 return BotTask.Result.RUNNING;
             }
         }
-        if (heading == null) heading = bot.exploreHeading != null ? bot.exploreHeading : Direction.Plane.HORIZONTAL.getRandomDirection(bot.body().getRandom());
+        if (heading == null) heading = frontier(bot);
         bot.exploreHeading = heading;
         BotNavigator nav = bot.navigator();
         if (!walking) {
@@ -86,6 +87,35 @@ public final class Explorer {
             if (s == BotNavigator.Status.FAILED) heading = bot.body().getRandom().nextBoolean() ? heading.getClockWise() : heading.getCounterClockWise();
         }
         return BotTask.Result.RUNNING;
+    }
+
+    /**
+     * The way to new country: the direction with the most land it has never had in view, just
+     * beyond what it sees now (a player heads off the edge of the map, not back over it). The
+     * old heading is kept unless another is clearly better.
+     */
+    private static Direction frontier(Bot bot) {
+        var level = bot.body().level();
+        int cx = bot.body().getBlockX() >> 4, cz = bot.body().getBlockZ() >> 4;
+        int view = BotWorld.viewChunks((net.minecraft.server.level.ServerLevel) level);
+        Direction best = null;
+        int bestScore = -1, oldScore = -1;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            int score = 0;
+            for (int r = view - 4; r <= view + 8; r += 2) {
+                for (int side = -r / 2; side <= r / 2; side += 2) {
+                    int x = cx + d.getStepX() * r + d.getStepZ() * side, z = cz + d.getStepZ() * r + d.getStepX() * side;
+                    if (!bot.memory().wasScanned(level.dimension(), x, z)) score++;
+                }
+            }
+            if (d == bot.exploreHeading) oldScore = score;
+            if (score > bestScore || score == bestScore && bot.body().getRandom().nextBoolean()) {
+                bestScore = score;
+                best = d;
+            }
+        }
+        if (bot.exploreHeading != null && oldScore >= bestScore * 0.7) return bot.exploreHeading;
+        return best;
     }
 
     /**
