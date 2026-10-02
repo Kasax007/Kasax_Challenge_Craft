@@ -277,6 +277,10 @@ public final class MineTask implements BotTask {
         if (rock == null) {
             rock = false;
             for (net.minecraft.world.level.block.Block b : BotWorld.COMMON) {
+                // (Soul sand and soil, basalt: only in their own Nether valleys and deltas - found
+                // by going there, not by digging anywhere.)
+                if (b == net.minecraft.world.level.block.Blocks.SOUL_SAND || b == net.minecraft.world.level.block.Blocks.SOUL_SOIL
+                        || b == net.minecraft.world.level.block.Blocks.BASALT) continue;
                 if (b != net.minecraft.world.level.block.Blocks.BEDROCK && blocks.test(b.defaultBlockState())) rock = true;
             }
         }

@@ -314,6 +314,12 @@ public final class BotKnowledge {
         if ((biome.contains("peaks") && !biome.contains("stony")) || biome.contains("slopes") || biome.contains("grove")) out.addAll(List.of("snow", "snow_block", "ice", "packed_ice"));
         if (biome.contains("peaks") || biome.contains("slopes") || biome.contains("grove")) out.add("emerald_ore");
         if (biome.contains("dappled")) out.addAll(List.of("poplar_log"));
+        // The Nether's own: each valley, forest and delta with its blocks.
+        if (biome.contains("soul_sand_valley")) out.addAll(List.of("soul_sand", "soul_soil", "bone_block", "basalt"));
+        if (biome.contains("basalt_deltas")) out.addAll(List.of("basalt", "blackstone", "magma_block"));
+        if (biome.contains("crimson_forest")) out.addAll(List.of("crimson_fungus", "crimson_stem", "nether_wart_block", "shroomlight", "weeping_vines"));
+        if (biome.contains("warped_forest")) out.addAll(List.of("warped_fungus", "warped_stem", "warped_wart_block", "shroomlight", "twisting_vines"));
+        if (biome.contains("nether_wastes")) out.addAll(List.of("nether_quartz_ore", "nether_gold_ore", "glowstone"));
         return out;
     }
 
