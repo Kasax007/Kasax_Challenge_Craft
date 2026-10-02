@@ -221,6 +221,17 @@ public final class Bot {
         if (body.tickCount % 10 == 0) layTrail();
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
         watchdog();
+        // (A fall of more than four: what it was doing then, for the log - falls are the
+        // commonest death after lava, and seldom a planned step.)
+        if (body.fallDistance > 4 && !fallLogged) {
+            fallLogged = true;
+            BotManager.LOG.info("[Bot] {}: falling at {} ({} blocks so far): {} | nav {} | last step from {}", name, body.blockPosition().toShortString(),
+                    Math.round(body.fallDistance), status(), navigator.debug(), lastGround == null ? "-" : lastGround.toShortString());
+        }
+        if (body.onGround()) {
+            fallLogged = false;
+            lastGround = body.blockPosition();
+        }
         reflexes();
         // (Not in the middle of a fight or a flight: the plan waits till that is over.)
         if (brain != null && !inReflex()) brain.tick(this);
@@ -292,6 +303,9 @@ public final class Bot {
         // Long: every other crumb in the middle dropped (the ends matter most).
         if (trail.size() > TRAIL_CAP) for (int i = trail.size() - 2; i > 0; i -= 2) trail.remove(i);
     }
+
+    private boolean fallLogged;
+    private net.minecraft.core.BlockPos lastGround;
 
     /** Where it was when it last got anywhere, and when (see {@link #watchdog()}). */
     private net.minecraft.core.BlockPos movedFrom;
