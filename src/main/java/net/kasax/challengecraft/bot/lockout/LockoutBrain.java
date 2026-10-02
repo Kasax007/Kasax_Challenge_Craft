@@ -1288,6 +1288,13 @@ public final class LockoutBrain implements BotBrain {
             if (lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 0, Integer::sum) >= 3) continue;
             // (One it could not get at before: not again.)
             if (lootedIn.getOrDefault("chest@" + c.toShortString(), 0) > 0) continue;
+            // In a bastion: only where no brute or crowd of piglins watches (opening it angers
+            // them all). In the other guarded places: only at good health, nothing about.
+            var lv = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            if (in.getPath().startsWith("bastion") && !net.kasax.challengecraft.bot.task.BastionLootTask.safe(lv, bot.body(), c)) continue;
+            if ((in.getPath().startsWith("fortress") || in.getPath().startsWith("pillager_outpost") || in.getPath().startsWith("end_city"))
+                    && (bot.body().getHealth() < 16 || !lv.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(c).inflate(12),
+                            m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty())) continue;
             chest = c;
             lootedIn.merge(in.getPath() + "@" + (c.getX() >> 6) + "," + (c.getZ() >> 6), 1, Integer::sum);
             break;

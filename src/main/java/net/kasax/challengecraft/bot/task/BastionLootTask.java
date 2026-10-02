@@ -90,7 +90,7 @@ public final class BastionLootTask implements BotTask {
     }
 
     /** Few enough about to take it: no brute, no hoglin close, not three piglins watching. */
-    static boolean safe(ServerLevel level, BotPlayer body, BlockPos at) {
+    public static boolean safe(ServerLevel level, BotPlayer body, BlockPos at) {
         AABB near = new AABB(at).inflate(12);
         if (!level.getEntitiesOfClass(PiglinBrute.class, near, LivingEntity::isAlive).isEmpty()) return false;
         if (!level.getEntitiesOfClass(Hoglin.class, new AABB(at).inflate(8), LivingEntity::isAlive).isEmpty()) return false;

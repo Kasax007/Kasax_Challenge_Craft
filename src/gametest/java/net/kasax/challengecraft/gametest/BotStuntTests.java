@@ -822,6 +822,44 @@ public class BotStuntTests {
         brawl(h, "brawl_zombie_trio", 8, EntityTypes.ZOMBIE, new int[]{26, 18}, EntityTypes.ZOMBIE, new int[]{26, 22}, EntityTypes.ZOMBIE, new int[]{24, 26});
     }
 
+    /** A piglin brute (golden axe, hard) on an iron sword: fought from a pillar, little lost. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlBrute(GameTestHelper h) {
+        brawlFromPillar(h, "brawl_brute", EntityTypes.PIGLIN_BRUTE);
+    }
+
+    /** A hoglin (hard) on an iron sword: from a pillar too, its tusks do not reach up there. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlHoglin(GameTestHelper h) {
+        brawlFromPillar(h, "brawl_hoglin", EntityTypes.HOGLIN);
+    }
+
+    private static void brawlFromPillar(GameTestHelper h, String name, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type) {
+        BotArena a = BotArena.flat(h, name);
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var brute = type.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        if (brute instanceof net.minecraft.world.entity.monster.piglin.AbstractPiglin p) p.setImmuneToZombification(true);
+        if (brute instanceof net.minecraft.world.entity.monster.hoglin.Hoglin hg) hg.setImmuneToZombification(true);
+        if (brute instanceof net.minecraft.world.entity.monster.piglin.PiglinBrute) brute.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.GOLDEN_AXE));
+        brute.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        brute.setPersistenceRequired();
+        level.addFreshEntity(brute);
+        a.spawn(16, FEET, 20, new ItemStack(Items.IRON_SWORD), new ItemStack(Items.COBBLESTONE, 16));
+        var body = a.bot().body();
+        float[] low = {body.getHealth()};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1500), 1500, () -> {
+            if (body.getHealth() < low[0]) BotArena.LOG.info("[BOTTEST] " + name + " hit: hp {} bot {} y {} brute {} y {} by {}", body.getHealth(),
+                    body.blockPosition().toShortString(), body.getY(), brute.blockPosition().toShortString(), brute.getY(),
+                    body.getLastDamageSource() == null ? "-" : body.getLastDamageSource().getMsgId());
+            low[0] = Math.min(low[0], body.getHealth());
+            if (20 - low[0] > 7) h.fail(name + ": lost " + (20 - low[0]) + " health");
+            if (brute.isAlive()) return false;
+            BotArena.LOG.info("[BOTTEST] {} lost {} health", name, 20 - low[0]);
+            return true;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {

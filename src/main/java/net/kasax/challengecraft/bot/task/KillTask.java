@@ -41,6 +41,11 @@ public final class KillTask implements BotTask {
     private final int count, kills;
     private final Set<java.util.UUID> unreachable = new java.util.HashSet<>();
     private LivingEntity target;
+
+    /** What it is fighting now (null between two). */
+    public LivingEntity target() {
+        return target;
+    }
     private BlockPos deathSpot;
     private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
     private final Explorer explorer = new Explorer(2400);
@@ -409,7 +414,7 @@ public final class KillTask implements BotTask {
     }
 
     /** Best melee weapon into the hand: the most damage per second (a sword beats an axe). */
-    private static void equipWeapon(Bot bot) {
+    static void equipWeapon(Bot bot) {
         var inv = bot.body().getInventory().getNonEquipmentItems();
         int best = -1;
         double bestDps = 4; // a fist: 1 damage, 4 blows a second

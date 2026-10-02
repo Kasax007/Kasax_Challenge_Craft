@@ -220,6 +220,7 @@ public final class Bot {
         memory.tick(body);
         if (body.tickCount % 10 == 0) layTrail();
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
+        watchdog();
         reflexes();
         // (Not in the middle of a fight or a flight: the plan waits till that is over.)
         if (brain != null && !inReflex()) brain.tick(this);
@@ -290,6 +291,34 @@ public final class Bot {
         if (trail.isEmpty() || trail.get(trail.size() - 1).distSqr(feet) >= TRAIL_STEP * TRAIL_STEP) trail.add(feet);
         // Long: every other crumb in the middle dropped (the ends matter most).
         if (trail.size() > TRAIL_CAP) for (int i = trail.size() - 2; i > 0; i -= 2) trail.remove(i);
+    }
+
+    /** Where it was when it last got anywhere, and when (see {@link #watchdog()}). */
+    private net.minecraft.core.BlockPos movedFrom;
+    private int movedAt, unsticks;
+
+    /**
+     * The last line of defence against standing still for good: trying to walk somewhere (a way
+     * set) for a minute without getting a block further, whatever the reason - a few steps off
+     * to somewhere else, as a player shakes off whatever holds him, and the walk again from there.
+     */
+    private void watchdog() {
+        var feet = body.blockPosition();
+        if (movedFrom == null || feet.distSqr(movedFrom) > 2 || navigator.status() != BotNavigator.Status.MOVING) {
+            movedFrom = feet;
+            movedAt = body.tickCount;
+            return;
+        }
+        if (body.tickCount - movedAt < 1200 || inReflex()) return;
+        movedAt = body.tickCount;
+        unsticks++;
+        BotTask top = tasks.peek();
+        say("stuck for a minute (" + (top == null ? "-" : top.describe()) + ", " + navigator.debug() + "): a few steps off first");
+        var r = body.getRandom();
+        double a = r.nextDouble() * Math.PI * 2;
+        net.minecraft.core.BlockPos aside = feet.offset((int) (Math.cos(a) * 8), 0, (int) (Math.sin(a) * 8));
+        actions.reset();
+        reflex(new net.kasax.challengecraft.bot.task.GoToTask(aside, 3));
     }
 
     private int reflexCooldown, armorCheck;
@@ -436,7 +465,24 @@ public final class Bot {
             reflex(upward ? net.kasax.challengecraft.bot.task.HideTask.upward() : new net.kasax.challengecraft.bot.task.HideTask());
             return;
         }
-        if (fighting) return;
+        // A brute or a hoglin after it, and not geared to stand up to it: up on a pillar, and hit
+        // from up there (nothing that only strikes close reaches two blocks up).
+        boolean pillaring = tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.PillarFightTask);
+        if (!pillaring && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)) {
+            // (Early: a brute's axe takes nearly all the hearts at one blow on hard, and it closes
+            // ten blocks in two seconds - up before it gets there, not as it arrives.)
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16, 6, 16),
+                    m -> m.isAlive() && m.getTarget() == body && net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, m)
+                            && (m.distanceTo(body) < 8 || body.hasLineOfSight(m)))) {
+                // (A fight with it on foot, begun by the reflexes: ended for this.)
+                if (top instanceof net.kasax.challengecraft.bot.task.KillTask k && k.target() == m) cancel(top);
+                actions.reset();
+                say("a " + m.getType().toShortString() + " after me: up on a pillar");
+                reflex(new net.kasax.challengecraft.bot.task.PillarFightTask(m));
+                return;
+            }
+        }
+        if (fighting || pillaring) return;
         // A shield in the pack goes into the off hand (nothing else lives there).
         if (body.getOffhandItem().isEmpty()) {
             int slot = BotInventory.slotOf(body, net.minecraft.world.item.Items.SHIELD);
@@ -473,7 +519,9 @@ public final class Bot {
             }
         }
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();
-        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && (body.getHealth() > 7 || cornered)
+        boolean fromPillar = attacker != null && net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, attacker)
+                && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this);
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !fromPillar && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.KillTask(attacker).nearby(12));
@@ -484,7 +532,8 @@ public final class Bot {
         if (body.getHealth() >= 12 && armed()) {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
                     m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
-                            && !(m instanceof net.minecraft.world.entity.monster.Creeper) && Math.abs(m.getY() - body.getY()) < 2.5 && body.hasLineOfSight(m))) {
+                            && !(m instanceof net.minecraft.world.entity.monster.Creeper) && Math.abs(m.getY() - body.getY()) < 2.5 && body.hasLineOfSight(m)
+                            && !(net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, m) && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)))) {
                 actions.reset();
                 reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(12));
                 return;

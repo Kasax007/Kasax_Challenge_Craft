@@ -334,6 +334,8 @@ public final class BotKnowledge {
             // surface, the deep dark near the bottom.)
             case "pointed_dripstone", "dripstone_block", "moss_block", "moss_carpet", "azalea", "flowering_azalea", "spore_blossom" -> 20;
             case "sculk", "sculk_vein", "sculk_sensor", "sculk_catalyst", "sculk_shrieker" -> -40;
+            // Geodes: anywhere from the bottom to some thirty above sea level, most often deep.
+            case "amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "budding_amethyst", "amethyst_block" -> -10;
             default -> null;
         };
     }

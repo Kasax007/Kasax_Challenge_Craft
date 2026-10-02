@@ -991,7 +991,7 @@ public final class ObtainPlanner {
                 boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
                 if (BotKnowledge.rarity(common, nether) >= 1000) mine.knownOnly();
                 // A cave biome's block: to the biome first, then down (not dug for right here).
-                if (BotKnowledge.caveBiome(common)) mine.digAtLead();
+                if (BotKnowledge.caveBiome(common) || blocks.contains(Blocks.AMETHYST_CLUSTER)) mine.digAtLead();
                 // Nether wart grows in fortresses only: to the fortress first (exploring for one).
                 if (nether && blocks.contains(Blocks.NETHER_WART) && !visibleBlocks.containsKey(Blocks.NETHER_WART)) {
                     var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
@@ -1025,6 +1025,13 @@ public final class ObtainPlanner {
 
     /** The nearest biome in view known for one of these blocks, if none of them is in sight. */
     private BlockPos lead(Bot bot, Set<Block> blocks) {
+        // Amethyst grows inside geodes: their shell (calcite round smooth basalt) shows in cave
+        // walls and on hillsides from afar. One remembered: there, and in.
+        if (blocks.contains(Blocks.AMETHYST_CLUSTER) && !visibleBlocks.containsKey(Blocks.AMETHYST_CLUSTER)) {
+            BlockPos shell = bot.memory().nearest((net.minecraft.server.level.ServerLevel) bot.body().level(), bot.body().blockPosition(),
+                    st -> st.is(Blocks.BUDDING_AMETHYST) || st.is(Blocks.AMETHYST_BLOCK) || st.is(Blocks.CALCITE) || st.is(Blocks.SMOOTH_BASALT), Set.of());
+            if (shell != null) return shell;
+        }
         // Seen ones may turn out out of reach (deep down, under water): the far lead stands by.
         for (Block b : blocks) if (visibleBlocks.containsKey(b)) return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD
                 && BotKnowledge.depth(b, bot.body().getBlockY()) == null ? farLeadStandBy(bot, blocks) : null;
