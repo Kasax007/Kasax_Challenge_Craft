@@ -19,6 +19,7 @@ public final class FarWalk {
     private boolean walking, legDirect;
     private int fails, side;
     private SurfaceTask climb;
+    private long climbAgainAt;
 
     public enum Status { MOVING, ARRIVED, FAILED }
 
@@ -37,11 +38,14 @@ public final class FarWalk {
         double dx = target.getX() - feet.getX(), dz = target.getZ() - feet.getZ(), flat = Math.sqrt(dx * dx + dz * dz);
         boolean near = flat <= NEAR;
         // Down in a mine with the walk far over the land: up first.
-        if (!near && climb == null && SurfaceTask.underground(bot.body())) climb = new SurfaceTask();
+        // (Once up, not again for a while: a climb that ends at once is not to be repeated each tick.)
+        long now = level.getGameTime();
+        if (!near && climb == null && now >= climbAgainAt && SurfaceTask.underground(bot.body())) climb = new SurfaceTask();
         if (climb != null) {
             var r = climb.tick(bot);
             if (r == net.kasax.challengecraft.bot.BotTask.Result.RUNNING) return Status.MOVING;
             climb = null;
+            climbAgainAt = now + 200;
             walking = false;
         }
         if (!walking) {

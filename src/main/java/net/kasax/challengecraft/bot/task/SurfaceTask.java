@@ -31,6 +31,22 @@ public final class SurfaceTask implements BotTask {
         return underground((ServerLevel) body.level(), body.blockPosition());
     }
 
+    /**
+     * The height of the ground itself at a column: the top, less any tree standing on it (trunks,
+     * leaves, huge mushrooms). A forest floor is the surface, not a pit between the trunks.
+     */
+    static int ground(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(x, y - 1, z);
+        for (int i = 0; i < 40 && y > level.getMinY(); i++, y--, p.setY(y - 1)) {
+            var st = level.getBlockState(p);
+            if (!(st.is(net.minecraft.tags.BlockTags.LOGS) || st.is(net.minecraft.tags.BlockTags.LEAVES) || st.is(net.minecraft.world.level.block.Blocks.VINE)
+                    || st.is(net.minecraft.world.level.block.Blocks.MUSHROOM_STEM) || st.is(net.minecraft.world.level.block.Blocks.BROWN_MUSHROOM_BLOCK)
+                    || st.is(net.minecraft.world.level.block.Blocks.RED_MUSHROOM_BLOCK) || st.isAir())) break;
+        }
+        return y;
+    }
+
     /** {@link #underground(BotPlayer)} for feet at {@code feet}. */
     public static boolean underground(ServerLevel level, BlockPos feet) {
         // The Nether and the End have no sky and no surface to climb to.
@@ -39,7 +55,7 @@ public final class SurfaceTask implements BotTask {
         // there is plenty; up an open shaft too, and that one needs no climbing either.)
         BlockPos head = feet.above();
         if (level.getBrightness(net.minecraft.world.level.LightLayer.SKY, head) < 6
-                && head.getY() < level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, head.getX(), head.getZ())) return true;
+                && head.getY() < ground(level, head.getX(), head.getZ())) return true;
         // Down a shaft or a ravine (the sky shines straight in): the ground a few blocks around is
         // mostly well above the feet. (One side high is only a cliff or a wall.)
         int feetY = feet.getY(), high = 0, deep = 0, samples = 0;
@@ -49,7 +65,7 @@ public final class SurfaceTask implements BotTask {
             int z = feet.getZ() + (int) Math.round(Math.sin(a) * 4);
             if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
             samples++;
-            int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            int ground = ground(level, x, z);
             if (ground > feetY + 1) high++;
             if (ground > feetY + 3) deep++;
         }
@@ -64,7 +80,8 @@ public final class SurfaceTask implements BotTask {
         int walls = 0;
         for (Direction d : Direction.Plane.HORIZONTAL) {
             BlockPos n = at.relative(d);
-            if (!level.getBlockState(n).getCollisionShape(level, n).isEmpty()) walls++;
+            var wst = level.getBlockState(n);
+            if (!wst.getCollisionShape(level, n).isEmpty() && !wst.is(net.minecraft.tags.BlockTags.LOGS)) walls++;
         }
         return samples > 0 && high * 10 >= samples * 7 && walls >= 2;
     }

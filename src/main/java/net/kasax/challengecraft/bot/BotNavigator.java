@@ -186,7 +186,7 @@ public final class BotNavigator {
         BotPathfinder.Step st = path.get(index);
         return "step " + index + "/" + path.size() + " to " + st.to().toShortString() + (st.breaks().isEmpty() ? "" : " breaking " + st.breaks())
                 + (st.place() == null ? "" : " placing") + " y " + String.format("%.2f", bot.getY()) + " water " + bot.isInWater()
-                + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans;
+                + " hcol " + bot.horizontalCollision + " jump " + bot.jump + " stuck " + stuck + " bank " + bankDig + "/" + bankTicks + " replans " + replans + " drops " + drops + " (" + dropped + ")";
     }
 
     /** Whether the step being walked leads down (into deeper water, say). */
@@ -230,7 +230,7 @@ public final class BotNavigator {
         if (bankDig == null && ++stepTicks > stepLimit(step) + (bot.isInWater() ? 160 : 0)) {
             avoid.add(step.to().asLong());
             stepTicks = 0;
-            dropPath();
+            dropPath("step too slow");
             bankDig = null;
             bankTicks = 0;
             return status;
@@ -275,7 +275,7 @@ public final class BotNavigator {
                 bot.forward = 0.6f; // sneaking stops at the edge by itself
                 if (actions.inReach(place) && !actions.placeThrowaway(place) && ++stuck > STUCK_TICKS) {
                     stuck = 0;
-                    dropPath(); // out of blocks: find a way that needs none
+                    dropPath("out of blocks"); // out of blocks: find a way that needs none
                     return status;
                 }
                 return status;
@@ -321,13 +321,13 @@ public final class BotNavigator {
                 }
                 if (!supported(step.place()) && ++stuck > STUCK_TICKS * 2) {
                     stuck = 0;
-                    dropPath();
+                    dropPath("pillar unsupported");
                 }
                 return status;
             }
             if (bot.getY() > step.place().getY() + 1.0 && open) {
                 if (!actions.placeThrowaway(step.place())) {
-                    dropPath(); // out of blocks: find a way that needs none
+                    dropPath("pillar: out of blocks");
                     return status;
                 }
             }
@@ -364,7 +364,7 @@ public final class BotNavigator {
         if (step.leap()) return leap(to, feet);
         // The world still as planned for this step? (A block put or broken since, water run in.)
         if (!stillValid(step, feet)) {
-            dropPath();
+            dropPath("invalid " + step.to().toShortString());
             holdStill();
             return status;
         }
@@ -414,11 +414,11 @@ public final class BotNavigator {
         else if (++stuck > STUCK_TICKS) {
             stuck = 0;
             avoid.add(to.asLong());
-            dropPath();
+            dropPath("stuck");
         }
         lastDistance = d;
         // Knocked off the path.
-        if (feet.distManhattan(to) > 4) dropPath();
+        if (feet.distManhattan(to) > (bot.isInWater() ? 6 : 4)) dropPath("off path");
         return status;
     }
 
@@ -510,7 +510,7 @@ public final class BotNavigator {
         }
         if (bot.getY() < to.getY() - 1.2) {
             bot.sprintNow = false;
-            dropPath(); // fell in
+            dropPath("fell short"); // fell in
             return status;
         }
         float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
@@ -581,8 +581,14 @@ public final class BotNavigator {
         return best;
     }
 
+    /** Why the last path was dropped, and how often paths were (for the status line). */
+    private String dropped = "-";
+    private int drops;
+
     /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
-    private void dropPath() {
+    private void dropPath(String why) {
+        dropped = why;
+        drops++;
         path = null;
         partial = false;
         cancelSearch();
