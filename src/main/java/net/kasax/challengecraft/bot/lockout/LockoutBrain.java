@@ -94,6 +94,9 @@ public final class LockoutBrain implements BotBrain {
 
     /** Only these tiles count (a field test of one goal at a time); null: the whole board. */
     private Set<String> only;
+    /** The dimension it is in, and when it last came through a portal (against going to and fro). */
+    private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lastDimension;
+    private long switchedAt = -100_000;
 
     public LockoutBrain only(Set<String> goalIds) {
         this.only = goalIds;
@@ -823,6 +826,14 @@ public final class LockoutBrain implements BotBrain {
                 over = 0;
             }
             if (o != null && over > 0) o = o.costing(o.cost() * (1 + 0.5 * over) + 20 * over);
+            // Through the portal again soon after coming through it (a tile up there looked cheap
+            // from down here, one down here from up there): the way back is dearer than the
+            // estimate says - a few minutes' resistance against going to and fro.
+            if (o != null && o.proxy() && now - switchedAt < 6000) {
+                boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;
+                boolean netherTile = tile.goal().category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER;
+                if (nether != netherTile) o = o.costing(o.cost() + 240);
+            }
             if (o != null) out.add(new Choice(tile, o, plain));
         }
         return out;
@@ -1129,6 +1140,11 @@ public final class LockoutBrain implements BotBrain {
     @Override
     public void tick(Bot bot) {
         long now = bot.body().level().getGameTime();
+        var dim = bot.body().level().dimension();
+        if (dim != lastDimension) {
+            if (lastDimension != null) switchedAt = now;
+            lastDimension = dim;
+        }
         if (sideTask != null && now - sideStarted > sideBudget) {
             bot.say("that takes too long, back to the goal");
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
