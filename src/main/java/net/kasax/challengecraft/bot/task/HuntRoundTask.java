@@ -59,4 +59,9 @@ public final class HuntRoundTask implements BotTask {
         for (EntityType<?> t : hunting) sb.append(' ').append(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(t).getPath());
         return sb.toString();
     }
+
+    @Override
+    public BotTask inner() {
+        return kill;
+    }
 }

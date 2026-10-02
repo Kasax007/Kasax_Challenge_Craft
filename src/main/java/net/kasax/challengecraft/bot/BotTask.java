@@ -13,4 +13,15 @@ public interface BotTask {
     default String status() {
         return describe();
     }
+
+    /** The task this one is carrying out right now on its behalf (a step of it), or null. */
+    default BotTask inner() {
+        return null;
+    }
+
+    /** Down through the tasks carried out on behalf of others, to the one actually at work. */
+    static BotTask innermost(BotTask t) {
+        for (int i = 0; i < 8 && t != null && t.inner() != null; i++) t = t.inner();
+        return t;
+    }
 }

@@ -163,6 +163,19 @@ public final class Bot {
     }
 
     /** Runs {@code task} first, then returns to what was going on. */
+    /** What the reflexes put on top (a fight, a retreat, the shield): the brain leaves the stack alone meanwhile. */
+    private BotTask reflexTask;
+
+    private void reflex(BotTask task) {
+        reflexTask = task;
+        interject(task);
+    }
+
+    /** A reflex (fight, flight, shield, air) is still being carried out. */
+    public boolean inReflex() {
+        return reflexTask != null && tasks.contains(reflexTask);
+    }
+
     public void interject(BotTask task) {
         // (The walk of what was on top is kept, and taken up again once this is done.)
         navigator.suspend(tasks.peek());
@@ -192,7 +205,8 @@ public final class Bot {
         if (body.tickCount % 10 == 0) layTrail();
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
         reflexes();
-        if (brain != null) brain.tick(this);
+        // (Not in the middle of a fight or a flight: the plan waits till that is over.)
+        if (brain != null && !inReflex()) brain.tick(this);
         BotTask task = tasks.peek();
         if (task == null) {
             if (brain != null) brain.think(this);
@@ -274,9 +288,13 @@ public final class Bot {
     private int shooterCheckAt;
 
     private void reflexes() {
+        // Every tick, cheaply: a creeper hissing close by (its fuse is a second and a half) or a
+        // monster about to strike - the full look round at once, not up to ten ticks late.
+        if (reflexCooldown > 0 && body.tickCount % 2 == 0 && dangerClose()) reflexCooldown = 0;
         if (reflexCooldown-- > 0) return;
         reflexCooldown = 10;
-        tidyInventory();
+        // (Not throwing things out with a monster at it: the hands are for the fight.)
+        if (!targeted(8)) tidyInventory();
         // Better armour on as soon as it has some (and gold in the Nether); not while a task puts
         // on something in particular (a tile wants leather worn).
         if (++armorCheck % 5 == 0 && !(tasks.peek() instanceof net.kasax.challengecraft.bot.task.EquipTask)
@@ -293,18 +311,19 @@ public final class Bot {
         if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < body.getMaxAirSupply() * (lid ? 4 : 2) / 5
                 && !(top instanceof net.kasax.challengecraft.bot.task.AirTask)) {
             actions.reset();
-            interject(new net.kasax.challengecraft.bot.task.AirTask());
+            reflex(new net.kasax.challengecraft.bot.task.AirTask());
             return;
         }
         // Sunk into powder snow by mistake (not on purpose for a tile): out, before it freezes.
         if (body.isInPowderSnow && body.getTicksFrozen() > 20 && !(top instanceof net.kasax.challengecraft.bot.task.SnowEscapeTask)
                 && !(top instanceof net.kasax.challengecraft.bot.task.PowderSnowTask)) {
             actions.reset();
-            interject(new net.kasax.challengecraft.bot.task.SnowEscapeTask());
+            reflex(new net.kasax.challengecraft.bot.task.SnowEscapeTask());
             return;
         }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
-        boolean fighting = top instanceof net.kasax.challengecraft.bot.task.KillTask;
+        // (A fight inside a hunt or a sequence counts too.)
+        boolean fighting = BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.KillTask;
         // Low on health with a monster close: get away first (and eat on the way), as a player
         // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
         // creeper about to blow: always away. (Cornered, with no way off: fight on, below.)
@@ -321,11 +340,20 @@ public final class Bot {
                     if (d < 4.4) {
                         net.minecraft.world.phys.Vec3 back = body.position().subtract(m.position()).normalize().scale(5.1 - d);
                         actions.reset();
-                        interject(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(back)), 0.8).sprinting());
+                        reflex(new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(back)), 0.8).sprinting());
                     } else {
                         navigator.stop();
                         body.stopInputs();
                     }
+                    return;
+                }
+                // Hissing too close to get clear (its blast reaches some seven blocks): behind
+                // the shield, facing it, if there is one - that takes the blast.
+                if (creeper && m.distanceTo(body) < 3 && body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                        && !(top instanceof net.kasax.challengecraft.bot.task.ShieldUpTask)) {
+                    actions.reset();
+                    navigator.stop();
+                    reflex(net.kasax.challengecraft.bot.task.ShieldUpTask.against((net.minecraft.world.entity.monster.Creeper) m));
                     return;
                 }
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7)) {
@@ -334,7 +362,7 @@ public final class Bot {
                     if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
                     actions.reset();
                     retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
-                    interject(retreat);
+                    reflex(retreat);
                     return;
                 }
             }
@@ -350,11 +378,11 @@ public final class Bot {
                 }
                 actions.reset();
                 if (armed && body.getHealth() >= 10) {
-                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(c.getType()), java.util.Set.of(), 0, 1).nearby(12));
+                    reflex(new net.kasax.challengecraft.bot.task.KillTask(c).nearby(12));
                 } else {
                     net.minecraft.world.phys.Vec3 away = body.position().subtract(c.position()).normalize().scale(14);
                     retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
-                    interject(retreat);
+                    reflex(retreat);
                 }
                 return;
             }
@@ -375,7 +403,7 @@ public final class Bot {
             boolean melee = !shot && !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(3),
                     net.minecraft.world.entity.LivingEntity::isAlive).isEmpty();
             boolean upward = melee && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this) || !net.kasax.challengecraft.bot.task.HideTask.possible(this);
-            interject(upward ? net.kasax.challengecraft.bot.task.HideTask.upward() : new net.kasax.challengecraft.bot.task.HideTask());
+            reflex(upward ? net.kasax.challengecraft.bot.task.HideTask.upward() : new net.kasax.challengecraft.bot.task.HideTask());
             return;
         }
         if (fighting) return;
@@ -403,11 +431,11 @@ public final class Bot {
                 // (Armed and well: straight at it, dodging the arrows - standing behind the shield
                 // only lets it shoot again and again.)
                 if (armed && body.getHealth() >= 12 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
-                    interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(m.getType()), java.util.Set.of(), 0, 1).nearby(16));
+                    reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(16));
                     return;
                 }
                 if (shieldOn) {
-                    interject(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
+                    reflex(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
                     return;
                 }
                 shooterCheckAt = body.tickCount + 40; // (nothing to do about it: not every check)
@@ -418,15 +446,50 @@ public final class Bot {
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
-            interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(attacker.getType()), java.util.Set.of(), 0, 1).nearby(12));
+            reflex(new net.kasax.challengecraft.bot.task.KillTask(attacker).nearby(12));
             return;
+        }
+        // A monster coming for it close by, armed and well: it strikes first (the first blow at a
+        // run throws it back), instead of waiting to be hit. (Creepers: above.)
+        if (body.getHealth() >= 12 && armed()) {
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
+                    m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
+                            && !(m instanceof net.minecraft.world.entity.monster.Creeper) && Math.abs(m.getY() - body.getY()) < 2.5 && body.hasLineOfSight(m))) {
+                actions.reset();
+                reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(12));
+                return;
+            }
         }
         int food = body.getFoodData().getFoodLevel();
         boolean hurt = body.getHealth() < body.getMaxHealth() * 0.6f && food < 20;
-        if ((food <= 14 || hurt) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
+        // (Not with a monster at it: eating stands still for a second and a half. Unless starving.)
+        if ((food <= 14 || hurt) && (food <= 4 || !targeted(8)) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();
-            interject(new net.kasax.challengecraft.bot.task.EatTask());
+            reflex(new net.kasax.challengecraft.bot.task.EatTask());
         }
+    }
+
+    /** A weapon (sword or axe) in the pack. */
+    private boolean armed() {
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
+        }
+        return false;
+    }
+
+    /** A monster within {@code r} blocks out for it. */
+    public boolean targeted(double r) {
+        return !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(r),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty();
+    }
+
+    /** Cheap, for every tick: a creeper hissing within five blocks, or a monster out for it within three. */
+    private boolean dangerClose() {
+        for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(5), net.minecraft.world.entity.LivingEntity::isAlive)) {
+            if (m instanceof net.minecraft.world.entity.monster.Creeper c && c.getSwellDir() > 0) return true;
+            if (m.getTarget() == body && m.distanceTo(body) < 3) return true;
+        }
+        return false;
     }
 
     /**

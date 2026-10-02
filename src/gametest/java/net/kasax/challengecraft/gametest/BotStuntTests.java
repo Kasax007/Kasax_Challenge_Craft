@@ -766,4 +766,59 @@ public class BotStuntTests {
         a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.STRIDER), java.util.Set.of(), 0, 1), 1200,
                 () -> !st.isAlive());
     }
+
+    // ---- brawls on hard: how much it gets hurt (logged; the limits say what is good enough) ----
+
+    /** Mobs of these kinds at these spots, the bot with a stone sword: all killed, losing at most {@code maxLoss} health. */
+    private static void brawl(GameTestHelper h, String name, float maxLoss, Object... kindsAndSpots) {
+        BotArena a = BotArena.flat(h, name);
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        java.util.List<net.minecraft.world.entity.Mob> mobs = new java.util.ArrayList<>();
+        java.util.Set<net.minecraft.world.entity.EntityType<?>> kinds = new java.util.HashSet<>();
+        for (int i = 0; i < kindsAndSpots.length; i += 2) {
+            var type = (net.minecraft.world.entity.EntityType<?>) kindsAndSpots[i];
+            int[] p = (int[]) kindsAndSpots[i + 1];
+            var m = (net.minecraft.world.entity.Mob) type.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            if (m instanceof net.minecraft.world.entity.monster.zombie.Zombie z && p.length > 2) z.setBaby(true);
+            if (m instanceof net.minecraft.world.entity.monster.skeleton.AbstractSkeleton) m.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+            // (No sun-burning: a helmet on the undead.)
+            m.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            m.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(p[0], FEET, p[1])));
+            m.setPersistenceRequired();
+            level.addFreshEntity(m);
+            mobs.add(m);
+            kinds.add(type);
+        }
+        a.spawn(16, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        float[] low = {body.getHealth()};
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(kinds, java.util.Set.of(), 0, mobs.size()), 1500, () -> {
+            low[0] = Math.min(low[0], body.getHealth());
+            if (20 - low[0] > maxLoss) h.fail(name + ": lost " + (20 - low[0]) + " health");
+            boolean done = mobs.stream().noneMatch(net.minecraft.world.entity.LivingEntity::isAlive);
+            if (done) BotArena.LOG.info("[BOTTEST] {} lost {} health", name, 20 - low[0]);
+            return done;
+        });
+    }
+
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlZombie(GameTestHelper h) {
+        brawl(h, "brawl_zombie", 2, EntityTypes.ZOMBIE, new int[]{26, 20});
+    }
+
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlBabyZombie(GameTestHelper h) {
+        brawl(h, "brawl_baby_zombie", 3, EntityTypes.ZOMBIE, new int[]{26, 20, 1});
+    }
+
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlSpider(GameTestHelper h) {
+        brawl(h, "brawl_spider", 3, EntityTypes.SPIDER, new int[]{26, 20});
+    }
+
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlZombieTrio(GameTestHelper h) {
+        brawl(h, "brawl_zombie_trio", 8, EntityTypes.ZOMBIE, new int[]{26, 18}, EntityTypes.ZOMBIE, new int[]{26, 22}, EntityTypes.ZOMBIE, new int[]{24, 26});
+    }
 }

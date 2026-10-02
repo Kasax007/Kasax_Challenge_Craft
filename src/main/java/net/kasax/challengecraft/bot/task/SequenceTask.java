@@ -42,4 +42,9 @@ public final class SequenceTask implements BotTask {
     public String describe() {
         return what;
     }
+
+    @Override
+    public BotTask inner() {
+        return current;
+    }
 }

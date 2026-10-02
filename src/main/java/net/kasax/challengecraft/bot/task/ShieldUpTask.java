@@ -19,11 +19,30 @@ public final class ShieldUpTask implements BotTask {
         this.shooter = shooter;
     }
 
+    /** A creeper about to go off too close to get away: behind the shield until it has blown (or calmed down). */
+    private boolean creeper;
+
+    public static ShieldUpTask against(net.minecraft.world.entity.monster.Creeper c) {
+        ShieldUpTask t = new ShieldUpTask(c);
+        t.creeper = true;
+        return t;
+    }
+
     @Override
     public Result tick(Bot bot) {
         var body = bot.body();
         bot.navigator().stop();
         body.stopInputs();
+        if (creeper) {
+            var c = (net.minecraft.world.entity.monster.Creeper) shooter;
+            if (!c.isAlive() || ++ticks > 60 || c.getSwellDir() < 0 && c.distanceTo(body) > 3.5 || !body.getOffhandItem().is(Items.SHIELD)) {
+                if (body.isUsingItem()) body.releaseUsingItem();
+                return Result.DONE;
+            }
+            body.lookAt(c.getEyePosition());
+            if (!body.isUsingItem()) body.gameMode.useItem(body, body.level(), body.getOffhandItem(), InteractionHand.OFF_HAND);
+            return Result.RUNNING;
+        }
         // Let go: the arrow is off (a moment more for it to arrive), or nothing to block.
         if (shooter.isUsingItem()) drawn = true;
         else if (drawn) {

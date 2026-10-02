@@ -126,4 +126,9 @@ public final class ObtainTask implements BotTask {
     public String describe() {
         return (craftOnly ? "craft " : "get ") + ObtainPlanner.names(items) + " x" + count;
     }
+
+    @Override
+    public BotTask inner() {
+        return step;
+    }
 }
