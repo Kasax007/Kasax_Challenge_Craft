@@ -793,7 +793,10 @@ public final class LockoutBrain implements BotBrain {
             double left = remaining(bot);
             boolean progress = left < goalEstimate * 0.85;
             if (!progress) stalls++;
-            double believed = left * (1 + 0.6 * stalls);
+            // (Without progress, what has taken long already is likely to take long still: at
+            // least half the time spent so far is believed left, however small the estimate.)
+            double spentSeconds = (now - goalStarted) / 20.0;
+            double believed = (stalls > 0 ? Math.max(left, 0.5 * spentSeconds) : left) * (1 + 0.6 * stalls);
             double other = Double.MAX_VALUE;
             if (extensions < 8 && left < Double.MAX_VALUE / 4) {
                 for (Choice c : choices(bot, targetIndex)) other = Math.min(other, c.option().cost() - strategist.bonus(c.tile().goal().id()));

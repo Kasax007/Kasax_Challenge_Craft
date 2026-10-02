@@ -426,6 +426,23 @@ public final class Bot {
             var hit = body.level().clip(new net.minecraft.world.level.ClipContext(eye, eye.add(dir.scale(length)),
                     net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, body));
             double free = hit.getLocation().distanceTo(eye);
+            // Ground all the way: a run off a cliff edge (or into a ravine) ends where the ground
+            // drops more than three blocks.
+            for (int k = 1; k <= (int) free; k++) {
+                net.minecraft.core.BlockPos col = net.minecraft.core.BlockPos.containing(body.getX() + dir.x * k, body.getY() - 0.5, body.getZ() + dir.z * k);
+                boolean ground = false;
+                for (int dy = 0; dy <= 3 && !ground; dy++) {
+                    net.minecraft.core.BlockPos q = col.below(dy);
+                    var st = body.level().getBlockState(q);
+                    ground = !st.getCollisionShape(body.level(), q).isEmpty() || !st.getFluidState().isEmpty()
+                            && st.getFluidState().is(net.minecraft.tags.FluidTags.WATER);
+                    if (st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) break;
+                }
+                if (!ground) {
+                    free = k - 1;
+                    break;
+                }
+            }
             // (Straight away is worth a little more: the others lead past the threat's side.)
             free -= Math.abs(deg) / 45.0;
             if (free > bestFree + 0.5) {
