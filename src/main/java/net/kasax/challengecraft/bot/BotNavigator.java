@@ -199,7 +199,11 @@ public final class BotNavigator {
         return BlockPos.containing(bot.getX(), bot.getY() + 0.2, bot.getZ());
     }
 
+    /** The body tick the walk was last carried on in (see {@link Bot}: inputs let go otherwise). */
+    public int tickedAt = -1;
+
     public Status tick() {
+        tickedAt = bot.tickCount;
         if (status != Status.MOVING) return status;
         BlockPos feet = feet();
         if (goal.test(feet) && bot.onGround() || goal.test(feet) && bot.isInWater()) {

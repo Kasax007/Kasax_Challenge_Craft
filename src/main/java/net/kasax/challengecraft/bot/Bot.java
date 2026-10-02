@@ -205,7 +205,12 @@ public final class Bot {
         BotTask.Result r;
         try {
             sinkToDig = false;
+            int before = navigator.tickedAt;
             r = task.tick(this);
+            // A walk left off without a word (the task waits for something now): the keys let
+            // go, or the body runs on in the last direction until a wall stops it.
+            if (navigator.status() == BotNavigator.Status.MOVING && navigator.tickedAt == before && before != body.tickCount
+                    && body.tickCount - before > 2) body.stopInputs();
             // Head under water: hold jump to swim up, whatever the task does (a player never forgets
             // that). Unless it is digging its way out from the bottom (afloat, it digs five times slower).
             if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig && !navigator.diving()) body.jump = true;
@@ -261,6 +266,8 @@ public final class Bot {
      * Things a player does without thinking about them, whatever the plan: hit back at a monster
      * that attacks, eat when hungry.
      */
+    private int shooterCheckAt;
+
     private void reflexes() {
         if (reflexCooldown-- > 0) return;
         reflexCooldown = 10;
@@ -378,7 +385,8 @@ public final class Bot {
         }
         // A bow drawn on it (skeleton, pillager): the shield up towards it until the arrow is in
         // it; then, armed and well and the shooter not far, after it (it shoots again otherwise).
-        if (body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) && !(top instanceof net.kasax.challengecraft.bot.task.ShieldUpTask)) {
+        boolean shieldOn = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+        if (!(top instanceof net.kasax.challengecraft.bot.task.ShieldUpTask) && body.tickCount >= shooterCheckAt) {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(20),
                     m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob
                             && m.isUsingItem() && body.hasLineOfSight(m))) {
@@ -387,11 +395,18 @@ public final class Bot {
                 for (var st : body.getInventory().getNonEquipmentItems()) {
                     if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
                 }
+                // (Armed and well: straight at it, dodging the arrows - standing behind the shield
+                // only lets it shoot again and again.)
                 if (armed && body.getHealth() >= 12 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
                     interject(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(m.getType()), java.util.Set.of(), 0, 1).nearby(16));
+                    return;
                 }
-                interject(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
-                return;
+                if (shieldOn) {
+                    interject(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
+                    return;
+                }
+                shooterCheckAt = body.tickCount + 40; // (nothing to do about it: not every check)
+                break;
             }
         }
         net.minecraft.world.entity.LivingEntity attacker = body.getLastHurtByMob();

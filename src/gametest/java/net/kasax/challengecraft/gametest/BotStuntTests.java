@@ -396,9 +396,7 @@ public class BotStuntTests {
 
     /** A skeleton shooting at it: the arrows end in the shield (or the skeleton is dealt with), the bot whole. */
     // (A batch of its own: the arrows would find the bots of the tests next door.)
-    // Not required yet: chasing a skeleton that backs off while it shoots still costs too many
-    // hearts at times (an open point in docs/bob-plan.md); it is run and reported all the same.
-    @GameTest(environment = "challengecraft:archery", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90, required = false)
+    @GameTest(environment = "challengecraft:archery", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
     public void skeletonShield(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "skeleton_shield");
         var level = h.getLevel();
@@ -416,6 +414,27 @@ public class BotStuntTests {
             var body = a.bot().body();
             if (body.getHealth() < 12) h.fail("shot: " + body.getHealth());
             return body.getStats().getValue(blocked) > before && body.getHealth() >= 14 || !sk.isAlive();
+        });
+    }
+
+    /** A skeleton, no shield: run at it dodging the arrows, killed with the sword, the bot not badly hurt. */
+    @GameTest(environment = "challengecraft:archery", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
+    public void skeletonDuel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "skeleton_duel");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(24, FEET, 20)));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(12, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.SKELETON), java.util.Set.of(), 0, 1), 900, () -> {
+            var body = a.bot().body();
+            if (body.getHealth() < 12) h.fail("shot: " + body.getHealth());
+            if (!sk.isAlive()) BotArena.LOG.info("[BOTTEST] skeleton_duel hp left {}", body.getHealth());
+            return !sk.isAlive();
         });
     }
 

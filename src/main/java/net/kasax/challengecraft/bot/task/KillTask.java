@@ -31,6 +31,9 @@ import java.util.Set;
  */
 public final class KillTask implements BotTask {
     private static final double REACH = 2.9;
+    /** Sidestepping a drawn bow: which way this time, and whether the step is on. */
+    private float dodgeSide = 1f;
+    private boolean dodging;
 
     private final Set<EntityType<?>> types;
     private final Set<Item> loot;
@@ -128,6 +131,40 @@ public final class KillTask implements BotTask {
         double dist = body.distanceTo(target);
         // Up in the air (a phantom, a ghast, a blaze over the lava): arrows, if it has a bow.
         if (target.getY() - body.getY() > 3.5 && dist > REACH && shoot(bot, target)) return Result.RUNNING;
+        body.strafe = 0f; // (a sidestep lasts only while the bow is drawn, below)
+        // A creeper is hit from just outside the three blocks at which it starts to hiss (the
+        // arm reaches its body, not its middle), with a running blow that throws it back.
+        boolean creeperTarget = target instanceof net.minecraft.world.entity.monster.Creeper;
+        if (creeperTarget && dist <= 4.2 && dist > REACH) {
+            if (walking) {
+                bot.navigator().stop();
+                walking = false;
+            }
+            body.lookAt(target.getEyePosition());
+            boolean ready = body.getAttackStrengthScale(0.5f) >= 1f;
+            if (!ready) {
+                // Waiting for the arm: just out of its range, backing off if it comes on.
+                body.forward = dist < 3.5 ? -1f : 0f;
+                return Result.RUNNING;
+            }
+            if (dist > 3.2) {
+                // Ready: one step in at a run, the blow lands as it comes into reach.
+                body.forward = 1f;
+                body.sprintNow = body.getFoodData().getFoodLevel() > 6;
+                return Result.RUNNING;
+            }
+            body.attack(target);
+            body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
+            body.forward = -1f;
+            body.sprintNow = false;
+            if (!target.isAlive()) {
+                killed++;
+                deathSpot = target.blockPosition();
+                collectTicks = 40;
+                target = null;
+            }
+            return Result.RUNNING;
+        }
         if (dist <= REACH) {
             if (walking) {
                 bot.navigator().stop();
@@ -194,6 +231,25 @@ public final class KillTask implements BotTask {
         }
         if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD)) body.releaseUsingItem();
         crit = 0;
+        // A shooter (skeleton, stray, pillager) in sight on open ground: straight at it at a run,
+        // a step aside each time its bow is drawn full (the arrow goes where it stood), as a
+        // player closes in on one. Then the blows, with the jump for the critical hit.
+        boolean shooter = target instanceof net.minecraft.world.entity.monster.RangedAttackMob;
+        if (shooter && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target)) {
+            if (walking) {
+                bot.navigator().stop();
+                walking = false;
+            }
+            body.lookAt(target.getEyePosition());
+            body.forward = 1f;
+            body.sprintNow = body.getFoodData().getFoodLevel() > 6;
+            boolean drawn = target.isUsingItem() && target.getTicksUsingItem() >= 12;
+            if (drawn && !dodging) dodgeSide = -dodgeSide; // (each arrow the other way: no pattern)
+            dodging = drawn;
+            body.strafe = drawn ? dodgeSide : 0f;
+            body.jump = body.horizontalCollision;
+            return Result.RUNNING;
+        }
         // Close and on about the same level: just run at it. Otherwise path there.
         if (dist < 6 && Math.abs(target.getY() - body.getY()) < 1.5 || direct > 0) {
             direct--;
