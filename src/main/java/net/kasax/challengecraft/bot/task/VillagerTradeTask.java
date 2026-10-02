@@ -198,6 +198,12 @@ public final class VillagerTradeTask implements BotTask {
                 clearedRivals = false;
             }
             if (!clearedRivals) return clearRivals(bot, level, siteAt, profession);
+            // Nobody comes, and the one that would have has just taken another job (the composter
+            // beside it, before ours was down): that job site taken up, and it is free again.
+            if (!claimed && waitTicks > 200) {
+                Result r = unemployFresh(bot, level, villagers, profession);
+                if (r != null) return r;
+            }
             return Result.RUNNING;
         }
         Villager jobless = villagers.stream().filter(v -> profession(v).equals("none"))
@@ -205,20 +211,9 @@ public final class VillagerTradeTask implements BotTask {
         if (jobless == null && villagers.stream().anyMatch(VillagerTradeTask::losingJob) && ++offerWait < 600) return Result.RUNNING;
         // None jobless, but a fresh one (never traded with) in another job: its job site taken up,
         // and it is jobless again.
-        if (jobless == null && rivalsBroken < 6) {
-            Villager fresh = villagers.stream().filter(v -> !profession(v).equals(profession) && !profession(v).equals("nitwit") && !profession(v).equals("none")
-                            && v.getVillagerData().level() <= 1 && v.getVillagerXp() == 0 && v.getBrain().getMemory(MemoryModuleType.JOB_SITE).isPresent())
-                    .min(Comparator.comparingDouble(v -> v.distanceToSqr(body))).orElse(null);
-            if (fresh != null) {
-                BlockPos its = fresh.getBrain().getMemory(MemoryModuleType.JOB_SITE).get().pos();
-                if (!bot.actions().inReach(its)) return walkTo(bot, its);
-                bot.tools().equipFor(level.getBlockState(its));
-                if (bot.actions().breakTick(its)) {
-                    rivalsBroken++;
-                    bot.say("the new " + profession(fresh) + " gives up its job site, to be a " + profession + " instead");
-                }
-                return Result.RUNNING;
-            }
+        if (jobless == null) {
+            Result r = unemployFresh(bot, level, villagers, profession);
+            if (r != null) return r;
         }
         if (jobless == null) {
             boolean nitwits = villagers.stream().anyMatch(v -> profession(v).equals("nitwit"));
@@ -251,6 +246,25 @@ public final class VillagerTradeTask implements BotTask {
         waitTicks = 0;
         claimedTicks = 0;
         clearedRivals = false;
+        return Result.RUNNING;
+    }
+
+    /** A fresh villager (first level, never traded) in another job: its job site broken. Null if none. */
+    private Result unemployFresh(Bot bot, ServerLevel level, List<Villager> villagers, String profession) {
+        if (rivalsBroken >= 6) return null;
+        BotPlayer body = bot.body();
+        Villager fresh = villagers.stream().filter(v -> !profession(v).equals(profession) && !profession(v).equals("nitwit") && !profession(v).equals("none")
+                        && v.getVillagerData().level() <= 1 && v.getVillagerXp() == 0 && v.getBrain().getMemory(MemoryModuleType.JOB_SITE).isPresent())
+                .min(Comparator.comparingDouble(v -> v.distanceToSqr(body))).orElse(null);
+        if (fresh == null) return null;
+        BlockPos its = fresh.getBrain().getMemory(MemoryModuleType.JOB_SITE).get().pos();
+        if (!bot.actions().inReach(its)) return walkTo(bot, its);
+        bot.tools().equipFor(level.getBlockState(its));
+        if (bot.actions().breakTick(its)) {
+            rivalsBroken++;
+            waitTicks = 0;
+            bot.say("the new " + profession(fresh) + " gives up its job site, to be a " + profession + " instead");
+        }
         return Result.RUNNING;
     }
 
