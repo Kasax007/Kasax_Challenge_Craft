@@ -380,6 +380,10 @@ public final class Bot {
     /** The last way off from a monster, and when one found no way (then it is a fight). */
     private BotTask retreat;
     private int retreatFailedAt = -1000, retreatFails;
+    /** The retreat being watched for progress: from where, since when. */
+    private BotTask retreatSeen;
+    private net.minecraft.world.phys.Vec3 retreatFrom;
+    private int retreatStart;
 
     /**
      * Things a player does without thinking about them, whatever the plan: hit back at a monster
@@ -446,6 +450,28 @@ public final class Bot {
         // Low on health with a monster close: get away first (and eat on the way), as a player
         // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
         // creeper about to blow: always away. (Cornered, with no way off: fight on, below.)
+        // Running away and getting nowhere (a corner, a dead end, no way found) while still being
+        // hit: the run is over - a failed one, and two of those make it cornered: it fights.
+        if (retreat != null && top == retreat) {
+            if (retreatFrom == null || retreatSeen != retreat) {
+                retreatSeen = retreat;
+                retreatFrom = body.position();
+                retreatStart = body.tickCount;
+            }
+            boolean stalled = body.tickCount - retreatStart > 40 && body.position().distanceToSqr(retreatFrom) < 9;
+            if (body.hurtTime > 0 && (stalled || navigator.status() != BotNavigator.Status.MOVING && body.tickCount - retreatStart > 20)) {
+                say("no way off from here: standing to fight");
+                cancel(retreat);
+                body.hurry = false;
+                retreat = null;
+                retreatFailedAt = body.tickCount;
+                retreatFails = Math.max(2, retreatFails + 1);
+                top = tasks.peek();
+            } else if (body.position().distanceToSqr(retreatFrom) >= 9 && body.tickCount - retreatStart > 40) {
+                retreatFrom = body.position();
+                retreatStart = body.tickCount;
+            }
+        }
         boolean recent = body.tickCount - retreatFailedAt < 200;
         if (!recent) retreatFails = 0;
         boolean cornered = recent && retreatFails >= 2;
@@ -633,6 +659,21 @@ public final class Bot {
         }
         boolean fromPillar = attacker != null && net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, attacker)
                 && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this);
+        // Bare-handed (just come back to life, say) against something that strikes close, more
+        // than one about or at night: away, far, instead of a fist fight it cannot win (on hard a
+        // zombie takes twenty blows of the fist; on seed 77 the bot died forty times so, at a bed
+        // with zombies round it). Cornered: it fights all the same.
+        if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !armed() && !cornered
+                && !(attacker instanceof net.minecraft.world.entity.monster.RangedAttackMob)
+                && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8
+                && !(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+            net.minecraft.world.phys.Vec3 away = openWayFrom(attacker.position(), 32);
+            actions.reset();
+            say("no weapon, a " + attacker.getType().toShortString() + " at me: away, not a fist fight");
+            retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
+            reflex(retreat);
+            return;
+        }
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !fromPillar && (body.getHealth() > 7 || cornered)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
