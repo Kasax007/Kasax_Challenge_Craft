@@ -238,6 +238,17 @@ public final class Bot {
         memory.tick(body);
         if (body.tickCount % 10 == 0) layTrail();
         waterBucketLanding(); // every tick, busy or not: a fall does not wait
+        // Head in a block (gravel or sand come down on it, dug from under a column of them):
+        // dug free at once, before anything else - it suffocates a heart every half second.
+        if (body.isInWall()) {
+            net.minecraft.core.BlockPos eye = net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
+            net.minecraft.core.BlockPos q = !body.level().getBlockState(eye).getCollisionShape(body.level(), eye).isEmpty() ? eye : eye.below();
+            navigator.stop();
+            body.stopInputs();
+            if (body.tickCount % 20 == 0) say("buried (head in " + body.level().getBlockState(q).getBlock().getName().getString() + "): digging free");
+            actions.breakTick(q);
+            return;
+        }
         watchdog();
         // (A fall of more than four: what it was doing then, for the log - falls are the
         // commonest death after lava, and seldom a planned step.)

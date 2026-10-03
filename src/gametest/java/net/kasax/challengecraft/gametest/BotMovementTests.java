@@ -496,4 +496,18 @@ public class BotMovementTests {
             return a.bot().current() == null && h.getTick() > 100;
         });
     }
+
+    /** Gravel come down on its head (a column of eight, as above a dug-out flint block): dug free, alive. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void buriedInGravel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "buried_in_gravel");
+        a.fill(19, FEET, 19, 21, FEET + 9, 21, Blocks.STONE);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SHOVEL));
+        a.fill(20, FEET, 20, 20, FEET + 8, 20, Blocks.GRAVEL);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 600, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("buried_in_gravel: suffocated");
+            return h.getTick() > 300 && !body.isInWall();
+        });
+    }
 }
