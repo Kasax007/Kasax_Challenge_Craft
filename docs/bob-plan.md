@@ -1449,3 +1449,28 @@ Kontakt.
 - L7 Eisen über Höhlen (das Eisen kommt jetzt schon nach 144 s; offen ist das Graben in der
   Tiefe, also Redstone und Diamant);
 - L8 lernende Schätzungen aus der Cortex-Bilanz.
+
+### 17.6 Vergleich alt gegen neu, 90 min HARD, je Seed
+
+- **Alt:** Stand vor Runde 11 (`c209711`).
+- **Neu:** Stand mit L1–L3, Teilen von L9/L10 und den Schleifenbrechern.
+- Je ein Lauf; auf Seed 77 zwei neue Läufe, Mittel in Klammern.
+
+| Seed | Alt: Felder | Alt: Tode | Neu: Felder | Neu: Tode |
+| --- | --- | --- | --- | --- |
+| −8848941644679110190 | 10 | 7 | 10 | 3 |
+| 77 | 10 | 8 | 15 / 9 (12) | 6 / 5 (5,5) |
+| 4242 | 1 | 29 | 2 | 14 |
+| 1234 | 6 | 1 | 5 | 6 |
+| **Summe** | **27** | **45** | **29** | **28,5** |
+
+**Befund:**
+
+- Die Tode sinken deutlich, um gut ein Drittel.
+- Die Felder bleiben etwa gleich.
+- Die Streuung zwischen zwei Läufen auf demselben Seed ist groß (Seed 77: 15 gegen 9 Felder).
+  Einzelläufe sagen wenig; künftig braucht es mehrere Läufe je Stand.
+- Auf Seed 1234 starb Bob öfter als vorher (2 Zombies, 1 Creeper) – das bleibt zu beobachten.
+
+**Verworfen:** Deckung schon ab 16 Herzen gegen zwei oder mehr Schützen. Im Test mit zwei
+Skeletten bestand der neue Stand 0 von 3 Läufen, der alte 1 von 3; kein Nutzen belegt.
