@@ -282,7 +282,27 @@ public final class Bot {
             tasks.remove(task);
             navigator.stop();
             navigator.resumeFor(tasks.peek());
-            if (r == BotTask.Result.FAILED) failures++;
+            if (r == BotTask.Result.FAILED) {
+                failures++;
+                // The same thing failing over and over within half a minute (a step that cannot be
+                // done, asked for again by the task under it): a loop. The whole errand ends as a
+                // failure, so the brain - and its memory of failures - decides what next.
+                long now = body.tickCount;
+                String what = task.describe();
+                var times = failedAt.computeIfAbsent(what, k -> new java.util.ArrayDeque<>());
+                times.addLast(now);
+                while (!times.isEmpty() && now - times.peekFirst() > 600) times.pollFirst();
+                if (times.size() >= 10 && !tasks.isEmpty()) {
+                    times.clear();
+                    BotTask root = tasks.peekLast();
+                    BotManager.LOG.info("[Bot] {}: loop - '{}' failed 10 times in half a minute: giving up on {}", name, what, root.describe());
+                    say("x " + task.describe());
+                    tasks.clear();
+                    navigator.stop();
+                    if (brain != null) brain.finished(this, root, false);
+                    return;
+                }
+            }
             if (task == retreat) {
                 body.hurry = false;
                 if (r == BotTask.Result.FAILED) {
@@ -347,6 +367,9 @@ public final class Bot {
         actions.reset();
         reflex(new net.kasax.challengecraft.bot.task.GoToTask(aside, 3));
     }
+
+    /** When each kind of task last failed (for the loop breaker). */
+    private final java.util.Map<String, java.util.ArrayDeque<Long>> failedAt = new java.util.HashMap<>();
 
     private int reflexCooldown, armorCheck;
     /** The last way off from a monster, and when one found no way (then it is a fight). */

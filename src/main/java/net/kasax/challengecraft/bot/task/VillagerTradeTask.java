@@ -123,6 +123,8 @@ public final class VillagerTradeTask implements BotTask {
                 emeralds |= pays;
                 // Levelling: the merchant's own trades; emeralds: anyone's.
                 if (levelUp ? v != merchant : !pays) continue;
+                // (What it went for twice already and still has not: no good as pay.)
+                if (asked.getOrDefault(o.getCostA().getItem(), 0) >= 2 || !o.getCostB().isEmpty() && asked.getOrDefault(o.getCostB().getItem(), 0) >= 2) continue;
                 double c = planner.estimate(bot, Set.of(o.getCostA().getItem()), o.getCostA().getCount());
                 if (!o.getCostB().isEmpty()) c += planner.estimate(bot, Set.of(o.getCostB().getItem()), o.getCostB().getCount());
                 if (levelUp) c /= Math.max(1, o.getXp());
@@ -158,6 +160,7 @@ public final class VillagerTradeTask implements BotTask {
         }
         for (ItemStack cost : List.of(best.getCostA(), best.getCostB())) {
             if (cost.isEmpty() || ObtainPlanner.countAny(body, Set.of(cost.getItem())) >= cost.getCount()) continue;
+            asked.merge(cost.getItem(), 1, Integer::sum);
             interject(bot, new ObtainTask(Set.of(cost.getItem()), cost.getCount(), planner).keeping(Set.of(Items.EMERALD)));
             return Result.RUNNING;
         }
@@ -323,6 +326,9 @@ public final class VillagerTradeTask implements BotTask {
         }
         return Result.RUNNING;
     }
+
+    /** What it set out to get as pay, how often (a third time is not tried: it cannot be had). */
+    private final java.util.Map<net.minecraft.world.item.Item, Integer> asked = new java.util.HashMap<>();
 
     private void interject(Bot bot, BotTask task) {
         steps++;
