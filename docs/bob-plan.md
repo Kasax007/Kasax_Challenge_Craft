@@ -1525,3 +1525,53 @@ Live-Seed und 4242 liefen noch ohne Fluchtregel.
 
 **Befund:** Die Tode sind auf ein Viertel gefallen. Der Engpass ist jetzt das Tempo: Fehlschläge
 bei Besorgungen und Feldern (Bündel, Bogen, Moos) und lange Wege.
+
+## 19. Baritone gegen Bob – Bestandsaufnahme und Nachbau
+
+**Quelle:** Baritone (cabaletta/baritone, `master`):
+
+- `Settings.java`: 213 Einstellungen;
+- `MovementHelper.java`: die Regeln, was betreten und abgebaut wird.
+
+Bob nutzt Baritone nicht; die Regeln sind nachgebaut.
+
+**Befund vorab:**
+
+- Baritone kämpft nicht. Es überlebt, weil es nach strengen Regeln läuft und gräbt.
+- Seine Mob-Meidung (`avoidance`) ist ab Werk sogar aus.
+- Bob muss zusätzlich kämpfen, Nether-Ziele holen und nachts draußen sein. Die Regeln sind deshalb
+  nötig, aber nicht genug.
+
+| Baritone | Was es tut | Bob vorher | Jetzt |
+| --- | --- | --- | --- |
+| `avoidWalkingInto` | nie in Flüssigkeit, Magma, Kaktus, Feuer, Spinnweben | ja, dazu Beerenbusch, Pulverschnee, Wither-Rose, Lagerfeuer, Tropfsteinspitzen, Druckplatten, Stolperdraht | – |
+| `avoidAdjacentBreaking` (Flüssigkeit) | nichts abbauen, wo Lava oder Wasser nachfließt | ja (`liquidAround`) | – |
+| `avoidAdjacentBreaking` (fallende Blöcke) | nichts abbauen, neben dem ungestützter Sand oder Kies liegt | nein | **nachgebaut** |
+| `avoidBreaking` | Silberfischchen-Blöcke, Eis | nein | **nachgebaut** |
+| `pauseMiningForFallingBlocks` | warten, bis fallende Blöcke gelandet sind | nein | **nachgebaut** (Navigator wartet) |
+| `maxFallHeightNoWater` = 3 | Fall nur bis 3 Blöcke | ja (`MAX_FALL` = 3) | – |
+| `allowWaterBucketFall` | Wassereimer bei tiefem Fall | ja | – |
+| `avoidance` / `mobAvoidance*` | Wege nahe Mobs ×1,5 (Radius 8) | nein | **nachgebaut**, gestaffelt ×4 / ×2,5 / ×1,5 nach Abstand, weil der flache Faktor 1,5 den geraden Weg dicht am Mob nicht verhindert (getestet) |
+| `mobSpawnerAvoidance*` | Wege nahe Spawnern ×2 (Radius 16) | nein | **nachgebaut** (Spawner und Trial-Spawner aus den geladenen Chunks) |
+| `costVerificationLookahead` = 5 | die nächsten 5 Schritte laufend nachprüfen | nur den aktuellen Schritt | **nachgebaut** |
+| `strictLiquidCheck`, `assumeWalkOnWater`/`Lava` | Sonderfälle | – | nicht nötig |
+| `allowParkour`, Diagonalen | riskante Sprünge | Sprünge mit Prüfung der Absturzgefahr, im Nether vorsichtig | – |
+| `autoTool`, `allowInventory` | Werkzeugwahl, Hotbar | ja | – |
+| `itemSaver` | Werkzeug vor dem Bruch schonen | Ersatz-Spitzhacke vor dem Bruch | – |
+| `blacklistClosestOnFailure` | Unerreichbares merken, nächstes nehmen | ja (`unreachable`) | – |
+| `exploreForBlocks` | erkunden, wenn nichts bekannt | ja (`Explorer`) | – |
+| `legitMine` | Erz nur sehen, nicht wissen | ja (Bob sieht nur, was sichtbar ist) | – |
+| `mineScanDroppedItems` | liegende Drops mitnehmen | ja | – |
+| Prozesse Follow, GetToBlock, Mine, Explore, Farm | – | ja (Follow, NavGoal, Mine, Explorer, Ernte) | – |
+| Prozesse Build, Backfill, Elytra | Schematics, Löcher füllen, Elytra | nein | für Lockout nicht nötig |
+
+**Eigene Ergänzung, angestoßen durch die Messungen:** Unter Wasser darf ein Weg nur dort verlaufen,
+wo Luft gerade darüber liegt, nicht unter einer Felsdecke (geflutete Höhlen). Auf Seed 77 war das
+15-mal die Todesursache.
+
+**Tests (alle grün, jeweils mit Gegenprobe gegen den alten Stand):**
+
+| Test | Szenario | Neu | Alt |
+| --- | --- | --- | --- |
+| `way_round_monster` | Zombie mitten auf dem geraden Weg | geht mit 7,4 Blöcken Abstand vorbei | 1,1 Blöcke |
+| `flooded_tunnel_avoided` | gefluteter Tunnel unter der Wand oder trockener Umweg | trockener Umweg | taucht |
