@@ -86,6 +86,11 @@ public final class LockoutBrain implements BotBrain {
     private long nextChance;
     private final Set<net.minecraft.core.BlockPos> treasureTried = new java.util.HashSet<>();
     private int pause, checkTicks;
+    /** The big brain over the deciders below: what each set out to do, failures, loops, the mode. */
+    private final Cortex cortex = new Cortex();
+    /** The decider now thinking (its intents are named after it), the intent running, and whether the cortex said no. */
+    private String stepKey, runningKey;
+    private boolean startRefused;
     private boolean joined;
 
     public LockoutBrain(Difficulty difficulty) {
@@ -120,7 +125,10 @@ public final class LockoutBrain implements BotBrain {
         if (team == null) return;
         // Died: the things are still lying there for a few minutes. Fetching them beats making
         // everything again (if it is not too far and they did not burn).
+        Cortex.Mode mode = cortex.mode(bot);
+        boolean surviving = mode == Cortex.Mode.SURVIVE;
         if (bot.lastDeath != null) {
+            stepKey = "recover";
             Bot.Death d = bot.lastDeath;
             bot.lastDeath = null;
             long age = bot.body().level().getGameTime() - d.time();
@@ -136,15 +144,15 @@ public final class LockoutBrain implements BotBrain {
             }
         }
         // Keep something to eat: a player who is starving loses more time than bread costs.
-        if (needsFood(bot)) return;
+        if (step(bot, "food", () -> needsFood(bot))) return;
         // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
-        if (goldGuard(bot)) return;
+        if (step(bot, "gold", () -> goldGuard(bot))) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
-        if (opening(bot)) return;
+        if (step(bot, "opening", () -> opening(bot))) return;
         // The kit a player never goes without: a pickaxe (a new one before the old one breaks)
         // and a stack of blocks to build with (out of a hole, over a gap, a pillar from mobs).
-        if (keepKit(bot)) return;
+        if (step(bot, "kit", () -> keepKit(bot))) return;
         // Iron the quick way: a shipwreck's chests (or a village's) when one is near and the plan
         // wants iron. Once per structure.
         // And whatever the plan: a shipwreck (or a ruined portal) not far off is looted the moment
@@ -152,7 +160,8 @@ public final class LockoutBrain implements BotBrain {
         // tile quicker, wanted now or not.
         // (By day: at night a village is full of zombies, and a long walk in the dark is how
         // games are lost.)
-        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
+        stepKey = "raid";
+        if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
                 && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
             boolean ironWanted = strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
@@ -186,14 +195,19 @@ public final class LockoutBrain implements BotBrain {
                     }
                 }
                 start(bot, new net.kasax.challengecraft.bot.task.RaidTask(level, kind, blocks), kind.equals("village") ? 6000 : 3600);
+                if (startRefused) {
+                    startRefused = false;
+                    continue;
+                }
                 return;
             }
         }
         // Leaving: the table it put down comes along.
-        if (net.kasax.challengecraft.bot.task.PackTableTask.worth(bot)) {
+        if (step(bot, "table", () -> {
+            if (!net.kasax.challengecraft.bot.task.PackTableTask.worth(bot)) return false;
             start(bot, new net.kasax.challengecraft.bot.task.PackTableTask(bot.ownTable), 400);
-            return;
-        }
+            return true;
+        })) return;
         strategist.update(bot, planner, replanNow);
         // What not to throw away when the pack is full: what the board and the plan want.
         bot.keepItems.clear();
@@ -204,7 +218,8 @@ public final class LockoutBrain implements BotBrain {
         // The Nether phase: with the kit in hand and several Nether tiles open, a player goes now
         // rather than one more Overworld tile at a time (each looks a bit cheaper on its own, and
         // the trip never happens). A couple of tries per life.
-        if (bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().level().getGameTime() >= netherRetryAt
+        stepKey = "nether";
+        if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().level().getGameTime() >= netherRetryAt
                 && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.WATER_BUCKET)) > 0) {
             int netherTiles = 0;
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
@@ -218,12 +233,14 @@ public final class LockoutBrain implements BotBrain {
                     netherRetryAt = bot.body().level().getGameTime() + (3600L << Math.min(3, netherFails++));
                     bot.say("Nether phase: " + netherTiles + " tiles there, the way in ~" + Math.round(trip.cost()) + " s");
                     start(bot, trip.task().get(), budget(trip.cost(), 2400, 9000));
-                    return;
+                    if (!startRefused) return;
+                    startRefused = false;
                 }
             }
         }
         // The investment the plan has decided on: iron tools and a bucket now, before the cheap
         // tiles (they pay for themselves on the tiles after). A few tries, then without.
+        stepKey = "invest";
         if (strategist.wantsIron() && bot.body().level().getGameTime() >= kitRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             for (var item : List.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.BUCKET)) {
                 if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
@@ -233,17 +250,19 @@ public final class LockoutBrain implements BotBrain {
                 kitRetryAt = bot.body().level().getGameTime() + (1200L << Math.min(3, kitTries++));
                 bot.say("investing: " + ObtainPlanner.name(item) + " (the plan wants the iron kit)");
                 start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 4800);
-                return;
+                if (!startRefused) return;
+                startRefused = false;
             }
         }
         // A bastion near in the Nether and gold of use on the board (bartering, gold tiles): its
         // chests and gold blocks, where few piglins watch. Once per bastion.
-        if (bastionRaid(bot)) return;
+        if (!surviving && step(bot, "bastion", () -> bastionRaid(bot))) return;
         // Night (or a cave, or the Nether), and several monsters wanted: one hunt for all of them.
-        if (huntRound(bot)) return;
+        if (!surviving && step(bot, "hunt", () -> huntRound(bot))) return;
         // Night with nothing to hunt: the night slept away in the bed it carries (fewer monsters
         // on the way, the spawn set here), and the bed taken along again.
-        if (sleep(bot)) return;
+        if (step(bot, "sleep", () -> sleep(bot))) return;
+        stepKey = null;
         replanNow = false;
         List<Choice> choices = choices(bot, -1);
         // Only dear tiles left (over half an hour, by the estimate) or ones that ran over a while
@@ -315,6 +334,33 @@ public final class LockoutBrain implements BotBrain {
                 + Math.round(po.luck()) + " s luck, " + Math.round(100 * po.within(goalBudget / 20.0)) + "% within " + goalBudget / 20 + " s, "
                 + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
         start(bot, goalTask, goalBudget);
+        if (startRefused) {
+            // (A loop on this tile: the cortex set it aside; something else next time round.)
+            startRefused = false;
+            targetIndex = -1;
+            goalTask = null;
+        }
+    }
+
+    /** One decider, under the cortex: returns whether it started something (a refused start is not that). */
+    private boolean step(Bot bot, String key, java.util.function.BooleanSupplier decider) {
+        stepKey = key;
+        startRefused = false;
+        boolean r = decider.getAsBoolean();
+        stepKey = null;
+        if (startRefused) {
+            startRefused = false;
+            return false;
+        }
+        return r;
+    }
+
+    /** The intent a task stands for: the decider and what the task does, without the counts. */
+    private String intent(BotTask task) {
+        if (task == goalTask && targetId != null) return "goal:" + targetId;
+        String what = task.describe().replaceAll("[0-9]+", "").replaceAll("\\s+", " ").trim();
+        if (what.length() > 40) what = what.substring(0, 40);
+        return (stepKey == null ? "other" : stepKey) + ":" + what;
     }
 
     private static final Set<net.minecraft.world.item.Item> FOODS = Set.of(net.minecraft.world.item.Items.BREAD,
@@ -1209,6 +1255,14 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private void start(Bot bot, BotTask task, long budgetTicks) {
+        String key = intent(task);
+        if (!cortex.start(bot, key, bot.body().level().getGameTime())) {
+            startRefused = true;
+            nextErrand = null;
+            return;
+        }
+        // (Whatever ran before and was left unfinished: not a failure of its own, it was put aside.)
+        runningKey = key;
         errand = nextErrand;
         nextErrand = null;
         running = task;
@@ -1256,6 +1310,8 @@ public final class LockoutBrain implements BotBrain {
         }
         if (running != null && running != goalTask && now - runningSince > runningBudget && bot.current() != null) {
             bot.say(running.describe() + " takes too long, something else");
+            cortex.ended(bot, runningKey, now, false, false);
+            runningKey = null;
             running = null;
             nextFoodCheck = now + 2400; // (if it was food: not the same way again right away)
             if (errand != null) {
@@ -1300,6 +1356,10 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
             bot.say(targetId + " takes too long, something else first");
+            if (runningKey != null && runningKey.equals("goal:" + targetId)) {
+                cortex.ended(bot, runningKey, now, false, false);
+                runningKey = null;
+            }
             overruns.merge(targetId, 1, Integer::sum);
             overrunEstimate.put(targetId, goalFirstEstimate);
             // (For next games too: at least this long, and it was not even done.)
@@ -1322,6 +1382,7 @@ public final class LockoutBrain implements BotBrain {
             }
             bot.welcomeExplosion = open;
         }
+        if (checkTicks % 6000 == 0) net.kasax.challengecraft.bot.BotManager.LOG.info("[Cortex] {}: {}", bot.name, cortex.summary());
         if (++checkTicks % 20 != 0) return;
         // Chances on the way (a chest, flowers the board wants) on errands too, not only on goals.
         if (checkTicks % 40 == 0 && sideTask == null && (targetIndex >= 0 || running != null && bot.current() != null)) takeChances(bot);
@@ -1480,6 +1541,10 @@ public final class LockoutBrain implements BotBrain {
 
     @Override
     public void finished(Bot bot, BotTask task, boolean success) {
+        if (task == running && runningKey != null) {
+            cortex.ended(bot, runningKey, bot.body().level().getGameTime(), success, false);
+            runningKey = null;
+        }
         if (task == sideTask) {
             // (The goal's clock stood still meanwhile: the side trip is not the goal's time.)
             if (goalTask != null) goalPaused += bot.body().level().getGameTime() - sideStarted;
@@ -1519,6 +1584,9 @@ public final class LockoutBrain implements BotBrain {
 
     @Override
     public void respawned(Bot bot) {
+        // Died at it: that intent waits longer before the next try.
+        if (runningKey != null) cortex.ended(bot, runningKey, bot.body().level().getGameTime(), false, true);
+        runningKey = null;
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
         openingWood = false;
@@ -1532,7 +1600,7 @@ public final class LockoutBrain implements BotBrain {
 
     private boolean resting(String goalId, long now) {
         Long until = restUntil.get(goalId);
-        return until != null && until > now;
+        return until != null && until > now || !cortex.allowed("goal:" + goalId, now);
     }
 
     private void drop(Bot bot) {

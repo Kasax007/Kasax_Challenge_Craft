@@ -265,6 +265,11 @@ public final class DangerSense {
         }
     }
 
+    /** Pressed for this tick by a reflex (a dodge): a way to go, in the world's frame - checked by the guard after. */
+    void steer(double wx, double wz) {
+        press(new Keys(wx, wz, false, false, false, false));
+    }
+
     private boolean onMagma() {
         var body = bot.body();
         return body.onGround() && !body.hasEffect(MobEffects.FIRE_RESISTANCE)

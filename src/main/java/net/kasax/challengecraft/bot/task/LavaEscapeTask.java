@@ -22,7 +22,9 @@ public final class LavaEscapeTask implements BotTask {
     public static boolean burning(Bot bot) {
         var body = bot.body();
         if (body.hasEffect(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE)) return false;
-        return body.isInLava() || body.onGround() && !body.isSteppingCarefully() && body.level().getBlockState(body.getOnPos()).is(Blocks.MAGMA_BLOCK)
+        return body.isInLava() || body.onGround() && body.level().getBlockState(body.getOnPos()).is(Blocks.MAGMA_BLOCK)
+                // (Crouched on the way across, it does not burn: on along the way then. Standing about on it: off.)
+                && (!body.isSteppingCarefully() || bot.navigator().status() != net.kasax.challengecraft.bot.BotNavigator.Status.MOVING)
                 // (Standing in fire, soul fire: out of it, the same way.)
                 || body.level().getBlockState(body.blockPosition()).is(net.minecraft.tags.BlockTags.FIRE);
     }

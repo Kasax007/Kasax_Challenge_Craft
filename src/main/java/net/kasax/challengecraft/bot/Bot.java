@@ -26,6 +26,8 @@ public final class Bot {
     private final BotMemory memory = new BotMemory();
     /** Lava, fire and drops about it, and the guard over its own moves (see {@link DangerSense}). */
     public final DangerSense danger = new DangerSense(this);
+    /** Arrows and fireballs seen coming, and side-stepped (see {@link ThreatSense}). */
+    public final ThreatSense threats = new ThreatSense(this);
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
     /**
@@ -220,6 +222,8 @@ public final class Bot {
         if (!body.isAlive()) return;
         danger.restore();
         act();
+        // Something flying at it that would hit: a step aside first.
+        threats.react();
         // Last, the keys pressed: where they lead worked out, and not pressed if that is into harm.
         danger.guard();
     }

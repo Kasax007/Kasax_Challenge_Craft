@@ -955,6 +955,34 @@ public class BotStuntTests {
         });
     }
 
+    /** Arrows shot at him from fifteen blocks off, one every two seconds: side-stepped, not taken. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void dodgeArrows(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "dodge_arrows");
+        var level = h.getLevel();
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        int[] shots = {0}, hits = {0};
+        float[] hp = {body.getHealth()};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(580), 600, () -> {
+            if (body.getHealth() < hp[0] - 0.5f) hits[0]++;
+            hp[0] = body.getHealth();
+            body.setHealth(20f);
+            hp[0] = 20f;
+            if (h.getTick() % 40 == 20 && shots[0] < 10) {
+                shots[0]++;
+                var arrow = EntityTypes.ARROW.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+                var from = net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(5, FEET + 1, 20 + (shots[0] % 3) - 1));
+                arrow.setPos(from);
+                var to = body.position().add(0, 1.0, 0).subtract(from);
+                arrow.shoot(to.x, to.y + to.horizontalDistance() * 0.2, to.z, 1.6f, 0f);
+                level.addFreshEntity(arrow);
+            }
+            h.assertTrue(hits[0] <= 2, "dodge_arrows: hit " + hits[0] + " times by " + shots[0] + " arrows");
+            return shots[0] >= 10 && h.getTick() > 560;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {
