@@ -89,7 +89,9 @@ public final class BotManager {
                     var src = body.getLastDamageSource();
                     boolean gone = body.isInLava() || src != null && (src.is(net.minecraft.tags.DamageTypeTags.IS_FIRE) && body.isInLava()
                             || src.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD));
-                    bot.lastDeath = new Bot.Death(body.level().dimension(), body.blockPosition(), body.level().getGameTime(), !gone);
+                    bot.lastDeath = new Bot.Death(body.level().dimension(), body.blockPosition(), body.level().getGameTime(), !gone,
+                            src != null && src.getEntity() instanceof net.minecraft.world.entity.LivingEntity,
+                            net.kasax.challengecraft.bot.task.SurfaceTask.underground(body));
                 }
                 if (body.deathTime >= RESPAWN_DELAY) {
                     // The way a client asks to respawn (the respawn button): the network handler

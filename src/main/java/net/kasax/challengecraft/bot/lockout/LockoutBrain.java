@@ -136,12 +136,22 @@ public final class LockoutBrain implements BotBrain {
             // (Not back into the dark with bare hands, to whatever killed it there - unless close.)
             var lv = bot.body().level();
             boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside();
-            if (d.recoverable() && d.dimension() == bot.body().level().dimension() && age < 3600 && dist < (night ? 40 : 350)
+            // Not bare-handed back to what killed it where it still lurks (in a cave, or at night),
+            // and not to a spot deep under ground that takes digging to reach: those cost a second
+            // death more often than they bring the things back (0 of 10 on the benchmarks).
+            // The things lie there five minutes: the time is that, not more.
+            long left = 6000 - age - 200;
+            boolean lurking = d.byMob() && (d.underground() || night);
+            boolean deep = d.underground() && d.pos().getY() < bot.body().getY() - 12;
+            if (d.recoverable() && d.dimension() == bot.body().level().dimension() && left > dist * 6 && dist < (night ? 40 : 250)
+                    && !lurking && !deep
                     && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE)) == 0) {
                 bot.say("back for my things at " + d.pos().toShortString() + " (" + Math.round(dist) + " blocks)");
-                start(bot, new net.kasax.challengecraft.bot.task.RecoverTask(d.pos()), 600 + (long) (dist * 8));
+                start(bot, new net.kasax.challengecraft.bot.task.RecoverTask(d.pos()), Math.min(left, 600 + (long) (dist * 8)));
                 return;
             }
+            if (d.recoverable()) bot.say("my things at " + d.pos().toShortString() + " left there ("
+                    + (lurking ? "what killed me is still about" : deep ? "too deep to get at" : "too far for the time they lie") + ")");
         }
         // In a basalt delta with nothing to do there: out of it first. Magma cubes by the dozen,
         // magma underfoot, lava in every hollow - the Nether's deadliest ground.
@@ -1489,6 +1499,8 @@ public final class LockoutBrain implements BotBrain {
 
     private void takeChances(Bot bot) {
         if (bot.current() instanceof net.kasax.challengecraft.bot.task.EatTask) return;
+        // (Fetching its things: against the clock, no detours.)
+        if (running instanceof net.kasax.challengecraft.bot.task.RecoverTask) return;
         // Chests worth a detour: where the good loot is (iron in a shipwreck, flint and steel and
         // gold at a ruined portal, the temples' treasure), a few per structure, not every chest in
         // a mineshaft or a trial chamber full of spiders and silverfish.

@@ -68,7 +68,12 @@ public final class Bot {
     public final java.util.Map<FarLead, java.util.List<String>> farLeads = new java.util.HashMap<>();
 
     /** Where and when it last died, and whether its things can still be there (not in lava, not in the void). */
-    public record Death(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, net.minecraft.core.BlockPos pos, long time, boolean recoverable) {
+    /**
+     * Where and when it died; whether the things can be had back (not burnt, not in the void),
+     * whether a monster killed it (it may still be there) and whether that was under ground.
+     */
+    public record Death(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension, net.minecraft.core.BlockPos pos, long time, boolean recoverable,
+                        boolean byMob, boolean underground) {
     }
 
     public Death lastDeath;
