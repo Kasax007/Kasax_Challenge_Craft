@@ -18,7 +18,8 @@ public final class ThreatSense {
     private Vec3 dodge;
     private int dodgeUntil;
     /** For the benchmarks: dodges begun, steps round so a blow would not throw it into lava. */
-    public int dodges, standsTaken;
+    public int dodges, standsTaken, creeperEscapes;
+    private int creeperSaidAt = -1000;
     /** Where to stand so no blow throws it into lava, and when that was last looked at. */
     private Vec3 stand;
     private int standCheckAt;
@@ -33,6 +34,33 @@ public final class ThreatSense {
         if (!body.isAlive() || body.isPassenger() || body.isInWater() || body.isInLava()) {
             dodge = null;
             return;
+        }
+        // A creeper hissing close: before anything else, arrows too (its blast takes far more).
+        // Close and a shield on the arm: turned to it, behind the shield (it takes the blast);
+        // else away at a sprint - the fuse is a second and a half, the blast reaches some six blocks.
+        if (!bot.welcomeExplosion) {
+            for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(7),
+                    c -> c.isAlive() && c.getSwellDir() > 0)) {
+                double d = c.distanceTo(body);
+                if (d < 4 && body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)) {
+                    body.lookAt(c.getEyePosition());
+                    if (!body.isUsingItem()) body.gameMode.useItem(body, body.level(), body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
+                    bot.danger.steer(0, 0);
+                } else {
+                    Vec3 away = bot.openWayFrom(c.position(), 8).multiply(1, 0, 1);
+                    if (away.lengthSqr() < 1e-4) continue;
+                    away = away.normalize();
+                    body.lookAt(body.getEyePosition().add(away.scale(4)));
+                    bot.danger.run(away.x, away.z);
+                }
+                if (body.tickCount - creeperSaidAt > 30) {
+                    creeperSaidAt = body.tickCount;
+                    creeperEscapes++;
+                    bot.say("creeper hissing " + String.format("%.1f", d) + " blocks off: " + (d < 4 && body.isBlocking() ? "shield up" : "running"));
+                }
+                dodge = null;
+                return;
+            }
         }
         if (dodge != null) {
             if (body.tickCount > dodgeUntil) dodge = null;

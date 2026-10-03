@@ -65,7 +65,7 @@ public final class DangerSense {
     private final Bot bot;
     /** The task's keys, while the guard pressed others for one tick (given back before the next). */
     private float savedForward, savedStrafe;
-    private boolean savedJump, savedSneak, overridden;
+    private boolean savedJump, savedSneak, savedSprint, overridden;
     /** Ticks on end the guard has had to step in, and when it last said so. */
     private int streak, saidAt = -1000;
     /** How often it stepped in (for the benchmarks): braked, a jump not made, crouched at an edge or on magma. */
@@ -163,6 +163,7 @@ public final class DangerSense {
         body.strafe = savedStrafe;
         body.jump = savedJump;
         body.sneak = savedSneak;
+        body.sprintNow = savedSprint;
         overridden = false;
     }
 
@@ -270,6 +271,13 @@ public final class DangerSense {
         press(new Keys(wx, wz, false, false, false, false));
     }
 
+    /** Pressed for this tick by a reflex: a run that way, sprinting (facing it), checked by the guard after. */
+    void run(double wx, double wz) {
+        press(new Keys(wx, wz, false, false, true, false));
+        var body = bot.body();
+        if (body.forward > 0.8f) body.sprintNow = true;
+    }
+
     private boolean onMagma() {
         var body = bot.body();
         return body.onGround() && !body.hasEffect(MobEffects.FIRE_RESISTANCE)
@@ -314,6 +322,7 @@ public final class DangerSense {
             savedStrafe = body.strafe;
             savedJump = body.jump;
             savedSneak = body.sneak;
+            savedSprint = body.sprintNow;
             overridden = true;
         }
         double wx = k.wx, wz = k.wz;
