@@ -131,6 +131,47 @@ public final class BotPathfinder {
         this.flatCost = abilities.sprint() ? SPRINT : WALK;
     }
 
+    /** Monsters (and mob spawners) about when the search started: ways near them cost more (as Baritone's avoidance). */
+    private int[] threatXYZ = new int[0], spawnerXYZ = new int[0];
+
+    public BotPathfinder avoiding(List<BlockPos> monsters, List<BlockPos> spawners) {
+        threatXYZ = new int[monsters.size() * 3];
+        for (int i = 0; i < monsters.size(); i++) {
+            threatXYZ[3 * i] = monsters.get(i).getX();
+            threatXYZ[3 * i + 1] = monsters.get(i).getY();
+            threatXYZ[3 * i + 2] = monsters.get(i).getZ();
+        }
+        spawnerXYZ = new int[spawners.size() * 3];
+        for (int i = 0; i < spawners.size(); i++) {
+            spawnerXYZ[3 * i] = spawners.get(i).getX();
+            spawnerXYZ[3 * i + 1] = spawners.get(i).getY();
+            spawnerXYZ[3 * i + 2] = spawners.get(i).getZ();
+        }
+        return this;
+    }
+
+    /** How much dearer a step to here is for the monsters and spawners near it: up to four times close by a monster, twice within sixteen of a spawner. */
+    private double threatFactor(BlockPos p) {
+        double f = 1;
+        for (int i = 0; i < spawnerXYZ.length; i += 3) {
+            int dx = p.getX() - spawnerXYZ[i], dy = p.getY() - spawnerXYZ[i + 1], dz = p.getZ() - spawnerXYZ[i + 2];
+            if (dx * dx + dy * dy + dz * dz < 16 * 16) {
+                f = 2;
+                break;
+            }
+        }
+        // (Graded by how close: Baritone's flat 1.5 within eight blocks still leaves the straight
+        // way past a monster's nose the cheaper one - a way round has to be worth it.)
+        double m = 1;
+        for (int i = 0; i < threatXYZ.length; i += 3) {
+            int dx = p.getX() - threatXYZ[i], dy = p.getY() - threatXYZ[i + 1], dz = p.getZ() - threatXYZ[i + 2];
+            if (Math.abs(dy) >= 6) continue;
+            int d2 = dx * dx + dz * dz;
+            m = Math.max(m, d2 < 9 ? 4 : d2 < 25 ? 2.5 : d2 < 64 ? 1.5 : 1);
+        }
+        return f * m;
+    }
+
     public BotPathfinder favouring(java.util.Set<Long> path) {
         this.favoured = path;
         return this;
@@ -248,6 +289,8 @@ public final class BotPathfinder {
                 }
             }
             for (Step s : moves(n.pos, n.step != null && n.step.place() != null && n.step.place().equals(n.pos.below()))) {
+                // (Under a roof of water and rock: no breath there - not that way.)
+                if (s.breaks().isEmpty() && inWater(s.to()) && !breathAbove(s.to())) continue;
                 double cost = cost(n.pos, s) + (avoid.contains(s.to().asLong()) ? 400 : 0);
                 if (favoured.contains(s.to().asLong())) cost *= 0.5;
                 long key = s.to().asLong();
@@ -333,6 +376,8 @@ public final class BotPathfinder {
         // Along the edge of a deep drop (a ledge, a cliff over the lava sea): a knock-back there
         // is a long fall. A block in from the edge where there is room.
         else if (!escapeLava && besideDrop(s.to())) c += DROP_EDGE;
+        // Near monsters, a spawner: dearer (a way round them where there is one).
+        if (threatXYZ.length > 0 || spawnerXYZ.length > 0) c *= threatFactor(s.to());
         double digFactor = (inWater(from) && !solid(from.below()) ? 5 : 1) * (inWater(from.above()) ? 5 : 1);
         for (BlockPos b : s.breaks()) {
             double ticks = breakTicks(state(b));
@@ -502,7 +547,7 @@ public final class BotPathfinder {
         List<BlockPos> out = null;
         for (BlockPos c : cells) {
             if (clear(c)) continue;
-            if (!abilities.mayBreak() || !breakable(c) || liquidAround(c)) return null;
+            if (!abilities.mayBreak() || !breakable(c) || liquidAround(c) || avoidBreaking(c)) return null;
             if (out == null) out = new ArrayList<>(2);
             out.add(c);
         }
@@ -602,9 +647,34 @@ public final class BotPathfinder {
         return !s.getCollisionShape(NO_WORLD, p).isEmpty() && (!dangerous(s) || escapeLava && s.is(Blocks.MAGMA_BLOCK));
     }
 
+    /** Set when the search starts with the head under water already: any way out goes. */
+    private boolean underwaterStart;
+
+    public BotPathfinder fromUnderWater(boolean under) {
+        this.underwaterStart = under;
+        return this;
+    }
+
+    /**
+     * Head under water here only where air is straight above, not far (a lake, open water): not
+     * under a roof of rock (a flooded cave, an aquifer) - there the way runs on below the ceiling
+     * with no breath anywhere, and that drowned the bot fifteen times on one benchmark.
+     */
+    private boolean breathAbove(BlockPos p) {
+        if (underwaterStart || !inWater(p.above())) return true;
+        for (int i = 2; i <= 10; i++) {
+            BlockPos q = p.above(i);
+            if (!loaded(q)) return true;
+            if (inWater(q)) continue;
+            return clear(q);
+        }
+        return false;
+    }
+
     /** Whether feet at {@code p} stand on something (or swim). */
     boolean canStand(BlockPos p) {
-        if (inWater(p) || escapeLava && lava(p)) return true;
+        if (inWater(p)) return breathAbove(p);
+        if (escapeLava && lava(p)) return true;
         BlockPos below = p.below();
         if (!solid(below)) return false;
         BlockState s = state(below);
@@ -629,6 +699,22 @@ public final class BotPathfinder {
         float hardness = s.getDestroySpeed(NO_WORLD, p);
         if (hardness < 0 || hardness > 50) return false; // bedrock, obsidian and the like are walls
         return breakTicks(s) < 400;
+    }
+
+    /**
+     * Blocks better left (Baritone's rules): a silverfish's (it comes out and calls the others),
+     * ice (it turns to water), and one with sand or gravel beside it that nothing holds up - it
+     * slides into the gap, onto the head.
+     */
+    private boolean avoidBreaking(BlockPos p) {
+        BlockState s = state(p);
+        if (s.getBlock() instanceof net.minecraft.world.level.block.InfestedBlock || s.is(Blocks.ICE)) return true;
+        for (BlockPos q : new BlockPos[]{p.north(), p.south(), p.east(), p.west()}) {
+            if (!loaded(q) || !(state(q).getBlock() instanceof net.minecraft.world.level.block.FallingBlock)) continue;
+            BlockPos under = q.below();
+            if (loaded(under) && net.minecraft.world.level.block.FallingBlock.isFree(state(under))) return true;
+        }
+        return false;
     }
 
     /** Breaking here would let a liquid in (from above or a side). */

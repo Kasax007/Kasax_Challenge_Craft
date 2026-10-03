@@ -510,4 +510,43 @@ public class BotMovementTests {
             return h.getTick() > 300 && !body.isInWall();
         });
     }
+
+    /** A zombie standing on the straight way across (Baritone's mob avoidance): the way goes round it, a few blocks off. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void wayRoundMonster(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "way_round_monster");
+        var level = h.getLevel();
+        var z = net.minecraft.world.entity.EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.setNoAi(true);
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(20, FEET, 20)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        a.spawn(6, FEET, 20);
+        var body = a.bot().body();
+        double[] closest = {99};
+        a.run(new GoToTask(a.abs(34, FEET, 20), 1.0), 600, () -> {
+            closest[0] = Math.min(closest[0], body.distanceTo(z));
+            if (a.bot().current() != null) return false;
+            BotArena.LOG.info("[BOTTEST] way_round_monster closest {}", closest[0]);
+            h.assertTrue(closest[0] > 3.5, "way_round_monster: passed within " + closest[0] + " of the zombie");
+            return body.getX() > a.abs(32, 0, 0).getX();
+        });
+    }
+
+    /** A flooded tunnel through a thick wall (water under rock, no air) or the long way round dry: the dry way. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void floodedTunnelAvoided(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "flooded_tunnel_avoided");
+        a.fill(14, FEET, 6, 26, FEET + 4, 39, Blocks.BEDROCK);
+        a.fill(14, GROUND - 1, 20, 26, FEET + 1, 20, Blocks.WATER);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        boolean[] dived = {false};
+        a.run(new GoToTask(a.abs(32, FEET, 20), 1.5), 1200, () -> {
+            if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) dived[0] = true;
+            h.assertTrue(!dived[0], "flooded_tunnel_avoided: dived into the tunnel");
+            return a.bot().current() == null && body.getX() > a.abs(30, 0, 0).getX();
+        });
+    }
 }

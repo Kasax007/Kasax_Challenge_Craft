@@ -454,6 +454,26 @@ public final class BotNavigator {
             }
             return status;
         }
+        // Sand or gravel still coming down where it is going (a column dug under): wait till it
+        // has landed, as Baritone does - not into the gap under it.
+        if (!bot.level().getEntitiesOfClass(net.minecraft.world.entity.item.FallingBlockEntity.class,
+                new net.minecraft.world.phys.AABB(to).inflate(1, 0, 1).expandTowards(0, 4, 0)).isEmpty()) {
+            bot.stopInputs();
+            stuck = 0;
+            return status;
+        }
+        // The next few steps still as planned (Baritone's look-ahead): lava run across the way,
+        // a block fallen in - a new way now, not on walking up to it.
+        if (bot.tickCount % 5 == 0) {
+            for (int i = index + 1; i < Math.min(path.size(), index + 6); i++) {
+                BotPathfinder.Step next = path.get(i);
+                if (next.leap()) break;
+                if (!stillValid(next, path.get(i - 1).to())) {
+                    dropPath("ahead " + next.to().toShortString());
+                    return status;
+                }
+            }
+        }
         if (step.leap()) return leap(to, feet);
         // The world still as planned for this step? (A block put or broken since, water run in.)
         if (!stillValid(step, feet)) {
@@ -868,6 +888,39 @@ public final class BotNavigator {
         dropPath("guard");
     }
 
+    /**
+     * The monsters about (Baritone's mob avoidance): ways near them cost more. Not the ones near
+     * where it is going - that one it means to reach (a hunt).
+     */
+    private java.util.List<BlockPos> monstersAbout(ServerLevel level, BlockPos from) {
+        java.util.List<BlockPos> out = new java.util.ArrayList<>();
+        BlockPos dest = target;
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(from).inflate(64, 24, 64),
+                m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+            if (dest != null && m.blockPosition().distSqr(dest) < 12 * 12) continue;
+            out.add(m.blockPosition());
+            if (out.size() >= 32) break;
+        }
+        return out;
+    }
+
+    /** Mob spawners (dungeons, mineshafts, trial chambers) in the chunks about. */
+    private static java.util.List<BlockPos> spawnersAbout(ServerLevel level, BlockPos from) {
+        java.util.List<BlockPos> out = new java.util.ArrayList<>();
+        int cx = from.getX() >> 4, cz = from.getZ() >> 4;
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                var chunk = level.getChunkSource().getChunkNow(cx + dx, cz + dz);
+                if (chunk == null) continue;
+                for (var be : chunk.getBlockEntities().values()) {
+                    if (be instanceof net.minecraft.world.level.block.entity.SpawnerBlockEntity
+                            || be instanceof net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity) out.add(be.getBlockPos());
+                }
+            }
+        }
+        return out;
+    }
+
     /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
     private void dropPath(String why) {
         if (path != null && index < path.size()) {
@@ -922,6 +975,8 @@ public final class BotNavigator {
         else if (!ahead && rest != null) favoured.addAll(rest);
         if (!ahead) for (long a : avoid) favoured.remove(a);
         BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf);
+        finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
+        finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
         var guideFuture = guide(level, from);
         if (guideFuture != null && guideFuture.isDone()) finder.guided(guideOf(guideFuture));
         Predicate<BlockPos> g = goal;
