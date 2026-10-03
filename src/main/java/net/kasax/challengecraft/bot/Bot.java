@@ -249,6 +249,24 @@ public final class Bot {
             actions.breakTick(q);
             return;
         }
+        // Still on something (a pig, a horse, a boat) with no task that wants to ride: off at
+        // once - a rider cannot walk, and every way it sets out on goes nowhere.
+        // (Five seconds' grace: between the steps of a ride - mount, sit - nothing is meant by it.)
+        boolean meantToRide = tasks.stream().anyMatch(t -> {
+            BotTask in = BotTask.innermost(t);
+            return t instanceof net.kasax.challengecraft.bot.task.RideTask || in instanceof net.kasax.challengecraft.bot.task.RideTask
+                    || t instanceof net.kasax.challengecraft.bot.task.WaitTask || in instanceof net.kasax.challengecraft.bot.task.WaitTask
+                    || in instanceof net.kasax.challengecraft.bot.task.UseOnMobTask;
+        });
+        if (body.isPassenger() && !meantToRide) {
+            if (++riddenIdle > 100) {
+                say("still riding a " + body.getVehicle().getType().toShortString() + ": off");
+                body.stopRiding();
+                // (The way on, worked out again from the ground: the saddle was a block higher.)
+                navigator.rethinkWay();
+                riddenIdle = 0;
+            }
+        } else riddenIdle = 0;
         watchdog();
         // (A fall of more than four: what it was doing then, for the log - falls are the
         // commonest death after lava, and seldom a planned step.)
@@ -354,6 +372,8 @@ public final class Bot {
     }
 
     private boolean fallLogged;
+    /** Ticks on a mount with no task that means to ride. */
+    private int riddenIdle;
     private net.minecraft.core.BlockPos lastGround;
 
     /** Where it was when it last got anywhere, and when (see {@link #watchdog()}). */

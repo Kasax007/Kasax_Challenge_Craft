@@ -343,6 +343,20 @@ public class BotStuntTests {
         });
     }
 
+    /** Left sitting on a pig (a ride cut short) and sent somewhere: it gets off and walks there. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void offThePig(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "off_the_pig");
+        var pig = EntityTypes.PIG.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        pig.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(10, FEET, 20)));
+        h.getLevel().addFreshEntity(pig);
+        a.spawn(10, FEET, 20);
+        var body = a.bot().body();
+        body.startRiding(pig, true, true);
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(30, FEET, 20), 1.5), 600,
+                () -> body.getVehicle() == null && a.bot().current() == null && body.getX() > a.abs(28, 0, 0).getX());
+    }
+
     /** A ghast in the sky: its fireball hit back at it, and it dies of it. */
     // (A batch of its own: it turns the difficulty up, and wants room for the ghast.)
     @GameTest(environment = "challengecraft:ghast", structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 30)

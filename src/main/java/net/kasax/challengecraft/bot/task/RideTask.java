@@ -52,7 +52,9 @@ public final class RideTask implements BotTask {
             // Long enough on it to count, then off where it is safe to step down.
             if (++riding < 60) return Result.RUNNING;
             if (safeToStepOff(body)) {
-                body.sneak = true;
+                // (Off directly: the crouch key alone does it for a client player, whose client
+                // asks the server; a bot has none, and stayed on the pig.)
+                body.stopRiding();
                 return Result.RUNNING;
             }
             return riding > 2400 ? Result.FAILED : Result.RUNNING;
