@@ -1379,3 +1379,73 @@ plus Aufgabe, z. B. `kit:get cobblestone` oder `goal:kill_drowned`.
 
 **Noch offen in L2:** Laufwege der Mobs voraus und Creeper-Zündung über die Zeit bis zum
 Kontakt.
+
+### 17.4 Aus den Messungen nachgelegt
+
+**L10 Taktikbuch, erster Eintrag: Magmawürfel und Schleime**
+
+- **Ausgangslage:** Im ersten Feldtest kamen 9 von 11 Toden von Magmawürfeln. Bob schlug jeden
+  zuerst; ein großer Würfel zerfällt in 2–4 mittlere und die wieder in 2–4 kleine. Der Schwarm
+  reibt Bob auf.
+- **Regel:** Würfel, die kein Ziel braucht, schlägt Bob nicht zuerst. Ist er schon im Kampf
+  (getroffen in den letzten 10 s), schlägt er auch die Abspaltungen zuerst.
+- **Flucht** nur vor einem Schwarm: ab 4 Würfeln oder ab 3, wenn er schon verletzt ist. Gegen
+  einen oder zwei Würfel ist Flucht schlechter, sie springen schneller hinterher, als Bob läuft
+  (gemessen).
+- **Test `brawl_magma_pair`** (zwei große Würfel, HARD):
+
+  | Stand | Bestanden | Verlust je bestandenem Lauf |
+  | --- | --- | --- |
+  | vorher | 2 von 3 | ~11 Herzen |
+  | jetzt | 3 von 5 | 3,6 / 4,6 / 10 Herzen |
+
+**L9 Nether-Gefahrenkarte, Teil 1**
+
+- Ist Bob in einem Basaltdelta und will kein offenes Feld etwas von dort, geht er zuerst hinaus:
+  zur nächsten anderen Biom-Stelle, die er in Ringen um sich herum findet.
+- **Rückstoß vorhergesehen**, auch außerhalb eines Kampfes: Würde der Schlag eines nahen Gegners
+  Bob in Lava werfen, stellt er sich vorher um.
+
+**Schleifenbrecher unter dem Großhirn**
+
+- Auf Seed 77 scheiterte „Rote Bete holen“ 1089-mal: Sie war als Bezahlung für einen Bauern
+  gewählt, aber nicht beschaffbar.
+- **Allgemein:** Scheitert dieselbe Teilaufgabe 10-mal in 30 s, endet die ganze Erledigung als
+  Fehlschlag, und das Großhirn verhängt seine Pause.
+- **Beim Handel:** Ein Zahlungsmittel, das zweimal nicht zu beschaffen war, wird nicht mehr
+  gewählt.
+
+### 17.5 Messungen
+
+**90 min HARD, Live-Seed −8848941644679110190**
+
+| Stand | Felder | Tode | Eisen | Eimer |
+| --- | --- | --- | --- | --- |
+| vorher | 10 | 7 | 489 s | 1710 s |
+| L1–L3 | 10 | 3 | 144 s | 196 s |
+
+- Größter Zeitfresser: `craft_dropper` mit 1103 s; Redstone in der Tiefe, 2 Tode durch Zombie
+  und Enderman.
+
+**90 min HARD, Seed 77 (L1–L3 und Würfel-Taktik, ohne die Schleifenbrecher)**
+
+- 15 Felder, 6 Tode.
+- Davon über 1000 Fehlschläge in der Rote-Bete-Schleife, inzwischen behoben.
+
+**Nether-Feldtest, 40 Ziele, Start im Basaltdelta**
+
+| Lauf | Felder | Tode |
+| --- | --- | --- |
+| Runde 9, Lauf 1 | 13 | 19 |
+| Runde 9, Lauf 2 | 17 | 8 |
+| Runde 9, Lauf 3 | 16 | 16 |
+| L1–L3 | 13 | 11 (9 Magmawürfel) |
+| mit L9 und Würfel-Taktik | 15 | 4 (3 Magmawürfel, 1 Lava) |
+
+**Als Nächstes:**
+
+- L5 schlauer Neustart;
+- L2 Teil 2 (Mob-Laufwege, Creeper-Zeit bis Kontakt);
+- L7 Eisen über Höhlen (das Eisen kommt jetzt schon nach 144 s; offen ist das Graben in der
+  Tiefe, also Redstone und Diamant);
+- L8 lernende Schätzungen aus der Cortex-Bilanz.
