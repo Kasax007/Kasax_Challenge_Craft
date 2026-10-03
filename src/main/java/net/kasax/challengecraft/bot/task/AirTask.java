@@ -13,6 +13,8 @@ import net.minecraft.tags.FluidTags;
  */
 public final class AirTask implements BotTask {
     private boolean started;
+    /** Ticks with the head out, catching breath. */
+    private int breathing;
     private int ticks, fails, stuck;
     private boolean digging;
     private net.minecraft.world.phys.Vec3 last;
@@ -26,7 +28,23 @@ public final class AirTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
-        if (!bot.body().isEyeInFluid(FluidTags.WATER)) return Result.DONE;
+        var b = bot.body();
+        // Head out: there until the lungs are nearly full again - a breath and straight back
+        // under (the way on leads through the water) and the next breath is shorter, until
+        // there is none. Meanwhile still, afloat (head kept up) or standing.
+        if (!b.isEyeInFluid(FluidTags.WATER)) {
+            if (b.getAirSupply() >= b.getMaxAirSupply() * 9 / 10 || ++breathing > 200) return Result.DONE;
+            bot.navigator().stop();
+            b.stopInputs();
+            if (b.isInWater()) b.jump = true;
+            return Result.RUNNING;
+        }
+        if (breathing > 0 && b.getAirSupply() >= b.getMaxAirSupply() / 2) {
+            // (Bobbing under for a moment while waiting at the surface: up again, no new search.)
+            b.stopInputs();
+            b.jump = true;
+            return Result.RUNNING;
+        }
         if (++ticks > (digging ? 1600 : 400)) return Result.FAILED;
         ServerLevel level = (ServerLevel) bot.body().level();
         // Not getting anywhere (a flooded gap one block high, a block on top): straight up,

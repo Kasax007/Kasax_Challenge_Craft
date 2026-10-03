@@ -479,4 +479,21 @@ public class BotMovementTests {
             return h.getTick() > 200 && body.getX() > a.abs(18, 0, 0).getX();
         });
     }
+
+    /** A walk along the bed of a long, deep lake (ten deep, thirty long): up for breath on the way, never drowned. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void longLakeBed(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "long_lake_bed");
+        a.fill(4, GROUND - 10, 16, 36, GROUND, 24, Blocks.STONE);
+        a.fill(5, GROUND - 9, 17, 35, GROUND, 23, Blocks.WATER);
+        a.spawn(6, GROUND - 9, 20);
+        var body = a.bot().body();
+        float[] low = {20};
+        a.run(new GoToTask(a.abs(34, GROUND - 9, 20), 1.0), 2400, () -> {
+            if (a.bot().body() != body) h.fail("long_lake_bed: drowned");
+            low[0] = Math.min(low[0], body.getHealth());
+            h.assertTrue(low[0] > 10, "long_lake_bed: nearly drowned, hp " + low[0]);
+            return a.bot().current() == null && h.getTick() > 100;
+        });
+    }
 }
