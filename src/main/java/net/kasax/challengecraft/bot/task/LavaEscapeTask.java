@@ -44,6 +44,8 @@ public final class LavaEscapeTask implements BotTask {
             if (walking) bot.navigator().stop();
             return Result.FAILED;
         }
+        if (ticks == 1) bot.say("burning (" + (body.isInLava() ? "in lava" : body.onGround() && level.getBlockState(body.getOnPos()).is(Blocks.MAGMA_BLOCK)
+                ? "on magma" : "in fire") + ") at " + body.blockPosition().toShortString() + ": out");
         if (firm == null) firm = nearestFirm(level, body.blockPosition());
         // Firm ground a step or two off: straight for it, jumping (a path through the lava is
         // walked no faster, and every tick in there burns).

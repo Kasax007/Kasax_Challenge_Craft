@@ -37,6 +37,11 @@ public final class KillTask implements BotTask {
     private boolean dodging;
 
     private final Set<EntityType<?>> types;
+
+    /** Whether this hunt is after that kind of creature (it is the job, not a nuisance on the way). */
+    public boolean after(EntityType<?> type) {
+        return types.contains(type);
+    }
     private final Set<Item> loot;
     private final int count, kills;
     private final Set<java.util.UUID> unreachable = new java.util.HashSet<>();

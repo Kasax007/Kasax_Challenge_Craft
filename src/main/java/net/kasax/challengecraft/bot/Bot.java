@@ -585,6 +585,24 @@ public final class Bot {
                     b -> b.body().blockPosition(), 600));
             return;
         }
+        // Magma cubes and slimes not wanted for anything: not fought - a big one splits in two to
+        // four, each of those again, and the swarm wears the hearts down (the Nether's commonest
+        // killer after lava). Hit with a swarm about: away from them instead.
+        // (Unless a hunt is after them: then that is the job.)
+        if (attacker instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob cube && attacker.isAlive() && !cornered
+                && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && !hunting(attacker.getType())) {
+            int cubes = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.cubemob.AbstractCubeMob.class,
+                    body.getBoundingBox().inflate(8), net.minecraft.world.entity.LivingEntity::isAlive).size();
+            // (One or two that are at it already: fought - they leap faster than it runs.)
+            if (cubes >= 4 || cubes >= 3 && body.getHealth() < 14) {
+                net.minecraft.world.phys.Vec3 away = openWayFrom(cube.position(), 14);
+                actions.reset();
+                say(cubes + " " + cube.getType().toShortString() + "s about me: away from the swarm, not a fight");
+                retreat = new net.kasax.challengecraft.bot.task.GoToTask(net.minecraft.core.BlockPos.containing(body.position().add(away)), 3).sprinting();
+                reflex(retreat);
+                return;
+            }
+        }
         boolean fromPillar = attacker != null && net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, attacker)
                 && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this);
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !fromPillar && (body.getHealth() > 7 || cornered)
@@ -599,6 +617,11 @@ public final class Bot {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
                     m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
                             && !(m instanceof net.minecraft.world.entity.monster.Creeper) && Math.abs(m.getY() - body.getY()) < 2.5 && body.hasLineOfSight(m)
+                            // (Not a magma cube or a slime nobody wants, left alone: they split, and the swarm is worse.)
+                            // (Once in a fight with them, though - hit in the last ten seconds - the splits are
+                            // hit first like anything else: waiting for their blows only costs hearts.)
+                            && !(m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob && !hunting(m.getType())
+                                    && body.tickCount - body.getLastHurtByMobTimestamp() > 200)
                             && !(net.kasax.challengecraft.bot.task.PillarFightTask.wanted(this, m) && net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)))) {
                 actions.reset();
                 reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(12));
@@ -614,6 +637,17 @@ public final class Bot {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.EatTask());
         }
+    }
+
+    /** Whether a task on the stack hunts this kind (then meeting one is the job). */
+    private boolean hunting(net.minecraft.world.entity.EntityType<?> type) {
+        for (BotTask t : tasks) {
+            BotTask in = BotTask.innermost(t);
+            if (t instanceof net.kasax.challengecraft.bot.task.KillTask k && k.after(type)
+                    || in instanceof net.kasax.challengecraft.bot.task.KillTask k2 && k2.after(type)) return true;
+            if (t instanceof net.kasax.challengecraft.bot.task.HuntRoundTask) return true;
+        }
+        return false;
     }
 
     /** A weapon (sword or axe) in the pack. */
