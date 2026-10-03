@@ -858,6 +858,16 @@ public final class BotNavigator {
     public final java.util.Map<String, Integer> dropReasons = new java.util.TreeMap<>();
     public int waitTicks;
 
+    /**
+     * The guard has kept the bot from the next steps for a second (they lead into lava, over a
+     * drop that hurts): that step left out, and another way looked for.
+     */
+    public void guardStop() {
+        if (path != null && index < path.size()) avoid.add(path.get(index).to().asLong());
+        stuck = 0;
+        dropPath("guard");
+    }
+
     /** Drops the path (the world turned out different, stuck): a new search from where it stands. */
     private void dropPath(String why) {
         if (path != null && index < path.size()) {

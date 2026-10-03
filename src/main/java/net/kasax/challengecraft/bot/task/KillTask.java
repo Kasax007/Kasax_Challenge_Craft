@@ -62,6 +62,11 @@ public final class KillTask implements BotTask {
         this.kills = kills;
     }
 
+    /** Where a blow would not throw it into lava or off an edge (looked for every few ticks), and whether here would. */
+    private net.minecraft.world.phys.Vec3 safeSpot;
+    private boolean unsafe;
+    private int safeCheckAt;
+
     /** Just this one (the monster that came for it), not the nearest of its kind. */
     private java.util.UUID only;
 
@@ -216,6 +221,29 @@ public final class KillTask implements BotTask {
                 // of its arms - and circled round meanwhile (side to side, a new side now and
                 // then or at a wall), as players fight: what comes at it walks into the blow.
                 // (A magma cube or a slime: at the very edge of reach, it leaps the gap.)
+                // By lava or a drop: every blow throws it back a block or two - so not with that
+                // at its back. Round to where a blow lands it on firm ground first (as a player
+                // turns a fight so the lava is to his side), else back off away from the lava.
+                if (bot.danger.lavaNear(6) || edgeNear(body)) {
+                    if (body.tickCount >= safeCheckAt) {
+                        safeCheckAt = body.tickCount + 5;
+                        safeSpot = bot.danger.thrown(target, body.position()).safe() ? null : bot.danger.saferStand(target);
+                        unsafe = safeSpot != null || !bot.danger.thrown(target, body.position()).safe();
+                    }
+                    if (unsafe) {
+                        net.minecraft.world.phys.Vec3 way = safeSpot != null ? safeSpot.subtract(body.position()) : bot.danger.awayFromHot();
+                        if (way.horizontalDistanceSqr() > 0.04) {
+                            way = way.multiply(1, 0, 1).normalize();
+                            double yaw = Math.toRadians(body.getYRot());
+                            double sin = Math.sin(yaw), cos = Math.cos(yaw);
+                            body.forward = (float) Mth.clamp(way.x * -sin + way.z * cos, -1, 1);
+                            body.strafe = (float) Mth.clamp(way.x * cos + way.z * sin, -1, 1);
+                            body.jump = false;
+                            keepFooting(body);
+                            return Result.RUNNING;
+                        }
+                    }
+                } else unsafe = false;
                 boolean cubeMob = target instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob;
                 double want = cubeMob ? 2.85 : pack >= 2 ? 2.75 : 2.55;
                 body.forward = (float) Mth.clamp((hit - want) * 2.5, -1, 1);

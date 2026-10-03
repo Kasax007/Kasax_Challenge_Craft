@@ -24,6 +24,8 @@ public final class Bot {
     private final BotSenses senses = new BotSenses();
     /** Where things are, as read from the world around it; kept across deaths. */
     private final BotMemory memory = new BotMemory();
+    /** Lava, fire and drops about it, and the guard over its own moves (see {@link DangerSense}). */
+    public final DangerSense danger = new DangerSense(this);
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
     /**
@@ -216,6 +218,13 @@ public final class Bot {
 
     void tick() {
         if (!body.isAlive()) return;
+        danger.restore();
+        act();
+        // Last, the keys pressed: where they lead worked out, and not pressed if that is into harm.
+        danger.guard();
+    }
+
+    private void act() {
         senses.tick(body);
         memory.tick(body);
         if (body.tickCount % 10 == 0) layTrail();
@@ -655,6 +664,14 @@ public final class Bot {
                     ground = !st.getCollisionShape(body.level(), q).isEmpty() || !st.getFluidState().isEmpty()
                             && st.getFluidState().is(net.minecraft.tags.FluidTags.WATER);
                     if (st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) break;
+                }
+                // (Nor into lava or fire at the feet, or beside the way: a run along a lava sea's
+                // shore is one stumble from the end.)
+                if (ground) {
+                    net.minecraft.core.BlockPos feetAt = col.above();
+                    net.minecraft.core.BlockPos side = net.minecraft.core.BlockPos.containing(-dir.z, 0, dir.x);
+                    if (DangerSense.hotCell(body.level(), feetAt) || DangerSense.hotCell(body.level(), feetAt.offset(side))
+                            || DangerSense.hotCell(body.level(), feetAt.subtract(side))) ground = false;
                 }
                 if (!ground) {
                     free = k - 1;

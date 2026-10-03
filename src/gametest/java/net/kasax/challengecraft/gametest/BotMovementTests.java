@@ -419,4 +419,64 @@ public class BotMovementTests {
             return (a.bot().current() == null || h.getTick() > 800) && body.isAlive();
         });
     }
+
+    /** A task that only holds the keys down: straight on east, sprinting (and jumping, if asked) - whatever lies ahead. */
+    private static net.kasax.challengecraft.bot.BotTask blindRun(boolean jump) {
+        return new net.kasax.challengecraft.bot.BotTask() {
+            @Override
+            public Result tick(net.kasax.challengecraft.bot.Bot bot) {
+                var body = bot.body();
+                body.setYRot(-90f);
+                body.setYHeadRot(-90f);
+                body.forward = 1f;
+                body.sprintNow = true;
+                body.jump = jump;
+                return Result.RUNNING;
+            }
+
+            @Override
+            public String describe() {
+                return "running blind";
+            }
+        };
+    }
+
+    /** Lava at the feet's height ahead and a task that runs straight at it: the guard stops him short. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void guardLavaAhead(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "guard_lava_ahead");
+        a.fill(20, FEET, 10, 26, FEET, 30, Blocks.LAVA);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        a.run(blindRun(false), 300, () -> {
+            h.assertTrue(!body.isInLava() && !body.isOnFire(), "guard_lava_ahead: into the lava at " + body.position());
+            return h.getTick() > 200 && body.getX() > a.abs(14, 0, 0).getX();
+        });
+    }
+
+    /** A lava pit (the floor gone) ahead, run at with jumps: no jump or step carries him in. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void guardLavaPitJumping(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "guard_lava_pit_jumping");
+        a.fill(20, GROUND, 10, 26, GROUND, 30, Blocks.LAVA);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        a.run(blindRun(true), 300, () -> {
+            h.assertTrue(!body.isInLava() && !body.isOnFire(), "guard_lava_pit_jumping: into the lava at " + body.position());
+            return h.getTick() > 200 && body.getX() > a.abs(17, 0, 0).getX();
+        });
+    }
+
+    /** A cliff ten deep ahead, sprinted at: he stops at the edge. */
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void guardCliff(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "guard_cliff");
+        a.fill(20, GROUND - 10, 0, 39, GROUND, 39, Blocks.AIR);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        a.run(blindRun(false), 300, () -> {
+            h.assertTrue(body.getY() > a.abs(0, FEET, 0).getY() - 0.7, "guard_cliff: over the edge at " + body.position());
+            return h.getTick() > 200 && body.getX() > a.abs(18, 0, 0).getX();
+        });
+    }
 }

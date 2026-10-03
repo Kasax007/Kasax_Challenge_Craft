@@ -935,6 +935,26 @@ public class BotStuntTests {
         });
     }
 
+    /** A zombie coming at him with a lava pit at his back: the fight turned so no blow throws him in. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void brawlByLava(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "brawl_by_lava");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        a.fill(10, BotArena.GROUND, 10, 16, BotArena.GROUND, 30, Blocks.LAVA);
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(24, FEET, 20)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        a.spawn(18, FEET, 20, new ItemStack(Items.IRON_SWORD));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1150), 1150, () -> {
+            h.assertTrue(!body.isInLava() && body.isAlive(), "brawl_by_lava: into the lava");
+            return !z.isAlive() || h.getTick() > 1100;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {
