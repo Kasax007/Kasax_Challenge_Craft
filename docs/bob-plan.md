@@ -1474,3 +1474,54 @@ Kontakt.
 
 **Verworfen:** Deckung schon ab 16 Herzen gegen zwei oder mehr Schützen. Im Test mit zwei
 Skeletten bestand der neue Stand 0 von 3 Läufen, der alte 1 von 3; kein Nutzen belegt.
+
+## 18. Runde 12: Woran Bob jetzt stirbt – und dagegen
+
+**Datengrundlage:** 25 Tode aus den neuen Läufen (Seeds 1234, 77, 4242), ausgewertet nach
+Ursache, Ort, Tiefe und laufender Aufgabe.
+
+| Befund | Ursache | Lösung | Beleg |
+| --- | --- | --- | --- |
+| 4 Tode durch Ertrinken, zweimal mitten in „Luft holen“ | Die Luft-Aufgabe galt als erledigt, sobald der Kopf einen Tick lang aus dem Wasser ragte. Der Navigator tauchte sofort wieder ab; mit jedem Auftauchen blieb weniger Luft. | Bob bleibt oben, bis die Luft wieder zu 90 % voll ist. | Test `long_lake_bed`: Auftauchen 29× → 5× |
+| 2 Tode durch Ersticken, beide nach Kies-Abbau für Feuerstein | Kein Reflex dafür | Neuer Reflex: Kopf im Block → sofort freigraben, vor allem anderen | Test `buried_in_gravel`: alt erstickt, neu frei |
+| 49 Tode auf Seed 77, davon 41 durch Zombies | Spawn-Camping: Nach jedem Tod stand Bob ohne Waffe an seinem Bett, um das nachts Zombies standen. Er wehrte sich mit Fäusten, schon ab 7 Herzen. | Ohne Waffe gegen Nahkämpfer flieht Bob weit (32 Blöcke), statt zu kämpfen. | Seed 77: 49 → 2 Tode, Seed 1234: 10 → 1 |
+| Flucht hängt fest, Bob wird weiter getroffen | Kein Abbruch einer festgefahrenen Flucht | Kommt die Flucht nicht voran und Bob wird getroffen, bricht er sie ab; er gilt als in die Enge getrieben und wehrt sich. | Test `unarmed_zombies` |
+| 2 Creeper-Tode ohne jede Reaktion | Die Reflexe für Creeper und Rückzug schwiegen, solange irgendeine Lauf-Aufgabe oben lag – nicht nur der eigene Rückzug. | Ausnahme nur noch für den eigenen Rückzug; Bob sagt, wovor er wegläuft. | Test `creeper_on_the_way`: 2 von 3 bestanden, alt ebenso; die Lücke im Benchmark-Log ist geschlossen. |
+| Sachen holen: 0 von 10 Versuchen erfolgreich, mehrere Zweit-Tode | Abstecher unterwegs; mit leeren Händen zurück zum Mob, der Bob gerade getötet hat; zu tief unter Tage | Neuer Teil von L5, siehe unten | – |
+
+**L5 schlauer Neustart:** Bob holt seine Sachen nur, wenn es sicher und machbar ist.
+
+- Nicht, wenn ein Mob ihn getötet hat und er unter Tage oder in der Nacht starb.
+- Nicht, wenn die Sachen deutlich tiefer liegen als der Wiedereinstiegspunkt.
+- Nur, wenn er in der verbleibenden Liegezeit (5 min) hinkommt.
+- Unterwegs keine Abstecher.
+
+**L8 lernende Schätzungen:** Das Großhirn glaubt einer Schätzung, was das laufende Spiel gezeigt
+hat:
+
+- Jeder Fehlschlag zählt die Schätzung einmal mehr.
+- Nie schneller als im Mittel tatsächlich gebraucht.
+
+Gilt für Bündel, Essen und alle Felder. Auf Seed 77 kostete das Bündel 594 s, geschätzt waren
+~120 s.
+
+**Testarena:** `BotArena.wide` verlängert den Boden um 20 Blöcke in jede Richtung, damit Fluchttests
+nicht an der Arenakante enden.
+
+**Verworfen:** Deckung ab 16 Herzen gegen mehrere Schützen. Im Test bestand der neue Stand 0 von 3
+Läufen, der alte 1 von 3; kein Nutzen belegt.
+
+### 18.1 Messungen, 90 min HARD
+
+| Seed | Alt (`c209711`): Felder | Alt: Tode | Neu: Felder | Neu: Tode |
+| --- | --- | --- | --- | --- |
+| Live | 10 | 7 | 12 | 5 |
+| 77 | 10 | 8 | 10 | 2 |
+| 4242 | 1 | 29 | 2 | 4 |
+| 1234 | 6 | 1 | 5 | 1 |
+| **Summe** | **27** | **45** | **29** | **12** |
+
+Live-Seed und 4242 liefen noch ohne Fluchtregel.
+
+**Befund:** Die Tode sind auf ein Viertel gefallen. Der Engpass ist jetzt das Tempo: Fehlschläge
+bei Besorgungen und Feldern (Bündel, Bogen, Moos) und lange Wege.
