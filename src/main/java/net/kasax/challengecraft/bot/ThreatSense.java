@@ -73,6 +73,8 @@ public final class ThreatSense {
         if (bot.current() instanceof net.kasax.challengecraft.bot.task.GhastDeflectTask) return;
         AABB me = body.getBoundingBox();
         for (Projectile p : body.level().getEntitiesOfClass(Projectile.class, me.inflate(24), pr -> pr.isAlive() && pr.getOwner() != body)) {
+            // (Behind a raised shield, facing it: the shield takes it.)
+            if (body.isBlocking() && p.getDeltaMovement().dot(body.getLookAngle()) < 0) continue;
             int hit = hitsIn(p, me.inflate(0.35));
             // Too late to get out of the way (it hits within three ticks), or not coming: nothing to do.
             if (hit < 3 || hit > 20) continue;

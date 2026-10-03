@@ -1025,6 +1025,32 @@ public class BotStuntTests {
         });
     }
 
+    /** A skeleton fourteen blocks off (hard), sword and shield: closed in behind the shield, little lost. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 24)
+    public void shieldChargeSkeleton(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "shield_charge_skeleton");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(30, FEET, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(16, FEET, 20, new ItemStack(Items.IRON_SWORD));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(sk), 1000, () -> {
+            low[0] = Math.min(low[0], body.getHealth());
+            h.assertTrue(body.isAlive(), "shield_charge_skeleton: dead");
+            if (sk.isAlive()) return false;
+            h.assertTrue(20 - low[0] <= 6, "shield_charge_skeleton: lost " + (20 - low[0]));
+            BotArena.LOG.info("[BOTTEST] shield_charge_skeleton lost {} health", 20 - low[0]);
+            return true;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {

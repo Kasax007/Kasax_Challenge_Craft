@@ -315,7 +315,6 @@ public final class KillTask implements BotTask {
             }
             return Result.RUNNING;
         }
-        if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD)) body.releaseUsingItem();
         crit = 0;
         // A shooter (skeleton, stray, pillager) in sight on open ground: straight at it at a run,
         // a step aside each time its bow is drawn full (the arrow goes where it stood), as a
@@ -324,7 +323,27 @@ public final class KillTask implements BotTask {
         // (Straight runs only over safe ground: the way to it checked a few steps ahead for a
         // drop or lava - else the path search, which knows the way round.)
         boolean openGround = groundTo(body, target);
-        if (shooter && openGround && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target)) {
+        boolean charge = shooter && openGround && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target);
+        boolean shieldOn = body.getOffhandItem().is(Items.SHIELD);
+        // (The shield down, unless it is held up running at a shooter: it needs a quarter second
+        // up before it blocks, so it is not lowered and raised again each tick.)
+        if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD) && !(charge && shieldOn)) body.releaseUsingItem();
+        if (charge && shieldOn) {
+            // With a shield: up and walk straight at it - the arrows hit the shield (a bot is not
+            // slowed holding it, only kept from sprinting), lowered in reach for the blow.
+            if (walking) {
+                bot.navigator().stop();
+                walking = false;
+            }
+            body.lookAt(target.getEyePosition());
+            if (!body.isUsingItem()) body.gameMode.useItem(body, level, body.getOffhandItem(), InteractionHand.OFF_HAND);
+            body.forward = 1f;
+            body.strafe = 0f;
+            body.sprintNow = false;
+            body.jump = body.horizontalCollision;
+            return Result.RUNNING;
+        }
+        if (charge) {
             if (walking) {
                 bot.navigator().stop();
                 walking = false;
