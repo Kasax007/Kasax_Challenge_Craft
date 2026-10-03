@@ -1578,11 +1578,20 @@ public final class LockoutBrain implements BotBrain {
         // A tile that wants several different things (three kinds of flower): one more kind right
         // beside the way is a few seconds, and a third of that tile done.
         if (collectDistinctNearby(bot)) return;
+        // (Tiles on the way only when fit for them: hurt, or bare in the dark, a quick tile is
+        // often a monster - an arrow from a skeleton at night killed the bot on seed 77.)
+        var me = bot.body();
+        if (me.getHealth() < 14 || cortex.mode(bot) == Cortex.Mode.SURVIVE) return;
+        boolean armed = ObtainPlanner.countAny(me, Set.of(net.minecraft.world.item.Items.STONE_SWORD, net.minecraft.world.item.Items.IRON_SWORD,
+                net.minecraft.world.item.Items.DIAMOND_SWORD, net.minecraft.world.item.Items.NETHERITE_SWORD, net.minecraft.world.item.Items.STONE_AXE,
+                net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE)) > 0;
         for (Choice c : choices(bot, targetIndex)) {
             // A few seconds' work, or a monster wanted for a tile right there in sight (the spider
             // in the cave it is mining in, the creeper met on a night walk): taken along.
             boolean quick = c.option().cost() < 8;
             boolean prey = !quick && c.option().cost() < 25 && c.tile().goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL;
+            // (A monster on the way: armed for it, or not at all.)
+            if (prey && !armed) continue;
             if (quick || prey) {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
