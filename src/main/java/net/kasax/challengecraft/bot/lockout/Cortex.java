@@ -121,6 +121,18 @@ final class Cortex {
         if (active != null) ended(bot, active, now, false, true);
     }
 
+    /**
+     * How long an intent is believed to take, from a fresh estimate and what this game has shown
+     * (plan 16, L8): every failure at it makes the estimate count for that much more, and it is
+     * never believed quicker than it really took on average so far.
+     */
+    double believe(String key, double estimateSeconds) {
+        Track t = tracks.get(key);
+        if (t == null || t.starts == 0) return estimateSeconds;
+        double mean = t.spent / 20.0 / t.starts;
+        return Math.max(estimateSeconds * (1 + t.fails), mean);
+    }
+
     String active() {
         return active;
     }

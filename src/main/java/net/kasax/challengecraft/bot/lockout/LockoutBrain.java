@@ -407,9 +407,13 @@ public final class LockoutBrain implements BotBrain {
     /** The intent a task stands for: the decider and what the task does, without the counts. */
     private String intent(BotTask task) {
         if (task == goalTask && targetId != null) return "goal:" + targetId;
+        return (stepKey == null ? "other" : stepKey) + ":" + plain(task);
+    }
+
+    /** What a task does, without the counts (one intent whatever the numbers). */
+    private static String plain(BotTask task) {
         String what = task.describe().replaceAll("[0-9]+", "").replaceAll("\\s+", " ").trim();
-        if (what.length() > 40) what = what.substring(0, 40);
-        return (stepKey == null ? "other" : stepKey) + ":" + what;
+        return what.length() > 40 ? what.substring(0, 40) : what;
     }
 
     private static final Set<net.minecraft.world.item.Item> FOODS = Set.of(net.minecraft.world.item.Items.BREAD,
@@ -739,10 +743,11 @@ public final class LockoutBrain implements BotBrain {
         if (net.kasax.challengecraft.bot.BotBundles.bundle(body) == null && net.kasax.challengecraft.bot.BotBundles.freeSlots(body) <= 8
                 && now >= bundleRetryAt) {
             bundleRetryAt = now + 6000;
-            double cost = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.BUNDLE), 1);
+            var bundleTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.BUNDLE), 1, planner);
+            double cost = cortex.believe("kit:" + plain(bundleTask), planner.estimate(bot, Set.of(net.minecraft.world.item.Items.BUNDLE), 1));
             if (cost < 120) {
                 bot.say("the pack fills up: a bundle for the odds and ends (~" + Math.round(cost) + " s)");
-                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.BUNDLE), 1, planner), 2400);
+                start(bot, bundleTask, budget(cost, 600, 2400));
                 return true;
             }
         }
@@ -924,7 +929,7 @@ public final class LockoutBrain implements BotBrain {
         boolean bare = points < 8;
         if (points >= 16 || level >= 17 && !bare) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
-        double cost = planner.estimate(bot, FOODS, have + 4);
+        double cost = cortex.believe("food:" + plain(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner)), planner.estimate(bot, FOODS, have + 4));
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
         // search only once hunger bites (below six shanks: soon no sprinting), and not a long one.
         // Starving (six shanks and less: no sprinting, and on hard the hunger eats the hearts
@@ -992,6 +997,8 @@ public final class LockoutBrain implements BotBrain {
                 over = 0;
             }
             if (o != null && over > 0) o = o.costing(o.cost() * (1 + 0.5 * over) + 20 * over);
+            // (What this game has shown of it: failed at, or slower than thought - believed so.)
+            if (o != null) o = o.costing(cortex.believe("goal:" + tile.goal().id(), o.cost()));
             // Through the portal again soon after coming through it (a tile up there looked cheap
             // from down here, one down here from up there): the way back is dearer than the
             // estimate says - a few minutes' resistance against going to and fro.
