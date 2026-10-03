@@ -486,7 +486,10 @@ public final class Bot {
         boolean recent = body.tickCount - retreatFailedAt < 200;
         if (!recent) retreatFails = 0;
         boolean cornered = recent && retreatFails >= 2;
-        if (!(top instanceof net.kasax.challengecraft.bot.task.GoToTask) && !cornered) {
+        // (Not while running from something already - its own retreat - but on any other walk: a
+        // creeper behind it on the way somewhere is no less a creeper.)
+        boolean running = retreat != null && top == retreat;
+        if (!running && !cornered) {
             // (Any enemy, not only the Monster kind: magma cubes and slimes are not of it.)
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
                     e -> e.isAlive() && e instanceof net.minecraft.world.entity.monster.Enemy)) {
@@ -531,6 +534,8 @@ public final class Bot {
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
                         + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0)) {
                     net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
+                    say((creeper ? "a creeper hissing " + String.format("%.1f", m.distanceTo(body)) + " blocks off" : "low (" + Math.round(body.getHealth()) + " hp), a "
+                            + m.getType().toShortString() + " at me") + ": away");
                     // (That way was blocked last time: off to the side instead.)
                     if (recent) away = new net.minecraft.world.phys.Vec3(-away.z, 0, away.x);
                     actions.reset();
@@ -542,7 +547,7 @@ public final class Bot {
         }
         // A creeper coming for it, not hissing yet: dealt with before it gets close, as a player
         // does. With a weapon and the hearts for it, killed (hit, a step back, hit); else away.
-        if (!fighting && !welcomeExplosion && !(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+        if (!fighting && !welcomeExplosion && !running) {
             for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(7),
                     c -> c.isAlive() && c.getTarget() == body && c.getSwellDir() <= 0 && body.hasLineOfSight(c))) {
                 boolean armed = false;
@@ -677,7 +682,7 @@ public final class Bot {
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !armed() && !cornered
                 && !(attacker instanceof net.minecraft.world.entity.monster.RangedAttackMob)
                 && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8
-                && !(top instanceof net.kasax.challengecraft.bot.task.GoToTask)) {
+                && !running) {
             net.minecraft.world.phys.Vec3 away = openWayFrom(attacker.position(), 32);
             actions.reset();
             say("no weapon, a " + attacker.getType().toShortString() + " at me: away, not a fist fight");

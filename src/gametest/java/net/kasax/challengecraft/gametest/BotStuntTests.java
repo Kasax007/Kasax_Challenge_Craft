@@ -983,6 +983,48 @@ public class BotStuntTests {
         });
     }
 
+    /** On a walk somewhere, no weapon, a creeper by the way (hard): it notices the hiss and gets clear. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void creeperOnTheWay(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "creeper_on_the_way");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var c = EntityTypes.CREEPER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        c.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(22, FEET, 22)));
+        c.setPersistenceRequired();
+        level.addFreshEntity(c);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(34, FEET, 20), 1.5), 900, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("creeper_on_the_way: blown up");
+            low[0] = Math.min(low[0], body.getHealth());
+            h.assertTrue(low[0] > 8, "creeper_on_the_way: nearly blown up, hp " + low[0]);
+            return h.getTick() > 800;
+        });
+    }
+
+    /** Just back to life, no weapon, three zombies about (hard), open land all round: it gets away instead of a fist fight. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1100, skyAccess = true, padding = 24)
+    public void unarmedZombies(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "unarmed_zombies");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        for (int i = 0; i < 3; i++) {
+            var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(22 + i, FEET, 18 + 2 * i)));
+            z.setPersistenceRequired();
+            level.addFreshEntity(z);
+        }
+        a.spawn(18, FEET, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1050), 1050, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("unarmed_zombies: killed");
+            return h.getTick() > 1000;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {

@@ -55,6 +55,20 @@ public final class BotArena {
         return a;
     }
 
+    /**
+     * The flat arena with the floor carried twenty blocks further out on every side (into the
+     * test's padding, which must be at least 24): room to run away, for the scenarios where
+     * running is the answer - the bare arena's edge is a drop the bot rightly will not take.
+     */
+    public static BotArena wide(GameTestHelper helper, String name) {
+        BotArena a = flat(helper, name);
+        a.fill(-20, GROUND - 2, -20, SIZE + 19, GROUND - 1, SIZE + 19, Blocks.STONE);
+        a.fill(-20, GROUND, -20, SIZE + 19, GROUND, SIZE + 19, Blocks.GRASS_BLOCK);
+        // (Nothing in the way out there: whatever stands at the structure's bounds, gone.)
+        a.fill(-20, FEET, -20, SIZE + 19, FEET + 6, SIZE + 19, Blocks.AIR);
+        return a;
+    }
+
     public GameTestHelper helper() {
         return helper;
     }
