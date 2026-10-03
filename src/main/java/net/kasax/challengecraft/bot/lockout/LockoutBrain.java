@@ -143,6 +143,9 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
         }
+        // In a basalt delta with nothing to do there: out of it first. Magma cubes by the dozen,
+        // magma underfoot, lava in every hollow - the Nether's deadliest ground.
+        if (step(bot, "deltas", () -> leaveDeltas(bot))) return;
         // Keep something to eat: a player who is starving loses more time than bread costs.
         if (step(bot, "food", () -> needsFood(bot))) return;
         // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
@@ -340,6 +343,42 @@ public final class LockoutBrain implements BotBrain {
             targetIndex = -1;
             goalTask = null;
         }
+    }
+
+    private static boolean deltas(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos p) {
+        return level.getBiome(p).is(net.minecraft.world.level.biome.Biomes.BASALT_DELTAS);
+    }
+
+    /** Out of a basalt delta (unless an open tile wants something from there): to the nearest other ground seen. */
+    private boolean leaveDeltas(Bot bot) {
+        var level = bot.body().level();
+        net.minecraft.core.BlockPos feet = bot.body().blockPosition();
+        if (level.dimension() != net.minecraft.world.level.Level.NETHER || !deltas(level, feet)) return false;
+        for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
+            if (t.claimedBy() != null || only != null && !only.contains(t.goal().id())) continue;
+            String id = t.goal().id();
+            if (id.contains("basalt") || id.contains("delta") || id.contains("magma") || id.contains("blackstone")) return false;
+        }
+        // The nearest point of other ground, from rings of looks round (the biome map, as a player
+        // sees the grey give way to red or blue).
+        net.minecraft.core.BlockPos out = null;
+        for (int r = 16; r <= 128 && out == null; r += 16) {
+            for (int i = 0; i < 24; i++) {
+                double a = i * Math.PI / 12;
+                net.minecraft.core.BlockPos q = feet.offset((int) (Math.cos(a) * r), 0, (int) (Math.sin(a) * r));
+                if (!level.isLoaded(q) || deltas(level, q)) continue;
+                out = q;
+                break;
+            }
+        }
+        if (out == null) return false;
+        net.minecraft.core.BlockPos steer = out;
+        bot.say("in a basalt delta with nothing to do here: out of it, towards " + out.toShortString());
+        start(bot, new net.kasax.challengecraft.bot.task.NavGoalTask("out of the basalt deltas",
+                (lv, p) -> !deltas(lv, p) && lv.getBlockState(p).getCollisionShape(lv, p).isEmpty() && lv.getFluidState(p).isEmpty()
+                        && !lv.getBlockState(p.below()).getCollisionShape(lv, p.below()).isEmpty() && lv.getFluidState(p.below()).isEmpty(),
+                b -> steer, 2400), 2400);
+        return true;
     }
 
     /** One decider, under the cortex: returns whether it started something (a refused start is not that). */

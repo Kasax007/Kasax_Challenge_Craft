@@ -17,8 +17,11 @@ public final class ThreatSense {
     /** The way being dodged to (flat, length one) and until when; null: no dodge on. */
     private Vec3 dodge;
     private int dodgeUntil;
-    /** For the benchmarks: dodges begun. */
-    public int dodges;
+    /** For the benchmarks: dodges begun, steps round so a blow would not throw it into lava. */
+    public int dodges, standsTaken;
+    /** Where to stand so no blow throws it into lava, and when that was last looked at. */
+    private Vec3 stand;
+    private int standCheckAt;
 
     ThreatSense(Bot bot) {
         this.bot = bot;
@@ -35,6 +38,34 @@ public final class ThreatSense {
             if (body.tickCount > dodgeUntil) dodge = null;
             else {
                 bot.danger.steer(dodge.x, dodge.z);
+                return;
+            }
+        }
+        // Something about to strike with lava (or a deep drop) at its back: round to where its blow
+        // throws it onto firm ground, before the blow - not only in a fight of its own choosing,
+        // on the way anywhere. (Looked at every few ticks; while the lava is about.)
+        if (body.onGround() && body.tickCount >= standCheckAt) {
+            standCheckAt = body.tickCount + 4;
+            stand = null;
+            if (bot.danger.lavaNear(6)) {
+                for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me().inflate(4.5),
+                        m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+                    if (bot.danger.thrown(m, body.position()).safe()) continue;
+                    stand = bot.danger.saferStand(m);
+                    if (stand != null) {
+                        standsTaken++;
+                        bot.say("a " + m.getType().toShortString() + " would throw me into the lava from here: round to " + String.format("%.1f %.1f", stand.x, stand.z));
+                    }
+                    break;
+                }
+            }
+        }
+        if (stand != null) {
+            Vec3 way = stand.subtract(body.position()).multiply(1, 0, 1);
+            if (way.lengthSqr() < 0.04) stand = null;
+            else {
+                way = way.normalize();
+                bot.danger.steer(way.x, way.z);
                 return;
             }
         }
@@ -59,6 +90,10 @@ public final class ThreatSense {
             bot.danger.steer(side.x, side.z);
             return;
         }
+    }
+
+    private AABB me() {
+        return bot.body().getBoundingBox();
     }
 
     /** How free the way a couple of blocks to that side is (0 to 2): no wall, firm ground, no lava. */
