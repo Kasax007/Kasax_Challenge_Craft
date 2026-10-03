@@ -1295,3 +1295,87 @@ Nether-Plan, Feld-Matrix) sind in L1–L13 aufgegangen und behalten ihre Einzels
 - Feldtest Nether: weniger Tode je Feld.
 - 90 min auf 3 Seeds (Durchschnitt, nicht ein einzelner Lauf): mehr Felder, weniger Tode.
 - Die GameTest-Suite bleibt grün.
+
+## 17. Runde 11: Gefahrensinn, Großhirn, Ausweichen – umgesetzt
+
+### 17.1 L1 Gefahrensinn und Bewegungswächter (`DangerSense`)
+
+**Gefahrenkarte:** Lava- und Feuerzellen im Umkreis von 8 Blöcken (6 nach unten, 2 nach oben),
+alle halbe Sekunde neu gelesen. Daraus kommen:
+
+- „Lava in der Nähe?“
+- die Richtung weg von der Lava.
+
+**Wächter (jeden Tick, nachdem die Aufgabe ihre Tasten gedrückt hat):**
+
+- Bobs Bewegung wird mit den Regeln des Spiels vorausgerechnet:
+  - Griff des Blocks, Luftwiderstand, Schwerkraft;
+  - Sprint, Sprung und Sprint-Sprung;
+  - Wände, Seelensand.
+- Die Rechnung nimmt die eigenen Tasten für diesen Tick an und danach Vollbremsung (am Boden
+  geduckt) bzw. Weiterfliegen bis zur Landung.
+- Gezählt wird, was dabei passiert: Lava, Feuer, ein Fall mit Schaden (über den
+  Sicherheitsabstand hinaus), die Leere.
+- Führt die Bewegung dort hinein, drückt der Wächter stattdessen die kleinste sichere Änderung:
+  ohne Sprung, geduckt, Bremsen oder weg von der Gefahr.
+- Hält das 20 Ticks an, bekommt der Navigator Bescheid und sucht einen anderen Weg.
+- **Magma:** Bob geht geduckt darüber, so verbrennt er nicht. Steht er still, geht er herunter.
+- **Fließende Lava:** Bob hält einen Block mehr Abstand und weicht aktiv zurück.
+
+**Kampf an Lava und Kanten:**
+
+- Bob rechnet aus, wohin ihn ein Schlag des Gegners werfen würde (Rückstoß, Hoglin-Wurf).
+- Fällt das in Lava oder über eine Kante, sucht er sich zuerst einen Platz, von dem aus der
+  Rückstoß auf festen Boden geht.
+- **Rückzug:** Die Fluchtrichtung meidet Lava auf und neben dem Weg.
+
+**Tests (alle grün):**
+
+- `guard_lava_ahead`: blindes Losrennen auf Lava auf gleicher Höhe zu;
+- `guard_lava_pit_jumping`: Lavagrube, mit Springen;
+- `guard_cliff`: Klippe, 10 tief;
+- `brawl_by_lava`: Zombie, Lava im Rücken.
+
+Die 45 bestehenden Bewegungs- und Kampftests bleiben grün.
+
+### 17.2 L3 Großhirn mit L4 Fehlschlag-Gedächtnis und L6 Modi (`Cortex`)
+
+Das Großhirn sitzt über der Kaskade in `LockoutBrain`. Jede Absicht hat einen Namen: Entscheider
+plus Aufgabe, z. B. `kit:get cobblestone` oder `goal:kill_drowned`.
+
+- **Gedächtnis:** Starts, Erfolge, Fehlschläge, Tode und Zeit je Absicht, über das ganze Spiel.
+- **Wachsende Pausen:**
+  - Nach Fehlschlägen in Folge wartet Bob 1, 2, 4, 8 Minuten Spielzeit.
+  - Nach einem Tod bei der Absicht verdoppelt sich die Pause.
+- **Schleifenbrecher:** Dreimal in 10 min begonnen und nie gelungen gilt als Schleife. Die
+  Absicht wird 5–40 min zur Seite gelegt, das Log sagt es (`[Cortex]`).
+- **Abgelehnter Start:** Die Kaskade läuft weiter zum nächsten Entscheider, statt hängen zu
+  bleiben.
+- **Modi:**
+
+  | Modus | Wann |
+  | --- | --- |
+  | Überleben | wenig Herzen, hungrig ohne Essen, oder nackt in der Nacht |
+  | Vorbereiten | ohne Steinspitzhacke |
+  | Spielen | sonst |
+
+  Beim Überleben startet Bob keine Plünderung, keine Jagd, keine Nether-Reise und keine Bastion.
+- **Bilanz:** alle 5 min die teuersten Absichten mit Bilanz (Starts, Erfolge, Fehlschläge, Tode,
+  Zeit).
+
+### 17.3 L2 Bedrohungsvorhersage, Teil 1: Geschosse (`ThreatSense`)
+
+- Pfeile, Feuerbälle und Schädel in 24 Blöcken Umkreis werden vorausgeflogen (Pfeile mit Fall und
+  Bremsung).
+- Trifft eines in 3–20 Ticks, macht Bob einen Seitschritt quer zur Flugbahn, zur offenen Seite.
+  Auch diesen Schritt prüft der Wächter.
+- Ghast-Feuerbälle werden weiter zurückgeschlagen.
+- **Test `dodge_arrows`:** 10 Pfeile aus 15 Blöcken.
+
+  | Durchlauf | Treffer |
+  | --- | --- |
+  | Ohne Ausweichen (Gegenprobe) | 5 von 10 |
+  | Mit Ausweichen | höchstens 2 (die Testgrenze) |
+
+**Noch offen in L2:** Laufwege der Mobs voraus und Creeper-Zündung über die Zeit bis zum
+Kontakt.
