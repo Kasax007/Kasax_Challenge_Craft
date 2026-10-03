@@ -1065,6 +1065,30 @@ public class BotStuntTests {
         });
     }
 
+    /** A skeleton shooting from fifteen blocks, no weapon, no shield, blocks in the pack (hard): a wall against it, little lost. */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 24)
+    public void skeletonCover(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "skeleton_cover");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(33, FEET, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(18, FEET, 20, new ItemStack(Items.COBBLESTONE, 32));
+        var body = a.bot().body();
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1250), 1300, () -> {
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().body() != body || !body.isAlive()) h.fail("skeleton_cover: shot dead");
+            if (h.getTick() < 1250) return false;
+            BotArena.LOG.info("[BOTTEST] skeleton_cover lost {} health", 20 - low[0]);
+            return true;
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {
