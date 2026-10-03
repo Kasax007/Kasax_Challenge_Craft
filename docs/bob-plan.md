@@ -1627,3 +1627,37 @@ Wasser ohne Luft darüber.
 
 - Früher an Schild und Rüstung kommen.
 - Nachts ohne Rüstung nicht auf offenem Hügelgelände arbeiten.
+
+### 20.3 Runde 16 und die Frage „Rückschritt?“
+
+**Runde 16** (Abstecher nur, wenn fit; Absteigen vom Reittier):
+
+| Seed | Felder / Tode |
+| --- | --- |
+| Live | 7/5 |
+| 77 | 6/6 |
+| 4242 | 6/7 |
+| 1234 | 5/6 |
+| **Summe** | **24/24** |
+
+Auf dem Live-Seed sanken die Felder über die Runden 13 bis 16 (14 → 11 → 9 → 7). Zwei Prüfungen:
+
+**1. Navigations-Benchmark** (30 Ziele auf der Oberfläche, friedlich): vor den Baritone-Regeln
+(`4a5e8d6`) gegen den aktuellen Stand.
+
+| Stand | Erreicht | Tempo | Umweg | Suchen ohne Weg |
+| --- | --- | --- | --- | --- |
+| alt | 30/30 | 3,18 Blöcke/s | 1,20 | 1 |
+| neu | 30/30 | 3,17 Blöcke/s | 1,20 | 0 |
+
+Die neuen Wegregeln kosten auf der Oberfläche keine Zeit.
+
+**2. Direkter Vergleich auf dem Live-Seed**, parallel gespielt, 90 min HARD:
+
+| Stand | Felder | Tode | Eisen | Eimer |
+| --- | --- | --- | --- | --- |
+| alt (`4a5e8d6`) | 9 | 5 | 355 s | 934 s |
+| neu | 8 | 6 | 180 s | 362 s |
+
+**Befund:** Kein Rückschritt; die 14 Felder in Runde 13 waren ein Ausreißer nach oben. Ein
+einzelner Lauf streut um ±3–5 Felder. Belastbare Vergleiche brauchen mehrere Läufe je Stand.
