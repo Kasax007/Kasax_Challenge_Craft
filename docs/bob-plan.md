@@ -1575,3 +1575,55 @@ wo Luft gerade darüber liegt, nicht unter einer Felsdecke (geflutete Höhlen). 
 | --- | --- | --- | --- |
 | `way_round_monster` | Zombie mitten auf dem geraden Weg | geht mit 7,4 Blöcken Abstand vorbei | 1,1 Blöcke |
 | `flooded_tunnel_avoided` | gefluteter Tunnel unter der Wand oder trockener Umweg | trockener Umweg | taucht |
+
+## 20. Runden 13–15: Messreihe und weitere Bausteine
+
+### 20.1 Neue Bausteine
+
+| Baustein | Anlass | Beleg |
+| --- | --- | --- |
+| **Schild-Anlauf:** Mit Schild geht Bob hinter dem erhobenen Schild auf Schützen zu. Ein Bot wird dabei nicht gebremst, nur der Sprint fällt weg. Bob senkt den Schild erst in Schlagweite; der Schild braucht 5 Ticks oben, bevor er blockt. | Skelett-Tode | `shield_charge_skeleton`: neu 3/3 (6/0/0 Herzen verloren), alt 2/3 (6/0/9,7) |
+| **Creeper-Flucht im Tick-Takt:** Vorrang vor allem, auch vor dem Pfeil-Ausweichen. Nah und mit Schild: Schild gegen den Creeper; sonst Sprint weg. | 4 Creeper-Tode auf Seed 4242, teils während Bob Pfeilen auswich | `creeper_on_the_way`: 3/3 (vorher 2/3) |
+| **Absteigen:** Bob steigt direkt ab; Schleichen allein holt einen Bot ohne Client nicht vom Tier. Ohne Reit-Aufgabe steigt er nach 5 s von jedem Reittier oder Fahrzeug ab. | Bob saß im Spiel des Spielers auf einem Schwein fest | `off_the_pig`: alt bleibt sitzen, neu kommt an |
+| **Abstecher nur, wenn fit:** ab 14 Herzen, nicht im Überlebensmodus; Jagd nur bewaffnet | Nächtliche Skelettjagd „für einen Pfeil“ auf Seed 77 | – |
+
+**Verworfen: Deckungswand gegen wiederholte Schützen.** Bob blieb hinter der Wand stehen, das
+Skelett lief seitlich herum.
+
+| Stand | Ergebnis im Test |
+| --- | --- |
+| mit Wand | 3 von 3 erschossen |
+| ohne Wand (nur Ausweichen) | 3 von 3 ohne Herzverlust |
+
+Der Test `skeleton_cover` bleibt als Regressionsschutz für das Ausweichen.
+
+### 20.2 Messreihe, 90 min HARD (Felder / Tode)
+
+| Stand | Live | 77 | 4242 | 1234 | Summe |
+| --- | --- | --- | --- | --- | --- |
+| Ausgangsstand vor Runde 11 | 10/7 | 10/8 | 1/29 | 6/1 | **27/45** |
+| Runde 12 (Fluchtregel u. a.)¹ | 12/5 | 10/2 | 2/4 | 5/1 | **29/12** |
+| Runde 13 (lernende Schätzungen) | 14/1 | 7/23² | 3/6 | 6/9 | **30/39** |
+| Runde 14 (Baritone-Regeln) | 11/5 | 12/6 | 0/13 | 6/2 | **29/26** |
+| Runde 15 (Schild-Anlauf, Creeper-Flucht) | 9/4 | 5/12 | 4/4 | 6/3 | **24/23** |
+
+¹ Zusammengesetzt aus verschiedenen Ständen: Live-Seed und 4242 stammen aus Runde 12 noch ohne
+Fluchtregel, 77 und 1234 aus den Läufen mit Fluchtregel.
+
+² Davon 15-mal ertrunken in einer gefluteten Höhle; seit Runde 14 sperrt die Pfadsuche Wege unter
+Wasser ohne Luft darüber.
+
+**Befund:**
+
+- Die Tode liegen deutlich unter dem Ausgangsstand.
+- Die Felder schwanken je Lauf um ±5, weil ein einzelner Tod oder eine Fehlentscheidung am Anfang
+  das ganze Spiel verschiebt.
+- Häufigste Todesursache sind jetzt Skelette (Seed 77, 4242), oft früh und nachts auf Hügeln,
+  noch ohne Schild und Rüstung.
+- Gegen einen einzelnen Schützen reicht das Ausweichen im Test (0 Herzen verloren). Im Feld kommen
+  Gelände, mehrere Schützen und Vorschäden dazu.
+
+**Offen:**
+
+- Früher an Schild und Rüstung kommen.
+- Nachts ohne Rüstung nicht auf offenem Hügelgelände arbeiten.
