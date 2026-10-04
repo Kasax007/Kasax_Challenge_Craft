@@ -12,10 +12,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
@@ -36,6 +38,8 @@ public abstract class MovementAndDamageMixin {
     @Unique
     private Vec3 lastPos = null;
     @Unique
+    private ResourceKey<Level> lastWalkDimension = null;
+    @Unique
     private float damageAccumulator = 0;
     @Unique
     private BlockPos lastBlockPos = null;
@@ -43,6 +47,8 @@ public abstract class MovementAndDamageMixin {
     private int standingTicks = 0;
     @Unique
     private static boolean sharingDamage = false;
+    @Unique
+    private static final double WALK_TELEPORT_RESET_DIST_SQ = 12.0 * 12.0;
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
@@ -50,28 +56,34 @@ public abstract class MovementAndDamageMixin {
 
         if (Chal_17_WalkRandomItem.isActive() || Chal_28_WalkDamage.isActive()) {
             Vec3 currentPos = player.position();
-            if (lastPos != null) {
-                double dist = currentPos.distanceTo(lastPos);
-                
-                if (Chal_17_WalkRandomItem.isActive()) {
-                    walkDistanceAccumulator += dist;
-                    while (walkDistanceAccumulator >= 500.0) {
-                        walkDistanceAccumulator -= 500.0;
-                        player.getInventory().add(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
-                    }
-                }
+            ResourceKey<Level> currentDimension = player.level().dimension();
+            if (lastPos != null && lastWalkDimension == currentDimension) {
+                double distSq = currentPos.distanceToSqr(lastPos);
+                if (distSq <= WALK_TELEPORT_RESET_DIST_SQ) {
+                    double dist = Math.sqrt(distSq);
 
-                if (Chal_28_WalkDamage.isActive()) {
-                    walkDamageDistanceAccumulator += dist;
-                    while (walkDamageDistanceAccumulator >= 1.0) {
-                        walkDamageDistanceAccumulator -= 1.0;
-                        player.hurtServer(player.level(), player.level().damageSources().generic(), 2.0f);
+                    if (Chal_17_WalkRandomItem.isActive()) {
+                        walkDistanceAccumulator += dist;
+                        while (walkDistanceAccumulator >= 500.0) {
+                            walkDistanceAccumulator -= 500.0;
+                            player.getInventory().add(Chal_17_WalkRandomItem.getRandomItem(player.getRandom()));
+                        }
+                    }
+
+                    if (Chal_28_WalkDamage.isActive()) {
+                        walkDamageDistanceAccumulator += dist;
+                        while (walkDamageDistanceAccumulator >= 1.0) {
+                            walkDamageDistanceAccumulator -= 1.0;
+                            player.hurtServer(player.level(), player.level().damageSources().generic(), 2.0f);
+                        }
                     }
                 }
             }
             lastPos = currentPos;
+            lastWalkDimension = currentDimension;
         } else {
             lastPos = null;
+            lastWalkDimension = null;
             walkDistanceAccumulator = 0;
             walkDamageDistanceAccumulator = 0;
         }
