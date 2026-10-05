@@ -100,6 +100,7 @@ final class ChallengeScenes {
     }
 
     private void keys(boolean forward, boolean sprint) {
+        if (forward) Cam.freeWalk = true;
         if (forward) d.ctx.getInput().holdKey(o -> o.keyUp);
         else d.ctx.getInput().releaseKey(o -> o.keyUp);
         if (sprint) d.ctx.getInput().holdKey(o -> o.keySprint);
@@ -349,15 +350,18 @@ final class ChallengeScenes {
     /** XP level 0: a world one block wide. Levels come in, the border grows. */
     private void levelBorder() {
         open(9);
-        BlockPos s = spawn();
-        Vec3 at = d.fromServer(server -> {
-            var b = server.overworld().getWorldBorder();
-            return new Vec3(b.getCenterX(), s.getY(), b.getCenterZ());
+        // The challenge keeps the border on 0/0, often far from spawn: load that ground first.
+        d.cmd("forceload add -48 -48 48 48");
+        d.run(60);
+        BlockPos c = d.fromServer(server -> {
+            int y = server.overworld().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, 0, 0);
+            return new BlockPos(0, y, 0);
         });
-        BlockPos c = BlockPos.containing(at);
+        Vec3 at = new Vec3(0.5, c.getY(), 0.5);
+        FilmDirector.LOG.info("[Film] border centre ground at {}", c);
         flat(c, -24, -24, 24, 24, "minecraft:grass_block");
         d.cam.playerPose(at, 200f, 10f, true);
-        d.run(30);
+        d.settle(400);
         d.shoot("level_border", 9.0, t -> {
             if (t == 30) d.cmd("xp add @p 3 levels");
             if (t == 70) d.cmd("xp add @p 7 levels");
@@ -394,17 +398,22 @@ final class ChallengeScenes {
         FilmDirector.doubleTrouble = 10;
         open(35);
         d.cmd("time set 18000");
-        d.cmd("gamerule spawn_mobs true");
         d.cmd("effect give @p minecraft:night_vision infinite 0 true");
         d.cmd("effect give @p minecraft:resistance infinite 4 true");
         d.cmd("effect give @p minecraft:invisibility infinite 0 true");
         BlockPos s = spawn();
+        flat(s, -10, -10, 10, 10, "minecraft:grass_block");
         Vec3 at = feet(s);
-        d.run(600);
+        Vec3 spot = at.add(5, 0, 0);
+        d.run(40);
+        // One mob of each kind appears in front of the camera - and comes ten times over.
         d.shoot("double_trouble", 8.0, t -> {
-            double ang = Math.toRadians(20 + t * 0.4);
-            Vec3 eye = at.add(Math.cos(ang) * 12, 9, Math.sin(ang) * 12);
-            track(t, eye, at);
+            if (t == 12) d.cmd(String.format(java.util.Locale.ROOT, "summon minecraft:zombie %.1f %.1f %.1f", spot.x, spot.y, spot.z - 1.5));
+            if (t == 52) d.cmd(String.format(java.util.Locale.ROOT, "summon minecraft:skeleton %.1f %.1f %.1f", spot.x + 1, spot.y, spot.z + 1));
+            if (t == 92) d.cmd(String.format(java.util.Locale.ROOT, "summon minecraft:creeper %.1f %.1f %.1f", spot.x - 1, spot.y, spot.z + 2.5));
+            double f = FilmDirector.ease(t, 0, 160);
+            Vec3 eye = spot.add(FilmDirector.lerp(-6.5, -9.5, f), FilmDirector.lerp(2.2, 4.5, f), FilmDirector.lerp(-2.5, -4.0, f));
+            track(t, eye, spot.add(0, 0.8, 0.5));
         });
     }
 
@@ -412,8 +421,9 @@ final class ChallengeScenes {
     private void skyblock() {
         open(11);
         d.settle(400);
-        BlockPos s = spawn();
-        Vec3 at = feet(s);
+        // The island is where the player stands; the spawn column below it is void.
+        Vec3 at = d.fromServer(server -> d.player(server).position());
+        FilmDirector.LOG.info("[Film] skyblock island at {}", at);
         d.cmd("effect give @p minecraft:invisibility infinite 0 true");
         d.shoot("skyblock", 8.0, t -> {
             double ang = Math.toRadians(-40 + t * 0.55);
@@ -455,12 +465,16 @@ final class ChallengeScenes {
         d.run(20);
         d.cmd("execute as @p run challengecraft_bot lockout Bob");
         d.run(60);
+        // The board opens by itself when the game starts; the run is filmed without it.
+        d.ctx.setScreen(() -> null);
+        d.run(5);
         d.shoot("lockout_bob_run", 7.0, t -> {
             Vec3 bob = d.ctx.computeOnClient(mc -> mc.level.players().stream()
                     .filter(p -> p.getName().getString().equals("Bob")).findFirst().map(p -> p.position()).orElse(at));
             track(t, bob.add(-3.5, 2.0, 3.0), bob.add(0, 1.2, 0));
         });
-        d.cam.player();
+        // The board over a calm sky, not over whatever the player stands in.
+        d.cam.cutTo(at.add(0, 6, 0), at.add(20, 9, 0));
         d.ctx.setScreen(net.kasax.challengecraft.client.screen.LockoutBingoBoardScreen::new);
         d.run(10);
         d.shoot("lockout_board", 4.0, null);

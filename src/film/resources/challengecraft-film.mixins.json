@@ -5,7 +5,10 @@
   "client": [
     "ChallengeTabFilmMixin",
     "ScreenshotLeakMixin",
-    "UiClockMixin"
+    "UiClockMixin",
+    "FreeCamPlayerMixin",
+    "FreeCamInputMixin",
+    "ScreenEffectFilmMixin"
   ],
   "injectors": {
     "defaultRequire": 1

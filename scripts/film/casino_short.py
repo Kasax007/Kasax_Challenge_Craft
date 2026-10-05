@@ -53,18 +53,18 @@ add(Clip(C + 'casino_slot_freespins_intro', 1.4, 2.0, zoom=(1.1, 1.2), focus=(0.
 add(Clip(C + 'casino_slot_freespins_intro', 2.6, 1.4, zoom=(1.15, 1.25), focus=(0.5, 0.45)), (0.0, 'casino', 'expand', 0.9))
 add(Clip(C + 'casino_plinko', 0.2, 2.6, zoom=(1.3, 1.45), focus=(0.5, 0.45)), (0.0, 'mc', 'note/hat', 0.3), (1.0, 'casino', 'win_big', 0.9))
 add(Clip(C + 'casino_crash_launch', 0.5, 1.6, zoom=(1.0, 1.15), focus=(0.4, 0.4)), (0.1, 'casino', 'rocket_launch', 1.0))
-add(Clip(C + 'casino_crash_climb', 0.0, 1.6, speed=4.0, zoom=(1.3, 1.4), focus=(0.62, 0.42)), (0.0, 'casino', 'rocket_flight', 0.7), (0.0, 'riser', None, 0.6))
+add(Clip(C + 'casino_crash_climb', 0.0, 1.6, speed=4.0, zoom=(1.0, 1.1), focus=(0.62, 0.42)), (0.0, 'casino', 'rocket_flight', 0.7), (0.0, 'riser', None, 0.6))
 add(Clip(C + 'casino_crash_cashout', 0.4, 2.2, zoom=(1.2, 1.3), focus=(0.62, 0.45)), (0.4, 'casino', 'cash_out', 1.0), (0.5, 'casino', 'coin_shower2', 0.8), (1.6, 'casino', 'crash', 0.8))
 add(Clip(C + 'casino_roulette_bets', 0.3, 1.4, speed=1.4), (0.0, 'casino', 'chip_stack1', 0.8), (0.6, 'casino', 'chip_stack2', 0.8))
 add(Clip(C + 'casino_roulette_spin', 3.6, 1.6, speed=2.0), (0.0, 'casino', 'roulette_spin', 0.8))
 add(Clip(C + 'casino_roulette_spin', 10.9, 1.4, zoom=(1.0, 1.15)), (0.0, 'casino', 'roulette_drop', 0.9), (0.4, 'casino', 'win_small', 0.8))
 # --- 5. lose -> monsters
-add(Clip(pick(C + 'casino_wave', C + 'casino_wave_old'), 3.6, 4.2, shake=0.4), (0.2, 'casino', 'house_sends', 1.0), (0.6, 'mc', 'mob/ravager/roar1', 0.8))
+add(Clip(pick(C + 'casino_wave', C + 'casino_wave_old'), 5.3, 3.7, shake=0.4, zoom=(1.05, 1.15), focus=(0.5, 0.5)), (0.2, 'casino', 'house_sends', 1.0), (0.6, 'mc', 'mob/ravager/roar1', 0.8))
 # --- 6. death -> blackjack -> revival
 BJ = pick(C + 'casino_blackjack', C + 'casino_blackjack_old')
-add(Clip(BJ, 0.2, 1.9, zoom=(1.15, 1.0), flash=True), (0.0, 'mc', 'damage/hit1', 0.9), (0.1, 'whoosh', None, 0.6))
-add(Clip(BJ, 2.6, 4.0, zoom=(1.25, 1.4), focus=(0.5, 0.45)), (0.0, 'casino', 'card_slide1', 0.9), (0.6, 'casino', 'card_place1', 0.9), (2.0, 'casino', 'card_flip', 0.9))
-add(Clip(pick(C + 'casino_revived', C + 'casino_revived_old'), 0.0, 3.2, flash=True), (0.0, 'casino', 'revive', 1.0), (0.0, 'mc', 'item/totem/use_totem', 0.8))
+add(Clip(BJ, 0.0, 0.9, zoom=(1.15, 1.0), flash=True, shake=0.6), (0.0, 'mc', 'damage/hit1', 0.9), (0.1, 'whoosh', None, 0.6))
+add(Clip(BJ, 0.75, 3.9, zoom=(1.2, 1.3), focus=(0.5, 0.42)), (0.0, 'casino', 'card_slide1', 0.9), (0.5, 'casino', 'card_place1', 0.9), (2.6, 'casino', 'card_flip', 0.9), (3.2, 'casino', 'win_small', 0.7))
+add(Clip(BJ, 8.6, 2.6, zoom=(1.0, 1.1)), (0.6, 'mc', 'item/totem/use_totem', 1.0), (0.6, 'casino', 'revive', 0.8))
 # --- 7. 96 % / the House always wins
 add(Clip(pick(C + 'casino_slot_spins', C + 'casino_slot_epic'), 0.1, 3.0, zoom=(1.1, 1.2), focus=(0.5, 0.45)), (0.0, 'casino', 'reel_spin', 0.6), (2.0, 'casino', 'lose', 0.8))
 add(Clip(SP + '/film/cards/end_casino', 0, 7.5, zoom=(1.0, 1.06)), (0.0, 'impact', None, 0.9), (0.1, 'casino', 'win_epic', 0.6))

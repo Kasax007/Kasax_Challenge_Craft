@@ -16,6 +16,8 @@ import net.minecraft.world.phys.Vec3;
 public final class Cam {
     private final FilmDirector d;
     private ArmorStand stand;
+    /** The player walks on held keys while the free camera films it (see {@code FreeCamInputMixin}). */
+    public static volatile boolean freeWalk;
 
     Cam(FilmDirector d) {
         this.d = d;
@@ -168,6 +170,7 @@ public final class Cam {
     }
 
     void reset() {
+        freeWalk = false;
         d.client(mc -> {
             mc.options.setCameraType(CameraType.FIRST_PERSON);
             if (mc.player != null) mc.setCameraEntity(mc.player);

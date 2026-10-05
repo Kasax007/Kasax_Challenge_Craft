@@ -21,53 +21,46 @@ def have(shot):
 BEATS = [
     # 0. hook: a blitz of the wildest ones under the title
     dict(cap=None, clips=[
-        (H + 'red_light', 6.0, 0.45, dict(zoom=(1.2, 1.3)), [(0, 'whoosh', None, 0.5)]),
-        (H + 'size_matters', 3.0, 0.45, dict(zoom=(1.1, 1.2)), [(0, 'mc', 'mob/creeper/say1', 0.6)]),
-        (H + 'dice_throw', 1.0, 0.45, dict(zoom=(1.2, 1.3)), [(0, 'mc', 'random/pop', 0.6)]),
+        (H + 'red_light', 5.3, 0.45, dict(zoom=(1.2, 1.3), focus=(0.5, 0.35)), [(0, 'whoosh', None, 0.5)]),
+        (H + 'size_matters', 2.0, 0.45, dict(zoom=(1.0, 1.1)), [(0, 'mc', 'mob/creeper/say1', 0.6)]),
+        (H + 'dice_throw', 1.8, 0.45, dict(zoom=(1.1, 1.2)), [(0, 'mc', 'random/pop', 0.6)]),
         (H + 'chunk_blocks', 2.0, 0.45, {}, [(0, 'whoosh', None, 0.4)]),
         (C + 'casino_slot_epic_show', 0.2, 0.45, dict(flash=True), [(0, 'casino', 'win_epic', 0.7)]),
-        (H + 'skyblock', 3.0, 0.45, {}, [(0, 'impact', None, 0.7)]),
+        (H + 'skyblock', 2.0, 0.45, {}, [(0, 'impact', None, 0.7)]),
     ], hook='I CODED *50* VIRAL CHALLENGES INTO MINECRAFT'),
     dict(cap='RED LIGHT: *MOVE* AND YOU DIE', accent=RED, clips=[
-        (H + 'red_light', 2.0, 3.8, dict(zoom=(1.0, 1.12)), [(0.4, 'mc', 'block/note_block/bell', 0.7), (2.6, 'mc', 'damage/hit1', 0.9)]),
+        (H + 'red_light', 3.9, 3.6, dict(zoom=(1.1, 1.2), focus=(0.5, 0.35)), [(0.0, 'mc', 'note/bell', 0.6), (1.3, 'mc', 'note/bass', 0.9), (1.8, 'mc', 'damage/hit1', 0.9)]),
     ]),
     dict(cap='*DICE*: WALK ONLY WHAT YOU ROLL', clips=[
-        (H + 'dice_throw', 0.6, 1.6, dict(zoom=(1.1, 1.2)), [(0, 'mc', 'random/pop', 0.7), (1.0, 'mc', 'random/levelup', 0.4)]),
-        (H + 'dice_walk', 0.5, 1.6, {}, [(0, 'whoosh', None, 0.4)]),
+        (H + 'dice_throw', 0.5, 3.0, dict(zoom=(1.0, 1.15)), [(0.2, 'mc', 'random/bow', 0.6), (0.5, 'mc', 'random/pop', 0.7), (1.6, 'mc', 'random/levelup', 0.4)]),
     ]),
     dict(cap='NO LEGS? TRAVEL BY *CUSHION*', clips=[
-        (H + 'cushion', 1.0, 3.0, dict(speed=1.6), [(0.2, 'mc', 'block/wool/place1', 0.8), (1.2, 'mc', 'block/wool/place2', 0.8)]),
+        (H + 'cushion', 1.0, 3.0, dict(speed=1.6), [(0.2, 'mc', 'dig/cloth1', 0.8), (1.2, 'mc', 'dig/cloth2', 0.8)]),
     ]),
     dict(cap='EVERY CHUNK IS *ONE RANDOM BLOCK*', clips=[
-        (H + 'chunk_blocks', 0.5, 2.8, dict(speed=1.5), [(0, 'whoosh', None, 0.5)]),
+        (H + 'chunk_blocks', 0.8, 2.8, dict(speed=1.5), [(0, 'whoosh', None, 0.5)]),
     ]),
     dict(cap='STAND STILL... THE FLOOR *BURNS*', accent=RED, clips=[
-        (H + 'floor_lava', 1.5, 2.8, dict(zoom=(1.0, 1.15)), [(1.0, 'mc', 'fire/ignite', 0.9), (1.4, 'mc', 'damage/hit2', 0.7)]),
+        (H + 'floor_lava', 0.5, 2.8, dict(zoom=(1.1, 1.25), focus=(0.5, 0.4)), [(1.0, 'mc', 'fire/ignite', 0.9), (1.4, 'mc', 'damage/hit2', 0.7)]),
     ]),
     dict(cap='MOBS SPAWN *GIANT*... OR TINY', clips=[
-        (H + 'size_matters', 0.8, 2.8, dict(zoom=(1.0, 1.1)), [(0.3, 'mc', 'mob/creeper/say2', 0.8)]),
+        (H + 'size_matters', 0.2, 2.9, dict(zoom=(1.0, 1.1)), [(0.3, 'mc', 'mob/creeper/say2', 0.8)]),
     ]),
     dict(cap='YOUR DROPS FLY *INTO THE SKY*', clips=[
         (H + 'upside_down', 1.0, 2.6, {}, [(0.3, 'mc', 'random/pop', 0.7), (0.8, 'mc', 'random/pop', 0.6)]),
     ]),
-    dict(cap='YOUR XP LEVEL = *WORLD BORDER*', accent=GREEN, clips=[
-        (H + 'level_border', 1.5, 3.0, dict(speed=1.4), [(0.2, 'mc', 'random/levelup', 0.6), (1.6, 'mc', 'random/orb', 0.6)]),
-    ]),
-    dict(cap='EVERY NEW CHUNK *TRAPS* YOU', clips=[
-        (H + 'chunk_hunt', 1.0, 3.0, dict(speed=1.4), [(0.4, 'mc', 'block/beacon/activate', 0.7)]),
-    ]),
     dict(cap='*10x* THE MOBS', accent=RED, clips=[
-        (H + 'double_trouble', 2.0, 2.2, dict(zoom=(1.0, 1.1)), [(0, 'mc', 'mob/zombie/say1', 0.8), (0.6, 'mc', 'mob/skeleton/say1', 0.7)]),
+        (H + 'double_trouble', 0.6, 3.0, dict(speed=1.4, zoom=(1.35, 1.45), focus=(0.5, 0.5)), [(0.0, 'mc', 'mob/zombie/say1', 0.8), (0.85, 'mc', 'mob/zombie/say2', 0.9), (0.9, 'impact', None, 0.5), (1.5, 'mc', 'mob/skeleton/say2', 0.7), (2.9, 'mc', 'random/fuse', 0.6)]),
     ]),
     dict(cap='*SKYBLOCK* IN ANY WORLD', clips=[
-        (H + 'skyblock', 1.0, 2.6, {}, [(0, 'whoosh', None, 0.5)]),
+        (H + 'skyblock', 0.3, 2.6, dict(zoom=(1.0, 1.08)), [(0, 'whoosh', None, 0.5)]),
     ]),
     dict(cap='RACE FOR *RANDOM ITEMS*...', clips=[
-        (H + 'force_item', 1.0, 2.8, dict(zoom=(1.0, 1.1)), [(0.3, 'mc', 'random/orb', 0.7)]),
+        (H + 'force_item', 0.5, 2.8, dict(zoom=(1.0, 1.1), focus=(0.5, 0.45)), [(0.3, 'mc', 'random/orb', 0.7)]),
     ]),
     dict(cap='...OR LOCKOUT VS *BOB*', clips=[
-        (H + 'lockout_bob_run', 1.0, 2.6, {}, [(0, 'whoosh', None, 0.5)]),
-        (H + 'lockout_board', 0.5, 1.8, dict(zoom=(1.0, 1.06)), [(0, 'mc', 'ui/button/click', 0.6)]),
+        (H + 'lockout_bob_run', 0.0, 2.4, dict(zoom=(1.0, 1.1)), [(0, 'whoosh', None, 0.5)]),
+        (H + 'lockout_board', 0.5, 2.0, dict(zoom=(1.15, 1.25), focus=(0.5, 0.5)), [(0, 'mc', 'random/click', 0.6)]),
     ], sub=('AN AI I\'M STILL *TEACHING*', 2.6)),
     dict(cap='EVEN A *CASINO*', accent=GOLD, clips=[
         (C + 'casino_slot_epic', 0.25, 1.1, dict(zoom=(1.05, 1.2), focus=(0.5, 0.42)), [(0, 'casino', 'reel_spin', 0.6)]),
@@ -75,8 +68,8 @@ BEATS = [
         (C + 'casino_crash_cashout', 0.4, 1.4, dict(zoom=(1.2, 1.3), focus=(0.62, 0.45)), [(0.3, 'casino', 'cash_out', 0.8)]),
     ], sub=('THE HOUSE *ALWAYS* WINS', 2.0)),
     dict(cap='STACK THEM FOR *MORE XP*', clips=[
-        ('ui/ui_select', 0.5, 2.4, {}, [(0.3, 'mc', 'ui/button/click', 0.7), (1.2, 'mc', 'ui/button/click', 0.7)]),
-        ('ui/ui_journey', 0.5, 2.0, {}, [(0.2, 'mc', 'random/levelup', 0.5)]),
+        ('ui/ui_select', 0.5, 2.0, dict(zoom=(1.7, 1.9), focus=(0.5, 0.4)), [(0.3, 'mc', 'random/click', 0.7), (1.2, 'mc', 'random/click', 0.7)]),
+        ('ui/ui_journey', 0.3, 2.8, dict(zoom=(1.25, 1.35), focus=(0.55, 0.45)), [(0.2, 'mc', 'random/levelup', 0.5)]),
     ], sub=('UNLOCK ALL *50*', 2.4)),
     dict(cap=None, clips=[
         (SP + '/film/cards/end_challenges', 0, 6.5, dict(zoom=(1.0, 1.06)), [(0, 'impact', None, 0.9)]),
