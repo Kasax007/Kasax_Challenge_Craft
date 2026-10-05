@@ -126,6 +126,11 @@ public final class Cam {
      * the camera. {@code cut}: jump there; otherwise glide from where it stood the tick before.
      */
     public void playerPose(Vec3 feet, float yaw, float pitch, boolean cut) {
+        // On a cut the server learns the new place too, or its next position check pulls the player back.
+        if (cut && d.sp != null) d.server(server -> {
+            var sp = d.player(server);
+            sp.teleportTo((net.minecraft.server.level.ServerLevel) sp.level(), feet.x, feet.y, feet.z, java.util.Set.of(), yaw, pitch, false);
+        });
         d.client(mc -> {
             LocalPlayer p = mc.player;
             if (p == null) return;

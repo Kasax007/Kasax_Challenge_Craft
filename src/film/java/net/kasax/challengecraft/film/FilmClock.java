@@ -16,7 +16,25 @@ public final class FilmClock {
     /** Server ticks that ran / were held back while gated (for the log). */
     public static final AtomicInteger RAN = new AtomicInteger(), HELD = new AtomicInteger();
 
+    /** The film's clock in milliseconds, or -1 for the real one (see {@code UiClockMixin}). */
+    private static volatile long filmMillis = -1;
+
     private FilmClock() {
+    }
+
+    /**
+     * The time the mod's own UI animations run on (banners, the blackjack table, timers). A frame
+     * takes far longer to draw than its 1/30 s, so on the real clock a 4.5 s banner was gone after
+     * six frames; while a world is filmed they run on game time instead.
+     */
+    public static long millis() {
+        long t = filmMillis;
+        return t < 0 ? System.currentTimeMillis() : t;
+    }
+
+    /** Sets the film's clock; -1 hands back to the real one. */
+    public static void setMillis(long t) {
+        filmMillis = t;
     }
 
     public static void gate(boolean on) {

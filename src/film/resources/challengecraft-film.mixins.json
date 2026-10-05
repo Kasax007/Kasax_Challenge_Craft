@@ -4,7 +4,8 @@
   "compatibilityLevel": "JAVA_25",
   "client": [
     "ChallengeTabFilmMixin",
-    "ScreenshotLeakMixin"
+    "ScreenshotLeakMixin",
+    "UiClockMixin"
   ],
   "injectors": {
     "defaultRequire": 1

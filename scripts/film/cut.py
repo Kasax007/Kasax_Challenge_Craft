@@ -111,9 +111,12 @@ def _caption_image(text, style, accent, size):
         stroke = 9
     font = _font(CAPTION_FONT, size)
     words = []
+    inside = False  # an accent may span several words: *GAME OVER*, and end before punctuation: *GAMBLE*?
     for raw in text.split(' '):
-        hot = raw.startswith('*') and raw.endswith('*') and len(raw) > 2
-        words.append((raw.strip('*') if hot else raw, hot))
+        hot = inside or '*' in raw
+        if raw.count('*') % 2:
+            inside = not inside
+        words.append((raw.replace('*', ''), hot))
     # Wrap to the safe width.
     max_w = W - 140
     lines, line = [], []

@@ -46,6 +46,8 @@ public class FilmDirector implements FabricClientGameTest {
     public Path out;
     /** Game ticks since the current world was opened. */
     public int tick;
+    /** Where the film's clock stood when the world opened (see {@link FilmClock#millis()}). */
+    private long clockBase;
     public final Cam cam = new Cam(this);
 
     /** Something done once per game tick while a shot runs; {@code t} counts the shot's ticks from 1. */
@@ -113,6 +115,8 @@ public class FilmDirector implements FabricClientGameTest {
         hud(false);
         settle(600);
         FilmClock.gate(true);
+        clockBase = System.currentTimeMillis() - tick * 50L;
+        FilmClock.setMillis(clockBase + tick * 50L);
     }
 
     /** Lets the game run until the client has drawn every chunk in sight (or {@code maxTicks} pass). */
@@ -130,6 +134,7 @@ public class FilmDirector implements FabricClientGameTest {
 
     public void closeWorld() {
         FilmClock.gate(false);
+        FilmClock.setMillis(-1);
         cam.reset();
         sp.close();
         sp = null;
@@ -170,6 +175,7 @@ public class FilmDirector implements FabricClientGameTest {
         FilmClock.allow();
         ctx.waitTick();
         tick++;
+        if (FilmClock.gated()) FilmClock.setMillis(clockBase + tick * 50L);
     }
 
     /** Lets the game run without filming. */
@@ -216,6 +222,7 @@ public class FilmDirector implements FabricClientGameTest {
                 step();
                 if (every != null) every.tick(tick - start);
             }
+            FilmClock.setMillis(clockBase + Math.round((tick + t - whole) * 50));
             ctx.takeScreenshot(TestScreenshotOptions.of(String.format("f%05d", i)).withDeltaTicks((float) (t - whole))
                     .disableCounterPrefix().withDestinationDir(dir));
             if (i % 90 == 0) LOG.info("[Film] {} frame {}: {}", name, i, memory());

@@ -4,6 +4,7 @@ import net.kasax.challengecraft.casino.BlackjackRevival;
 import net.kasax.challengecraft.casino.BlackjackTable;
 import net.kasax.challengecraft.casino.CasinoBooth;
 import net.kasax.challengecraft.casino.CasinoEconomy;
+import net.kasax.challengecraft.casino.CasinoNet;
 import net.kasax.challengecraft.casino.CasinoRegistry;
 import net.kasax.challengecraft.casino.CasinoTestHooks;
 import net.kasax.challengecraft.casino.CounterDeposit;
@@ -13,8 +14,10 @@ import net.kasax.challengecraft.casino.PlinkoGame;
 import net.kasax.challengecraft.casino.RouletteGame;
 import net.kasax.challengecraft.casino.RouletteMath;
 import net.kasax.challengecraft.casino.SlotGame;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -396,6 +399,19 @@ final class CasinoScenes {
         Vec3 tray = new Vec3(a.getX() + 0.5, a.getY() + 1.0, a.getZ() + 0.5);
         d.cam.playerLook(spot, tray.add(0.5, 0.35, 0), true);
         d.run(20);
+        d.server(server -> {
+            ServerPlayer p = d.player(server);
+            p.teleportTo(spot.x, spot.y, spot.z);
+            FilmDirector.LOG.info("[Film] at the counter: {} (player {}, croupier {})", net.kasax.challengecraft.casino.CasinoGames.atCroupier(p),
+                    p.position(), CasinoBooth.croupier(server) == null ? null : CasinoBooth.croupier(server).position());
+        });
+        d.run(5);
+        d.server(server -> {
+            CounterDeposit.place(d.player(server), new ItemStack(Items.DIAMOND, 1));
+            FilmDirector.LOG.info("[Film] test deposit lies on the counter: {}", CounterDeposit.hasPile(d.player(server)));
+            CounterDeposit.takeBack(d.player(server), 0);
+        });
+        d.run(5);
         d.shoot("casino_counter", 9.0, t -> {
             if (t == 6) d.server(server -> CounterDeposit.place(d.player(server), new ItemStack(Items.DIAMOND, 64)));
             if (t == 16) d.server(server -> CounterDeposit.place(d.player(server), new ItemStack(Items.GOLD_INGOT, 64)));
@@ -403,8 +419,9 @@ final class CasinoScenes {
             if (t == 36) d.server(server -> CounterDeposit.place(d.player(server), new ItemStack(Items.NETHERITE_INGOT, 9)));
             if (t == 70) d.server(server -> CounterDeposit.deal(d.player(server)));
             double f = FilmDirector.ease(t, 0, 160);
-            Vec3 eye = spot.add(FilmDirector.lerp(0.15, 0.45, f), 1.62, FilmDirector.lerp(0.35, 0.1, f));
-            Vec3 at = tray.add(FilmDirector.lerp(0.25, 0.6, f), FilmDirector.lerp(0.2, 0.5, f), 0);
+            double up = FilmDirector.ease(t, 70, 120);
+            Vec3 eye = spot.add(FilmDirector.lerp(0.1, 0.25, f), FilmDirector.lerp(1.75, 1.65, f), FilmDirector.lerp(0.3, 0.15, f));
+            Vec3 at = tray.add(FilmDirector.lerp(0.05, 0.6, up), FilmDirector.lerp(-0.05, 0.6, up), 0);
             if (t <= 1) d.cam.cutTo(eye, at);
             else d.cam.moveTo(eye, at);
         });
@@ -431,9 +448,9 @@ final class CasinoScenes {
         Vec3 hero = standAt.add(0, 1.0, 0);
         d.shoot("casino_wave", 9.0, t -> {
             double f = FilmDirector.ease(t, 0, 180);
-            double ang = Math.toRadians(FilmDirector.lerp(200, 250, f));
-            double r = FilmDirector.lerp(7.5, 9.5, f);
-            Vec3 eye = hero.add(Math.cos(ang) * r, FilmDirector.lerp(4.5, 6.5, f), Math.sin(ang) * r);
+            double ang = Math.toRadians(FilmDirector.lerp(150, 200, f));
+            double r = FilmDirector.lerp(4.2, 6.0, f);
+            Vec3 eye = hero.add(Math.cos(ang) * r, FilmDirector.lerp(1.6, 3.2, f), Math.sin(ang) * r);
             if (t <= 1) d.cam.cutTo(eye, hero);
             else d.cam.moveTo(eye, hero);
         });
@@ -495,6 +512,12 @@ final class CasinoScenes {
             Field table = limbo.getClass().getDeclaredField("table");
             table.setAccessible(true);
             table.set(limbo, new BlackjackTable(RandomSource.create(seed)));
+            // The hand dealt first may already have been over (a natural): play the new one from the start.
+            for (String[] f : new String[][]{{"phase", "0"}, {"outcome", "-1"}, {"ticksLeft", "400"}}) {
+                Field fld = limbo.getClass().getDeclaredField(f[0]);
+                fld.setAccessible(true);
+                fld.setInt(limbo, Integer.parseInt(f[1]));
+            }
             Method send = BlackjackRevival.class.getDeclaredMethod("send", ServerPlayer.class, limbo.getClass());
             send.setAccessible(true);
             send.invoke(null, player, limbo);
@@ -506,21 +529,51 @@ final class CasinoScenes {
     /** The fee is due (HUD shown), the House collects; then a fee the team cannot pay: the House wins. */
     private void fee() {
         openCasino(SEED);
-        d.hud(true);
-        Vec3 standAt = new Vec3(a.getX() - 6.5, a.getY(), a.getZ() + 0.5);
-        Vec3 booth = new Vec3(a.getX() + 1.5, a.getY() + 1.6, a.getZ() + 0.5);
+        // A step back from the counter, the croupier in the middle of the frame.
+        Vec3 spot = CasinoBooth.customerSpot(a, 1);
+        Vec3 tray = new Vec3(a.getX() + 0.5, spot.y, a.getZ() + 0.5);
+        Vec3 back = spot.subtract(tray).normalize();
+        Vec3 standAt = spot.add(back.scale(1.6));
+        Vec3 croupier = d.fromServer(server -> CasinoBooth.croupier(server) == null ? null : CasinoBooth.croupier(server).position());
+        Vec3 face = croupier == null ? tray.add(0, 1.6, 0) : croupier.add(0, 1.3, 0);
         d.cam.player();
-        d.cam.playerLook(standAt, booth, true);
+        d.cam.playerLook(standAt, face, true);
+        d.hud(true);
         d.run(40);
-        d.shoot("casino_fee", 6.0, t -> {
-            if (t == 20) d.cmd("casino fee");
+        d.shoot("casino_fee", 6.5, t -> {
+            if (t == 2) d.server(server -> {
+                long fee = CasinoEconomy.fee(server, CasinoEconomy.nextFeeIndex(server));
+                ServerPlayNetworking.send(d.player(server), new CasinoNet.Fx(CasinoNet.Fx.FEE_WARNING, fee, "", 0L));
+            });
+            if (t == 60) {
+                long fee = d.fromServer(server -> CasinoEconomy.fee(server, CasinoEconomy.nextFeeIndex(server)));
+                d.cmd("casino fee");
+                d.server(server -> ServerPlayNetworking.send(d.player(server), new CasinoNet.Fx(CasinoNet.Fx.FEE_PAID, fee, Long.toString(fee), 0L)));
+            }
         });
         d.cmd("execute as @p run casino chips -1990000");
-        d.cmd("casino feescale 1000000");
-        d.run(40);
+        // A smaller GUI, so the title "THE HOUSE WINS" fits the phone-wide screen.
+        d.client(mc -> {
+            mc.options.guiScale().set(3);
+            mc.resizeGui();
+        });
+        d.run(30);
         d.shoot("casino_bankrupt", 7.0, t -> {
-            if (t == 15) d.cmd("casino fee");
+            if (t == 12) d.server(server -> {
+                try {
+                    Method bankrupt = CasinoEconomy.class.getDeclaredMethod("bankrupt", MinecraftServer.class, long.class, long.class);
+                    bankrupt.setAccessible(true);
+                    long total = CasinoEconomy.total(server);
+                    bankrupt.invoke(null, server, Math.max(total * 3, 1_000_000L), total);
+                } catch (ReflectiveOperationException e) {
+                    throw new IllegalStateException(e);
+                }
+            });
         });
         d.hud(false);
+        d.client(mc -> {
+            mc.options.guiScale().set(4);
+            mc.resizeGui();
+        });
     }
 }
