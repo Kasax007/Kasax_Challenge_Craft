@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "net.kasax.challengecraft.film.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "ChallengeTabFilmMixin",
+    "ScreenshotLeakMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "mixins": [
+    "ServerLockstepMixin"
+  ]
+}

@@ -101,3 +101,37 @@ loom.runs.matching { it.name == 'gameTest' }.configureEach {
 	// Every plan the planner makes, step by step, in the log: ./gradlew runGameTest -PbotDebugPlan
 	if (project.hasProperty('botDebugPlan')) vmArg "-Dbob.debugPlan=true"
 }
+
+// Footage for the shorts, frame by frame (src/film): ./gradlew runFilm -Pfilm=SCENE
+// A client game test of its own source set, so the bot tests' test instances (far_walk's padding
+// of 200 is more than the network can carry to a client) stay out of the client it films with.
+sourceSets {
+	film {
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+	}
+}
+loom {
+	mods {
+		"challengecraft-film" {
+			sourceSet sourceSets.film
+		}
+	}
+	runs {
+		film {
+			client()
+			name "Film"
+			source sourceSets.film
+			runDir "build/run/film"
+			property "fabric.client.gametest"
+			property "fabric.client.gametest.testModResourcesPath", file("src/film/resources").absolutePath
+			vmArg "-Xmx3G"
+			if (project.hasProperty('film')) vmArg "-Dfilm.scene=${project.property('film')}"
+			if (project.hasProperty('filmOut')) vmArg "-Dfilm.out=${project.property('filmOut')}"
+			if (project.hasProperty('filmSeed')) vmArg "-Dfilm.seed=${project.property('filmSeed')}"
+		}
+	}
+}
+tasks.matching { it.name == 'runFilm' }.configureEach {
+	onlyIf { project.hasProperty('film') }
+}

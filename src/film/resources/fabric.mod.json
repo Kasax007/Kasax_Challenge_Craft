@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "challengecraft-film",
+  "version": "1.0.0",
+  "name": "Challenge Craft film director",
+  "description": "Films scenes for the shorts frame by frame (dev only, never shipped).",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "net.kasax.challengecraft.film.FilmDirector"
+    ]
+  },
+  "depends": {
+    "challengecraft": "*",
+    "fabric-client-gametest-api-v1": "*"
+  },
+  "mixins": [
+    "challengecraft-film.mixins.json"
+  ]
+}
