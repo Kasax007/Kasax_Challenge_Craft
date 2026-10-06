@@ -910,18 +910,19 @@ public final class LockoutBrain implements BotBrain {
         // before the board ever wants iron (round 17: no 30-minute run made one).
         if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && !openingIron) {
             var body = bot.body();
-            int need = (has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) ? 0 : 1)
-                    + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
-                    net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
-            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
-            if (need <= iron || openingIronTries++ > 1) {
+            // (As the whole thing, not as "four raw iron": the planner then takes the nearest ore
+            // and the furnace on the way, and the kit's iron for the shield from the same vein -
+            // raw iron alone walked off to the remembered ore a hundred blocks away.)
+            net.minecraft.world.item.Item next = !has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
+                    net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? net.minecraft.world.item.Items.IRON_PICKAXE
+                    : !has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) ? net.minecraft.world.item.Items.SHIELD : null;
+            if (next == null || openingIronTries++ > 2) {
                 openingIron = true;
                 return false;
             }
-            bot.say("opening: iron for a shield and a pickaxe (" + iron + "/" + need + ")");
+            bot.say("opening: " + ObtainPlanner.name(next) + " (iron early: the shield and the pickaxe)");
             nextErrand = "iron";
-            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.RAW_IRON),
-                    ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.RAW_IRON)) + need - iron, planner), 6000);
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(next), 1, planner), 6000);
             return true;
         }
         return false;

@@ -143,7 +143,10 @@ final class LockoutStrategist {
         // The kit's iron too, not only the board's: the iron pickaxe, the bucket the plan invests
         // in, and a shield (one ingot, and the arrows end in it) - mined in the same trip, from
         // the same vein, instead of a second trip down for the last few.
-        boolean ironWanted = ironKit || planner.boardDemand.containsKey(Items.RAW_IRON);
+        // (On hard always, until the shield is made: the opening goes for it - see LockoutBrain.opening.)
+        boolean ironWanted = ironKit || planner.boardDemand.containsKey(Items.RAW_IRON)
+                || bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD
+                && !holdsAny(bot, Set.of(Items.SHIELD)) && bot.body().getOffhandItem().getItem() != Items.SHIELD;
         if (ironWanted) {
             int kit = 0;
             if (!holdsAny(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE))) kit += 3;
