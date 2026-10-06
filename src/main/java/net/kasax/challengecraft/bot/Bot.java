@@ -654,9 +654,11 @@ public final class Bot {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(16));
                     return;
                 }
+                // (A shield on the arm: up towards it on the way, without stopping - the threat
+                // sense does that every tick; standing still behind it only made a target.)
                 if (shieldOn) {
-                    reflex(new net.kasax.challengecraft.bot.task.ShieldUpTask(m));
-                    return;
+                    shooterCheckAt = body.tickCount + 10;
+                    break;
                 }
                 shooterCheckAt = body.tickCount + 40; // (nothing to do about it: not every check)
                 break;

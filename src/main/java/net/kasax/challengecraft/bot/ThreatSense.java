@@ -19,6 +19,11 @@ public final class ThreatSense {
     private int dodgeUntil;
     /** For the benchmarks: dodges begun, steps round so a blow would not throw it into lava. */
     public int dodges, standsTaken, creeperEscapes;
+    /** For the benchmarks: ticks walked behind the raised shield, arrows met with it instead of a dodge. */
+    public int shieldWalkTicks, shieldBlocks;
+    private int shieldSaidAt = -1000;
+    /** The shield is up on this sense's account (not a task's) until this tick; then it comes down. */
+    private int shieldMineUntil = -1;
     private int creeperSaidAt = -1000;
     /** Where to stand so no blow throws it into lava, and when that was last looked at. */
     private Vec3 stand;
@@ -61,6 +66,17 @@ public final class ThreatSense {
                 dodge = null;
                 return;
             }
+        }
+        if (shieldWalk()) {
+            dodge = null;
+            return;
+        }
+        // Raised here and no longer wanted: down again (a task that wants it raises it itself).
+        if (shieldMineUntil >= 0 && body.tickCount > shieldMineUntil) {
+            shieldMineUntil = -1;
+            if (body.isUsingItem() && body.getUseItem().is(net.minecraft.world.item.Items.SHIELD)
+                    && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ShieldUpTask)
+                    && !(bot.current() instanceof net.kasax.challengecraft.bot.task.KillTask)) body.releaseUsingItem();
         }
         if (dodge != null) {
             if (body.tickCount > dodgeUntil) dodge = null;
@@ -106,6 +122,16 @@ public final class ThreatSense {
             int hit = hitsIn(p, me.inflate(0.35));
             // Too late to get out of the way (it hits within three ticks), or not coming: nothing to do.
             if (hit < 3 || hit > 20) continue;
+            // A shield on the arm and time to raise it (it blocks after five ticks): turned to the
+            // arrow behind the shield - a step aside misses as often as not, the shield never.
+            boolean raising = body.isUsingItem() && body.getUseItem().is(net.minecraft.world.item.Items.SHIELD);
+            if ((hit >= 6 || raising) && shieldOn()) {
+                Vec3 from = p.position().subtract(p.getDeltaMovement().scale(4));
+                raiseShieldTowards(from, true);
+                if (!raising) shieldBlocks++;
+                if (!raising) say("a " + p.getType().toShortString() + " coming (in " + hit + " ticks): shield up");
+                return;
+            }
             Vec3 v = p.getDeltaMovement().multiply(1, 0, 1);
             if (v.lengthSqr() < 1e-4) v = body.position().subtract(p.position()).multiply(1, 0, 1);
             if (v.lengthSqr() < 1e-4) continue;
@@ -120,6 +146,63 @@ public final class ThreatSense {
             bot.danger.steer(side.x, side.z);
             return;
         }
+    }
+
+    private boolean shieldOn() {
+        return bot.body().getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+    }
+
+    /**
+     * A shooter (skeleton, stray, pillager) after Bob in sight, and a shield on the arm: the shield
+     * stays up towards it while Bob goes on his way - a bot loses only the sprint with the shield
+     * raised, and every arrow ends in it. Not while something strikes close: then the sword is wanted.
+     */
+    private boolean shieldWalk() {
+        var body = bot.body();
+        if (!shieldOn() || bot.current() instanceof net.kasax.challengecraft.bot.task.KillTask) return false;
+        net.minecraft.world.entity.Mob shooter = null;
+        double best = Double.MAX_VALUE;
+        for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(24),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob
+                        && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+            double d = m.distanceToSqr(body);
+            if (d < best && body.hasLineOfSight(m)) {
+                best = d;
+                shooter = m;
+            }
+        }
+        if (shooter == null) return false;
+        // Something close enough to strike: a fight, not a shield walk (the reflexes start it).
+        if (!body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(3),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
+                        && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)).isEmpty()) return false;
+        raiseShieldTowards(shooter.getEyePosition(), true);
+        shieldWalkTicks++;
+        if (body.tickCount - shieldSaidAt > 100) {
+            shieldSaidAt = body.tickCount;
+            say("a " + shooter.getType().toShortString() + " shooting at me " + Math.round(Math.sqrt(best)) + " blocks off: on my way behind the shield");
+        }
+        return true;
+    }
+
+    /** Turned to {@code at} with the shield up; the keys the task pressed still go the same way over the ground. */
+    private void raiseShieldTowards(Vec3 at, boolean keepGoing) {
+        var body = bot.body();
+        double yaw = body.getYRot() * net.minecraft.util.Mth.DEG_TO_RAD;
+        double sin = Math.sin(yaw), cos = Math.cos(yaw);
+        double wx = -body.forward * sin + body.strafe * cos, wz = body.forward * cos + body.strafe * sin;
+        body.lookAt(at);
+        if (!body.isUsingItem() || !body.getUseItem().is(net.minecraft.world.item.Items.SHIELD)) {
+            if (body.isUsingItem()) body.releaseUsingItem();
+            body.gameMode.useItem(body, body.level(), body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
+        }
+        shieldMineUntil = body.tickCount + (keepGoing ? 2 : 14);
+        if (keepGoing) bot.danger.steer(wx, wz);
+        else bot.danger.steer(0, 0);
+    }
+
+    private void say(String what) {
+        bot.say(what);
     }
 
     private AABB me() {

@@ -1065,6 +1065,42 @@ public class BotStuntTests {
         });
     }
 
+    /**
+     * Three strays shooting from the side while Bob walks past (hard), a shield and no weapon:
+     * the shield stays up towards them on the way (no dodging into the next arrow) - little lost.
+     */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
+    public void shieldWalkStrays(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "shield_walk_strays");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        java.util.List<net.minecraft.world.entity.Mob> strays = new java.util.ArrayList<>();
+        for (int[] at : new int[][]{{14, 4}, {22, 2}, {30, 5}}) {
+            var st = EntityTypes.STRAY.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            strays.add(st);
+            st.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+            st.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            st.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(at[0], FEET, at[1])));
+            st.setPersistenceRequired();
+            level.addFreshEntity(st);
+        }
+        a.spawn(-14, FEET, 22);
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(54, FEET, 22), 1.5), 1150, () -> {
+            // (They have seen it from the start, as strays on a hill at night do.)
+            for (var st : strays) if (st.isAlive() && st.getTarget() != body) st.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().body() != body || !body.isAlive()) h.fail("shield_walk_strays: shot dead");
+            if (body.position().x < a.abs(53, FEET, 22).getX()) return false;
+            BotArena.LOG.info("[BOTTEST] shield_walk_strays lost {} health, shield walk {} ticks, {} arrows met with the shield, {} dodges",
+                    20 - low[0], a.bot().threats.shieldWalkTicks, a.bot().threats.shieldBlocks, a.bot().threats.dodges);
+            h.assertTrue(20 - low[0] <= 6, "shield_walk_strays: lost " + (20 - low[0]));
+            return true;
+        });
+    }
+
     /** A skeleton shooting from fifteen blocks, no weapon, no shield, blocks in the pack (hard): a wall against it, little lost. */
     @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 24)
     public void skeletonCover(GameTestHelper h) {
