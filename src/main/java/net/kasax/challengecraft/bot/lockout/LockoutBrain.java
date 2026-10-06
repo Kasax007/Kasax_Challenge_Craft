@@ -177,7 +177,7 @@ public final class LockoutBrain implements BotBrain {
         if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
                 && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-            boolean ironWanted = strategist.wantsIron() && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
+            boolean ironWanted = (strategist.wantsIron() || !openingIron) && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
             // Only for what is wanted: iron (the kit, the board), food running low; a ruined
             // portal for its obsidian and gold when the board or the way to the Nether wants them.
             boolean foodLow = bot.body().getFoodData().getFoodLevel() < 12 && net.kasax.challengecraft.bot.task.EatTask.bestFood(bot.body()) < 0;
@@ -904,8 +904,31 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner), 2400);
             return true;
         }
+        // On hard the opening ends with iron: a shield (one ingot) and the iron pickaxe (three),
+        // as every good player gets them in the first minutes - from the first cave, a village's
+        // smith, a shipwreck. Without a shield the skeletons and the night cost a life or two
+        // before the board ever wants iron (round 17: no 30-minute run made one).
+        if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && !openingIron) {
+            var body = bot.body();
+            int need = (has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) ? 0 : 1)
+                    + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
+                    net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
+            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+            if (need <= iron || openingIronTries++ > 1) {
+                openingIron = true;
+                return false;
+            }
+            bot.say("opening: iron for a shield and a pickaxe (" + iron + "/" + need + ")");
+            nextErrand = "iron";
+            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.RAW_IRON),
+                    ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.RAW_IRON)) + need - iron, planner), 6000);
+            return true;
+        }
         return false;
     }
+
+    private boolean openingIron;
+    private int openingIronTries;
 
     private int openingTries;
     private boolean openingWood;
@@ -1663,6 +1686,8 @@ public final class LockoutBrain implements BotBrain {
         replanNow = true;
         openingStep = 0; // the tools are gone with the rest
         openingWood = false;
+        openingIron = false;
+        openingIronTries = 0;
         kitRetryAt = 0;
         kitTries = 0;
         openingTries = 0;
