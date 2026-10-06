@@ -914,10 +914,43 @@ public final class LockoutBrain implements BotBrain {
         // iron no sooner than without it.
         if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && !openingIron
                 && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD))) openingIron = true;
+        // Iron in sight close to the surface - in a cliff, a cave mouth, a ravine's upper walls,
+        // at most ten blocks down and fifty off: taken now for the shield (and the pickaxe), a
+        // short way back up if anything goes wrong. Never a dig down to it.
+        if (!openingIron && bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD
+                && bot.body().getHealth() >= 12 && bot.body().level().getGameTime() >= shallowIronAt) {
+            shallowIronAt = bot.body().level().getGameTime() + 600;
+            var body = bot.body();
+            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+            int need = 1 + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
+                    net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
+            var ore = shallowIron(bot);
+            if (iron < need && ore != null) {
+                bot.say("opening: iron near the surface at " + ore.toShortString() + " (for the shield)");
+                nextErrand = "iron";
+                start(bot, new net.kasax.challengecraft.bot.task.MineTask("raw_iron", SHALLOW_IRON, Set.of(net.minecraft.world.item.Items.RAW_IRON),
+                        ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.RAW_IRON)) + need - iron).knownOnly(), 1800);
+                return true;
+            }
+        }
         return false;
     }
 
     private boolean openingIron;
+    private long shallowIronAt;
+    private static final java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> SHALLOW_IRON =
+            st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE) || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE);
+
+    /** Iron ore in sight within fifty blocks, at most ten below the surface over it; the nearest. */
+    private static net.minecraft.core.BlockPos shallowIron(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        var at = bot.body().blockPosition();
+        for (var p : net.kasax.challengecraft.bot.BotWorld.nearestN(level, at, 48, 24, SHALLOW_IRON, true, bot.unreachable(), 16)) {
+            int surface = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p).getY();
+            if (p.getY() >= surface - 10) return p;
+        }
+        return null;
+    }
     private long healRetryAt;
 
     private boolean healUp(Bot bot) {
@@ -1695,6 +1728,7 @@ public final class LockoutBrain implements BotBrain {
         openingStep = 0; // the tools are gone with the rest
         openingWood = false;
         openingIron = false;
+        shallowIronAt = 0;
         kitRetryAt = 0;
         kitTries = 0;
         openingTries = 0;
