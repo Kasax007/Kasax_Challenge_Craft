@@ -916,10 +916,14 @@ public final class LockoutBrain implements BotBrain {
             net.minecraft.world.item.Item next = !has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
                     net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? net.minecraft.world.item.Items.IRON_PICKAXE
                     : !has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) ? net.minecraft.world.item.Items.SHIELD : null;
-            if (next == null || openingIronTries++ > 2) {
+            if (next == null || openingIronTries > 2) {
                 openingIron = true;
                 return false;
             }
+            // A shipwreck or a village close by (by day): its chests and its smith first, as every
+            // speedrunner does - iron without the caves' skeletons (see the raid step).
+            if (lootableNear(bot)) return false;
+            openingIronTries++;
             bot.say("opening: " + ObtainPlanner.name(next) + " (iron early: the shield and the pickaxe)");
             nextErrand = "iron";
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(next), 1, planner), 6000);
@@ -929,6 +933,20 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
+
+    /** A shipwreck or a village within 160 blocks not yet looted, by day, in good health. */
+    private boolean lootableNear(Bot bot) {
+        if (bot.body().getHealth() < 12 || bot.body().level().isDarkOutside()
+                || bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        for (String kind : List.of("shipwreck", "village")) {
+            var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
+                    net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, kind));
+            if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > 160L * 160) continue;
+            if (!raided.contains(kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6))) return true;
+        }
+        return false;
+    }
     private int openingIronTries;
 
     private int openingTries;
