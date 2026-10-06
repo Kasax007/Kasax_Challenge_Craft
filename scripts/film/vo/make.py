@@ -48,7 +48,11 @@ LINES = {
         (45.4, "so in the long run, the House always wins.", 0.55, 0.4),
         (48.4, "Would you gamble?", 0.75, 0.35),
     ]),
-}[SHORT]
+}.get(SHORT)
+_plan = os.path.join(HERE, SHORT + '_plan.json')
+if os.path.exists(_plan):  # V2 shorts: the edit script writes the plan
+    _p = json.load(open(_plan))
+    LINES = (_p['total'], [tuple(x) for x in _p['lines']])
 TOTAL, LINES = LINES
 OUT = os.path.join(HERE, SHORT)
 os.makedirs(OUT, exist_ok=True)

@@ -91,3 +91,87 @@ Link in der Bio: die CurseForge-Seite der Mod.
 den Casino-Szenen sind Ergebnisse (Jackpot, Plinko-Fach, Crash-Punkt, Roulette-Zahl, Blackjack-Blatt)
 mit den Admin-Testbefehlen der Mod festgelegt (die Gebühr und der Bankrott über die Test-Haken), damit jede Szene zeigt, was das Skript braucht. Die
 Spiele selbst laufen dabei unverändert.
+
+---
+
+## V2: schneller Schnitt (Schnitte alle 0,4–1,2 s, Wort-Captions)
+
+Dateien in `out/send/`: `<name>_final_vo.mp4` (mit Untertiteln), `<name>_clean_vo.mp4` (ohne), `<name>.srt`, `<name>_voice.m4a` (reine Sprachspur). Skripte in `scripts/film/` (`v2lib.py` ist der gemeinsame Builder).
+
+### Challenge-Short V2 – „I coded 50 viral challenges into Minecraft“
+
+Skript: `edit/challenge_short_v2.py`, Länge 32.2 s.
+
+| Zeit | Voice-Over |
+| --- | --- |
+| 0:00.0 | I coded fifty viral challenges into Minecraft! |
+| 0:03.2 | Red light? Move... and you're dead. |
+| 0:05.4 | Dice decide how far you walk! |
+| 0:07.3 | No legs? Cushion! |
+| 0:08.9 | Every chunk, one random block. |
+| 0:10.9 | Stand still, and the floor burns! |
+| 0:12.7 | Giant mobs. Or tiny ones. |
+| 0:14.3 | Your drops fly into the sky! |
+| 0:15.9 | One zombie? Ten zombies! |
+| 0:18.6 | Skyblock, anywhere. |
+| 0:20.0 | Race for random items... or play Lockout against Bob, my AI! |
+| 0:24.1 | There's even a casino! |
+| 0:25.6 | Stack them for more XP... and unlock all fifty! |
+| 0:29.2 | Free on CurseForge. Which one next? |
+
+### Casino-Short V2 – „I built a real casino in Minecraft“ (mit Auswahl, Level-Baum und CTA)
+
+Skript: `edit/casino_short_v2.py`, Länge 36.7 s.
+
+| Zeit | Voice-Over |
+| --- | --- |
+| 0:00.0 | I built a real casino in Minecraft! |
+| 0:02.9 | Every item you own is a chip. |
+| 0:04.3 | The dealer buys your loot. |
+| 0:05.9 | But every ten minutes... the House takes its fee! |
+| 0:08.5 | Can't pay? Game over. |
+| 0:10.3 | So... grind, or gamble? |
+| 0:12.3 | Slots with free spins! |
+| 0:13.9 | Plinko! Drop the ball! |
+| 0:15.1 | Crash: cash out before it blows! |
+| 0:17.5 | Roulette! Place your bets! |
+| 0:19.7 | Lose a bet, and the House sends monsters! |
+| 0:22.1 | Die? Play blackjack... for your life! |
+| 0:24.6 | Win, and you're back! |
+| 0:26.8 | Ninety-six percent payback. The House always wins. |
+| 0:30.1 | Play this, and forty-nine other challenges, in Challenge Craft! |
+| 0:33.8 | Free on CurseForge. Would you gamble? |
+
+### Neuer Short A – „Minecraft, but dying is a card game“
+
+Skript: `edit/blackjack_short.py`, Länge 15.5 s.
+
+| Zeit | Voice-Over |
+| --- | --- |
+| 0:00.0 | Minecraft, but dying is a card game! |
+| 0:02.0 | Can't pay the House's fee? That's game over. |
+| 0:04.1 | You die... but the House makes you an offer. |
+| 0:06.4 | Beat the dealer at blackjack! |
+| 0:08.0 | Hit, stand, or double down! |
+| 0:09.6 | The dealer busts... and you live! |
+| 0:11.5 | Back on your feet, with everything! |
+| 0:13.3 | Would you gamble? |
+
+### Neuer Short B – „Minecraft, but every chunk is ONE random block“
+
+Skript: `edit/random_chunks_short.py`, Länge 16.1 s.
+
+| Zeit | Voice-Over |
+| --- | --- |
+| 0:00.0 | Minecraft, but every chunk is one random block! |
+| 0:03.0 | Take sixteen steps... and the whole ground changes! |
+| 0:05.7 | Gold. Redstone. Diamond. Emerald! |
+| 0:08.1 | And from above... it's pure chaos! |
+| 0:10.8 | It's one of fifty challenges in Challenge Craft! |
+| 0:13.5 | Free on CurseForge. Would you survive this? |
+
+Hashtags: `#minecraft #minecraftmods #minecraftchallenge #gaming` (Casino: `#casino #minecraftbuilds`,
+Blackjack: `#blackjack #gamble`, Chunks: `#minecraftbuilds #randomizer`). Link in der Bio: CurseForge.
+
+Neue Szene für Short B: `chunk_walk` in `ChallengeScenes.java` (Kamera-Fahrt über sechs Chunk-Böden;
+brauchbar sind die Frames 0–125).

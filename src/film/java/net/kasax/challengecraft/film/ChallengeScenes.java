@@ -42,6 +42,7 @@ final class ChallengeScenes {
             case "dice" -> c.dice();
             case "cushion" -> c.cushion();
             case "chunk_blocks" -> c.chunkBlocks();
+            case "chunk_walk" -> c.chunkWalk();
             case "floor_lava" -> c.floorLava();
             case "size_matters" -> c.sizeMatters();
             case "upside_down" -> c.upsideDown();
@@ -269,6 +270,40 @@ final class ChallengeScenes {
             track(t, eye, eye.add(18, -30, 14));
         });
         d.client(mc -> mc.options.renderDistance().set(6));
+    }
+
+    /** Sprinting along a road that crosses chunk after chunk, each chunk one block of the challenge's pool. */
+    private void chunkWalk() {
+        open(16);
+        d.settle(600);
+        BlockPos s = spawn();
+        String[] floors = {"gold_block", "redstone_block", "diamond_block", "emerald_block", "lapis_block", "purpur_block", "gold_block"};
+        int cx = s.getX() >> 4;
+        int x0 = cx * 16, x1 = (cx + floors.length) * 16 - 1;
+        int z0 = s.getZ() - 10, z1 = s.getZ() + 10, y = s.getY();
+        d.cmd(String.format("forceload add %d %d %d %d", x0, z0, x1, z1));
+        d.run(100);
+        for (int k = 0; k < floors.length; k++) {
+            int a = x0 + k * 16, b = a + 15;
+            d.cmd(String.format("fill %d %d %d %d %d %d minecraft:air", a, y, z0, b, y + 14, z1));
+            d.cmd(String.format("fill %d %d %d %d %d %d minecraft:%s", a, y - 4, z0, b, y - 1, z1, floors[k]));
+        }
+        d.run(10);
+        clearLoose();
+        Vec3 start = new Vec3(x0 + 5.5, y, s.getZ() + 0.5);
+        d.cam.playerPose(start, -90f, 0f, true);
+        d.run(20);
+        d.hud(false);
+        keys(true, true);
+        d.shoot("chunk_walk", 10.0, t -> {
+            Vec3 p = playerPos();
+            double f = FilmDirector.ease(t, 0, 300);
+            // From the side, looking ahead at the next chunk, to low in front of him.
+            Vec3 eye = p.add(FilmDirector.lerp(1.5, 4.8, f), FilmDirector.lerp(1.6, 1.0, f), FilmDirector.lerp(4.8, 1.6, f));
+            Vec3 look = p.add(FilmDirector.lerp(3.5, 0, f), FilmDirector.lerp(0.6, 1.1, f), 0);
+            track(t, eye, look);
+        });
+        keys(false, false);
     }
 
     /** Standing still on his own platform: three seconds, and he burns. */

@@ -253,22 +253,27 @@ Format, das gut läuft: **„Minecraft, but …“** mit einer einzigen Challeng
 
 ## Stand
 
-- [ ] 0. TTS-Umgebung wieder aufsetzen (siehe oben), Speicher prüfen
-- [ ] 1. Challenge-Short V2: Schnittskript `challenge_short_v2.py`, VO-Liste `challenges_v2`
-  - [ ] Draft gerendert + Kontaktbogen geprüft
-  - [ ] VO erzeugt, `check.py` ok, gemischt, Mix per Whisper geprüft
-  - [ ] Final + clean + SRT + Sprachspur in `out/` und `out/send/`
-- [ ] 2. Casino-Short V2 (mit Auswahl und Level-Baum am Ende + CTA „Play this and 49 other
+- [x] 0. TTS-Umgebung wieder aufsetzen (siehe oben), Speicher prüfen
+- [x] 1. Challenge-Short V2: Schnittskript `challenge_short_v2.py`, VO-Liste `challenges_v2`
+  - [x] Draft gerendert + Kontaktbogen geprüft
+  - [x] VO erzeugt, `check.py` ok, gemischt, Mix per Whisper geprüft
+  - [x] Final + clean + SRT + Sprachspur in `out/` und `out/send/`
+- [x] 2. Casino-Short V2 (mit Auswahl und Level-Baum am Ende + CTA „Play this and 49 other
   challenges …“): `casino_short_v2.py`, VO `casino_v2`
-  - [ ] Draft + Kontaktbogen
-  - [ ] VO + Prüfung + Mix
-  - [ ] Final + clean + SRT + Sprachspur
-- [ ] 3. Neuer Short A (Thema: …)
-- [ ] 4. Neuer Short B (Thema: …)
-- [ ] 5. `docs/marketing/shorts.md` um V2 und die neuen Shorts ergänzen (Zeiten, Text, Hashtags),
+  - [x] Draft + Kontaktbogen
+  - [x] VO + Prüfung + Mix
+  - [x] Final + clean + SRT + Sprachspur
+- [x] 3. Neuer Short A (Thema: Minecraft, but dying is a card game; blackjack_life, 15.5 s)
+- [x] 4. Neuer Short B (Thema: every chunk one random block; random_chunks, 16 s)
+- [x] 5. `docs/marketing/shorts.md` um V2 und die neuen Shorts ergänzen (Zeiten, Text, Hashtags),
   Skripte nach `scripts/film/` kopieren, committen (ohne Push)
 - [ ] 6. Abschlussbericht an den Haupt-Agenten: Dateipfade in `out/send/`, Längen, offene Punkte
 
 ## Protokoll
 
 (Jede Zeile: Uhrzeit (UTC), was getan, Ergebnis, nächster Schritt.)
+- 08:24 UTC: TTS-Umgebung neu aufgesetzt (tts/ im SP, HF_HOME=SP/hf). Neu: edit/v2lib.py (gemeinsamer V2-Builder: Beats mit Clips, Wort-Captions, VO-Plan -> vo/<name>_plan.json), vo/make.py liest <name>_plan.json, vo/run_v2.sh <name>. edit/challenge_short_v2.py geschrieben (38 Clips, 31 s). Läuft: VO-Erzeugung challenges_v2 + Draft. Nächste: Kontaktbogen prüfen, check.py, mix.
+- 08:39 UTC: Challenge V2 fertig: out/send/challenges_v2_{final,clean}_vo.mp4 (32.2 s, 38 Clips, ~15 MB), .srt, _voice.m4a. VO per Whisper ok, Kontaktbogen geprüft. Neu: vo/sync.py NAME (nach Schnitt-Änderung vor mix.py: Startzeiten aus plan.json in lines.json), vo/transcribe.py, fin.sh NAME. casino_short_v2.py (43 Clips, 35.6 s) Draft ok, VO casino_v2 läuft. Nächste: VO check, mix Casino.
+- 08:54 UTC: Casino V2 fertig: out/send/casino_v2_{final,clean}_vo.mp4 (36.7 s, 43 Clips), srt, voice.m4a. Whisper-Mix ok (VO: 'dealer' statt 'croupier', weil TTS das Wort verhunzt). Ende: ui_select, ui_journey, 'Play this, and forty-nine other challenges, in Challenge Craft!' + Karte 'Free on CurseForge. Would you gamble?'. Neue Shorts: A = 'Minecraft, but you gamble for your LIFE' (Blackjack, vorhandenes Material, 15-20 s), B = 'Minecraft, but every chunk is ONE random block' (neue Szene chunk_walk filmen, plus vorhandener Luftflug). Nächste: Szene chunk_walk in ChallengeScenes.java ergänzen und filmen.
+- 09:21 UTC: Short A fertig: out/send/blackjack_life_{final,clean}_vo.mp4 (15.5 s, 19 Clips), srt, voice. Whisper ok. Neue Szene chunk_walk in ChallengeScenes.java (Kamera-Fahrt über 6 Chunk-Böden gold/redstone/diamond/emerald/lapis/purpur; nutzbar sind Frames 0-125 = 4,2 s, danach läuft der Spieler vom Streifen). Nächste: Short B 'random_chunks' aus chunk_walk 0-4 s + chunk_blocks Luftflug.
+- 09:28 UTC: Short B fertig: out/send/random_chunks_{final,clean}_vo.mp4 (16.1 s), srt, voice. shorts.md um V2-Abschnitt ergänzt, Skripte nach scripts/film kopiert. Nächste: committen, Abschlussbericht.
