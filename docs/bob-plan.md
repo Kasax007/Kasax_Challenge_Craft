@@ -1712,3 +1712,65 @@ Einfluss des Verzeichnisses auszuschließen):
    gezielt nutzen; der Schild als erstes Eisenteil vor Spitzhacke und Eimer.
 2. Mehr Läufe pro Stand (mindestens acht je Version), Tode pro Lauf mit Streuung berichten.
 3. Den Deckel-Grenzfall im Unterschlupf lösen (Monster auf der Deckelposition).
+
+## 22. Runde 18: Eisen früh? Messreihe, Fehlerfunde, YouTube-Recherche
+
+### 22.1 Recherche (Lockout-Videos)
+
+- **Werkzeug:** Mit yt-dlp wurden die automatischen Untertitel von 8 Videos geladen: Feinberg
+  (Lockout/Draftout), Lockout-Turnier, Ranked und Speedrun-Tricks. Die Transkripte liegen im
+  Archiv-Repo unter `research/youtube-transcripts/`.
+- **Video-Frames** blockiert YouTube von hier aus mit der Bot-Prüfung. Dafür bräuchte es Cookies
+  oder einen Gemini-Schlüssel.
+- **Lehren:**
+  - Gute Spieler holen Eisen zuerst aus Truhen: zuerst der Schmied im Dorf, dann Schiffswracks und
+    vergrabene Schätze, außerdem vom Eisengolem.
+  - Essen kommt aus Dorf und Wrack.
+  - Lederrüstung von Kühen als schnelle Rüstung.
+  - Tode kommen fast immer durch Skelette, Hunger oder Lava beim Graben nach unten.
+
+### 22.2 Was gebaut und gemessen wurde
+
+| Änderung | Ergebnis |
+| --- | --- |
+| Eröffnung auf HARD: Eisen-Spitzhacke und Schild direkt nach den Steinwerkzeugen (Höhle oder Treppe) | **verworfen**: mehr Tode (Seed 66: 6–7 Tode, Seed 77: 3–4), Eisen nicht früher |
+| Auf HARD vor dem Schild Eisen immer „gewünscht“ (Kit-Bedarf) | **verworfen**: 8–15 Eisen-Ausflüge pro Spiel mit Steinwerkzeug, doppelt so viele Tode |
+| Eisen nur aus gesichtetem Erz nah an der Oberfläche (≤ 10 unter der Oberfläche, ≤ 48 entfernt) | drin (Wunsch des Spielers); löst selten aus |
+| Wrack oder Dorf vor dem Schild plündern (bei Tag) | drin; hat in den Läufen nie ausgelöst |
+| Wenige Herzen in Höhle, Dunkel oder bei Monstern: eingraben, essen, heilen | drin; löst kaum aus, meist fehlt Essen |
+| Erkunden für Land-Dinge: Land bevorzugen, nach 3 Abschnitten auf offener See zurück | **Fehlerfix**: Seed 11 schwamm 1300 Blöcke aufs Meer |
+| Wächter „steckt fest“: setzt bei verworfenen Wegen nicht mehr zurück; beim 2. Mal an derselben Stelle an die Oberfläche graben | **Fehlerfix**: Seed 33 (5 min) und alt Seed 22 (25 min, 0 Felder) |
+| In der Baumkrone fest (Respawn auf Blättern): nach 10 s durch das Laub nach unten | **Fehlerfix**: Seed 66, 3 min; Test `tree_top_down` |
+| Erinnertes Erz zweimal unerreichbar: dann graben statt zum nächsten laufen | **Fehlerfix**: Seed 33 lief 5 min von Ader zu Ader |
+
+### 22.3 Messung (30 min HARD)
+
+| Stand | Läufe | Felder | Tode | pro Lauf |
+| --- | --- | --- | --- | --- |
+| alt `73660df` | 16 (Seeds 11–88, teils doppelt) | 65 | 26 | 4,1 Felder, 1,6 Tode |
+| neu `139158b` | 8 | 25 | 16 | 3,1 Felder, 2,0 Tode |
+
+- Derselbe alte Stand schwankte auf Seed 66 zwischen 7 Feldern/0 Toden und 3 Feldern/2 Toden.
+- Auf Seed 11/22/33/55 liegen alt und neu gleichauf; auf 66/77/88/44 liegt neu etwas schlechter.
+- Bei der Streuung (±2 Tode pro Lauf) ist kein Unterschied gesichert. Die neuen Verhaltensweisen
+  lösten in den Läufen fast nie aus.
+- **Wichtigste Lehre:** Frühes Eisen um jeden Preis kostet Leben. Jede Variante, die Bob mit
+  Steinwerkzeug unter Tage schickt, verdoppelt die Tode.
+
+### 22.4 Woran Bob stirbt (alle Läufe)
+
+- Skelette (größter Anteil, auch beim Ausweichen);
+- Zombies bei wenig Leben;
+- Creeper;
+- Ertrinken in Höhlenwasser;
+- Wüste (Husk/Parched) und Plünderer;
+- danach oft eine Todesspirale: zurück an dieselbe Stelle, ohne Rüstung und Essen.
+
+### 22.5 Nächste Schritte
+
+1. **Skelett-Kampf:** Deckung suchen (Säule oder Block in die Schusslinie), Abstand verkürzen
+   hinter Hindernissen.
+2. **Essen** als festen Teil des Start-Kits (Tiere, Brot), damit Heilen überhaupt möglich ist.
+3. **Nach einem Tod** nicht in dieselbe Höhle zurück. Die Todesstelle für einige Minuten meiden.
+4. **Mehr Läufe pro Stand** (16 statt 8) und dieselben Erfahrungsdateien für beide Stände, sonst
+   misst man Rauschen.
