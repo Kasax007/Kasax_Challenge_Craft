@@ -1661,3 +1661,54 @@ Die neuen Wegregeln kosten auf der Oberfläche keine Zeit.
 
 **Befund:** Kein Rückschritt; die 14 Felder in Runde 13 waren ein Ausreißer nach oben. Ein
 einzelner Lauf streut um ±3–5 Felder. Belastbare Vergleiche brauchen mehrere Läufe je Stand.
+
+## 21. Runde 17: Schild, Start-Kit, Unterschlupf – und was die Messungen (nicht) zeigen
+
+### 21.1 Umgesetzt
+
+| Baustein | Anlass | Beleg im Test |
+| --- | --- | --- |
+| **Schild-Gehen:** Mit Schild hält Bob ihn zum Schützen hoch und geht weiter (ein Bot verliert dabei nur den Sprint); ein anfliegender Pfeil wird mit dem Schild abgefangen statt mit einem Seitschritt. Der alte Reflex blieb stehen und senkte den Schild nach jedem Pfeil: jedes Mal fünf ungeschützte Ticks. Unter vier Blöcken Abstand wird gekämpft. | Seed 4242: mit Schild am Arm von Strays erschossen | `shield_walk_strays` (drei Strays von der Seite): alt erschossen, neu 0 Herzen verloren |
+| **Essen, wenn verletzt:** Unter 12 Herzen und nichts zu essen geht Essen vor, auch nachts. | Live-Seed: halbe Gesundheit, kein Essen, Creeper-Jagd in einer Höhle | – |
+| **Brustpanzer auf HARD:** Sobald Eisenspitzhacke und Schild da sind, kommen dessen acht Eisen auf die Einkaufsliste. | Kein einziger Lauf baute einen Panzer | – |
+| **Unterschlupf für die Nacht:** Wiedergeboren, nachts, ohne Waffe, Monster im Umkreis (keines näher als 8 Blöcke): mit bloßen Händen drei Blöcke tief, die Erde als Deckel, bis zum Morgen. | Seed 77: zwölf Tode in zehn Minuten am Spawn | `night_shelter_bare`: allein bestanden; im vollen Testlauf scheitert er, wenn ein Zombie im Moment des Deckelns auf der Deckelposition steht |
+| `get_shot` repariert (wartet, wo nichts mehr zu erkunden ist; kein Schild beim absichtlichen Treffer) | Test schon auf altem Stand rot | grün |
+
+Verworfen: Essen holen bei leerem Rucksack bis drei Minuten, auch satt. Auf Seed 77 holte Bob in
+Minute 0 und 2 Äpfel (74 s, 157 s) vor den Werkzeugen und kam damit in die Nacht.
+
+### 21.2 Messungen
+
+90 min HARD, je ein Lauf: alter Stand Live 12/2, 4242 0/6, 77 10/2, 1234 4/6 (Felder/Tode);
+Zwischenstände der neuen Version Live 11/6, 77 5/14.
+
+30 min HARD, Seeds 11, 22, 33, 55, je Version zwei Läufe (einmal je Arbeitsverzeichnis, um einen
+Einfluss des Verzeichnisses auszuschließen):
+
+| Stand | Lauf A | Lauf B | Summe Tode | Summe Felder |
+| --- | --- | --- | --- | --- |
+| alt (`87301f3`) | 5 Tode, 12 Felder | 11 Tode, 15 Felder | 16 | 27 |
+| neu (`95c653a`) | 13 Tode, 11 Felder | 14 Tode, 11 Felder | 27 | 22 |
+
+**Befund:**
+
+- Im Mittel 2,0 gegen 3,4 Tode pro Lauf. Die Streuung je Lauf ist mit etwa ±2 so groß, dass der
+  Unterschied noch nicht gesichert ist: Derselbe alte Stand hatte in Lauf A 5, in Lauf B 11 Tode.
+- **In keinem der 30-Minuten-Läufe baute Bob einen Schild**; das Schild-Gehen war nie aktiv, der
+  Unterschlupf löste nicht aus, die Essens-Ausflüge waren gleich häufig. Der Code verhält sich im
+  frühen Spiel ohne Schild wie der alte. Ein Rückschritt durch diese Änderungen ist damit
+  unwahrscheinlich, aber auch ein Nutzen ist in den Benchmarks noch nicht belegt.
+- **Der eigentliche Engpass:** Eisen kommt spät (erstes Eisen oft nach 10–25 min, in 7 von 16
+  Läufen gar nicht in 30 min). Ohne Eisen kein Schild und keine Rüstung; die meisten Tode fallen
+  in genau diese Zeit (Skelette, Zombies, nachts, ohne Essen).
+- Ein seltener Absturz von 26.3 selbst trat auf: `NullPointerException` bei der Mondphase während
+  der Chunk-Erzeugung (`ServerLevel.getMoonBrightness`). Er liegt nicht im Code des Mods.
+- Die Laufumgebung räumt Prozesse ab, sobald die Sitzung ruht: Lange Messreihen laufen nur, solange
+  aktiv gearbeitet wird.
+
+### 21.3 Nächste Schritte
+
+1. Erstes Eisen früher: Oberflächen-Höhlen und freiliegendes Eisen gleich nach den Steinwerkzeugen
+   gezielt nutzen; der Schild als erstes Eisenteil vor Spitzhacke und Eimer.
+2. Mehr Läufe pro Stand (mindestens acht je Version), Tode pro Lauf mit Streuung berichten.
+3. Den Deckel-Grenzfall im Unterschlupf lösen (Monster auf der Deckelposition).
