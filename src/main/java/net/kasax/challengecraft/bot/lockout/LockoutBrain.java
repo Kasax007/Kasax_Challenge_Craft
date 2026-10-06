@@ -158,6 +158,10 @@ public final class LockoutBrain implements BotBrain {
         if (step(bot, "deltas", () -> leaveDeltas(bot))) return;
         // Keep something to eat: a player who is starving loses more time than bread costs.
         if (step(bot, "food", () -> needsFood(bot))) return;
+        // Few hearts left down in a cave, in the dark or with monsters about: dug in, eaten, and
+        // waited for the hearts - not on with the next ore at two hearts (seed 66: six deaths,
+        // most of them at one to four hp, still mining "for later").
+        if (step(bot, "heal", () -> healUp(bot))) return;
         // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
         if (step(bot, "gold", () -> goldGuard(bot))) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
@@ -946,6 +950,25 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
+    private long healRetryAt;
+
+    private boolean healUp(Bot bot) {
+        var body = bot.body();
+        long now = body.level().getGameTime();
+        boolean hard = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+        if (now < healRetryAt || body.getHealth() >= (hard ? 10 : 8)) return false;
+        // (Hearts only come back with a stomach of eighteen: something to eat, or already full.)
+        boolean canHeal = net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0 || body.getFoodData().getFoodLevel() >= 18;
+        if (!canHeal) return false;
+        boolean risky = net.kasax.challengecraft.bot.task.SurfaceTask.underground(body) || body.level().isDarkOutside()
+                || !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
+                net.minecraft.world.entity.LivingEntity::isAlive).isEmpty();
+        if (!risky || !net.kasax.challengecraft.bot.task.HideTask.possible(bot)) return false;
+        healRetryAt = now + 600;
+        bot.say("few hearts left (" + Math.round(body.getHealth()) + "): dug in to eat and heal");
+        start(bot, new net.kasax.challengecraft.bot.task.HideTask(), 1800);
+        return true;
+    }
     private long ironLookAt;
 
     /** Iron ore seen (in view or remembered) within 48 blocks, at most 24 up or down, not marked out of reach. */
