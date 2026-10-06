@@ -77,6 +77,12 @@ public final class MineTask implements BotTask {
     public MineTask(String what, Predicate<BlockState> blocks, Set<Item> items, int count, Integer depth, BlockPos lead) {
         this.what = what;
         this.blocks = blocks;
+        for (var b : List.of(net.minecraft.world.level.block.Blocks.IRON_ORE, net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE,
+                net.minecraft.world.level.block.Blocks.COAL_ORE, net.minecraft.world.level.block.Blocks.GOLD_ORE, net.minecraft.world.level.block.Blocks.DIAMOND_ORE,
+                net.minecraft.world.level.block.Blocks.REDSTONE_ORE, net.minecraft.world.level.block.Blocks.LAPIS_ORE, net.minecraft.world.level.block.Blocks.COPPER_ORE,
+                net.minecraft.world.level.block.Blocks.DEEPSLATE_DIAMOND_ORE, net.minecraft.world.level.block.Blocks.DEEPSLATE_GOLD_ORE)) {
+            if (blocks.test(b.defaultBlockState())) oreLike = true;
+        }
         this.items = Set.copyOf(items);
         this.count = count;
         this.depth = depth;
@@ -158,12 +164,17 @@ public final class MineTask implements BotTask {
                     }
                 }
                 // Nothing right here: somewhere it has been past (or seen from afar).
-                if (target == null) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
+                // (Ore seen in a cliff or a ravine wall that twice had no way to it: the rest of
+                // what it remembers is likely the same - dug for here instead of walked to; seed 33
+                // walked five minutes from one seen iron vein to the next and mined none.)
+                boolean fromMemory = target == null && !(oreLike && memoryFails >= 2);
+                if (fromMemory) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 for (int i = 0; i < 8 && target != null && !worthIt(level, bot, target); i++) {
                     skip.add(target);
                     target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 }
                 if (target != null && !worthIt(level, bot, target)) target = null;
+                targetFromMemory = fromMemory && target != null;
             }
             if (target == null) return search(bot);
             // A trunk (or any column of them) is taken from the bottom: that one is in reach from
@@ -340,6 +351,10 @@ public final class MineTask implements BotTask {
     }
 
     private boolean knownOnly;
+    private boolean targetFromMemory;
+    private int memoryFails;
+    /** Whether it digs for ore (dug for anywhere at the right depth, unlike a tree or a flower). */
+    private boolean oreLike;
     /** Blocks of the vein (or tree) being taken, seen next to the ones broken: next in line. */
     private final java.util.ArrayDeque<BlockPos> vein = new java.util.ArrayDeque<>();
 
@@ -349,6 +364,7 @@ public final class MineTask implements BotTask {
      */
     private void giveUp(Bot bot, BlockPos p) {
         ServerLevel level = (ServerLevel) bot.body().level();
+        if (targetFromMemory) memoryFails++;
         skip.add(p.immutable());
         bot.markUnreachable(p);
         if (BotWorld.COMMON.contains(level.getBlockState(p).getBlock())) return;
@@ -448,10 +464,22 @@ public final class MineTask implements BotTask {
             return Result.RUNNING;
         }
         // On the surface (climbing up first if it is down in a mine), walking out.
-        if (explorer == null) explorer = new Explorer(budget);
+        if (explorer == null) explorer = new Explorer(budget).onLand(!aquatic());
         Result r = explorer.tick(bot);
         if (r == Result.FAILED) bot.say("found no " + what);
         return r;
+    }
+
+    /** Whether what it looks for grows in the sea (kelp, seagrass, coral...): then the sea is no detour. */
+    private boolean aquatic() {
+        for (var b : List.of(net.minecraft.world.level.block.Blocks.KELP, net.minecraft.world.level.block.Blocks.KELP_PLANT,
+                net.minecraft.world.level.block.Blocks.SEAGRASS, net.minecraft.world.level.block.Blocks.SEA_PICKLE,
+                net.minecraft.world.level.block.Blocks.TUBE_CORAL_BLOCK, net.minecraft.world.level.block.Blocks.TUBE_CORAL,
+                net.minecraft.world.level.block.Blocks.BRAIN_CORAL_FAN, net.minecraft.world.level.block.Blocks.WET_SPONGE,
+                net.minecraft.world.level.block.Blocks.PRISMARINE, net.minecraft.world.level.block.Blocks.SEA_LANTERN)) {
+            if (blocks.test(b.defaultBlockState())) return true;
+        }
+        return false;
     }
 
     /** Not buried far below the ground when it is a surface thing (and the bot is not down there too). */

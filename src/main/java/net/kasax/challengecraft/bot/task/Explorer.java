@@ -27,6 +27,20 @@ public final class Explorer {
     private boolean habitatGiveUp;
     private final FarWalk toHabitat = new FarWalk();
 
+    private boolean land;
+    private int seaLegs;
+    private BlockPos lastLand;
+
+    /**
+     * Exploring for something found on land (trees, stone, a village): headings with land in view
+     * first, and back toward the coast after a few legs out at sea - a player looking for trees
+     * does not swim on into the open ocean (seed 11: 1300 blocks out, no log found).
+     */
+    Explorer onLand(boolean land) {
+        this.land = land;
+        return this;
+    }
+
     /** Exploring for these kinds of mob: their habitat first, when one is known. */
     Explorer lookingFor(java.util.Set<net.minecraft.world.entity.EntityType<?>> types) {
         this.habitat = types;
@@ -65,11 +79,29 @@ public final class Explorer {
                 return BotTask.Result.RUNNING;
             }
         }
-        if (heading == null) heading = frontier(bot);
+        if (heading == null) heading = frontier(bot, land);
         bot.exploreHeading = heading;
         BotNavigator nav = bot.navigator();
         if (!walking) {
             legs++;
+            if (land) {
+                var lvl = (net.minecraft.server.level.ServerLevel) bot.body().level();
+                if (!sea(lvl, nav.feet())) {
+                    seaLegs = 0;
+                    lastLand = nav.feet();
+                } else if (++seaLegs >= 3) {
+                    // Out at sea three legs: the heading with the most land in view, else back
+                    // the way to the last land it stood on.
+                    seaLegs = 0;
+                    Direction d = landward(bot);
+                    if (d == null && lastLand != null) d = Direction.getApproximateNearest(lastLand.getX() - nav.feet().getX(), 0, lastLand.getZ() - nav.feet().getZ());
+                    if (d != null && d != heading) {
+                        bot.say("out at sea: back toward land (" + d.getName() + ")");
+                        heading = d;
+                        bot.exploreHeading = heading;
+                    }
+                }
+            }
             BlockPos p = nav.feet().relative(heading, 40).relative(heading.getClockWise(), bot.body().getRandom().nextInt(21) - 10);
             // Under a roof (the Nether) the height map is the bedrock ceiling: legs at about the
             // height it is at instead, on something to stand on (else it tunnels through the
@@ -101,7 +133,42 @@ public final class Explorer {
      * beyond what it sees now (a player heads off the edge of the map, not back over it). The
      * old heading is kept unless another is clearly better.
      */
-    private static Direction frontier(Bot bot) {
+    /** Whether the column at {@code p} is open water at the surface (or not loaded). */
+    private static boolean sea(net.minecraft.server.level.ServerLevel level, BlockPos p) {
+        if (!level.hasChunkAt(p)) return false;
+        BlockPos top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
+        return !level.getFluidState(top.below()).isEmpty() && level.getHeightmapPos(Heightmap.Types.OCEAN_FLOOR, p).getY() < top.getY() - 2;
+    }
+
+    /** Land columns in view in direction {@code d} (sampled every other chunk, loaded ones only). */
+    private static int landIn(net.minecraft.server.level.ServerLevel level, BlockPos from, Direction d, int view) {
+        int n = 0;
+        for (int r = 1; r < view; r += 2) {
+            for (int side = -r / 2; side <= r / 2; side += 2) {
+                BlockPos p = from.offset((d.getStepX() * r + d.getStepZ() * side) * 16, 0, (d.getStepZ() * r + d.getStepX() * side) * 16);
+                if (level.hasChunkAt(p) && !sea(level, p)) n++;
+            }
+        }
+        return n;
+    }
+
+    /** The heading with the most land in view; null if there is none in view at all. */
+    private static Direction landward(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        int view = BotWorld.viewChunks(level);
+        Direction best = null;
+        int most = 0;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            int n = landIn(level, bot.body().blockPosition(), d, view);
+            if (n > most) {
+                most = n;
+                best = d;
+            }
+        }
+        return best;
+    }
+
+    private static Direction frontier(Bot bot, boolean land) {
         var level = bot.body().level();
         int cx = bot.body().getBlockX() >> 4, cz = bot.body().getBlockZ() >> 4;
         int view = BotWorld.viewChunks((net.minecraft.server.level.ServerLevel) level);
@@ -115,6 +182,8 @@ public final class Explorer {
                     if (!bot.memory().wasScanned(level.dimension(), x, z)) score++;
                 }
             }
+            // (Looking for land things: new country with land in it, not the open sea.)
+            if (land && !level.dimensionType().hasCeiling()) score += 2 * landIn((net.minecraft.server.level.ServerLevel) level, bot.body().blockPosition(), d, view);
             if (d == bot.exploreHeading) oldScore = score;
             if (score > bestScore || score == bestScore && bot.body().getRandom().nextBoolean()) {
                 bestScore = score;

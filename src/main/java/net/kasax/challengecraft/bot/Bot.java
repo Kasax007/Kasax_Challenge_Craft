@@ -378,7 +378,8 @@ public final class Bot {
 
     /** Where it was when it last got anywhere, and when (see {@link #watchdog()}). */
     private net.minecraft.core.BlockPos movedFrom;
-    private int movedAt, unsticks;
+    private int movedAt, unsticks, notWalking;
+    private net.minecraft.core.BlockPos lastUnstick;
 
     /**
      * The last line of defence against standing still for good: trying to walk somewhere (a way
@@ -387,20 +388,37 @@ public final class Bot {
      */
     private void watchdog() {
         var feet = body.blockPosition();
-        if (movedFrom == null || feet.distSqr(movedFrom) > 2 || navigator.status() != BotNavigator.Status.MOVING) {
+        // (A way failing and searched again every few seconds is still trying to walk: only ten
+        // seconds without any way set count as standing still on purpose - seed 33 stood five
+        // minutes in a crevice, its way dropped 84 times, the clock reset each time.)
+        // (Arrived counts as getting somewhere, as before; a failed way does not.)
+        var st = navigator.status();
+        if (st == BotNavigator.Status.MOVING || st == BotNavigator.Status.FAILED) notWalking = 0;
+        else notWalking++;
+        if (movedFrom == null || feet.distSqr(movedFrom) > 2 || st == BotNavigator.Status.ARRIVED || notWalking > 200) {
             movedFrom = feet;
             movedAt = body.tickCount;
             return;
         }
+        if (st != BotNavigator.Status.MOVING) return;
         if (body.tickCount - movedAt < 1200 || inReflex()) return;
         movedAt = body.tickCount;
         unsticks++;
         BotTask top = tasks.peek();
         say("stuck for a minute (" + (top == null ? "-" : top.describe()) + ", " + navigator.debug() + "): a few steps off first");
         var r = body.getRandom();
-        double a = r.nextDouble() * Math.PI * 2;
-        net.minecraft.core.BlockPos aside = feet.offset((int) (Math.cos(a) * 8), 0, (int) (Math.sin(a) * 8));
+        // Stuck at the same spot again: in a hole or a crevice, up to the open sky (a staircase
+        // dug if need be) before the few steps off; and those a bit further.
+        boolean again = lastUnstick != null && lastUnstick.distSqr(feet) < 36;
+        lastUnstick = feet;
         actions.reset();
+        if (again && net.kasax.challengecraft.bot.task.SurfaceTask.underground(body)) {
+            reflex(new net.kasax.challengecraft.bot.task.SurfaceTask());
+            return;
+        }
+        double a = r.nextDouble() * Math.PI * 2;
+        int far = again ? 16 : 8;
+        net.minecraft.core.BlockPos aside = feet.offset((int) (Math.cos(a) * far), 0, (int) (Math.sin(a) * far));
         reflex(new net.kasax.challengecraft.bot.task.GoToTask(aside, 3));
     }
 
