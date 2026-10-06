@@ -401,6 +401,15 @@ public final class Bot {
             return;
         }
         if (st != BotNavigator.Status.MOVING) return;
+        // Up a tree, on the leaves of its crown (seed 66 came back to life up there, and the fall
+        // guard will not have it jump off): down through the leaves after ten seconds, not a minute.
+        if (body.tickCount - movedAt >= 200 && !inReflex() && net.kasax.challengecraft.bot.task.LeafDescentTask.upATree(this)) {
+            movedAt = body.tickCount;
+            actions.reset();
+            say("stuck up a tree: down through the leaves");
+            reflex(new net.kasax.challengecraft.bot.task.LeafDescentTask());
+            return;
+        }
         if (body.tickCount - movedAt < 1200 || inReflex()) return;
         movedAt = body.tickCount;
         unsticks++;

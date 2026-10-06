@@ -255,6 +255,21 @@ public class BotMovementTests {
         a.run(new GoToTask(a.abs(34, FEET + 12, 20), 1.5), 420, () -> a.near(34, FEET + 12, 20, 1.6));
     }
 
+    /**
+     * Back to life on the crown of a tree (the world spawn can be up there), nine above the
+     * ground: down through the leaves and on - not standing at the edge for good, the fall guard
+     * forbidding the jump (seed 66 stood there three minutes).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 8)
+    public void treeTopDown(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "tree_top_down");
+        a.fill(10, FEET, 20, 10, FEET + 8, 20, Blocks.OAK_LOG);
+        a.fill(8, FEET + 6, 18, 12, FEET + 8, 22, Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        a.fill(10, FEET + 6, 20, 10, FEET + 8, 20, Blocks.OAK_LOG);
+        a.spawn(8, FEET + 9, 18, new ItemStack(Items.BREAD, 8));
+        a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 1000, () -> a.near(30, FEET, 20, 1.6));
+    }
+
     /** Across a deep lake thirty wide: swum (sprint-swimming), not bobbed across (that took twice as long). */
     @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
     public void lakeSwim(GameTestHelper h) {
