@@ -15,7 +15,7 @@ import java.util.Comparator;
 public final class GetShotTask implements BotTask {
     private final Explorer explorer = new Explorer(3600);
     private int ticks;
-    private boolean walking;
+    private boolean walking, explored;
 
     @Override
     public Result tick(Bot bot) {
@@ -26,7 +26,11 @@ public final class GetShotTask implements BotTask {
         if (++ticks > 4800 || body.getHealth() < 10) return Result.FAILED;
         AbstractSkeleton sk = level.getEntitiesOfClass(AbstractSkeleton.class, new AABB(body.blockPosition()).inflate(32), AbstractSkeleton::isAlive)
                 .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
-        if (sk == null) return explorer.tick(bot);
+        // (Nothing more to explore here - a small place, say: wait for one to come by.)
+        if (sk == null) {
+            if (!explored && explorer.tick(bot) == Result.FAILED) explored = true;
+            return Result.RUNNING;
+        }
         explorer.pause(bot);
         if (sk.distanceTo(body) > 12 || !sk.hasLineOfSight(body)) {
             if (!walking || ticks % 30 == 0) {

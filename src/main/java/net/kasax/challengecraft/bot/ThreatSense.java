@@ -67,6 +67,8 @@ public final class ThreatSense {
                 return;
             }
         }
+        // (Out to be shot - a tile wants it: no shield, no dodge.)
+        if (bot.current() instanceof net.kasax.challengecraft.bot.task.GetShotTask) return;
         if (shieldWalk()) {
             dodge = null;
             return;
