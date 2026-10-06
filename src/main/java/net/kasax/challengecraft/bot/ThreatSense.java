@@ -173,7 +173,8 @@ public final class ThreatSense {
                 shooter = m;
             }
         }
-        if (shooter == null) return false;
+        // (One within four blocks is a fight, not a shield walk: at arm's length it shoots point-blank.)
+        if (shooter == null || best < 16) return false;
         // Something close enough to strike: a fight, not a shield walk (the reflexes start it).
         if (!body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(3),
                 m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
