@@ -923,6 +923,19 @@ public final class LockoutBrain implements BotBrain {
             // A shipwreck or a village close by (by day): its chests and its smith first, as every
             // speedrunner does - iron without the caves' skeletons (see the raid step).
             if (lootableNear(bot)) return false;
+            // Only when it comes cheap - iron ore seen within about fifty blocks, a short way up
+            // or down: a long dig with stone tools is where the early deaths are (seed 77: three
+            // in the caves, two tiles in half an hour). Else the board first, the iron when the
+            // plan wants it. (The planner's estimate is no help here: ~90 s for the iron kit
+            // even where it took a quarter of an hour.)
+            // (Looked at again every half minute: a cave on the way may show some.)
+            long now = bot.body().level().getGameTime();
+            if (now < ironLookAt) return false;
+            if (!ironInSight(bot)) {
+                if (ironLookAt == 0) bot.say("opening: no iron in sight: the board first");
+                ironLookAt = now + 600;
+                return false;
+            }
             openingIronTries++;
             bot.say("opening: " + ObtainPlanner.name(next) + " (iron early: the shield and the pickaxe)");
             nextErrand = "iron";
@@ -933,6 +946,17 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
+    private long ironLookAt;
+
+    /** Iron ore seen (in view or remembered) within 48 blocks, at most 24 up or down, not marked out of reach. */
+    private static boolean ironInSight(Bot bot) {
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        var at = bot.body().blockPosition();
+        java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> iron =
+                st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE) || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE);
+        var p = bot.memory().nearest(level, at, iron, bot.unreachable());
+        return p != null && Math.abs(p.getY() - at.getY()) <= 24 && p.distSqr(at) <= 48 * 48;
+    }
 
     /** A shipwreck or a village within 160 blocks not yet looted, by day, in good health. */
     private boolean lootableNear(Bot bot) {
@@ -1707,6 +1731,7 @@ public final class LockoutBrain implements BotBrain {
         openingWood = false;
         openingIron = false;
         openingIronTries = 0;
+        ironLookAt = 0;
         kitRetryAt = 0;
         kitTries = 0;
         openingTries = 0;
