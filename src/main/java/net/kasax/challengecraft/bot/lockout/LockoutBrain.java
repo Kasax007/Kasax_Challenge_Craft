@@ -908,44 +908,12 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner), 2400);
             return true;
         }
-        // On hard the opening ends with iron: a shield (one ingot) and the iron pickaxe (three),
-        // as every good player gets them in the first minutes - from the first cave, a village's
-        // smith, a shipwreck. Without a shield the skeletons and the night cost a life or two
-        // before the board ever wants iron (round 17: no 30-minute run made one).
-        if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && !openingIron) {
-            var body = bot.body();
-            // (As the whole thing, not as "four raw iron": the planner then takes the nearest ore
-            // and the furnace on the way, and the kit's iron for the shield from the same vein -
-            // raw iron alone walked off to the remembered ore a hundred blocks away.)
-            net.minecraft.world.item.Item next = !has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
-                    net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? net.minecraft.world.item.Items.IRON_PICKAXE
-                    : !has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) ? net.minecraft.world.item.Items.SHIELD : null;
-            if (next == null || openingIronTries > 2) {
-                openingIron = true;
-                return false;
-            }
-            // A shipwreck or a village close by (by day): its chests and its smith first, as every
-            // speedrunner does - iron without the caves' skeletons (see the raid step).
-            if (lootableNear(bot)) return false;
-            // Only when it comes cheap - iron ore seen within about fifty blocks, a short way up
-            // or down: a long dig with stone tools is where the early deaths are (seed 77: three
-            // in the caves, two tiles in half an hour). Else the board first, the iron when the
-            // plan wants it. (The planner's estimate is no help here: ~90 s for the iron kit
-            // even where it took a quarter of an hour.)
-            // (Looked at again every half minute: a cave on the way may show some.)
-            long now = bot.body().level().getGameTime();
-            if (now < ironLookAt) return false;
-            if (!ironInSight(bot)) {
-                if (ironLookAt == 0) bot.say("opening: no iron in sight: the board first");
-                ironLookAt = now + 600;
-                return false;
-            }
-            openingIronTries++;
-            bot.say("opening: " + ObtainPlanner.name(next) + " (iron early: the shield and the pickaxe)");
-            nextErrand = "iron";
-            start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(next), 1, planner), 6000);
-            return true;
-        }
+        // On hard, until the shield is made, iron is wanted from a shipwreck's or a village's
+        // chests (the raid step, by day) - as speedrunners get it. Not dug for in the caves with
+        // stone tools: that was measured (round 18) to cost lives - seven deaths on one seed, the
+        // iron no sooner than without it.
+        if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && !openingIron
+                && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD))) openingIron = true;
         return false;
     }
 
@@ -969,32 +937,6 @@ public final class LockoutBrain implements BotBrain {
         start(bot, new net.kasax.challengecraft.bot.task.HideTask(), 1800);
         return true;
     }
-    private long ironLookAt;
-
-    /** Iron ore seen (in view or remembered) within 48 blocks, at most 24 up or down, not marked out of reach. */
-    private static boolean ironInSight(Bot bot) {
-        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-        var at = bot.body().blockPosition();
-        java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> iron =
-                st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE) || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE);
-        var p = bot.memory().nearest(level, at, iron, bot.unreachable());
-        return p != null && Math.abs(p.getY() - at.getY()) <= 24 && p.distSqr(at) <= 48 * 48;
-    }
-
-    /** A shipwreck or a village within 160 blocks not yet looted, by day, in good health. */
-    private boolean lootableNear(Bot bot) {
-        if (bot.body().getHealth() < 12 || bot.body().level().isDarkOutside()
-                || bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return false;
-        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-        for (String kind : List.of("shipwreck", "village")) {
-            var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
-                    net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, kind));
-            if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > 160L * 160) continue;
-            if (!raided.contains(kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6))) return true;
-        }
-        return false;
-    }
-    private int openingIronTries;
 
     private int openingTries;
     private boolean openingWood;
@@ -1753,8 +1695,6 @@ public final class LockoutBrain implements BotBrain {
         openingStep = 0; // the tools are gone with the rest
         openingWood = false;
         openingIron = false;
-        openingIronTries = 0;
-        ironLookAt = 0;
         kitRetryAt = 0;
         kitTries = 0;
         openingTries = 0;
