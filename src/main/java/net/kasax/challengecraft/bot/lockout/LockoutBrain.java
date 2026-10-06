@@ -927,6 +927,9 @@ public final class LockoutBrain implements BotBrain {
         // back with a full stomach: without food every fight is one hurt more till the last).
         int level = bot.body().getFoodData().getFoodLevel();
         boolean bare = points < 8;
+        // Hurt and nothing to eat: on hard the hearts only come back with food, and the next fight
+        // starts half dead (seed live: half health, no food, a creeper hunt in a cave - killed).
+        boolean hurt = bot.body().getHealth() < 12 && bare;
         if (points >= 16 || level >= 17 && !bare) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = cortex.believe("food:" + plain(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner)), planner.estimate(bot, FOODS, have + 4));
@@ -936,13 +939,16 @@ public final class LockoutBrain implements BotBrain {
         // away - a fall then kills): food first, whatever it costs.
         // (A stock while not hungry yet only if it is near - a cow in sight -, not a hunt across
         // the country: the estimates of those run long.)
-        if (level >= 12 && cost > (bare ? 60 : 25) || cost > (level <= 6 ? 900 : bare ? 120 : 90)) return false;
+        // (Part of the kit: next to nothing to eat in the pack is put right while it is not far -
+        // up to three minutes - hungry or not; hurt as well, whatever it costs.)
+        if (!hurt && (level >= 12 && cost > (bare ? 180 : 25) || cost > (level <= 6 ? 900 : bare ? 180 : 90))) return false;
+        if (hurt && cost > 900) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
         var lv = bot.body().level();
         boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
                 && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
-        if (night && cost > 30 && level > 6) return false;
+        if (night && cost > 30 && level > 6 && !hurt) return false;
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
         nextErrand = "food";
         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));

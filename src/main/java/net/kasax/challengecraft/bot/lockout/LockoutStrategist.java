@@ -153,6 +153,16 @@ final class LockoutStrategist {
             // twice as long - the chestplate comes from the iron as it turns up, see upgrade().)
             if (kit > 0) planner.boardDemand.merge(Items.RAW_IRON, kit, Integer::sum);
         }
+        // The chestplate on hard, once the pickaxe and the shield are in hand: the next iron trip
+        // brings its eight as well. Waiting for iron "to spare" never came - the board eats it -
+        // and without armour every arrow and zombie blow is a third more (no run made one).
+        boolean pickaxe = holdsAny(bot, Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE, Items.NETHERITE_PICKAXE));
+        boolean shield = holdsAny(bot, Set.of(Items.SHIELD)) || bot.body().getOffhandItem().getItem() == Items.SHIELD;
+        if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD && pickaxe && shield
+                && !holdsAny(bot, Set.of(Items.IRON_CHESTPLATE, Items.DIAMOND_CHESTPLATE, Items.NETHERITE_CHESTPLATE))
+                && bot.body().getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()) {
+            planner.boardDemand.merge(Items.RAW_IRON, 8, Integer::sum);
+        }
         // Fuel for all that smelting: coal, picked up on the way (a player does not burn the logs
         // it worked for). About one coal per eight items.
         int smelt = 0;
