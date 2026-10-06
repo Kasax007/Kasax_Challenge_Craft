@@ -924,12 +924,13 @@ public final class LockoutBrain implements BotBrain {
             int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
             int need = 1 + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
                     net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
-            var ore = shallowIron(bot);
+            var ore = shallowIron(bot, shallowTried);
             if (iron < need && ore != null) {
+                shallowTried.add(ore.immutable()); // (one go at each: no way there, another next time)
                 bot.say("opening: iron near the surface at " + ore.toShortString() + " (for the shield)");
                 nextErrand = "iron";
                 start(bot, new net.kasax.challengecraft.bot.task.MineTask("raw_iron", SHALLOW_IRON, Set.of(net.minecraft.world.item.Items.RAW_IRON),
-                        ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.RAW_IRON)) + need - iron).knownOnly(), 1800);
+                        ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.RAW_IRON)) + need - iron, null, ore).knownOnly(), 1800);
                 return true;
             }
         }
@@ -942,12 +943,14 @@ public final class LockoutBrain implements BotBrain {
             st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE) || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE);
 
     /** Iron ore in sight within fifty blocks, at most ten below the surface over it; the nearest. */
-    private static net.minecraft.core.BlockPos shallowIron(Bot bot) {
+    private final Set<net.minecraft.core.BlockPos> shallowTried = new java.util.HashSet<>();
+
+    private static net.minecraft.core.BlockPos shallowIron(Bot bot, Set<net.minecraft.core.BlockPos> tried) {
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
         var at = bot.body().blockPosition();
         for (var p : net.kasax.challengecraft.bot.BotWorld.nearestN(level, at, 48, 24, SHALLOW_IRON, true, bot.unreachable(), 16)) {
             int surface = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p).getY();
-            if (p.getY() >= surface - 10) return p;
+            if (p.getY() >= surface - 10 && tried.stream().noneMatch(t -> t.distSqr(p) < 9)) return p;
         }
         return null;
     }
