@@ -35,6 +35,48 @@ public final class HideTask implements BotTask {
         return true;
     }
 
+    /**
+     * The night's shelter for a bot come back to life with nothing (no weapon, no blocks) and the
+     * monsters about the spawn: dug in with bare hands (the dug dirt is the lid), and out again in
+     * the morning - instead of dying to them again every half minute (seed 77: twelve times).
+     */
+    private boolean untilDay;
+
+    public static HideTask shelter() {
+        HideTask t = new HideTask();
+        t.untilDay = true;
+        return t;
+    }
+
+    /** Whether a shelter can be dug here with bare hands: soft ground three deep that drops itself (dirt, grass). */
+    public static boolean shelterPossible(Bot bot) {
+        return shelterProblem(bot) == null;
+    }
+
+    /** Ground dug quickly with bare hands, that drops itself (the lid): dirt and its kind. */
+    private static boolean soft(net.minecraft.world.level.block.state.BlockState s) {
+        return s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)
+                || s.is(net.minecraft.world.level.block.Blocks.PODZOL) || s.is(net.minecraft.world.level.block.Blocks.MYCELIUM)
+                || s.is(net.minecraft.world.level.block.Blocks.COARSE_DIRT) || s.is(net.minecraft.world.level.block.Blocks.ROOTED_DIRT)
+                || s.is(net.minecraft.world.level.block.Blocks.DIRT);
+    }
+
+    /** Why no shelter can be dug here (null: it can). */
+    public static String shelterProblem(Bot bot) {
+        BotPlayer body = bot.body();
+        if (!body.onGround() || body.isInWater()) return "not on dry ground";
+        ServerLevel level = (ServerLevel) body.level();
+        BlockPos feet = body.blockPosition();
+        for (int i = 1; i <= 4; i++) {
+            BlockPos p = feet.below(i);
+            var s = level.getBlockState(p);
+            if (s.getCollisionShape(level, p).isEmpty() || s.getDestroySpeed(level, p) < 0) return "no floor " + i + " down";
+            if (i <= 3 && !soft(s)) return s.getBlock() + " " + i + " down";
+            for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) return "water " + i + " down";
+        }
+        return null;
+    }
+
     /** Up instead of down: three blocks on a pillar, out of reach of zombies (they hit on while one digs). */
     private boolean up;
     private int placed;
@@ -59,7 +101,7 @@ public final class HideTask implements BotTask {
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
-        if (++ticks > MAX_TICKS || !body.isAlive()) return Result.DONE;
+        if (++ticks > (untilDay ? 9000 : MAX_TICKS) || !body.isAlive()) return Result.DONE;
         if (top == null) top = body.blockPosition();
         if (up) return pillar(bot, body, level);
         body.stopInputs();
@@ -80,7 +122,7 @@ public final class HideTask implements BotTask {
             BlockPos lid = body.blockPosition().above(2);
             if (!body.onGround()) return Result.RUNNING; // (still dropping in: the head is in the way)
             if (!level.getBlockState(lid).getCollisionShape(level, lid).isEmpty()) closed = true;
-            else if (!bot.actions().placeThrowaway(lid) && ++lidTries > 20) closed = true; // (it will not go: as it is)
+            else if (!bot.actions().placeThrowaway(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
             return Result.RUNNING;
         }
         // Safe: eat, and wait for the hearts (natural regeneration wants a full-ish stomach).
@@ -88,6 +130,8 @@ public final class HideTask implements BotTask {
             bot.interject(new EatTask());
             return Result.RUNNING;
         }
+        // (The night's shelter: until the sun is up - the zombies and skeletons burn then.)
+        if (untilDay) return level.isDarkOutside() ? Result.RUNNING : Result.DONE;
         if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 200) return Result.DONE;
         return Result.RUNNING;
     }
@@ -128,6 +172,6 @@ public final class HideTask implements BotTask {
 
     @Override
     public String describe() {
-        return "hide in the ground";
+        return untilDay ? "dug in for the night" : "hide in the ground";
     }
 }

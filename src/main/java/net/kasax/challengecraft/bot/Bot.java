@@ -587,6 +587,30 @@ public final class Bot {
                 return;
             }
         }
+        // Back to life at night with nothing (no weapon) and monsters about: dug in until the
+        // morning with bare hands, instead of dying to the same ones again and again (on seed 77
+        // twelve deaths in ten minutes at the spawn - each one all that was gathered since).
+        if (!(top instanceof net.kasax.challengecraft.bot.task.HideTask) && body.tickCount < 1200
+                && body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && body.level().isDarkOutside()
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(body)) {
+            boolean weapon = false;
+            for (var st : body.getInventory().getNonEquipmentItems()) {
+                if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) weapon = true;
+            }
+            var about = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
+                    m -> m.isAlive() && m.getType() != net.minecraft.world.entity.EntityTypes.ENDERMAN);
+            int monsters = about.size();
+            double nearest = about.stream().mapToDouble(m -> m.distanceTo(body)).min().orElse(99);
+            // (Digging in takes some five seconds with bare hands: with one closer than eight
+            // blocks, away first - the flight below - and dug in once there is the time.)
+            if (!weapon && monsters > 0 && nearest >= 8 && net.kasax.challengecraft.bot.task.HideTask.shelterPossible(this)) {
+                actions.reset();
+                navigator.stop();
+                say(monsters + " monster(s) about and nothing in hand at night: dug in till morning");
+                reflex(net.kasax.challengecraft.bot.task.HideTask.shelter());
+                return;
+            }
+        }
         // Hurt badly by something (an arrow from afar counts), and running did not or would not
         // help: into the ground until the hearts are back.
         var shooter = body.getLastHurtByMob();

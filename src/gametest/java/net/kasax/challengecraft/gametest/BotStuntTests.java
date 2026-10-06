@@ -1069,7 +1069,7 @@ public class BotStuntTests {
      * Three strays shooting from the side while Bob walks past (hard), a shield and no weapon:
      * the shield stays up towards them on the way (no dodging into the next arrow) - little lost.
      */
-    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
     public void shieldWalkStrays(GameTestHelper h) {
         BotArena a = BotArena.wide(h, "shield_walk_strays");
         var level = h.getLevel();
@@ -1097,6 +1097,39 @@ public class BotStuntTests {
             BotArena.LOG.info("[BOTTEST] shield_walk_strays lost {} health, shield walk {} ticks, {} arrows met with the shield, {} dodges",
                     20 - low[0], a.bot().threats.shieldWalkTicks, a.bot().threats.shieldBlocks, a.bot().threats.dodges);
             h.assertTrue(20 - low[0] <= 6, "shield_walk_strays: lost " + (20 - low[0]));
+            return true;
+        });
+    }
+
+    /**
+     * Back at the spawn at night with nothing, three zombies and a skeleton about (hard): dug in
+     * with bare hands and alive a minute later, instead of dying to them again and again.
+     */
+    @GameTest(environment = "challengecraft:shelter", structure = STRUCTURE, maxTicks = 1400, skyAccess = true, padding = 44)
+    public void nightShelterBare(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "night_shelter_bare");
+        var level = h.getLevel();
+        var src = level.getServer().createCommandSourceStack().withSuppressedOutput();
+        level.getServer().getCommands().performPrefixedCommand(src, "difficulty hard");
+        level.getServer().getCommands().performPrefixedCommand(src, "time set 18000");
+        a.fill(-20, BotArena.GROUND - 4, -20, BotArena.SIZE + 19, BotArena.GROUND - 1, BotArena.SIZE + 19, Blocks.DIRT);
+        java.util.List<net.minecraft.world.entity.Mob> mobs = new java.util.ArrayList<>();
+        for (int[] at : new int[][]{{8, 20}, {20, 8}, {32, 20}, {20, 34}}) {
+            var m = (at[1] == 34 ? EntityTypes.SKELETON : EntityTypes.ZOMBIE).create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            if (at[1] == 34) m.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+            m.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            m.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(at[0], FEET, at[1])));
+            m.setPersistenceRequired();
+            level.addFreshEntity(m);
+            mobs.add(m);
+        }
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1300), 1350, () -> {
+            for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
+            if (a.bot().body() != body || !body.isAlive()) h.fail("night_shelter_bare: killed");
+            if (h.getTick() < 1300) return false;
+            BotArena.LOG.info("[BOTTEST] night_shelter_bare alive with {} health, {}", body.getHealth(), a.bot().current() == null ? "-" : a.bot().current().describe());
             return true;
         });
     }

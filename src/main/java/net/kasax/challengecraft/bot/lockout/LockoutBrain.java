@@ -939,9 +939,9 @@ public final class LockoutBrain implements BotBrain {
         // away - a fall then kills): food first, whatever it costs.
         // (A stock while not hungry yet only if it is near - a cow in sight -, not a hunt across
         // the country: the estimates of those run long.)
-        // (Part of the kit: next to nothing to eat in the pack is put right while it is not far -
-        // up to three minutes - hungry or not; hurt as well, whatever it costs.)
-        if (!hurt && (level >= 12 && cost > (bare ? 180 : 25) || cost > (level <= 6 ? 900 : bare ? 180 : 90))) return false;
+        // (Hurt and nothing to eat: food first, whatever it costs. Not hurt: as before - three
+        // minutes for apples at the start delayed the tools into the night on seed 77.)
+        if (!hurt && (level >= 12 && cost > (bare ? 60 : 25) || cost > (level <= 6 ? 900 : bare ? 120 : 90))) return false;
         if (hurt && cost > 900) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
