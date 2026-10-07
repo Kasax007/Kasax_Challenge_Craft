@@ -748,7 +748,9 @@ public final class Bot {
                 // lone bowman: two of them shoot it down on the way, as in a dozen deaths.)
                 int bowmen = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(20),
                         b -> b.isAlive() && b.getTarget() == body && b instanceof net.minecraft.world.entity.monster.RangedAttackMob).size();
-                double needed = shieldOn || body.getArmorValue() >= 6 ? 12 : 16;
+                // (Close - six blocks and less - the rush is the safest thing whatever: the dodges
+                // fail at that range and turning away takes the arrows in the back.)
+                double needed = m.distanceTo(body) <= 6 ? 10 : shieldOn || body.getArmorValue() >= 6 ? 12 : 16;
                 if (armed && body.getHealth() >= needed && bowmen <= 1 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(16));
                     return;
