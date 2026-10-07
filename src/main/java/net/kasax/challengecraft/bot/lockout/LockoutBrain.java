@@ -162,6 +162,10 @@ public final class LockoutBrain implements BotBrain {
         // waited for the hearts - not on with the next ore at two hearts (seed 66: six deaths,
         // most of them at one to four hp, still mining "for later").
         if (step(bot, "heal", () -> healUp(bot))) return;
+        // The night: geared for it (a weapon, food, armour or a shield, the hearts) it is played;
+        // else slept away in a bed (one made before dusk if wool is close), or dug in till
+        // morning. Half of all deaths were in the first night, on the surface, bare.
+        if (step(bot, "night", () -> nightPlan(bot))) return;
         // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
         if (step(bot, "gold", () -> goldGuard(bot))) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
@@ -491,6 +495,8 @@ public final class LockoutBrain implements BotBrain {
     private boolean huntRound(Bot bot) {
         long now = bot.body().level().getGameTime();
         if (now < huntRetryAt || !huntingTime(bot) || bot.body().getHealth() < 14) return false;
+        // (Not out at night after monsters ungeared: that is how the first nights were lost.)
+        if (nightComing(bot, DUSK) && !nightReady(bot)) return false;
         Set<net.minecraft.world.entity.EntityType<?>> wanted = wantedMonsters(bot);
         // At night on the surface even a single one: they come to it, the hunt is cheap now and
         // dear by day. (In a cave at any time only for several: it is there to mine.)
@@ -508,6 +514,114 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long sleepRetryAt;
+
+    // ---- the night plan --------------------------------------------------------------------
+
+    /** Dusk: from here on, ready for the night or making ready (monsters come out from about 13000). */
+    static final long DUSK = 11000, SHELTER_FROM = 12600, DAWN = 23200;
+    private long bedTriedDay = -1, shelterRetryAt;
+
+    private static long clock(Bot bot) {
+        return bot.body().level().getOverworldClockTime() % 24000;
+    }
+
+    /** Whether it is the night (or close to it) up in the Overworld. */
+    private static boolean nightComing(Bot bot, long from) {
+        long c = clock(bot);
+        return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && c >= from && c < DAWN;
+    }
+
+    /** Ready for a night out on the surface, as a player would be: a weapon, food, armour or a shield, the hearts. */
+    public static boolean nightReady(Bot bot) {
+        var body = bot.body();
+        boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+        int food = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+            if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
+            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH) && !st.is(net.minecraft.world.item.Items.SPIDER_EYE)) food += f.nutrition() * st.getCount();
+        }
+        return armed && food >= 8 && (body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2) && body.getHealth() >= 12;
+    }
+
+    private static net.minecraft.world.item.Item bedInPack(Bot bot) {
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) if (st.is(net.minecraft.tags.ItemTags.BEDS)) return st.getItem();
+        return null;
+    }
+
+    private static final Set<net.minecraft.world.item.Item> BEDS = tagged(net.minecraft.tags.ItemTags.BEDS);
+
+    /**
+     * Not ready for the night: before dusk a bed if one is quickly made (wool from sheep in sight);
+     * at nightfall slept away in it, or dug in until the morning (a hole with a lid: nothing gets
+     * at it, the hearts come back). Underground already (a mine of its own), it works on.
+     */
+    private boolean nightPlan(Bot bot) {
+        if (!nightComing(bot, DUSK) || nightReady(bot)) return false;
+        var level = bot.body().level();
+        long now = level.getGameTime(), c = clock(bot);
+        long day = level.getOverworldClockTime() / 24000;
+        net.minecraft.world.item.Item bed = bedInPack(bot);
+        // Before dusk proper: a bed, if it comes cheap (the sheep are in sight, wool in the pack).
+        if (bed == null && c < SHELTER_FROM - 300 && bedTriedDay != day) {
+            bedTriedDay = day;
+            double est = planner.estimate(bot, BEDS, 1);
+            if (est <= 150) {
+                bot.say("dusk soon, not geared for the night: a bed first (~" + Math.round(est) + " s)");
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(BEDS, 1, planner), 3000);
+                if (!startRefused) return true;
+                startRefused = false;
+            }
+        }
+        if (c < SHELTER_FROM) return false;
+        if (net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body())) return false;
+        // A bed: the night slept away (once the game lets one lie down), if that ends it.
+        if (bed != null && c >= 12542 && now >= sleepRetryAt && nightWouldPass(bot)) {
+            sleepRetryAt = now + Math.max(600, 24000 - c);
+            Set<net.minecraft.world.item.Item> beds = Set.of(bed);
+            bot.say("night, not geared for it: sleeping it away");
+            net.minecraft.world.item.Item placed = bed;
+            start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("sleep the night away", List.of(
+                    () -> new net.kasax.challengecraft.bot.task.PlaceAndUseTask(placed, net.kasax.challengecraft.bot.task.PlaceAndUseTask.Then.CLICK, null, 0),
+                    net.kasax.challengecraft.bot.task.SleepTask::new,
+                    () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), beds,
+                            ObtainPlanner.countAny(bot.body(), beds) + 1).knownOnly())), 1200);
+            if (!startRefused) return true;
+            startRefused = false;
+        }
+        // Else dug in till the morning.
+        if (now < shelterRetryAt) return false;
+        shelterRetryAt = now + 400;
+        if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)) {
+            // (Not here - water, sand, a cliff edge: a few steps off and again.)
+            return false;
+        }
+        bot.say("night, not geared for it (" + nightGaps(bot) + "): dug in till morning");
+        start(bot, net.kasax.challengecraft.bot.task.HideTask.shelter(), 13000);
+        if (!startRefused) return true;
+        startRefused = false;
+        return false;
+    }
+
+    /** What is missing for the night, for the log. */
+    private static String nightGaps(Bot bot) {
+        var body = bot.body();
+        List<String> out = new ArrayList<>();
+        boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+        int food = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+            if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
+            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) food += f.nutrition() * st.getCount();
+        }
+        if (!armed) out.add("no weapon");
+        if (food < 8) out.add("food " + food);
+        if (body.getArmorValue() < 6 && !(shield && body.getArmorValue() >= 2)) out.add("armour " + body.getArmorValue() + (shield ? "+shield" : ""));
+        if (body.getHealth() < 12) out.add("hp " + Math.round(body.getHealth()));
+        return String.join(", ", out);
+    }
 
     private boolean sleep(Bot bot) {
         var level = bot.body().level();
@@ -938,6 +1052,17 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
+    private long nightDropAt;
+
+    /** Already seeing to the night: in a hole, in bed, or on the way to one. */
+    private static boolean sheltering(Bot bot) {
+        for (BotTask t : bot.tasks()) {
+            BotTask in = BotTask.innermost(t);
+            if (t instanceof net.kasax.challengecraft.bot.task.HideTask || in instanceof net.kasax.challengecraft.bot.task.HideTask
+                    || in instanceof net.kasax.challengecraft.bot.task.SleepTask || t.describe().startsWith("sleep")) return true;
+        }
+        return false;
+    }
     private long shallowIronAt;
     private static final java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> SHALLOW_IRON =
             st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE) || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE);
@@ -1498,6 +1623,21 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         if (goalTask != null && targetId != null) spent.merge(targetId, 1, Integer::sum);
+        // Nightfall while out on the surface, not geared for it: whatever it is doing is put
+        // aside, and the night plan decides (a bed, or a hole with a lid) - not on with a log hunt
+        // into the dark.
+        if (checkTicks % 40 == 0 && nightComing(bot, SHELTER_FROM) && now >= nightDropAt && !nightReady(bot)
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body()) && !sheltering(bot)) {
+            nightDropAt = now + 1200;
+            bot.say("nightfall, not geared for it: " + nightGaps(bot));
+            if (runningKey != null) {
+                cortex.ended(bot, runningKey, now, false, false);
+                runningKey = null;
+            }
+            running = null;
+            drop(bot);
+            return;
+        }
         // In the middle of a long goal (digging for diamonds) the pickaxe wears out too: a spare
         // made before it breaks, without dropping the goal.
         if (checkTicks % 200 == 0 && goalTask != null && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask) && pickaxeAlmostGone(bot)) {

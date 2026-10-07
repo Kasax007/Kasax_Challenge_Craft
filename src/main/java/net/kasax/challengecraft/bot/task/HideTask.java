@@ -101,7 +101,7 @@ public final class HideTask implements BotTask {
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
-        if (++ticks > (untilDay ? 9000 : MAX_TICKS) || !body.isAlive()) return Result.DONE;
+        if (++ticks > (untilDay ? 13000 : MAX_TICKS) || !body.isAlive()) return Result.DONE;
         if (top == null) top = body.blockPosition();
         if (up) return pillar(bot, body, level);
         body.stopInputs();

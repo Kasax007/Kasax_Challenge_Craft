@@ -219,6 +219,11 @@ public final class Bot {
         return tasks.peekLast();
     }
 
+    /** The task stack, top first (read only). */
+    public java.util.Collection<BotTask> tasks() {
+        return java.util.Collections.unmodifiableCollection(tasks);
+    }
+
     public BotTask current() {
         return tasks.peek();
     }
