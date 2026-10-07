@@ -1774,3 +1774,95 @@ Einfluss des Verzeichnisses auszuschließen):
 3. **Nach einem Tod** nicht in dieselbe Höhle zurück. Die Todesstelle für einige Minuten meiden.
 4. **Mehr Läufe pro Stand** (16 statt 8) und dieselben Erfahrungsdateien für beide Stände, sonst
    misst man Rauschen.
+
+## 23. Runde 19: Analyse der Entscheidungslogik – und „nicht mehr sterben“
+
+### 23.1 Wie Bob entscheidet (Bestandsaufnahme)
+
+Bob hat drei Ebenen:
+
+1. **Reflexe** (`Bot.reflexes`, `ThreatSense`, alle 1–10 Ticks), immer aktiv:
+   - Luft, Lava, Feuer, Pulverschnee;
+   - Creeper;
+   - wenig Leben → weg, Säule oder Loch;
+   - zurückschlagen, Schild, Pfeilen ausweichen, essen.
+2. **Gehirn, während einer Aufgabe** (`LockoutBrain.tick`): nur Zeitbudgets, Gelegenheiten am Weg
+   und Ersatz-Spitzhacke.
+3. **Gehirn, zwischen Aufgaben** (`LockoutBrain.think`): eine Leiter in dieser Reihenfolge:
+   1. Sachen holen;
+   2. Essen;
+   3. Heilen;
+   4. Eröffnung;
+   5. Kit;
+   6. Plündern;
+   7. Nether;
+   8. Investition;
+   9. Jagd;
+   10. Schlaf;
+   11. Brettziele.
+
+### 23.2 Gefundene Lücken (gegenüber einem normalen Spieler)
+
+- **Überlebens-Checks nur zwischen Aufgaben.** `think()` läuft nur, wenn keine Aufgabe ansteht.
+  Folge: Mitten in einer 5-Minuten-Grabung greifen Essen, Heilen und der Überlebensmodus nie, nur
+  die Reflexe.
+- **Keine Nacht-Planung.** Die Auswertung von 54 Toden zeigt: 29 davon (54 %) in Minute 10–20,
+  also in der ersten Nacht, an der Oberfläche, ohne Rüstung. Schlafen ging nur mit Bett im
+  Gepäck, das Bob nie baute. Fast jedes Brett hat ein „Nacht-Feld“ (Zombie, Spinne, Pfeil), also
+  schlief er nie. Nachtjagden liefen auch ungerüstet.
+- **Kein Essensvorrat.** In 30 von 54 Toden hatte Bob nichts zu essen dabei. Auf HARD kommen
+  Herzen nur mit vollem Magen zurück. Vorrat holte er nur, wenn er sehr billig war.
+- **Säule gegen Spinnen.** Spinnen klettern. Mehrere Tode nach „hurt, with a spider: up a pillar“.
+- **Faustkampf mit Skeletten.** Ohne Waffe startete der Treffer-Reflex trotzdem einen Nahkampf.
+- **Skelette ungerüstet angreifen** ab 12 Leben, auch gegen zwei Schützen.
+- **Creeper zu nah:** Weglaufen aus 2,8 Blöcken scheiterte mehrfach.
+- **Einzelfehler:**
+  - Unterschlupf in einem Süßbeerenstrauch;
+  - Ersticken (falscher Block freigegraben);
+  - Graben unter Sand.
+
+### 23.3 Was gebaut wurde
+
+- **Nachtplan:**
+  - Ab Spielzeit 10000 prüft Bob, ob er für die Nacht gerüstet ist: Waffe, mindestens 8
+    Essenspunkte, Rüstung ≥ 6 oder Schild mit Rüstung ≥ 2, mindestens 12 Leben.
+  - Wenn nicht: vor der Dämmerung ein Bett (wenn es günstig zu haben ist) und Essen. Bei
+    Nachteinbruch schlafen, sonst eingraben bis zum Morgen. Mit Spitzhacke gräbt er stattdessen
+    einen eigenen, geschlossenen Stollen zum Eisen (er bricht keine Höhle an).
+  - Laufende Aufgaben werden bei Nachteinbruch unterbrochen.
+  - Nachtjagden nur noch gerüstet.
+- **Essen:**
+  - Vorrat, sobald die Steinwerkzeuge da sind.
+  - Mitten in einer Aufgabe holt er Essen, wenn keins mehr da ist und er hungrig oder verletzt
+    ist.
+- **Kampf:**
+  - Spinnen: ins Loch mit Deckel statt Säule.
+  - Keine Säule, wenn ein Schütze zielt.
+  - Skelette ohne Schild oder Rüstung erst ab 16 Leben und nur einzeln angreifen.
+  - Kein Faustkampf außer in die Enge getrieben.
+  - Zu naher Creeper: erst ein Schlag (Rückstoß), dann weg.
+- **Fixes:**
+  - kein Unterschlupf in Beerenstrauch, Kaktus, Feuer oder Spinnweben;
+  - beim Ersticken den richtigen Block freigraben;
+  - keine Treppenstufe unter Sand oder Kies, aus Sand seitlich heraustreten.
+- **Tests:** `skeleton_behind_wall`.
+
+  Dabei zeigte sich: Deckung hinter einer kleinen Mauer verliert gegen ein Skelett, das außen
+  herumläuft, während reines Ausweichen auf 12 Blöcke 0 Leben kostet. Die Deckungssuche ist
+  deshalb wieder raus.
+
+### 23.4 Messung (30 min HARD, Seeds 11–88)
+
+| Stand | Läufe | Tode | Tode pro Lauf | Felder pro Lauf |
+| --- | --- | --- | --- | --- |
+| alt (Runde 18) | 16 | 26 | 1,6 | 4,1 |
+| A: Nachtplan | 8 | 8 | 1,0 | 4,0 |
+| B: + Essen und Kampf | 8 | 8 | 1,0 | 3,0 |
+
+- Die Nacht-Tode sind praktisch weg.
+- Die übrigen Tode sind verstreut:
+  - Ertrunkener beim Jagen am Wasser;
+  - Ersticken im Sand;
+  - Beerenstrauch;
+  - Enderman;
+  - Skelette auf kurze Distanz.

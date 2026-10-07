@@ -701,6 +701,27 @@ public final class LockoutBrain implements BotBrain {
         return true;
     }
 
+    private static final Set<String> HEAVY = Set.of("enderman", "witch", "vindicator", "evoker", "ravager", "piglin_brute", "warden", "ghast", "blaze", "wither_skeleton");
+
+    private static boolean heavy(String entityId) {
+        try {
+            return HEAVY.contains(net.minecraft.resources.Identifier.parse(entityId).getPath());
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** Fit for a hard fight: a weapon, armour (six points, or a shield and some), the hearts. */
+    static boolean geared(Bot bot) {
+        var body = bot.body();
+        boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+            if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
+        }
+        return armed && (body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2) && body.getHealth() >= 16;
+    }
+
     /** An open tile that is only to be had in the Nether. */
     private static boolean hostile(String entityId) {
         var type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.parse(entityId));
@@ -1223,6 +1244,9 @@ public final class LockoutBrain implements BotBrain {
             // Hurt: no going after monsters until the hearts are back (eaten, rested).
             if (bot.body().getHealth() < 12 && tile.goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL
                     && hostile(tile.goal().primaryTarget())) continue;
+            // The heavy hitters (an enderman: over ten hearts' worth a blow on hard; a witch's
+            // potions; a vindicator's axe): only geared - armour, a weapon, the hearts.
+            if (tile.goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL && heavy(tile.goal().primaryTarget()) && !geared(bot)) continue;
             if (last ? tries.getOrDefault(tile.goal().id(), 0) > MAX_TRIES : resting(tile.goal().id(), now)) continue;
             if (difficulty == Difficulty.EASY && tile.goal().difficulty() == LockoutBingoGoalDifficulty.HARD) continue;
             LockoutGoals.Option o;
