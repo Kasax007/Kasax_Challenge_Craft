@@ -66,8 +66,10 @@ public final class ThreatSense {
                     // the pack: a blow first - it throws the creeper back out of its blast range
                     // and resets nothing, but buys the steps - then away (seed 11, 1234: it ran
                     // from 2.8 blocks four times over and was blown up each time).
+                    // (Whatever the arm's charge - just switched from the pickaxe it is low: the
+                    // throw-back of a blow does not depend on it, only its damage does.)
                     if (armedNow(body) && net.kasax.challengecraft.bot.task.KillTask.hitDistance(body, c) <= 3.0
-                            && body.getAttackStrengthScale(0.5f) >= 0.9f && body.hasLineOfSight(c)) {
+                            && c.hurtTime == 0 && body.hasLineOfSight(c)) {
                         net.kasax.challengecraft.bot.task.KillTask.equipWeapon(bot);
                         body.lookAt(c.getEyePosition());
                         body.attack(c);
