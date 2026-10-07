@@ -24,7 +24,10 @@ public final class HideTask implements BotTask {
         for (BlockPos p : List.of(feet, feet.above())) {
             var s = level.getBlockState(p);
             if (s.is(net.minecraft.world.level.block.Blocks.SWEET_BERRY_BUSH) || s.is(net.minecraft.tags.BlockTags.FIRE)
-                    || s.is(net.minecraft.world.level.block.Blocks.POWDER_SNOW) || s.is(net.minecraft.world.level.block.Blocks.COBWEB)) return true;
+                    || s.is(net.minecraft.world.level.block.Blocks.POWDER_SNOW) || s.is(net.minecraft.world.level.block.Blocks.COBWEB)
+                    // (Vines, a ladder: it hangs on them and never drops into its hole - seed 11
+                    // was shot so, "dug in" at the surface.)
+                    || s.is(net.minecraft.tags.BlockTags.CLIMBABLE)) return true;
             for (Direction d : Direction.Plane.HORIZONTAL) if (level.getBlockState(p.relative(d)).is(net.minecraft.world.level.block.Blocks.CACTUS)) return true;
         }
         return false;
@@ -125,6 +128,9 @@ public final class HideTask implements BotTask {
         // Down: the block under the feet, three times (it drops into the gap), so the lid goes in
         // at ground level, held by the ground round it.
         dug = top.getY() - body.blockPosition().getY();
+        // (Not getting down at all - hanging on something, the block will not break: given up,
+        // so somewhere else is tried, instead of standing in the open "dug in".)
+        if (dug < 3 && ticks > 200 && dug <= 0) return Result.FAILED;
         if (dug < 3) {
             if (!body.onGround()) return Result.RUNNING;
             // Over the middle of the block first, or it would stay standing on the next one.
