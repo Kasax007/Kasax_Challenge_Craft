@@ -60,6 +60,7 @@ public final class HideTask implements BotTask {
      * the morning - instead of dying to them again every half minute (seed 77: twelve times).
      */
     private boolean untilDay;
+    private int dawnTicks;
 
     public static HideTask shelter() {
         HideTask t = new HideTask();
@@ -121,7 +122,10 @@ public final class HideTask implements BotTask {
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
-        if (++ticks > (untilDay ? 13000 : MAX_TICKS) || !body.isAlive()) return Result.DONE;
+        if (!body.isAlive()) return Result.DONE;
+        // (Out of time, but hurt with one still by the hole: a while longer - out at 11 hp into
+        // the zombie that waited, it died on seed 44.)
+        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay || body.getHealth() >= 16 || !monsterBy(body))) return Result.DONE;
         if (top == null) top = body.blockPosition();
         if (up) return pillar(bot, body, level);
         body.stopInputs();
@@ -154,9 +158,24 @@ public final class HideTask implements BotTask {
             return Result.RUNNING;
         }
         // (The night's shelter: until the sun is up - the zombies and skeletons burn then.)
-        if (untilDay) return level.isDarkOutside() ? Result.RUNNING : Result.DONE;
-        if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 200) return Result.DONE;
+        // (And not out while one still stands by the hole: in the shade or not burning yet, a
+        // zombie waiting at dawn finished it off as it climbed out on seed 66. A while longer.)
+        if (untilDay) {
+            if (level.isDarkOutside()) return Result.RUNNING;
+            if (++dawnTicks < 2400 && monsterBy(body)) return Result.RUNNING;
+            return Result.DONE;
+        }
+        if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !monsterBy(body)) return Result.DONE;
         return Result.RUNNING;
+    }
+
+    /** A monster that would be waiting outside: within ten blocks (not an enderman, not a spider by day). */
+    private static boolean monsterBy(BotPlayer body) {
+        boolean day = !body.level().isDarkOutside();
+        return !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
+                body.getBoundingBox().inflate(10, 5, 10), m -> m.isAlive()
+                        && !(m instanceof net.minecraft.world.entity.monster.Enderman)
+                        && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)).isEmpty();
     }
 
     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {

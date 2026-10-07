@@ -255,6 +255,17 @@ public final class MineTask implements BotTask {
         bot.navigator().stop();
         walking = false;
         net.minecraft.world.level.block.Block was = level.getBlockState(target).getBlock();
+        // (Straight over the head with more sand or gravel on it: dug from under, the column
+        // comes down on the head - in the water, where digging is slow, it suffocated so.
+        // A player takes it from the side; this one is left.)
+        BlockPos feetNow = bot.body().blockPosition();
+        if (target.getX() == feetNow.getX() && target.getZ() == feetNow.getZ() && target.getY() > feetNow.getY()
+                && level.getBlockState(target.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) {
+            bot.actions().reset();
+            skip.add(target);
+            target = null;
+            return Result.RUNNING;
+        }
         if (bot.actions().breakTick(target)) {
             if (blocks.test(level.getBlockState(target))) {
                 skip.add(target); // refused (protected)
