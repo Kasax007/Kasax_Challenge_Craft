@@ -33,10 +33,13 @@ public final class HideTask implements BotTask {
     /** Whether hiding right here works: solid ground two deep, nothing liquid, something to dig with. */
     public static boolean possible(Bot bot) {
         BotPlayer body = bot.body();
-        if (!body.onGround() || body.isInWater() || !bot.actions().hasThrowaway()) return false;
+        if (!body.onGround() || body.isInWater()) return false;
         ServerLevel level = (ServerLevel) body.level();
         BlockPos feet = body.blockPosition();
         if (hurtsHere(level, feet)) return false;
+        // (Nothing in the pack for the lid: what it digs out is the lid, if it drops - stone to a
+        // pickaxe, dirt to a hand.)
+        if (!bot.actions().hasThrowaway() && !bot.tools().canHarvest(level.getBlockState(feet.below()))) return false;
         for (int i = 1; i <= 4; i++) {
             BlockPos p = feet.below(i);
             var s = level.getBlockState(p);

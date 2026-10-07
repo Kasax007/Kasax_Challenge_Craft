@@ -614,6 +614,13 @@ public final class LockoutBrain implements BotBrain {
         }
         // Else dug in till the morning.
         if (now < shelterRetryAt) return false;
+        // (Mid-jump or mid-step: on the ground first, then looked at - not walked off for that.)
+        if (!bot.body().onGround() && !bot.body().isInWater()) {
+            start(bot, new net.kasax.challengecraft.bot.task.WaitTask(10), 40);
+            if (!startRefused) return true;
+            startRefused = false;
+            return false;
+        }
         shelterRetryAt = now + 400;
         if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)) {
             // (Not here - water, sand, a berry bush: a few steps off and again.)
