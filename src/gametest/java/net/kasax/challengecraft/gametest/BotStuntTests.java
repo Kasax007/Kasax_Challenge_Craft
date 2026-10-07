@@ -1190,6 +1190,27 @@ public class BotStuntTests {
         });
     }
 
+    /**
+     * An enderman standing right in the way it walks: walked past without a look into its eyes -
+     * it stays calm (on hard one angry blow takes over ten hearts).
+     */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 500, skyAccess = true, padding = 24)
+    public void endermanNoStare(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "enderman_no_stare");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var en = EntityTypes.ENDERMAN.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        en.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 22)));
+        en.setPersistenceRequired();
+        level.addFreshEntity(en);
+        a.spawn(4, FEET, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(36, FEET, 20), 1.5), 480, () -> {
+            if (en.isCreepy() || en.getTarget() == body) h.fail("enderman_no_stare: looked it in the eyes");
+            return a.near(36, FEET, 20, 1.6);
+        });
+    }
+
     /** Killed once and back: as hurtable as before (not shielded for good like a player still loading). */
     @GameTest(structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 8)
     public void hurtableAfterDeath(GameTestHelper h) {

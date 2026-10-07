@@ -529,6 +529,16 @@ public final class Bot {
             reflex(new net.kasax.challengecraft.bot.task.SnowEscapeTask());
             return;
         }
+        // Up in a tree's crown (the spawn can be up there; seed 66 jumped about on the leaves and
+        // fell to its death): down through the leaves at once, a block's fall at a time.
+        if (body.onGround() && !(top instanceof net.kasax.challengecraft.bot.task.LeafDescentTask)
+                && net.kasax.challengecraft.bot.task.LeafDescentTask.upATree(this)) {
+            actions.reset();
+            navigator.stop();
+            say("up in a tree crown: down through the leaves");
+            reflex(new net.kasax.challengecraft.bot.task.LeafDescentTask());
+            return;
+        }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         // Getting out of lava, out of the water, out of the fire: nothing else meanwhile (a meal
         // in the lava is the last one).
