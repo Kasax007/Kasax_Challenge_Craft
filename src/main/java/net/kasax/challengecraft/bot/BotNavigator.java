@@ -225,32 +225,36 @@ public final class BotNavigator {
         return diving && status == Status.MOVING;
     }
 
-    private Predicate<BlockPos> savedGoal;
-    private boolean savedPure;
-    private BlockPos savedTarget;
-    private BotTask savedFor;
+    private record Suspended(Predicate<BlockPos> goal, BlockPos target, boolean pure) {}
+
+    /** The walks put aside, by the task they belong to (one under another: a dodge, then a hole). */
+    private final java.util.Map<BotTask, Suspended> suspended = new java.util.IdentityHashMap<>();
 
     /**
      * Stops for something that comes in between (a fight, food): the walk of {@code owner} is
      * kept and taken up again by {@link #resumeFor} once that task is back on top.
+     * (Kept per task: with a second interruption on top of the first - an arrow dodged, then a
+     * hole dug - the walk under both was lost, and the smelting under them stood three minutes
+     * by its furnace "walking" with no walk on seed 55.)
      */
     public void suspend(BotTask owner) {
-        if (status == Status.MOVING && goal != null) {
-            savedPure = pureGoal;
-            savedGoal = goal;
-            savedTarget = target;
-            savedFor = owner;
+        if (owner != null && status == Status.MOVING && goal != null) {
+            if (suspended.size() > 16) suspended.clear();
+            suspended.put(owner, new Suspended(goal, target, pureGoal));
         }
         stop();
     }
 
     /** {@code task} is on top again: the walk it was on when interrupted goes on. */
     public void resumeFor(BotTask task) {
-        if (task != null && task == savedFor && savedGoal != null && status != Status.MOVING) {
-            setGoal(savedGoal, savedTarget, savedPure);
-        }
-        savedGoal = null;
-        savedFor = null;
+        if (task == null) return;
+        Suspended w = suspended.remove(task);
+        if (w != null && status != Status.MOVING) setGoal(w.goal(), w.target(), w.pure());
+    }
+
+    /** Nothing to take up again (the stack was cleared). */
+    public void forgetSuspended() {
+        suspended.clear();
     }
 
     public void stop() {

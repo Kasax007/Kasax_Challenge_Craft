@@ -76,6 +76,12 @@ abstract class StationTask implements BotTask {
                 if (station == null && bot.body().isInWater()) {
                     // Swimming: ashore first (nothing stands on water).
                     if (++placeTries > 4) return Result.FAILED;
+                    // (No way ashore the last time - a pit full of water, walls all round: dug
+                    // out of it, not swum round in till a drowned came; seed 11.)
+                    if (placeTries > 1) {
+                        bot.interject(new DigOutTask());
+                        return Result.RUNNING;
+                    }
                     bot.interject(new NavGoalTask("ashore to put down a " + block.getName().getString(),
                             (lv, p) -> lv.getFluidState(p).isEmpty() && lv.getFluidState(p.below()).isEmpty()
                                     && !lv.getBlockState(p.below()).getCollisionShape(lv, p.below()).isEmpty(),
@@ -104,6 +110,8 @@ abstract class StationTask implements BotTask {
                 walking = true;
             }
             BotNavigator.Status s = bot.navigator().tick();
+            // (The walk dropped by something in between: set out again.)
+            if (s == BotNavigator.Status.IDLE) walking = false;
             if (s == BotNavigator.Status.FAILED || s == BotNavigator.Status.ARRIVED && !bot.actions().inReach(station)) {
                 bot.unreachableStations.add(station);
                 station = null;

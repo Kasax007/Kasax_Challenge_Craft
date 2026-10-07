@@ -343,6 +343,14 @@ public final class ObtainPlanner {
         return new Leaf(l.cost() * 4 + 30, l.search() * 4 + 30, l.at());
     }
 
+    private static final Set<EntityType<?>> RISKY_PREY = Set.of(net.minecraft.world.entity.EntityTypes.SKELETON, net.minecraft.world.entity.EntityTypes.STRAY, net.minecraft.world.entity.EntityTypes.BOGGED,
+            net.minecraft.world.entity.EntityTypes.WITCH, net.minecraft.world.entity.EntityTypes.DROWNED, net.minecraft.world.entity.EntityTypes.PILLAGER, net.minecraft.world.entity.EntityTypes.BLAZE);
+
+    /** A shield, or armour worth the name. */
+    private static boolean geared(net.kasax.challengecraft.bot.BotPlayer body) {
+        return body.getArmorValue() >= 6 || countAny(body, Set.of(net.minecraft.world.item.Items.SHIELD)) > 0;
+    }
+
     private Leaf landMobLeaf(EntityType<?> type, double effort) {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return Leaf.NONE;
@@ -366,6 +374,10 @@ public final class ObtainPlanner {
         // a trip down into a cave, about three searches' worth); in the Nether and down in a cave
         // it is dark at noon.
         double wait = monster && !dark && !nether && !underground ? Math.min(untilNight, effort * 3) : 0;
+        // The ones that hit from afar (or with potions, or from the water) are not hunted bare:
+        // without a shield or armour that is how the early deaths went (a skeleton hunted for
+        // one arrow at minute four on seed 22, a witch, a drowned). Other ways first.
+        if (RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body())) wait += 300;
         return new Leaf(walk + wait + effort, effort, at);
     }
 

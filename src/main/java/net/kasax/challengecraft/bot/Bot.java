@@ -159,6 +159,7 @@ public final class Bot {
     public void doNow(BotTask task) {
         tasks.clear();
         navigator.stop();
+        navigator.forgetSuspended();
         tasks.push(task);
         say("-> " + task.describe());
     }
@@ -167,6 +168,7 @@ public final class Bot {
     public void clearTasks() {
         tasks.clear();
         navigator.stop();
+        navigator.forgetSuspended();
         actions.reset();
         body.stopInputs();
     }

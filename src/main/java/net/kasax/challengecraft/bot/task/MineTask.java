@@ -174,6 +174,10 @@ public final class MineTask implements BotTask {
                     target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 }
                 if (target != null && !worthIt(level, bot, target)) target = null;
+                if (target != null && leash != null && horizontal(target, leash) > 24) {
+                    skip.add(target);
+                    target = null;
+                }
                 targetFromMemory = fromMemory && target != null;
             }
             if (target == null) return search(bot);
@@ -362,6 +366,7 @@ public final class MineTask implements BotTask {
     }
 
     private boolean knownOnly;
+    private BlockPos leash;
     private boolean targetFromMemory;
     private int memoryFails;
     /** Whether it digs for ore (dug for anywhere at the right depth, unlike a tree or a flower). */
@@ -427,6 +432,9 @@ public final class MineTask implements BotTask {
     /** Only where it is seen or remembered: no searching for it. */
     public MineTask knownOnly() {
         this.knownOnly = true;
+        // (With a lead: that spot and its vein, not a remembered one 150 blocks on - seed 11
+        // walked off so from the shallow iron into a skeleton's cave.)
+        this.leash = lead;
         return this;
     }
 

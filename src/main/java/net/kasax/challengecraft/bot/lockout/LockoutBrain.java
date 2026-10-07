@@ -446,10 +446,11 @@ public final class LockoutBrain implements BotBrain {
 
     private static final List<Set<net.minecraft.world.item.Item>> OPENING = List.of(
             Set.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE),
-            Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE),
-            // The full kit a player keeps: a sword for what comes at night, a shovel for sand,
-            // gravel and snow (both cost two cobblestone and a stick at the same table).
+            // The full kit a player keeps: a sword for what comes at night (right after the
+            // pickaxe: no weapon at nightfall on seed 55), an axe, a shovel for sand, gravel and
+            // snow (each two or three cobblestone and a stick at the same table).
             Set.of(net.minecraft.world.item.Items.STONE_SWORD, net.minecraft.world.item.Items.IRON_SWORD, net.minecraft.world.item.Items.DIAMOND_SWORD),
+            Set.of(net.minecraft.world.item.Items.STONE_AXE, net.minecraft.world.item.Items.IRON_AXE, net.minecraft.world.item.Items.DIAMOND_AXE),
             Set.of(net.minecraft.world.item.Items.STONE_SHOVEL, net.minecraft.world.item.Items.IRON_SHOVEL, net.minecraft.world.item.Items.DIAMOND_SHOVEL));
 
     /** Works through the opening; returns whether it started a step of it. */
@@ -1252,6 +1253,18 @@ public final class LockoutBrain implements BotBrain {
         boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
                 && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
         if (night && cost > 30 && level > 6 && !hurt) return false;
+        // (No weapon yet, and one a few seconds off - the stone is there: that first. The hunt
+        // goes quicker with it, and the night may come before the hunt is done.)
+        if (!hurt && level > 6 && ObtainPlanner.countAny(bot.body(), OPENING.get(1)) == 0) {
+            double sword = planner.estimate(bot, OPENING.get(1), 1);
+            if (sword <= 30) {
+                bot.say("a sword first, then food (~" + Math.round(sword) + " s)");
+                nextFoodCheck = now;
+                startRefused = false;
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(OPENING.get(1), 1, planner), budget(sword, 300, 900));
+                if (!startRefused) return true;
+            }
+        }
         bot.say("stocking up on food (~" + Math.round(cost) + " s)");
         nextErrand = "food";
         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));
@@ -1948,6 +1961,9 @@ public final class LockoutBrain implements BotBrain {
             boolean prey = !quick && c.option().cost() < 25 && c.tile().goal().type() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalType.KILL;
             // (A monster on the way: armed for it, or not at all.)
             if (prey && !armed) continue;
+            // (Nor down into the dark after it, bare: a zombie followed into a cave at minute
+            // four brought a skeleton's arrows with it on seed 11. In the open, one at a time.)
+            if (prey && me.getArmorValue() < 6 && !openPrey(me)) continue;
             if (quick || prey) {
                 sideTask = c.option().task().get();
                 if (sideTask == null) continue;
@@ -1960,6 +1976,17 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
         }
+    }
+
+    /** The monsters about all out in the open at its own level, and not more than one of them. */
+    private static boolean openPrey(net.kasax.challengecraft.bot.BotPlayer me) {
+        var near = me.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me.getBoundingBox().inflate(20, 12, 20),
+                m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy);
+        if (near.size() > 1) return false;
+        for (var m : near) {
+            if (Math.abs(m.getY() - me.getY()) > 4 || !me.level().canSeeSky(m.blockPosition().above())) return false;
+        }
+        return true;
     }
 
     @Override
