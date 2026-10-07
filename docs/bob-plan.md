@@ -1912,3 +1912,44 @@ Mit diesen Fixes hatte Seed 77 im nächsten Lauf 0 Tode.
 - Nicht unter Sand oder Kies graben; aus Sand tritt er seitlich heraus.
 - Der Nachtstollen (Eisen in einem eigenen, geschlossenen Tunnel) brachte kaum Eisen und ist
   abgeschaltet (`NIGHT_MINE`).
+
+### 23.7 Nachtloch nur bei echter Gefahr (Runde G)
+
+Jede Nacht einzugraben kostete Felder und sparte keine Tode (23.5). Seit `20ba16a` gräbt sich Bob
+nur dann für die Nacht ein, wenn es dort wirklich gefährlich ist:
+
+- keine Waffe;
+- weniger als 12 Leben;
+- nichts zu essen und Hunger unter 14;
+- zwei Monster in 24 Blöcken, oder eines, das ihn anvisiert oder näher als 12 ist.
+
+Eine ruhige Nacht spielt er weiter. Ein Bett im Gepäck schläft die Nacht wie bisher weg.
+
+**Messung:** gleiche Bretter, 30 min HARD, 8 Seeds.
+
+| Seed | Basis Felder | Basis Tode | G Felder | G Tode |
+| --- | --- | --- | --- | --- |
+| 77 | 4 | 1 | 7 | 1 |
+| 66 | 8 | 1 | 3 | 1 |
+| 88 | 3 | 1 | 2 | 0 |
+| 44 | 2 | 0 | 1 | 1 |
+| 11 | 1 | 3 | 1 | 1 |
+| 22 | 5 | 0 | 6 | 0 |
+| 33 | 6 | 1 | 2 | 0 |
+| 55 | 8 | 0 | 2 | 0 |
+| **Summe** | **37** | **7** | **24** | **4** |
+
+Die Tode sinken um gut 40 %, die Felder um ein Drittel: Bob ist vorsichtiger und dadurch
+langsamer.
+
+**Die vier Tode in G und die Fixes danach (`08e3644`):**
+
+- **Seed 77, Minute 3:** Bob grub unter Wasser Kies für Feuerstein von unten ab. Die Säule fiel nach,
+  und unter Wasser gräbt er 25-mal langsamer: erstickt.
+  Fix: Kies oder Sand direkt über dem Kopf mit weiterem darüber lässt er liegen.
+- **Seed 66, Minute 20:** Bob kam bei Tagesanbruch aus dem Erdloch, und ein Zombie stand noch daneben.
+  Fix: Bob bleibt bis zu 2 Minuten länger im Loch, solange ein Monster in 10 Blöcken steht.
+- **Seed 44, Minute 14:** Bob war in einer Höhle auf y 1–11 eingegraben, kam nach 45 s mit 11 Leben
+  heraus und lief einem Zombie in die Arme.
+  Fix: Mit weniger als 16 Leben und einem Monster vor dem Loch bleibt er bis zu 3-mal länger drin.
+- **Seed 11, Minute 4:** Ein Skelett in der Höhle beim Eisen, ohne Rüstung. Offen.
