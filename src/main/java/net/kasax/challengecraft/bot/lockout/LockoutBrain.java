@@ -1736,8 +1736,11 @@ public final class LockoutBrain implements BotBrain {
         }
         // Nothing left to eat in the middle of a long errand, and hungry or hurt: food now, the
         // errand after (on hard the hearts only come back with a full stomach).
+        // (Not at night out on the surface: the hole comes first - a sheep hunt in the dark for
+        // something to eat was a death on seed 55.)
         if (checkTicks % 300 == 0 && now >= foodInterjectAt && !(BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask)
-                && (goalTask != null || running != null) && !bot.targeted(10)) {
+                && (goalTask != null || running != null) && !bot.targeted(10) && !sheltering(bot)
+                && !(nightComing(bot, SHELTER_FROM) && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body()))) {
             int points = 0;
             for (var st : bot.body().getInventory().getNonEquipmentItems()) {
                 var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
