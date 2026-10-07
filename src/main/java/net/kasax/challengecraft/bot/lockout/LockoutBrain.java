@@ -619,6 +619,21 @@ public final class LockoutBrain implements BotBrain {
             // (Not here - water, sand, a cliff edge: a few steps off and again.)
             return false;
         }
+        // With a pickaxe and something to eat: the night worked, not waited - dug in, the hole
+        // shut, and a tunnel of its own down to the iron (none of it open to a cave), as players
+        // spend a first night. The morning brings the shield and the armour with it.
+        if (ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0 && net.kasax.challengecraft.bot.task.HideTask.possible(bot)) {
+            int iron = ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.RAW_IRON, net.minecraft.world.item.Items.IRON_INGOT));
+            int want = Math.min(16, Math.max(iron + 4, planner.demandFor(net.minecraft.world.item.Items.RAW_IRON) + 1 + 8));
+            bot.say("night, not geared for it (" + nightGaps(bot) + "): dug in, and a tunnel of my own for iron till morning");
+            start(bot, new net.kasax.challengecraft.bot.task.SequenceTask("the night's mine", List.of(
+                    net.kasax.challengecraft.bot.task.HideTask::new,
+                    () -> new net.kasax.challengecraft.bot.task.MineTask("raw_iron", s -> s.is(net.minecraft.world.level.block.Blocks.IRON_ORE)
+                            || s.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE), Set.of(net.minecraft.world.item.Items.RAW_IRON),
+                            ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.RAW_IRON)) + want - iron, 16).sealed())), 13000);
+            if (!startRefused) return true;
+            startRefused = false;
+        }
         bot.say("night, not geared for it (" + nightGaps(bot) + "): dug in till morning");
         start(bot, net.kasax.challengecraft.bot.task.HideTask.shelter(), 13000);
         if (!startRefused) return true;

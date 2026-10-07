@@ -153,7 +153,7 @@ public final class MineTask implements BotTask {
                     // (Things from the surface - logs, sand - seen deep down, a mineshaft's beams,
                     // are not worth digging fifty blocks for: those are left out, see worthIt.)
                     List<BlockPos> seen = new ArrayList<>();
-                    for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), searching ? 12 : 28, searching ? 8 : 20, blocks, true, skip, 12)) {
+                    for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), sealed ? 5 : searching ? 12 : 28, sealed ? 4 : searching ? 8 : 20, blocks, true, skip, 12)) {
                         // (A trunk from the bottom: that one is in reach from the ground.)
                         for (int i = 0; i < 12 && blocks.test(level.getBlockState(p.below())) && !skip.contains(p.below()); i++) p = p.below();
                         if (!seen.contains(p) && worthIt(level, bot, p)) seen.add(p);
@@ -167,7 +167,7 @@ public final class MineTask implements BotTask {
                 // (Ore seen in a cliff or a ravine wall that twice had no way to it: the rest of
                 // what it remembers is likely the same - dug for here instead of walked to; seed 33
                 // walked five minutes from one seen iron vein to the next and mined none.)
-                boolean fromMemory = target == null && !(oreLike && memoryFails >= 2);
+                boolean fromMemory = target == null && !sealed && !(oreLike && memoryFails >= 2);
                 if (fromMemory) target = bot.memory().nearest(level, bot.body().blockPosition(), blocks, skip);
                 for (int i = 0; i < 8 && target != null && !worthIt(level, bot, target); i++) {
                     skip.add(target);
@@ -401,6 +401,18 @@ public final class MineTask implements BotTask {
         return this;
     }
 
+    /**
+     * Mining in a shut-in tunnel of its own (the night's work, dug in): no caves walked, none
+     * dropped into, only what its own tunnel shows - the dark outside stays outside.
+     */
+    private boolean sealed;
+
+    public MineTask sealed() {
+        this.sealed = true;
+        this.cavesDone = true;
+        return this;
+    }
+
     /** Only where it is seen or remembered: no searching for it. */
     public MineTask knownOnly() {
         this.knownOnly = true;
@@ -429,7 +441,7 @@ public final class MineTask implements BotTask {
         BotNavigator nav = bot.navigator();
         // Ores: a cave first (walk through it and see what its walls show), a tunnel only when
         // there is no cave about or the caves had nothing.
-        if (depth != null && !cavesDone && !rock(level(bot)) && !(digAtLead && lead != null)) return explore(bot);
+        if (depth != null && !cavesDone && !sealed && !rock(level(bot)) && !(digAtLead && lead != null)) return explore(bot);
         if (depth == null && rock(level(bot))) return dig(bot);
         if (depth != null && !(digAtLead && lead != null)) return dig(bot);
         // Where they are known to be: go there first.
@@ -646,7 +658,7 @@ public final class MineTask implements BotTask {
             // The next step has no floor: a cave right below. A short drop into it is the way on
             // (and its walls show more than any tunnel); else on along the level for a step.
             if (down && !safeStep(level, digBlocks, digTo)) {
-                if (shortDrop(level, digBlocks, digTo)) {
+                if (!sealed && shortDrop(level, digBlocks, digTo)) {
                     // (The landing is wherever it comes down: the step is taken from there.)
                     // Broken into a cave: that is walked first, as any cave found.
                     if (depth != null && cavesDone) {
@@ -656,16 +668,22 @@ public final class MineTask implements BotTask {
                     }
                 } else {
                     List<BlockPos> along = List.of(ahead, ahead.above());
-                    if (safeStep(level, along, ahead)) {
+                    if (safeStep(level, along, ahead) && !(sealed && breaches(level, along, feet))) {
                         digTo = ahead;
                         digBlocks = along;
                     }
                 }
             }
-            if (!safeStep(level, digBlocks, digTo) && !(down && shortDrop(level, digBlocks, digTo))) {
+            if (!safeStep(level, digBlocks, digTo) && !(down && !sealed && shortDrop(level, digBlocks, digTo))
+                    || sealed && breaches(level, digBlocks, feet)) {
                 digTo = null;
                 heading = heading.getClockWise();
                 if (++turns >= 4) {
+                    // (Shut in: not out of its own tunnel for another start - it stays put.)
+                    if (sealed) {
+                        bot.say("the tunnel would break into a cave every way: staying put");
+                        return Result.FAILED;
+                    }
                     // No safe way on from here (water all around, a ledge): try a few blocks away.
                     turns = 0;
                     if (++moves > 4) {
@@ -752,6 +770,23 @@ public final class MineTask implements BotTask {
     }
 
     /** The new spot has a floor, nothing is above it that falls, and no liquid touches what gets dug out. */
+    /**
+     * Whether digging these would open the tunnel to the outside: air next to them that is not the
+     * tunnel it stands in (its own column and the cells just round its feet).
+     */
+    private static boolean breaches(ServerLevel level, List<BlockPos> dig, BlockPos feet) {
+        for (BlockPos b : dig) {
+            for (Direction d : Direction.values()) {
+                BlockPos n = b.relative(d);
+                if (dig.contains(n)) continue;
+                int dx = Math.abs(n.getX() - feet.getX()), dz = Math.abs(n.getZ() - feet.getZ()), dy = n.getY() - feet.getY();
+                if (dx + dz <= 1 && dy >= -1 && dy <= 2) continue;
+                if (level.getBlockState(n).isAir() || level.getBlockState(n).getCollisionShape(level, n).isEmpty() && level.getFluidState(n).isEmpty()) return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean safeStep(ServerLevel level, List<BlockPos> dig, BlockPos feet) {
         BlockPos floor = feet.below();
         BlockState f = level.getBlockState(floor);
