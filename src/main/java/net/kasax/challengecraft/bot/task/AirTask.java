@@ -69,6 +69,22 @@ public final class AirTask implements BotTask {
                 }
             }
         }
+        // No way found by the search, again and again: up by hand - straight up where the water
+        // goes up to the air, else towards the nearest column of water that does (seed 88
+        // drowned twice at the sea's surface with "no way found", the walk under it taken up
+        // again after this gave up).
+        if (fails > 1) {
+            bot.navigator().stop();
+            body.stopInputs();
+            body.jump = true;
+            BlockPos feet = body.blockPosition();
+            BlockPos open = openColumn(level, feet);
+            if (open != null && (open.getX() != feet.getX() || open.getZ() != feet.getZ())) {
+                body.lookAt(net.minecraft.world.phys.Vec3.atCenterOf(open.atY(feet.getY())));
+                body.forward = 1f;
+            }
+            return Result.RUNNING;
+        }
         if (!started) {
             bot.navigator().setGoal(p -> breathable(level, p), bot.body().blockPosition().above(8));
             started = true;
@@ -76,11 +92,34 @@ public final class AirTask implements BotTask {
         BotNavigator.Status s = bot.navigator().tick();
         if (s == BotNavigator.Status.FAILED) {
             started = false;
-            if (++fails > 3) return Result.FAILED;
+            fails++;
         } else if (s == BotNavigator.Status.ARRIVED) {
             started = false;
         }
         return Result.RUNNING;
+    }
+
+    /** The nearest column (within six) where nothing but water stands between the feet's level and the air above. */
+    private static BlockPos openColumn(ServerLevel level, BlockPos feet) {
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                double d = dx * dx + dz * dz;
+                if (d >= bestD) continue;
+                BlockPos p = feet.offset(dx, 0, dz);
+                for (int up = 0; up <= 10; up++) {
+                    BlockPos q = p.above(up);
+                    if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) break;
+                    if (level.getFluidState(q).isEmpty()) {
+                        best = p;
+                        bestD = d;
+                        break;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     @Override
