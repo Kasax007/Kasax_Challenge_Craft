@@ -1866,3 +1866,49 @@ Bob hat drei Ebenen:
   - Beerenstrauch;
   - Enderman;
   - Skelette auf kurze Distanz.
+
+### 23.5 Faire Messung (gleiches Brett pro Seed)
+
+**Problem der bisherigen Messungen:** Das Bingo-Brett war bei jedem Lauf ein anderes, weil die
+Startzeit und eine zufällige Spieler-UUID in den Seed eingehen. Das Brett bestimmt, was ein Lauf
+riskiert, deshalb schwankte derselbe Seed zwischen 0 und 7 Toden.
+
+**Lösung:** Die Benchmarks setzen jetzt `CHALLENGECRAFT_BOARD_SEED` (in `bench.sh`, `BOARD_SEED`
+oder der Welt-Seed). Damit bekommen zwei Stände dasselbe Brett. Im normalen Spiel bleibt das Brett
+zufällig.
+
+**Messung (30 min HARD, je 8 Seeds, gleiche Bretter):**
+
+| Stand | Tode | Felder pro Lauf |
+| --- | --- | --- |
+| alt (`0e39c23`) | 6 in 7 Läufen (Seed 66 fehlt noch) | 3,5 |
+| neu (`1ff88ef`) | 13 in 8 Läufen, davon 11 in einer Todesspirale auf Seed 77; ohne diese 2 in 7 Läufen | 4,4 |
+
+**Die Todesspirale:** Bob saß nach einem Respawn 10 Minuten an einem Hang am Spawn fest. In der
+Nacht starb er dort 10-mal in 2 Minuten: ohne Waffe, ohne Ausweg, mit Fäusten.
+
+**Behoben durch:**
+
+- Nachts wartet Bob nach dem Tod bis zur Dämmerung, statt sofort zu respawnen (höchstens
+  6 Minuten), wie ein Spieler.
+- Steckt er zweimal an derselben Stelle fest, gräbt er sich frei (`DigOutTask`).
+
+Mit diesen Fixes hatte Seed 77 im nächsten Lauf 0 Tode.
+
+### 23.6 Weitere Fixes dieser Runde
+
+- Vor Schützen gräbt sich Bob bei wenig Leben ein, statt wegzulaufen.
+- Nahe Skelette (≤ 6 Blöcke) greift er schon ab 10 Leben an.
+- Endermen schaut er nie in die Augen: Der Blick geht nach unten (Test `enderman_no_stare`).
+- Schwere Gegner (Enderman, Hexe, Vindicator …) nur mit Rüstung und vollem Leben.
+- Keine Gelegenheiten am Weg, während er sich für die Nacht eingräbt.
+- Unterschlupf:
+  - nicht in Ranken oder Leitern;
+  - auf Stein auch ohne Block im Gepäck;
+  - nicht mitten im Sprung prüfen;
+  - abbrechen, wenn das Graben nicht vorankommt.
+- Steht er oben in einer Baumkrone, steigt er sofort durch das Laub ab.
+- Creeper zu nah: Rückstoß-Schlag unabhängig von der Aufladung.
+- Nicht unter Sand oder Kies graben; aus Sand tritt er seitlich heraus.
+- Der Nachtstollen (Eisen in einem eigenen, geschlossenen Tunnel) brachte kaum Eisen und ist
+  abgeschaltet (`NIGHT_MINE`).
