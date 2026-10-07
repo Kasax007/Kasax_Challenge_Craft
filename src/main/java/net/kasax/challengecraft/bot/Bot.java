@@ -248,6 +248,18 @@ public final class Bot {
         if (body.isInWall()) {
             net.minecraft.core.BlockPos eye = net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
             net.minecraft.core.BlockPos q = !body.level().getBlockState(eye).getCollisionShape(body.level(), eye).isEmpty() ? eye : eye.below();
+            // (The head at the edge of a block, in the one beside it - the game counts the corners
+            // of the head too: that one, not the air straight above the middle; seed 77 dug at the
+            // air till it suffocated.)
+            if (body.level().getBlockState(q).getCollisionShape(body.level(), q).isEmpty()) {
+                double w = body.getBbWidth() * 0.4;
+                for (double ox : new double[] {-w, w}) {
+                    for (double oz : new double[] {-w, w}) {
+                        net.minecraft.core.BlockPos c = net.minecraft.core.BlockPos.containing(body.getX() + ox, body.getEyeY(), body.getZ() + oz);
+                        if (!body.level().getBlockState(c).getCollisionShape(body.level(), c).isEmpty()) q = c;
+                    }
+                }
+            }
             navigator.stop();
             body.stopInputs();
             if (body.tickCount % 20 == 0) say("buried (head in " + body.level().getBlockState(q).getBlock().getName().getString() + "): digging free");

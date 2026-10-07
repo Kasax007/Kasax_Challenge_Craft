@@ -6,6 +6,7 @@ import net.kasax.challengecraft.bot.BotTask;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import java.util.List;
 
 /**
  * The player's way out of a fight going badly (a skeleton shooting from afar, zombies all round):
@@ -18,12 +19,24 @@ public final class HideTask implements BotTask {
     private BlockPos top;
     private boolean closed;
 
+    /** Something that hurts in the spot itself (a berry bush, a cactus beside it, fire): no shelter there. */
+    static boolean hurtsHere(ServerLevel level, BlockPos feet) {
+        for (BlockPos p : List.of(feet, feet.above())) {
+            var s = level.getBlockState(p);
+            if (s.is(net.minecraft.world.level.block.Blocks.SWEET_BERRY_BUSH) || s.is(net.minecraft.tags.BlockTags.FIRE)
+                    || s.is(net.minecraft.world.level.block.Blocks.POWDER_SNOW) || s.is(net.minecraft.world.level.block.Blocks.COBWEB)) return true;
+            for (Direction d : Direction.Plane.HORIZONTAL) if (level.getBlockState(p.relative(d)).is(net.minecraft.world.level.block.Blocks.CACTUS)) return true;
+        }
+        return false;
+    }
+
     /** Whether hiding right here works: solid ground two deep, nothing liquid, something to dig with. */
     public static boolean possible(Bot bot) {
         BotPlayer body = bot.body();
         if (!body.onGround() || body.isInWater() || !bot.actions().hasThrowaway()) return false;
         ServerLevel level = (ServerLevel) body.level();
         BlockPos feet = body.blockPosition();
+        if (hurtsHere(level, feet)) return false;
         for (int i = 1; i <= 4; i++) {
             BlockPos p = feet.below(i);
             var s = level.getBlockState(p);
@@ -67,6 +80,7 @@ public final class HideTask implements BotTask {
         if (!body.onGround() || body.isInWater()) return "not on dry ground";
         ServerLevel level = (ServerLevel) body.level();
         BlockPos feet = body.blockPosition();
+        if (hurtsHere(level, feet)) return "something that hurts here";
         for (int i = 1; i <= 4; i++) {
             BlockPos p = feet.below(i);
             var s = level.getBlockState(p);

@@ -616,7 +616,14 @@ public final class LockoutBrain implements BotBrain {
         if (now < shelterRetryAt) return false;
         shelterRetryAt = now + 400;
         if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)) {
-            // (Not here - water, sand, a cliff edge: a few steps off and again.)
+            // (Not here - water, sand, a berry bush: a few steps off and again.)
+            var r = bot.body().getRandom();
+            var off = bot.body().blockPosition().offset(r.nextInt(9) - 4, 0, r.nextInt(9) - 4);
+            var spot = bot.body().level().getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, off);
+            bot.say("no ground to dig in here (" + net.kasax.challengecraft.bot.task.HideTask.shelterProblem(bot) + "): a few steps off");
+            start(bot, new net.kasax.challengecraft.bot.task.GoToTask(spot, 1), 300);
+            if (!startRefused) return true;
+            startRefused = false;
             return false;
         }
         // With a pickaxe and something to eat: the night worked, not waited - dug in, the hole
