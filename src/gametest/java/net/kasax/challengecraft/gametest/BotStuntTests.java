@@ -1102,6 +1102,38 @@ public class BotStuntTests {
     }
 
     /**
+     * A skeleton shooting from twelve blocks, no weapon and no shield, a stone wall a few steps
+     * off (hard): alive half a minute later, not in a fist fight with it (a wall to hide behind
+     * does not help - it walks round; the dodges do).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 44)
+    public void skeletonBehindWall(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "skeleton_behind_wall");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        // The wall: four wide, three high, three blocks east of it.
+        a.fill(25, FEET, 18, 25, FEET + 2, 22, Blocks.STONE);
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(10, FEET, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(22, FEET, 20, new ItemStack(Items.COBBLESTONE, 16));
+        var body = a.bot().body();
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(680), 690, () -> {
+            if (sk.isAlive() && sk.getTarget() != body) sk.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().body() != body || !body.isAlive()) h.fail("skeleton_behind_wall: shot dead");
+            if (h.getTick() < 600) return false;
+            BotArena.LOG.info("[BOTTEST] skeleton_behind_wall lost {} health", 20 - low[0]);
+            h.assertTrue(20 - low[0] <= 10, "skeleton_behind_wall: lost " + (20 - low[0]));
+            return true;
+        });
+    }
+
+    /**
      * Back at the spawn at night with nothing, three zombies and a skeleton about (hard): dug in
      * with bare hands and alive a minute later, instead of dying to them again and again.
      */

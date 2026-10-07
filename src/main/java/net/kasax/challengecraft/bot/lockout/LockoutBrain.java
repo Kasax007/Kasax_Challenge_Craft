@@ -518,8 +518,8 @@ public final class LockoutBrain implements BotBrain {
     // ---- the night plan --------------------------------------------------------------------
 
     /** Dusk: from here on, ready for the night or making ready (monsters come out from about 13000). */
-    static final long DUSK = 11000, SHELTER_FROM = 12600, DAWN = 23200;
-    private long bedTriedDay = -1, shelterRetryAt;
+    static final long DUSK = 10000, SHELTER_FROM = 12600, DAWN = 23200;
+    private long bedTriedDay = -1, foodTriedDay = -1, shelterRetryAt;
 
     private static long clock(Bot bot) {
         return bot.body().level().getOverworldClockTime() % 24000;
@@ -569,9 +569,31 @@ public final class LockoutBrain implements BotBrain {
             double est = planner.estimate(bot, BEDS, 1);
             if (est <= 150) {
                 bot.say("dusk soon, not geared for the night: a bed first (~" + Math.round(est) + " s)");
-                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(BEDS, 1, planner), 3000);
+                nightPrep = new net.kasax.challengecraft.bot.task.ObtainTask(BEDS, 1, planner);
+                start(bot, nightPrep, 3000);
                 if (!startRefused) return true;
                 startRefused = false;
+            }
+        }
+        // And something to eat for the night (in the hole the hearts only come back with food).
+        if (c < SHELTER_FROM - 300 && foodTriedDay != day) {
+            int points = 0;
+            for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+                var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
+                if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += f.nutrition() * st.getCount();
+            }
+            if (points < 8) {
+                foodTriedDay = day;
+                int have = ObtainPlanner.countAny(bot.body(), FOODS);
+                double est = planner.estimate(bot, FOODS, have + 4);
+                if (est <= 180) {
+                    bot.say("dusk soon and little to eat (" + points + "): food for the night (~" + Math.round(est) + " s)");
+                    nextErrand = "food";
+                    nightPrep = new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner);
+                    start(bot, nightPrep, 3000);
+                    if (!startRefused) return true;
+                    startRefused = false;
+                }
             }
         }
         if (c < SHELTER_FROM) return false;
@@ -1052,11 +1074,15 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
-    private long nightDropAt;
+    private long nightDropAt, foodInterjectAt;
+
+    /** The bed or the food being got for the night (not put aside at nightfall: it is the plan). */
+    private BotTask nightPrep;
 
     /** Already seeing to the night: in a hole, in bed, or on the way to one. */
-    private static boolean sheltering(Bot bot) {
+    private boolean sheltering(Bot bot) {
         for (BotTask t : bot.tasks()) {
+            if (t == nightPrep && clock(bot) < 13500) return true;
             BotTask in = BotTask.innermost(t);
             if (t instanceof net.kasax.challengecraft.bot.task.HideTask || in instanceof net.kasax.challengecraft.bot.task.HideTask
                     || in instanceof net.kasax.challengecraft.bot.task.SleepTask || t.describe().startsWith("sleep")) return true;
@@ -1133,7 +1159,12 @@ public final class LockoutBrain implements BotBrain {
         // the country: the estimates of those run long.)
         // (Hurt and nothing to eat: food first, whatever it costs. Not hurt: as before - three
         // minutes for apples at the start delayed the tools into the night on seed 77.)
-        if (!hurt && (level >= 12 && cost > (bare ? 60 : 25) || cost > (level <= 6 ? 900 : bare ? 120 : 90))) return false;
+        // (Once the stone tools are made: a stock is worth a couple of minutes - the first night
+        // is not to be had without one, and on hard no heart comes back without food; 30 of 54
+        // deaths had nothing to eat in the pack.)
+        boolean opened = ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0;
+        double stockCost = bare ? (opened ? 150 : 60) : 25;
+        if (!hurt && (level >= 12 && cost > stockCost || cost > (level <= 6 ? 900 : bare ? Math.max(120, stockCost) : 90))) return false;
         if (hurt && cost > 900) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
@@ -1643,6 +1674,27 @@ public final class LockoutBrain implements BotBrain {
         if (checkTicks % 200 == 0 && goalTask != null && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask) && pickaxeAlmostGone(bot)) {
             bot.say("the pickaxe is about to break: a spare one first");
             bot.interject(new net.kasax.challengecraft.bot.task.ObtainTask(GOOD_PICKAXES, ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) + 1, planner));
+        }
+        // Nothing left to eat in the middle of a long errand, and hungry or hurt: food now, the
+        // errand after (on hard the hearts only come back with a full stomach).
+        if (checkTicks % 300 == 0 && now >= foodInterjectAt && !(BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask)
+                && (goalTask != null || running != null) && !bot.targeted(10)) {
+            int points = 0;
+            for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+                var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
+                if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += f.nutrition() * st.getCount();
+            }
+            int level = bot.body().getFoodData().getFoodLevel();
+            boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+            if (points < 4 && (level <= 10 || hard && bot.body().getHealth() < 14)) {
+                foodInterjectAt = now + 3600;
+                int have = ObtainPlanner.countAny(bot.body(), FOODS);
+                double cost = planner.estimate(bot, FOODS, have + 4);
+                if (cost <= (level <= 6 ? 600 : 200)) {
+                    bot.say("nothing left to eat (hunger " + level + ", hp " + Math.round(bot.body().getHealth()) + "): food first (~" + Math.round(cost) + " s)");
+                    bot.interject(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner));
+                }
+            }
         }
         if (checkTicks % 100 == 0) {
             boolean open = false;

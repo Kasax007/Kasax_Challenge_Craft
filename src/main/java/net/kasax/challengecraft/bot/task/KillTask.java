@@ -435,7 +435,7 @@ public final class KillTask implements BotTask {
     private static final double HIT = 2.85;
 
     /** From the eyes to the nearest point of the target's box. */
-    static double hitDistance(BotPlayer body, LivingEntity t) {
+    public static double hitDistance(BotPlayer body, LivingEntity t) {
         var eye = body.getEyePosition();
         AABB b = t.getBoundingBox();
         double x = Mth.clamp(eye.x, b.minX, b.maxX), y = Mth.clamp(eye.y, b.minY, b.maxY), z = Mth.clamp(eye.z, b.minZ, b.maxZ);
@@ -545,7 +545,7 @@ public final class KillTask implements BotTask {
     }
 
     /** Best melee weapon into the hand: the most damage per second (a sword beats an axe). */
-    static void equipWeapon(Bot bot) {
+    public static void equipWeapon(Bot bot) {
         var inv = bot.body().getInventory().getNonEquipmentItems();
         int best = -1;
         double bestDps = 4; // a fist: 1 damage, 4 blows a second

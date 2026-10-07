@@ -29,6 +29,16 @@ public final class ThreatSense {
     private Vec3 stand;
     private int standCheckAt;
 
+    int creeperHits;
+
+    private static boolean armedNow(net.kasax.challengecraft.bot.BotPlayer body) {
+        if (body.getMainHandItem().is(net.minecraft.tags.ItemTags.SWORDS) || body.getMainHandItem().is(net.minecraft.tags.ItemTags.AXES)) return true;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
+        }
+        return false;
+    }
+
     ThreatSense(Bot bot) {
         this.bot = bot;
     }
@@ -52,6 +62,18 @@ public final class ThreatSense {
                     if (!body.isUsingItem()) body.gameMode.useItem(body, body.level(), body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
                     bot.danger.steer(0, 0);
                 } else {
+                    // Too close to outrun (under three blocks, the fuse half gone) and a weapon in
+                    // the pack: a blow first - it throws the creeper back out of its blast range
+                    // and resets nothing, but buys the steps - then away (seed 11, 1234: it ran
+                    // from 2.8 blocks four times over and was blown up each time).
+                    if (armedNow(body) && net.kasax.challengecraft.bot.task.KillTask.hitDistance(body, c) <= 3.0
+                            && body.getAttackStrengthScale(0.5f) >= 0.9f && body.hasLineOfSight(c)) {
+                        net.kasax.challengecraft.bot.task.KillTask.equipWeapon(bot);
+                        body.lookAt(c.getEyePosition());
+                        body.attack(c);
+                        body.swing(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+                        creeperHits++;
+                    }
                     Vec3 away = bot.openWayFrom(c.position(), 8).multiply(1, 0, 1);
                     if (away.lengthSqr() < 1e-4) continue;
                     away = away.normalize();

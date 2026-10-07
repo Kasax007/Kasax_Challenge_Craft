@@ -573,8 +573,20 @@ public final class Bot {
                 // Low with something at it that only strikes close (a zombie that keeps
                 // coming, wherever it runs): three blocks up, out of reach, and eat up there.
                 // (Not from a magma cube or a slime: they leap that high - away from those instead.)
-                if (!creeper && body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0) && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)
+                // (Not from a spider either: it climbs the pillar - into a hole with a lid instead.
+                // Nor with a bow drawn on it: up there it is the easiest target of all.)
+                boolean climber = m instanceof net.minecraft.world.entity.monster.spider.Spider;
+                boolean low = body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0);
+                if (!creeper && low && climber && net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+                    actions.reset();
+                    navigator.stop();
+                    say("hurt, with a spider at me: into the ground, lid on");
+                    reflex(new net.kasax.challengecraft.bot.task.HideTask());
+                    return;
+                }
+                if (!creeper && low && !climber && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)
                         && !(m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob)
+                        && !shooterOnMe(16)
                         && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this)) {
                     actions.reset();
                     navigator.stop();
@@ -705,8 +717,13 @@ public final class Bot {
                     if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
                 }
                 // (Armed and well: straight at it, dodging the arrows - standing behind the shield
-                // only lets it shoot again and again.)
-                if (armed && body.getHealth() >= 12 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
+                // only lets it shoot again and again. Bare - no shield, no armour - only with the
+                // hearts for the arrows on the way and the point-blank ones after, and only at a
+                // lone bowman: two of them shoot it down on the way, as in a dozen deaths.)
+                int bowmen = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(20),
+                        b -> b.isAlive() && b.getTarget() == body && b instanceof net.minecraft.world.entity.monster.RangedAttackMob).size();
+                double needed = shieldOn || body.getArmorValue() >= 6 ? 12 : 16;
+                if (armed && body.getHealth() >= needed && bowmen <= 1 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(16));
                     return;
                 }
@@ -768,8 +785,9 @@ public final class Bot {
             reflex(retreat);
             return;
         }
+        // (Bare-handed only when cornered: a fist fight with a skeleton is lost on the way in.)
         if (attacker instanceof net.minecraft.world.entity.monster.Enemy && attacker.isAlive() && !fromPillar && (body.getHealth() > 7 || cornered)
-                && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
+                && (armed() || cornered) && body.tickCount - body.getLastHurtByMobTimestamp() < 60 && attacker.distanceTo(body) < 8) {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.KillTask(attacker).nearby(12));
             return;
@@ -819,6 +837,12 @@ public final class Bot {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
         }
         return false;
+    }
+
+    /** A bowman (skeleton, pillager...) within {@code r} blocks out for it, in sight. */
+    boolean shooterOnMe(double r) {
+        return !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(r),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && body.hasLineOfSight(m)).isEmpty();
     }
 
     /** A monster within {@code r} blocks out for it. */
