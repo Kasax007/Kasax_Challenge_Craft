@@ -336,6 +336,7 @@ public final class Bot {
             // (Before the task's tick: what the task sets itself stands.)
             if (navigator.status() == BotNavigator.Status.MOVING && body.tickCount - navigator.tickedAt > 2) navigator.stop();
             r = task.tick(this);
+            avoidEndermanStare();
             // Head under water: hold jump to swim up, whatever the task does (a player never forgets
             // that). Unless it is digging its way out from the bottom (afloat, it digs five times slower).
             if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && !sinkToDig && !navigator.diving()) body.jump = true;
@@ -865,6 +866,32 @@ public final class Bot {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
         }
         return false;
+    }
+
+    /**
+     * Never a look into an enderman's eyes (that is what sets it on one - on hard over ten hearts a
+     * blow): if where the task has it look would meet one's head, the eyes go down instead, as a
+     * player looks at the ground when one is about. (Unless out to fight one.)
+     */
+    private void avoidEndermanStare() {
+        if (body.tickCount % 2 != 0) return;
+        if (hunting(net.minecraft.world.entity.EntityTypes.ENDERMAN)) return;
+        var look = body.getViewVector(1f).normalize();
+        var eye = body.getEyePosition();
+        for (var e : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Enderman.class, body.getBoundingBox().inflate(64),
+                net.minecraft.world.entity.LivingEntity::isAlive)) {
+            if (e.getTarget() == body) continue; // (angry already: the fight decides)
+            var to = new net.minecraft.world.phys.Vec3(e.getX() - eye.x, e.getEyeY() - eye.y, e.getZ() - eye.z);
+            double d = to.length();
+            if (d < 1e-3) continue;
+            double dot = look.dot(to.scale(1 / d));
+            // (The game's own test is a cone of 0.025/distance round the head; a wider berth.)
+            if (dot > 1.0 - 0.08 / d && body.hasLineOfSight(e)) {
+                body.setXRot(Math.min(90f, body.getXRot() + 30f));
+                body.setYHeadRot(body.getYRot() + 25f);
+                return;
+            }
+        }
     }
 
     /** A bowman (skeleton, pillager...) within {@code r} blocks out for it, in sight. */
