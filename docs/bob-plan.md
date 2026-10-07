@@ -1953,3 +1953,36 @@ langsamer.
   heraus und lief einem Zombie in die Arme.
   Fix: Mit weniger als 16 Leben und einem Monster vor dem Loch bleibt er bis zu 3-mal länger drin.
 - **Seed 11, Minute 4:** Ein Skelett in der Höhle beim Eisen, ohne Rüstung. Offen.
+
+### 23.8 Runde H (`08e3644`)
+
+Gleiche Bretter, 30 min HARD, 8 Seeds.
+
+| Seed | 77 | 66 | 88 | 44 | 11 | 22 | 33 | 55 | Summe |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Felder | 7 | 4 | 4 | 1 | 3 | 5 | 6 | 3 | **33** |
+| Tode | 0 | 0 | 0 | 0 | 1 | 1 | 0 | 1 | **3** |
+
+Gegenüber der Basis (37 Felder, 7 Tode) sind die Tode mehr als halbiert. Die Felder liegen fast
+wieder auf dem alten Stand.
+
+**Die drei Tode und die Fixes danach (`e7d0e17`):**
+
+- **Ertrunkener:** Bob steckte in einer mit Wasser vollgelaufenen Grube. „Ans Ufer“ scheiterte
+  zehnmal, bis ein Drowned kam.
+  Fix: Nach dem ersten Fehlschlag gräbt er sich frei (`DigOutTask`).
+- **Skelett in Minute 4:** Bob jagte ohne Rüstung ein Skelett, nur für einen Pfeil.
+  Fix: Fernkämpfer und andere gefährliche Beute (Skelett, Stray, Bogged, Hexe, Drowned, Plünderer,
+  Lohe) kosten im Planer 300 s mehr, solange er weder Schild noch Rüstung hat.
+- **Hexe:** Sie griff ihn bei der Feuerstein-Suche an. Offen.
+
+**Dazu weitere Lücken aus der Analyse:**
+
+- Wird eine Unterbrechung von einer zweiten unterbrochen (Pfeil ausweichen, dann eingraben), ging
+  der Weg der Aufgabe darunter verloren. Bob stand 3 Minuten am Ofen, das gebratene Fleisch blieb
+  darin.
+  Fix: Der Navigator merkt sich die Wege pro Aufgabe.
+- Das Schwert kommt jetzt direkt nach der Spitzhacke und vor einer Futtersuche, wenn es nur Sekunden
+  kostet. Auf Seed 55 hatte Bob bei Einbruch der Nacht noch keine Waffe.
+- Das flache Eisen bleibt im Umkreis von 24 Blöcken um die gefundene Stelle.
+- Ohne Rüstung jagt er Monster unterwegs nur einzeln, im Freien und auf seiner Höhe.
