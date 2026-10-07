@@ -92,6 +92,9 @@ public final class BotManager {
                     bot.lastDeath = new Bot.Death(body.level().dimension(), body.blockPosition(), body.level().getGameTime(), !gone,
                             src != null && src.getEntity() instanceof net.minecraft.world.entity.LivingEntity,
                             net.kasax.challengecraft.bot.task.SurfaceTask.underground(body));
+                    // (Where the killer stands - the outpost, the cave mouth - is avoided a while.)
+                    if (src != null && src.getEntity() instanceof net.minecraft.world.entity.monster.Enemy killer)
+                        bot.markDanger(((net.minecraft.world.entity.Entity) killer).blockPosition());
                 }
                 // Dead at night: the respawn button waits for the morning (at most some six
                 // minutes), as a player does - back at the spawn in the dark with nothing, among

@@ -40,6 +40,29 @@ public final class Bot {
         unreachable.put(p.immutable(), body.level().getGameTime());
     }
 
+    /** Where a monster killed it: kept clear of for a while (an outpost's pillagers by the trees). */
+    private final java.util.Map<net.minecraft.core.BlockPos, Long> dangerZones = new java.util.HashMap<>();
+
+    public void markDanger(net.minecraft.core.BlockPos p) {
+        dangerZones.put(p.immutable(), body.level().getGameTime());
+    }
+
+    /**
+     * Within 28 blocks of where a monster killed it in the last ten minutes: not a place to go
+     * back to for a log or a stone (seed 55: four times shot by the same outpost's pillagers,
+     * each time back for the trees beside it).
+     */
+    public boolean dangerous(net.minecraft.core.BlockPos p) {
+        if (dangerZones.isEmpty()) return false;
+        long now = body.level().getGameTime();
+        dangerZones.values().removeIf(t -> now - t > 12000);
+        for (var z : dangerZones.keySet()) {
+            double dx = z.getX() - p.getX(), dz = z.getZ() - p.getZ();
+            if (dx * dx + dz * dz < 28 * 28) return true;
+        }
+        return false;
+    }
+
     /** The ones that still count as out of reach (five minutes after the try). */
     public java.util.Set<net.minecraft.core.BlockPos> unreachable() {
         long now = body.level().getGameTime();

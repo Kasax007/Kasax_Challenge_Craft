@@ -1200,6 +1200,11 @@ public final class LockoutBrain implements BotBrain {
                 || !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
                 net.minecraft.world.entity.LivingEntity::isAlive).isEmpty();
         if (!risky || !net.kasax.challengecraft.bot.task.HideTask.possible(bot)) return false;
+        // (Not with one at arm's length after it: digging the hole takes seconds it hits through
+        // - the zombie beside it killed it in its half-dug hole on seed 77. That one first: the
+        // reflexes fight it or get away, and the hole comes after.)
+        if (!body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(5),
+                m -> m.isAlive() && m.getTarget() == body && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)).isEmpty()) return false;
         healRetryAt = now + 600;
         bot.say("few hearts left (" + Math.round(body.getHealth()) + "): dug in to eat and heal");
         start(bot, new net.kasax.challengecraft.bot.task.HideTask(), 1800);

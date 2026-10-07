@@ -518,6 +518,7 @@ public final class MineTask implements BotTask {
 
     /** Not buried far below the ground when it is a surface thing (and the bot is not down there too). */
     private boolean worthIt(ServerLevel level, Bot bot, BlockPos p) {
+        if (bot.dangerous(p)) return false;
         // Under water: diving and digging there (five times slower) is not worth it while there
         // are others on dry land.
         // (Not so for what lies under shallow water as a rule - clay on a river bed - or once a
