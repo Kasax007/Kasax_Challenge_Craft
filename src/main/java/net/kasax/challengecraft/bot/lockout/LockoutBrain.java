@@ -612,7 +612,10 @@ public final class LockoutBrain implements BotBrain {
             if (!startRefused) return true;
             startRefused = false;
         }
-        // Else dug in till the morning.
+        // Else dug in till the morning - when the night is dangerous here and now: monsters about
+        // or coming, no weapon, few hearts, nothing to eat. A quiet night is played on, carefully
+        // (measured on fixed boards: a hole every night cost half the tiles and saved no lives).
+        if (!nightThreat(bot)) return false;
         if (now < shelterRetryAt) return false;
         // (Mid-jump or mid-step: on the ground first, then looked at - not walked off for that.)
         if (!bot.body().onGround() && !bot.body().isInWater()) {
@@ -652,6 +655,27 @@ public final class LockoutBrain implements BotBrain {
         start(bot, net.kasax.challengecraft.bot.task.HideTask.shelter(), 13000);
         if (!startRefused) return true;
         startRefused = false;
+        return false;
+    }
+
+    /**
+     * Whether this night is dangerous where it stands: a monster out for it or two about within
+     * twenty-four blocks, no weapon, under twelve hearts, or nothing to eat.
+     */
+    private static boolean nightThreat(Bot bot) {
+        var body = bot.body();
+        boolean armed = false;
+        int food = 0;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
+            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) food += f.nutrition() * st.getCount();
+        }
+        if (!armed || body.getHealth() < 12 || food == 0 && body.getFoodData().getFoodLevel() < 14) return true;
+        var about = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(24),
+                m -> m.isAlive() && m.getType() != net.minecraft.world.entity.EntityTypes.ENDERMAN);
+        if (about.size() >= 2) return true;
+        for (var m : about) if (m.getTarget() == body || m.distanceTo(body) < 12) return true;
         return false;
     }
 
@@ -1716,7 +1740,7 @@ public final class LockoutBrain implements BotBrain {
         // Nightfall while out on the surface, not geared for it: whatever it is doing is put
         // aside, and the night plan decides (a bed, or a hole with a lid) - not on with a log hunt
         // into the dark.
-        if (checkTicks % 40 == 0 && nightComing(bot, SHELTER_FROM) && now >= nightDropAt && !nightReady(bot)
+        if (checkTicks % 40 == 0 && nightComing(bot, SHELTER_FROM) && now >= nightDropAt && !nightReady(bot) && nightThreat(bot)
                 && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body()) && !sheltering(bot)) {
             nightDropAt = now + 1200;
             bot.say("nightfall, not geared for it: " + nightGaps(bot));
