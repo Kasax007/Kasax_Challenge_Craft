@@ -795,6 +795,10 @@ public final class MineTask implements BotTask {
         for (BlockPos b : dig) {
             if (!level.getBlockState(b).getFluidState().isEmpty()) return false;
             if (level.getBlockState(b).getDestroySpeed(level, b) < 0) return false;
+            // (Sand or gravel over it: dug from under, the column comes down on the head - in
+            // the desert it suffocated so, digging at the sand that kept on falling.)
+            if (!dig.contains(b.above()) && level.getBlockState(b.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+                    && !(level.getBlockState(b).getBlock() instanceof net.minecraft.world.level.block.FallingBlock)) return false;
             for (Direction d : Direction.values()) {
                 BlockPos n = b.relative(d);
                 if (dig.contains(n)) continue;

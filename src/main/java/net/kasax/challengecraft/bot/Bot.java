@@ -263,6 +263,20 @@ public final class Bot {
             navigator.stop();
             body.stopInputs();
             if (body.tickCount % 20 == 0) say("buried (head in " + body.level().getBlockState(q).getBlock().getName().getString() + "): digging free");
+            // Sand or gravel: it keeps coming down while dug - a step aside into the open, if
+            // there is one, gets out of it at once.
+            if (body.level().getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) {
+                var feet = body.blockPosition();
+                for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                    var n = feet.relative(d);
+                    if (body.level().getBlockState(n).getCollisionShape(body.level(), n).isEmpty()
+                            && body.level().getBlockState(n.above()).getCollisionShape(body.level(), n.above()).isEmpty()) {
+                        body.setYRot(d.toYRot());
+                        body.forward = 1f;
+                        return;
+                    }
+                }
+            }
             actions.breakTick(q);
             return;
         }
