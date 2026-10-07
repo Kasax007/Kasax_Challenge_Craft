@@ -92,6 +92,21 @@ import java.util.function.Predicate;
  */
 public final class Chal_40_LockoutBingo {
     public static final int CHALLENGE_ID = 40;
+    /**
+     * The board's seed: normally new every run; for the bot benchmarks fixed by the environment
+     * (CHALLENGECRAFT_BOARD_SEED), so two versions are measured on the same board, not on two
+     * different ones - the board decides most of what a run risks.
+     */
+    private static long fixedBoardSeed(MinecraftServer server, long random) {
+        String fixed = System.getenv("CHALLENGECRAFT_BOARD_SEED");
+        if (fixed == null || fixed.isBlank()) return random;
+        try {
+            return server.overworld().getSeed() ^ Long.parseLong(fixed.trim());
+        } catch (NumberFormatException e) {
+            return random;
+        }
+    }
+
     private static final int BOARD_SIZE = 25;
     private static final int MAP_DROP_RETRY_TICKS = 100;
 
@@ -464,7 +479,7 @@ public final class Chal_40_LockoutBingo {
         data.setTeam(bot.getUUID(), bot.getGameProfile().name(), LockoutBingoTeam.BLUE);
         data.retainPlayers(Set.of(human.getUUID(), bot.getUUID()));
 
-        long boardSeed = server.overworld().getSeed() ^ server.overworld().getGameTime() ^ human.getUUID().getMostSignificantBits();
+        long boardSeed = fixedBoardSeed(server, server.overworld().getSeed() ^ server.overworld().getGameTime() ^ human.getUUID().getMostSignificantBits());
         List<LockoutBingoGoal> goals = new ArrayList<>();
         for (String id : forcedGoalIds) {
             LockoutBingoGoal forced = LockoutBingoGoalPool.byId(id);
@@ -510,10 +525,10 @@ public final class Chal_40_LockoutBingo {
         data.setTeam(player.getUUID(), player.getGameProfile().name(), LockoutBingoTeam.RED);
         data.retainPlayers(Set.of(player.getUUID()));
 
-        long boardSeed = server.overworld().getSeed()
+        long boardSeed = fixedBoardSeed(server, server.overworld().getSeed()
                 ^ server.overworld().getGameTime()
                 ^ player.getUUID().getMostSignificantBits()
-                ^ player.getUUID().getLeastSignificantBits();
+                ^ player.getUUID().getLeastSignificantBits());
         List<LockoutBingoGoal> goals = new ArrayList<>();
         for (String id : forcedGoalIds) {
             LockoutBingoGoal forced = LockoutBingoGoalPool.byId(id);
