@@ -629,7 +629,7 @@ public final class LockoutBrain implements BotBrain {
         // With a pickaxe and something to eat: the night worked, not waited - dug in, the hole
         // shut, and a tunnel of its own down to the iron (none of it open to a cave), as players
         // spend a first night. The morning brings the shield and the armour with it.
-        if (ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0 && net.kasax.challengecraft.bot.task.HideTask.possible(bot)) {
+        if (NIGHT_MINE && ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0 && net.kasax.challengecraft.bot.task.HideTask.possible(bot)) {
             int iron = ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.RAW_IRON, net.minecraft.world.item.Items.IRON_INGOT));
             int want = Math.min(16, Math.max(iron + 4, planner.demandFor(net.minecraft.world.item.Items.RAW_IRON) + 1 + 8));
             bot.say("night, not geared for it (" + nightGaps(bot) + "): dug in, and a tunnel of my own for iron till morning");
@@ -1118,6 +1118,12 @@ public final class LockoutBrain implements BotBrain {
 
     private boolean openingIron;
     private long nightDropAt, foodInterjectAt;
+    /**
+     * The night spent in a sealed tunnel of its own after iron instead of waiting in the hole.
+     * Off: measured (round 19 C) it brought little iron - on hills the tunnel kept meeting the
+     * open air and turned - and the round had more deaths. Kept for another try.
+     */
+    static final boolean NIGHT_MINE = false;
 
     /** The bed or the food being got for the night (not put aside at nightfall: it is the plan). */
     private BotTask nightPrep;
@@ -1755,7 +1761,9 @@ public final class LockoutBrain implements BotBrain {
         if (checkTicks % 6000 == 0) net.kasax.challengecraft.bot.BotManager.LOG.info("[Cortex] {}: {}", bot.name, cortex.summary());
         if (++checkTicks % 20 != 0) return;
         // Chances on the way (a chest, flowers the board wants) on errands too, not only on goals.
-        if (checkTicks % 40 == 0 && sideTask == null && (targetIndex >= 0 || running != null && bot.current() != null)) takeChances(bot);
+        // (Not while seeing to the night - dug in, in bed, on the way to either: the coal for
+        // later lured it out of its hole into a parched's arrows on seed 55.)
+        if (checkTicks % 40 == 0 && sideTask == null && (targetIndex >= 0 || running != null && bot.current() != null) && !sheltering(bot)) takeChances(bot);
         if (targetIndex < 0) return;
         MinecraftServer server = bot.server();
         if (!Chal_40_LockoutBingo.isRunning(server)) {
