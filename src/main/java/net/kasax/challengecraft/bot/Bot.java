@@ -417,6 +417,7 @@ public final class Bot {
     private net.minecraft.core.BlockPos movedFrom;
     private int movedAt, unsticks, notWalking;
     private net.minecraft.core.BlockPos lastUnstick;
+    private int stuckHere;
 
     /**
      * The last line of defence against standing still for good: trying to walk somewhere (a way
@@ -456,8 +457,17 @@ public final class Bot {
         // Stuck at the same spot again: in a hole or a crevice, up to the open sky (a staircase
         // dug if need be) before the few steps off; and those a bit further.
         boolean again = lastUnstick != null && lastUnstick.distSqr(feet) < 36;
+        stuckHere = again ? stuckHere + 1 : 0;
         lastUnstick = feet;
         actions.reset();
+        // Stuck here a second time (no way off it, the steps aside failed too): dug out by hand,
+        // a two-high way towards the most open side.
+        if (stuckHere >= 1) {
+            stuckHere = 0;
+            say("stuck here again and again: digging my way out");
+            reflex(new net.kasax.challengecraft.bot.task.DigOutTask());
+            return;
+        }
         if (again && net.kasax.challengecraft.bot.task.SurfaceTask.underground(body)) {
             reflex(new net.kasax.challengecraft.bot.task.SurfaceTask());
             return;
