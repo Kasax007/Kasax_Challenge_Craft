@@ -1708,7 +1708,10 @@ public final class LockoutBrain implements BotBrain {
             }
             int level = bot.body().getFoodData().getFoodLevel();
             boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
-            if (points < 4 && (level <= 10 || hard && bot.body().getHealth() < 14)) {
+            // (Not before the stone tools - and a sword - unless the hunger is serious: a hunt
+            // across the fields bare-handed at the start ran into a drowned on seed 88.)
+            boolean opened = ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0;
+            if (points < 4 && (level <= 6 || opened && (level <= 10 || hard && bot.body().getHealth() < 14))) {
                 foodInterjectAt = now + 3600;
                 int have = ObtainPlanner.countAny(bot.body(), FOODS);
                 double cost = planner.estimate(bot, FOODS, have + 4);
