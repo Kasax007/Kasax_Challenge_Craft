@@ -764,6 +764,30 @@ public final class Bot {
         // A bow drawn on it (skeleton, pillager): the shield up towards it until the arrow is in
         // it; then, armed and well and the shooter not far, after it (it shoots again otherwise).
         boolean shieldOn = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+        // A witch after it: she throws without drawing anything (the bowman check below never saw
+        // her), and dodging her potions forever only waits for the one that hits - killed so on
+        // seed 55. Armed and well: at her (she is slow and close in her potions miss); else into
+        // the ground, out of her sight.
+        if (!(top instanceof net.kasax.challengecraft.bot.task.KillTask) && !(top instanceof net.kasax.challengecraft.bot.task.HideTask)
+                && body.tickCount % 20 == 0) {
+            var witches = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Witch.class, body.getBoundingBox().inflate(16),
+                    w -> w.isAlive() && w.getTarget() == body && body.hasLineOfSight(w));
+            if (!witches.isEmpty()) {
+                var w = witches.get(0);
+                if (armed() && body.getHealth() >= 12) {
+                    actions.reset();
+                    say("a witch at me: at her");
+                    reflex(new net.kasax.challengecraft.bot.task.KillTask(w).nearby(20));
+                    return;
+                }
+                if (net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+                    actions.reset();
+                    say("a witch at me, not fit for her: into the ground");
+                    reflex(new net.kasax.challengecraft.bot.task.HideTask());
+                    return;
+                }
+            }
+        }
         if (!(top instanceof net.kasax.challengecraft.bot.task.ShieldUpTask) && body.tickCount >= shooterCheckAt) {
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(20),
                     m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob

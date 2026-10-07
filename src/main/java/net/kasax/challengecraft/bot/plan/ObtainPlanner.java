@@ -355,7 +355,8 @@ public final class ObtainPlanner {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return Leaf.NONE;
         // In sight: a walk there and the fight, no luck needed.
-        if (seen != null) return new Leaf(seen, 0, mobPos.get(type));
+        // (One in sight that shoots: as dear without gear as one still to be found - see below.)
+        if (seen != null) return new Leaf(seen + (RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body()) ? 300 : 0), 0, mobPos.get(type));
         // Nether mobs only in the Nether, and the Overworld's not there.
         if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return Leaf.NONE;
         // One that lives somewhere in particular: the walk to the nearest such place it knows,

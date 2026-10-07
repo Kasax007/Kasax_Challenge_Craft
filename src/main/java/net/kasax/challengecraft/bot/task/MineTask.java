@@ -307,6 +307,9 @@ public final class MineTask implements BotTask {
                 // by going there, not by digging anywhere.)
                 if (b == net.minecraft.world.level.block.Blocks.SOUL_SAND || b == net.minecraft.world.level.block.Blocks.SOUL_SOIL
                         || b == net.minecraft.world.level.block.Blocks.BASALT) continue;
+                // (Gravel neither: a few patches by a river, not in every wall - for flint a
+                // staircase was dug down into the dark, away from the furnace, on seed 55.)
+                if (b == net.minecraft.world.level.block.Blocks.GRAVEL) continue;
                 if (b != net.minecraft.world.level.block.Blocks.BEDROCK && blocks.test(b.defaultBlockState())) rock = true;
             }
         }

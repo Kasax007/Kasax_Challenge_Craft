@@ -1133,6 +1133,28 @@ public class BotStuntTests {
         });
     }
 
+    /** A witch eight blocks off throwing at it, a stone sword in the pack (hard): at her and alive, not dodging till a potion hits. */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 44)
+    public void witchRush(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "witch_rush");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var w = EntityTypes.WITCH.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        w.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(12, FEET, 20)));
+        w.setPersistenceRequired();
+        level.addFreshEntity(w);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.BREAD, 8));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(880), 890, () -> {
+            if (w.isAlive() && w.getTarget() != body) w.setTarget(body);
+            if (a.bot().body() != body || !body.isAlive()) h.fail("witch_rush: killed");
+            if (w.isAlive() && h.getTick() < 850) return false;
+            BotArena.LOG.info("[BOTTEST] witch_rush witch dead {}, health {}", !w.isAlive(), body.getHealth());
+            h.assertTrue(!w.isAlive(), "witch_rush: the witch still stands");
+            return true;
+        });
+    }
+
     /**
      * Back at the spawn at night with nothing, three zombies and a skeleton about (hard): dug in
      * with bare hands and alive a minute later, instead of dying to them again and again.
