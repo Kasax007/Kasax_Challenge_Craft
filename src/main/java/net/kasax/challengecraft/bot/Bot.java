@@ -631,6 +631,9 @@ public final class Bot {
                     reflex(net.kasax.challengecraft.bot.task.HideTask.upward());
                     return;
                 }
+                // (Not from a bowman: running from one is taking its arrows in the back - into the
+                // ground instead, below; most of the late deaths were "low, a skeleton: away".)
+                if (!creeper && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && net.kasax.challengecraft.bot.task.HideTask.possible(this)) continue;
                 // (From a magma cube sooner: they come in families, each split another two blows.)
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
                         + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0)) {
