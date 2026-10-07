@@ -219,6 +219,11 @@ public final class Bot {
         return tasks.peekLast();
     }
 
+    /** When it died (server time), while waiting to come back; -1 when alive. */
+    public long deadSince = -1;
+    /** Waiting on the death screen for the morning. */
+    public boolean waitingForDawn;
+
     /** The task stack, top first (read only). */
     public java.util.Collection<BotTask> tasks() {
         return java.util.Collections.unmodifiableCollection(tasks);

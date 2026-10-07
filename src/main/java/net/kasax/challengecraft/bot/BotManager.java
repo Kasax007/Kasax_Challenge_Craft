@@ -93,7 +93,24 @@ public final class BotManager {
                             src != null && src.getEntity() instanceof net.minecraft.world.entity.LivingEntity,
                             net.kasax.challengecraft.bot.task.SurfaceTask.underground(body));
                 }
+                // Dead at night: the respawn button waits for the morning (at most some six
+                // minutes), as a player does - back at the spawn in the dark with nothing, among
+                // the monsters that stand about it, it died ten times over in two minutes (seed 77).
+                // (The body's own death clock stops at twenty: the server's clock counts.)
+                long serverNow = server.overworld().getGameTime();
+                if (bot.deadSince < 0) bot.deadSince = serverNow;
+                long clock = server.overworld().getOverworldClockTime() % 24000;
+                boolean night = clock >= 12800 && clock < 23200;
+                if (body.deathTime >= RESPAWN_DELAY && night && serverNow - bot.deadSince < 7200) {
+                    if (!bot.waitingForDawn) {
+                        bot.waitingForDawn = true;
+                        bot.say("dead at night: back at dawn, not into the dark with nothing");
+                    }
+                    continue;
+                }
                 if (body.deathTime >= RESPAWN_DELAY) {
+                    bot.deadSince = -1;
+                    bot.waitingForDawn = false;
                     // The way a client asks to respawn (the respawn button): the network handler
                     // respawns it, acts for the new body from then on, and forgets that it was
                     // waiting for the respawn. (Respawned past it, the game went on waiting, and
