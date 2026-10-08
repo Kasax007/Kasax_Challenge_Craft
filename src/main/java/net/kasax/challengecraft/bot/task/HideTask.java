@@ -140,6 +140,50 @@ public final class HideTask implements BotTask {
         return t;
     }
 
+    /**
+     * Walled in where it stands, instead of dug in (stone underfoot and nothing to dig it with,
+     * sand, water close below): the four sides at the feet and at the head, and a lid - as a
+     * player boxes himself in. No arrow gets in, no spider, no zombie.
+     */
+    private boolean box;
+
+    public static HideTask boxed() {
+        HideTask t = new HideTask();
+        t.box = true;
+        return t;
+    }
+
+    /** The night's shelter as a box of blocks (see {@link #boxed()}), until the morning. */
+    public static HideTask boxedShelter() {
+        HideTask t = boxed();
+        t.untilDay = true;
+        return t;
+    }
+
+    /** A box round these feet: the four sides at the feet and at the head, the lid over the head. */
+    private static List<BlockPos> boxBlocks(BlockPos feet) {
+        List<BlockPos> out = new java.util.ArrayList<>();
+        for (Direction d : Direction.Plane.HORIZONTAL) out.add(feet.relative(d));
+        for (Direction d : Direction.Plane.HORIZONTAL) out.add(feet.above().relative(d));
+        out.add(feet.above(2));
+        return out;
+    }
+
+    /** Whether a box works here: dry ground, nothing that hurts in the spot, blocks enough for the open sides. */
+    public static boolean boxPossible(Bot bot) {
+        BotPlayer body = bot.body();
+        if (!body.onGround() || body.isInWater()) return false;
+        ServerLevel level = (ServerLevel) body.level();
+        BlockPos feet = body.blockPosition();
+        if (hurtsHere(level, feet) || level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) return false;
+        int open = 0;
+        for (BlockPos p : boxBlocks(feet)) {
+            if (level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) return false;
+            if (level.getBlockState(p).canBeReplaced()) open++;
+        }
+        return bot.actions().spendableBlocks() >= open;
+    }
+
     /** Whether a pillar works here: room above the head for two more blocks, something to build with. */
     public static boolean pillarPossible(Bot bot) {
         BotPlayer body = bot.body();
@@ -161,28 +205,32 @@ public final class HideTask implements BotTask {
         if (top == null) top = body.blockPosition();
         if (up) return pillar(bot, body, level);
         body.stopInputs();
-        // Down: the block under the feet, three times (it drops into the gap), so the lid goes in
-        // at ground level, held by the ground round it.
-        dug = top.getY() - body.blockPosition().getY();
-        // (Not getting down at all - hanging on something, the block will not break: given up,
-        // so somewhere else is tried, instead of standing in the open "dug in".)
-        if (dug < 3 && ticks > 200 && dug <= 0) return Result.FAILED;
-        if (dug < 3) {
-            if (!body.onGround()) return Result.RUNNING;
-            // Over the middle of the block first, or it would stay standing on the next one.
-            if (!centred(body)) return Result.RUNNING;
-            BlockPos below = body.blockPosition().below();
-            bot.tools().equipFor(level.getBlockState(below));
-            bot.actions().breakTick(below);
-            return Result.RUNNING;
-        }
-        // The lid: a block where the feet were.
-        if (!closed) {
-            BlockPos lid = body.blockPosition().above(2);
-            if (!body.onGround()) return Result.RUNNING; // (still dropping in: the head is in the way)
-            if (!level.getBlockState(lid).getCollisionShape(level, lid).isEmpty()) closed = true;
-            else if (!bot.actions().placeThrowaway(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
-            return Result.RUNNING;
+        if (box) {
+            if (!closed) return boxIn(bot, body, level);
+        } else {
+            // Down: the block under the feet, three times (it drops into the gap), so the lid goes in
+            // at ground level, held by the ground round it.
+            dug = top.getY() - body.blockPosition().getY();
+            // (Not getting down at all - hanging on something, the block will not break: given up,
+            // so somewhere else is tried, instead of standing in the open "dug in".)
+            if (dug < 3 && ticks > 200 && dug <= 0) return Result.FAILED;
+            if (dug < 3) {
+                if (!body.onGround()) return Result.RUNNING;
+                // Over the middle of the block first, or it would stay standing on the next one.
+                if (!centred(body)) return Result.RUNNING;
+                BlockPos below = body.blockPosition().below();
+                bot.tools().equipFor(level.getBlockState(below));
+                bot.actions().breakTick(below);
+                return Result.RUNNING;
+            }
+            // The lid: a block where the feet were.
+            if (!closed) {
+                BlockPos lid = body.blockPosition().above(2);
+                if (!body.onGround()) return Result.RUNNING; // (still dropping in: the head is in the way)
+                if (!level.getBlockState(lid).getCollisionShape(level, lid).isEmpty()) closed = true;
+                else if (!bot.actions().placeThrowaway(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
+                return Result.RUNNING;
+            }
         }
         // Safe: eat, and wait for the hearts (natural regeneration wants a full-ish stomach).
         if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0) {
@@ -197,7 +245,10 @@ public final class HideTask implements BotTask {
             if (++dawnTicks < 2400 && monsterBy(body)) return Result.RUNNING;
             return Result.DONE;
         }
-        if (body.getHealth() >= 16 || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !monsterBy(body)) return Result.DONE;
+        // (The hearts back, but the bowmen still by the hole: a while longer, as long as they stay
+        // and the time lasts - seed 88, hard: out at full health into the same patrol, and shot.)
+        boolean waiting = monsterBy(body);
+        if (body.getHealth() >= 16 && (!waiting || ticks > MAX_TICKS) || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !waiting) return Result.DONE;
         return Result.RUNNING;
     }
 
@@ -213,6 +264,31 @@ public final class HideTask implements BotTask {
                         && !(m instanceof net.minecraft.world.entity.monster.Enderman)
                         && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)
                         && (m instanceof net.minecraft.world.entity.monster.RangedAttackMob || m.distanceToSqr(body) < 11 * 11)).isEmpty();
+    }
+
+    /** The box going up, a block a tick: the sides at the feet, at the head, then the lid. */
+    private Result boxIn(Bot bot, BotPlayer body, ServerLevel level) {
+        // Over the middle of the block first: a side block cannot go where a shoulder is.
+        if (!body.onGround() || !centred(body)) return Result.RUNNING;
+        // (Round where it stands now, until the first block is in: a dodge or a blow may have
+        // moved it since the start.)
+        if (placed == 0) top = body.blockPosition();
+        boolean open = false;
+        for (BlockPos p : boxBlocks(top)) {
+            if (!level.getBlockState(p).canBeReplaced()) continue;
+            open = true;
+            if (bot.actions().placeThrowaway(p)) {
+                placed++;
+                return Result.RUNNING;
+            }
+        }
+        // (What will not go - a mob standing in the way, nothing to set it against yet - is
+        // tried again a while; then the box is as it is.)
+        if (!open || ++lidTries > (untilDay ? 400 : 60)) {
+            closed = true;
+            if (open) bot.say("box: not every side would go in");
+        }
+        return Result.RUNNING;
     }
 
     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {
@@ -251,6 +327,7 @@ public final class HideTask implements BotTask {
 
     @Override
     public String describe() {
+        if (box) return untilDay ? "boxed in for the night" : "boxed in";
         return untilDay ? "dug in for the night" : "hide in the ground";
     }
 }

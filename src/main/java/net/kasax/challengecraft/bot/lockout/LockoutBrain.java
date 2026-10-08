@@ -262,21 +262,38 @@ public final class LockoutBrain implements BotBrain {
         // The investment the plan has decided on: iron tools and a bucket now, before the cheap
         // tiles (they pay for themselves on the tiles after). A few tries, then without.
         stepKey = "invest";
-        if (strategist.wantsIron() && bot.body().level().getGameTime() >= kitRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+        // (On hard the shield whatever the board wants: one ingot, and the first night is not
+        // played without it - seed 77: no iron tile on the board, so no iron and no shield, and
+        // dead to the zombies on a spider hunt at minute twelve.)
+        boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+        boolean shieldWanted = hard && !has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD));
+        if ((strategist.wantsIron() || shieldWanted) && bot.body().level().getGameTime() >= kitRetryAt
+                && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             // (On hard the shield first - one ingot of the same trip down: the first iron went into
             // the pickaxe and the bucket, and the shield came twenty minutes later or never, while
             // most deaths were arrows.)
             List<net.minecraft.world.item.Item> kit = new ArrayList<>();
-            if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD) kit.add(net.minecraft.world.item.Items.SHIELD);
-            kit.add(net.minecraft.world.item.Items.IRON_PICKAXE);
-            kit.add(net.minecraft.world.item.Items.BUCKET);
+            if (hard) kit.add(net.minecraft.world.item.Items.SHIELD);
+            if (strategist.wantsIron()) {
+                kit.add(net.minecraft.world.item.Items.IRON_PICKAXE);
+                kit.add(net.minecraft.world.item.Items.BUCKET);
+            }
             for (var item : kit) {
                 if (has(bot.body(), Set.of(item)) || item == net.minecraft.world.item.Items.BUCKET && has(bot.body(), Set.of(net.minecraft.world.item.Items.WATER_BUCKET, net.minecraft.world.item.Items.LAVA_BUCKET))) continue;
                 // (Not again at once if this fails, and each failure waits longer; four, and the
                 // kit is left to the tiles that need it.)
                 if (kitTries >= 4) break;
+                // (The shield alone, no iron wanted otherwise: only while it comes cheap - iron
+                // in sight, a cave by - and not by digging a mine for the one ingot with stone
+                // tools: round 18 measured where that leads. Looked at again in a minute.)
+                if (item == net.minecraft.world.item.Items.SHIELD && !strategist.wantsIron()
+                        && planner.estimate(bot, Set.of(item), 1) > SHIELD_ALONE_MAX) {
+                    kitRetryAt = bot.body().level().getGameTime() + 1200;
+                    break;
+                }
                 kitRetryAt = bot.body().level().getGameTime() + (1200L << Math.min(3, kitTries++));
-                bot.say("investing: " + ObtainPlanner.name(item) + " (the plan wants the iron kit)");
+                bot.say("investing: " + ObtainPlanner.name(item) + (item == net.minecraft.world.item.Items.SHIELD
+                        ? " (hard: no night without one)" : " (the plan wants the iron kit)"));
                 start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 4800);
                 if (!startRefused) return;
                 startRefused = false;
@@ -627,6 +644,15 @@ public final class LockoutBrain implements BotBrain {
             return false;
         }
         shelterRetryAt = now + 400;
+        // (No digging in here - sand, bare stone and no pickaxe - but blocks in the pack: walled in
+        // where it stands, at once, rather than a walk in the dark to softer ground.)
+        if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)
+                && net.kasax.challengecraft.bot.task.HideTask.boxPossible(bot)) {
+            bot.say("night, not geared for it (" + nightGaps(bot) + "): no ground to dig in here, walled in till morning");
+            start(bot, net.kasax.challengecraft.bot.task.HideTask.boxedShelter(), 13000);
+            if (!startRefused) return true;
+            startRefused = false;
+        }
         if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)) {
             // Not here (water, sand, a berry bush): to the nearest ground where it can be done,
             // and on with it the moment it is there - not a few steps anywhere and then, for
@@ -1225,6 +1251,8 @@ public final class LockoutBrain implements BotBrain {
     private boolean openingWood;
     private long netherRetryAt, kitRetryAt;
     private int kitTries;
+    /** The shield on hard when nothing else wants iron: only for so many seconds of effort (iron in sight, a cave by). */
+    private static final double SHIELD_ALONE_MAX = 240;
     private int netherFails;
 
     private boolean needsFood(Bot bot) {

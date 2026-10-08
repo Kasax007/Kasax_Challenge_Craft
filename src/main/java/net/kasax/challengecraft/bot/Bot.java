@@ -271,6 +271,7 @@ public final class Bot {
     }
 
     void tick() {
+        logHits();
         if (!body.isAlive()) return;
         danger.restore();
         act();
@@ -461,6 +462,31 @@ public final class Bot {
     }
 
     private boolean fallLogged;
+    /** The health a tick ago, for the log of hits taken (-1: not looked at yet). */
+    private float lastHp = -1;
+
+    /**
+     * Every hit taken, for the log: by what, from how far, who else is after it, behind the shield
+     * or not. On hard twenty hearts went in fifteen seconds with nothing in the log to say how
+     * (seed 88: a patrol's crossbows; seed 77: zombies in the night).
+     */
+    void logHits() {
+        float hp = body.getHealth();
+        if (lastHp >= 0 && hp < lastHp - 0.01f) {
+            var src = body.getLastDamageSource();
+            var by = src == null ? null : src.getEntity();
+            java.util.Map<String, Integer> after = new java.util.TreeMap<>();
+            for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16),
+                    m -> m.isAlive() && m.getTarget() == body)) after.merge(m.getType().toShortString(), 1, Integer::sum);
+            BotTask top = tasks.peek(), root = tasks.peekLast();
+            BotManager.LOG.info("[Bot] {}: hit {} -> {} hp by {}{} | after me {} | armour {}, {} | {}", name,
+                    String.format("%.1f", lastHp), String.format("%.1f", hp), src == null ? "?" : src.type().msgId(),
+                    by == null ? "" : " (" + by.getType().toShortString() + String.format(" %.1f off)", by.distanceTo(body)), after,
+                    body.getArmorValue(), body.isBlocking() ? "blocking" : body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) ? "shield down" : "no shield",
+                    top == null ? "idle" : top == root ? top.describe() : top.describe() + " in " + root.describe());
+        }
+        lastHp = hp;
+    }
     /** Ticks on a mount with no task that means to ride. */
     private int riddenIdle;
     private net.minecraft.core.BlockPos lastGround;
@@ -681,11 +707,12 @@ public final class Bot {
                 // Nor with a bow drawn on it: up there it is the easiest target of all.)
                 boolean climber = m instanceof net.minecraft.world.entity.monster.spider.Spider;
                 boolean low = body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0);
-                if (!creeper && low && climber && net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+                var spiderCover = !creeper && low && climber ? coverHere() : null;
+                if (spiderCover != null) {
                     actions.reset();
                     navigator.stop();
-                    say("hurt, with a spider at me: into the ground, lid on");
-                    reflex(new net.kasax.challengecraft.bot.task.HideTask());
+                    say("hurt, with a spider at me: " + (spiderCover.describe().startsWith("boxed") ? "walled in" : "into the ground") + ", lid on");
+                    reflex(spiderCover);
                     return;
                 }
                 if (!creeper && low && !climber && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)
@@ -700,7 +727,7 @@ public final class Bot {
                 }
                 // (Not from a bowman: running from one is taking its arrows in the back - into the
                 // ground instead, below; most of the late deaths were "low, a skeleton: away".)
-                if (!creeper && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && net.kasax.challengecraft.bot.task.HideTask.possible(this)) continue;
+                if (!creeper && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && (net.kasax.challengecraft.bot.task.HideTask.possible(this) || net.kasax.challengecraft.bot.task.HideTask.boxPossible(this))) continue;
                 // (From a magma cube sooner: they come in families, each split another two blows.)
                 if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
                         + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0)) {
@@ -769,17 +796,20 @@ public final class Bot {
         // A bow drawn on it (skeleton, pillager) with few hearts left: before the arrow, not after.
         boolean aimedAt = body.getHealth() <= 10 && !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16),
                 m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob).isEmpty();
-        if ((body.getHealth() <= (shot ? 10 : 6) && (cornered || shot) && body.tickCount - body.getLastHurtByMobTimestamp() < 60 || aimedAt)
-                && (net.kasax.challengecraft.bot.task.HideTask.possible(this) || net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this))) {
-            actions.reset();
-            navigator.stop();
-            // Arrows: into the ground. Zombies and the like close by: up a pillar, out of their reach
-            // (they would hit on while it digs).
+        if (body.getHealth() <= (shot ? 10 : 6) && (cornered || shot) && body.tickCount - body.getLastHurtByMobTimestamp() < 60 || aimedAt) {
+            // Arrows: into the ground, or walled in where it stands. Zombies and the like close by:
+            // up a pillar, out of their reach (they would hit on while it digs). Never up a pillar
+            // from a bowman: up there it is the easiest target of all - on its feet, dodging, it
+            // has a chance (a skeleton shot it off a pillar on bare stone, no pickaxe to dig).
             boolean melee = !shot && !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(3),
                     net.minecraft.world.entity.LivingEntity::isAlive).isEmpty();
-            boolean upward = melee && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this) || !net.kasax.challengecraft.bot.task.HideTask.possible(this);
-            reflex(upward ? net.kasax.challengecraft.bot.task.HideTask.upward() : new net.kasax.challengecraft.bot.task.HideTask());
-            return;
+            net.kasax.challengecraft.bot.task.HideTask hide = melee && net.kasax.challengecraft.bot.task.HideTask.pillarPossible(this) ? net.kasax.challengecraft.bot.task.HideTask.upward() : coverHere();
+            if (hide != null) {
+                actions.reset();
+                navigator.stop();
+                reflex(hide);
+                return;
+            }
         }
         // A brute or a hoglin after it, and not geared to stand up to it: up on a pillar, and hit
         // from up there (nothing that only strikes close reaches two blocks up).
@@ -796,6 +826,28 @@ public final class Bot {
                 say("a " + m.getType().toShortString() + " after me: up on a pillar");
                 reflex(new net.kasax.challengecraft.bot.task.PillarFightTask(m));
                 return;
+            }
+            // Two and more that only strike close coming for it, on hard with next to no armour:
+            // up before they are there, and each hit from above as it comes to the foot (their
+            // arm reaches no higher than their head). Toe to toe two zombies' blows outrun any
+            // meal - seed 77: dead at the foot of a pillar begun at eight hearts, too late.
+            // (Not with a spider among them - it climbs - nor a creeper: its blast at the foot
+            // reaches up. Nor with a bow drawn on it: up there it is the easiest target.)
+            if (body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD && body.getArmorValue() < 6 && !shooterOnMe(24)) {
+                var crowd = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(10, 4, 10),
+                        m -> m.isAlive() && m.getTarget() == body && (m.distanceTo(body) < 6 || body.hasLineOfSight(m)));
+                var closeOnly = crowd.stream().filter(net.kasax.challengecraft.bot.task.PillarFightTask::reachless)
+                        .sorted(java.util.Comparator.comparingDouble(m -> m.distanceToSqr(body))).toList();
+                boolean unsafe = crowd.stream().anyMatch(m -> m instanceof net.minecraft.world.entity.monster.spider.Spider
+                        || m instanceof net.minecraft.world.entity.monster.Creeper);
+                if (closeOnly.size() >= 2 && !unsafe) {
+                    var first = closeOnly.get(0);
+                    actions.reset();
+                    say(closeOnly.size() + " at me (" + first.getType().toShortString() + " the nearest, "
+                            + String.format("%.1f", first.distanceTo(body)) + " off): up on a pillar, and from above");
+                    reflex(new net.kasax.challengecraft.bot.task.PillarFightTask(first).untilClear());
+                    return;
+                }
             }
         }
         // (Backing off from something: not straight back into a fight with it - the retreat
@@ -830,10 +882,11 @@ public final class Bot {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(w).nearby(20));
                     return;
                 }
-                if (net.kasax.challengecraft.bot.task.HideTask.possible(this)) {
+                var witchCover = coverHere();
+                if (witchCover != null) {
                     actions.reset();
-                    say("a witch at me, not fit for her: into the ground");
-                    reflex(new net.kasax.challengecraft.bot.task.HideTask());
+                    say("a witch at me, not fit for her: out of her sight (" + witchCover.describe() + ")");
+                    reflex(witchCover);
                     return;
                 }
             }
@@ -858,6 +911,18 @@ public final class Bot {
                 double needed = m.distanceTo(body) <= 6 ? 10 : shieldOn || body.getArmorValue() >= 6 ? 12 : 16;
                 if (armed && body.getHealth() >= needed && bowmen <= 1 && m.distanceTo(body) < 14 && m instanceof net.minecraft.world.entity.monster.Enemy) {
                     reflex(new net.kasax.challengecraft.bot.task.KillTask(m).nearby(16));
+                    return;
+                }
+                // Two and more drawing on it, and next to no armour: out of their sight, into the
+                // ground until they have gone - the shield covers one side only (seed 88, hard: a
+                // patrol's crossbows from two sides, twenty hearts in fifteen seconds). A patrol's
+                // ground is kept clear of for a while after (they do not burn in the sun).
+                var cover = bowmen >= 2 && body.getArmorValue() < 6 ? coverHere() : null;
+                if (cover != null) {
+                    if (m instanceof net.minecraft.world.entity.monster.illager.AbstractIllager) markDanger(m.blockPosition());
+                    say(bowmen + " bowmen at me (" + m.getType().toShortString() + " " + Math.round(m.distanceTo(body)) + " blocks off): out of their sight till they go ("
+                            + cover.describe() + ")");
+                    reflex(cover);
                     return;
                 }
                 // (A shield on the arm: up towards it on the way, without stopping - the threat
@@ -947,7 +1012,9 @@ public final class Bot {
         // of a magma cube or a brute take twelve.)
         boolean hurt = body.getHealth() < body.getMaxHealth() * (body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD ? 0.8f : 0.6f) && food < 20;
         // (Not with a monster at it: eating stands still for a second and a half. Unless starving.)
-        if ((food <= 14 || hurt) && (food <= 4 || !targeted(8)) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
+        // (Nor with a bowman drawing on it in sight, however far: the meal is a second and a half
+        // with the shield down - seed 88, hard: shot dead eating, a patrol's crossbows about.)
+        if ((food <= 14 || hurt) && (food <= 4 || !targeted(8) && !shooterOnMe(24)) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.EatTask());
         }
@@ -1035,6 +1102,16 @@ public final class Bot {
     boolean shooterOnMe(double r) {
         return !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(r),
                 m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && body.hasLineOfSight(m)).isEmpty();
+    }
+
+    /**
+     * Out of sight where it stands: dug in if the ground lets it, else walled in with the blocks
+     * it carries (stone underfoot and no pickaxe, sand, water close below); null when neither.
+     */
+    private net.kasax.challengecraft.bot.task.HideTask coverHere() {
+        if (net.kasax.challengecraft.bot.task.HideTask.possible(this)) return new net.kasax.challengecraft.bot.task.HideTask();
+        if (net.kasax.challengecraft.bot.task.HideTask.boxPossible(this)) return net.kasax.challengecraft.bot.task.HideTask.boxed();
+        return null;
     }
 
     /** A monster within {@code r} blocks out for it. */

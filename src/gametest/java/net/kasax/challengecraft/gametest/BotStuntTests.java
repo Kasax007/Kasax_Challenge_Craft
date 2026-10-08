@@ -1156,6 +1156,162 @@ public class BotStuntTests {
     }
 
     /**
+     * Two pillagers with crossbows, one on each side fourteen blocks off; a shield, a sword, no
+     * armour (hard): into the ground out of their sight and alive three quarters of a minute later
+     * (seed 88: the shield covers one side only - shot dead in fifteen seconds).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 44)
+    public void patrolTwoSides(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "patrol_two_sides");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        java.util.List<net.minecraft.world.entity.Mob> mobs = new java.util.ArrayList<>();
+        for (int x : new int[]{6, 34}) {
+            var p = EntityTypes.PILLAGER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            p.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.CROSSBOW));
+            p.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(x, FEET, 20)));
+            p.setPersistenceRequired();
+            level.addFreshEntity(p);
+            mobs.add(p);
+        }
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 16), new ItemStack(Items.BREAD, 8));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        for (var m : mobs) m.setTarget(body);
+        float[] low = {20};
+        boolean[] hid = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(980), 990, () -> {
+            for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.HideTask)) hid[0] = true;
+            if (a.bot().body() != body || !body.isAlive()) h.fail("patrol_two_sides: shot dead");
+            if (h.getTick() < 900) return false;
+            BotArena.LOG.info("[BOTTEST] patrol_two_sides lost {} health, into the ground {}", 20 - low[0], hid[0]);
+            h.assertTrue(hid[0], "patrol_two_sides: never out of their sight");
+            return true;
+        });
+    }
+
+    /**
+     * Two zombies coming from eight blocks off, a stone sword and blocks, no armour, no shield
+     * (hard): up on a pillar before they are there, both killed from above, little lost (seed 77:
+     * toe to toe, then a pillar begun at eight hearts - too late).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 44)
+    public void zombiePairPillar(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "zombie_pair_pillar");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        java.util.List<net.minecraft.world.entity.Mob> mobs = new java.util.ArrayList<>();
+        for (int[] at : new int[][]{{12, 20}, {20, 28}}) {
+            var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+            z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(at[0], FEET, at[1])));
+            z.setPersistenceRequired();
+            level.addFreshEntity(z);
+            mobs.add(z);
+        }
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16), new ItemStack(Items.BREAD, 8));
+        var body = a.bot().body();
+        for (var m : mobs) m.setTarget(body);
+        float[] low = {20};
+        boolean[] pillar = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1280), 1290, () -> {
+            for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.PillarFightTask)) pillar[0] = true;
+            if (a.bot().body() != body || !body.isAlive()) h.fail("zombie_pair_pillar: killed");
+            if (mobs.stream().anyMatch(net.minecraft.world.entity.LivingEntity::isAlive) && h.getTick() < 1250) return false;
+            BotArena.LOG.info("[BOTTEST] zombie_pair_pillar both dead {}, lost {} health, pillar {}", mobs.stream().noneMatch(net.minecraft.world.entity.LivingEntity::isAlive),
+                    20 - low[0], pillar[0]);
+            h.assertTrue(mobs.stream().noneMatch(net.minecraft.world.entity.LivingEntity::isAlive), "zombie_pair_pillar: a zombie still stands");
+            h.assertTrue(pillar[0], "zombie_pair_pillar: fought them on foot");
+            return true;
+        });
+    }
+
+    /**
+     * Down to nine hearts with a skeleton drawing on it, bare stone underfoot and no pickaxe, a
+     * stack of blocks (hard): walled in where it stands - not up a pillar, where it was shot down
+     * in the test of the wall - and alive half a minute later.
+     */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 24)
+    public void boxAgainstSkeleton(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "box_against_skeleton");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(33, FEET, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        // (Stone right under the grass: nothing to dig with but the hands.)
+        a.fill(0, BotArena.GROUND, 0, BotArena.SIZE - 1, BotArena.GROUND, BotArena.SIZE - 1, Blocks.STONE);
+        a.spawn(18, FEET, 20, new ItemStack(Items.COBBLESTONE, 32));
+        var body = a.bot().body();
+        body.setHealth(9);
+        sk.setTarget(body);
+        boolean[] boxed = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(680), 690, () -> {
+            if (sk.isAlive() && sk.getTarget() != body) sk.setTarget(body);
+            if (a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.HideTask && t.describe().startsWith("boxed"))) boxed[0] = true;
+            if (a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.HideTask && t.describe().equals("hide in the ground"))
+                    && body.getY() > a.abs(0, FEET, 0).getY() + 1.5) h.fail("box_against_skeleton: up a pillar with a bow drawn on it");
+            if (a.bot().body() != body || !body.isAlive()) h.fail("box_against_skeleton: shot dead");
+            if (h.getTick() < 600) return false;
+            BotArena.LOG.info("[BOTTEST] box_against_skeleton boxed {}, health {}", boxed[0], body.getHealth());
+            h.assertTrue(boxed[0], "box_against_skeleton: never walled in");
+            return true;
+        });
+    }
+
+    /**
+     * Hungry and hurt, a skeleton drawing on it from fourteen blocks, nowhere to dig in (hard): no
+     * meal while it is in sight (a second and a half with the shield down: seed 88 was shot dead
+     * so); the moment it is gone, the meal.
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 44)
+    public void noMealUnderFire(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "no_meal_under_fire");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(34, FEET, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        // (No pickaxe, no blocks: no hole and no pillar - only the meal is in question. Iron on,
+        // so the arrows of four seconds do not kill it first.)
+        a.spawn(20, FEET, 20, new ItemStack(Items.BREAD, 8));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, new ItemStack(Items.IRON_BOOTS));
+        body.setHealth(12);
+        body.getFoodData().setFoodLevel(10);
+        sk.setTarget(body);
+        boolean[] ate = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(380), 390, () -> {
+            boolean eating = a.bot().current() instanceof net.kasax.challengecraft.bot.task.EatTask;
+            if (h.getTick() < 80) {
+                if (sk.getTarget() != body) sk.setTarget(body);
+                if (eating && body.hasLineOfSight(sk)) h.fail("no_meal_under_fire: eating with the skeleton drawing on it");
+                return false;
+            }
+            if (sk.isAlive()) sk.discard();
+            if (eating || body.getFoodData().getFoodLevel() > 10) ate[0] = true;
+            if (a.bot().body() != body || !body.isAlive()) h.fail("no_meal_under_fire: shot dead");
+            if (!ate[0] && h.getTick() < 300) return false;
+            BotArena.LOG.info("[BOTTEST] no_meal_under_fire ate once it was gone {} (food {}, health {})", ate[0], body.getFoodData().getFoodLevel(), body.getHealth());
+            h.assertTrue(ate[0], "no_meal_under_fire: no meal even with the skeleton gone");
+            return true;
+        });
+    }
+
+    /**
      * Back at the spawn at night with nothing, three zombies and a skeleton about (hard): dug in
      * with bare hands and alive a minute later, instead of dying to them again and again.
      */

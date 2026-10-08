@@ -19,13 +19,28 @@ import net.minecraft.world.item.component.SwingAnimation;
  */
 public final class PillarFightTask implements BotTask {
     private static final int MAX_TICKS = 1200;
-    private final LivingEntity target;
+    private LivingEntity target;
     private BlockPos base;
     private int ticks, placed, lastPlaced, placedAt, waiting;
-    private boolean shot;
+    private boolean shot, untilClear;
 
     public PillarFightTask(LivingEntity target) {
         this.target = target;
+    }
+
+    /** Against a crowd: when the one it is about is dead, on with the next at it, down only once none is left. */
+    public PillarFightTask untilClear() {
+        untilClear = true;
+        return this;
+    }
+
+    /**
+     * One that only strikes close and cannot climb: a zombie of any kind, a vindicator. Two
+     * blocks up is out of their reach (their arm reaches no higher than their head).
+     */
+    public static boolean reachless(Mob m) {
+        return (m instanceof net.minecraft.world.entity.monster.zombie.Zombie || m instanceof net.minecraft.world.entity.monster.illager.Vindicator)
+                && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob);
     }
 
     /** Whether to take this one on from a pillar, rather than toe to toe. */
@@ -52,6 +67,16 @@ public final class PillarFightTask implements BotTask {
     public Result tick(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
+        if (untilClear && !target.isAlive()) {
+            // The next of the crowd still at it, if any; then down.
+            LivingEntity next = level.getEntitiesOfClass(Mob.class, body.getBoundingBox().inflate(10, 6, 10),
+                            m -> m.isAlive() && m.getTarget() == body && reachless(m))
+                    .stream().min(java.util.Comparator.comparingDouble(m -> m.distanceToSqr(body))).map(m -> (LivingEntity) m).orElse(null);
+            if (next != null) {
+                target = next;
+                waiting = 0;
+            }
+        }
         if (++ticks > MAX_TICKS || !target.isAlive()) return Result.DONE;
         if (ticks % 100 == 0) bot.say("on the pillar: " + target.getType().toShortString() + " at " + String.format("%.1f", KillTask.hitDistance(body, target))
                 + ", its health " + Math.round(target.getHealth()));

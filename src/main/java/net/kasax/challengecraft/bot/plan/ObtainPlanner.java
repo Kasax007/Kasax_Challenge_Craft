@@ -352,9 +352,21 @@ public final class ObtainPlanner {
     private static final Set<EntityType<?>> RISKY_PREY = Set.of(net.minecraft.world.entity.EntityTypes.SKELETON, net.minecraft.world.entity.EntityTypes.STRAY, net.minecraft.world.entity.EntityTypes.BOGGED,
             net.minecraft.world.entity.EntityTypes.WITCH, net.minecraft.world.entity.EntityTypes.DROWNED, net.minecraft.world.entity.EntityTypes.PILLAGER, net.minecraft.world.entity.EntityTypes.BLAZE);
 
-    /** A shield, or armour worth the name. */
+    /** A shield (on the arm or in the pack), or armour worth the name. */
     private static boolean geared(net.kasax.challengecraft.bot.BotPlayer body) {
-        return body.getArmorValue() >= 6 || countAny(body, Set.of(net.minecraft.world.item.Items.SHIELD)) > 0;
+        // (The off hand too: that is where the shield lives - counted in the pack only, a bot with
+        // its shield up was planned as bare.)
+        return body.getArmorValue() >= 6 || body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                || countAny(body, Set.of(net.minecraft.world.item.Items.SHIELD)) > 0;
+    }
+
+    /**
+     * Any other monster hunted bare (no shield, no armour worth the name): dearer too - the fight
+     * is where the hearts go (seed 77, hard: a spider hunt for a bow's string at minute twelve,
+     * dead to the zombies of the same night). What is worth it still gets done, just later.
+     */
+    private static double bareRisk(EntityType<?> type) {
+        return type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER ? 180 : 0;
     }
 
     private Leaf landMobLeaf(EntityType<?> type, double effort) {
@@ -364,7 +376,7 @@ public final class ObtainPlanner {
         // (One in sight that shoots, or any monster while hurt: as dear as one still to be found
         // - see below.)
         if (seen != null) {
-            double risk = RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body()) ? 300 : 0;
+            double risk = habitatBot == null || geared(habitatBot.body()) ? 0 : RISKY_PREY.contains(type) ? 300 : bareRisk(type);
             if (type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER && habitatBot != null && habitatBot.body().getHealth() <= 8) risk += 600;
             return new Leaf(seen + risk, 0, mobPos.get(type));
         }
@@ -389,7 +401,7 @@ public final class ObtainPlanner {
         // The ones that hit from afar (or with potions, or from the water) are not hunted bare:
         // without a shield or armour that is how the early deaths went (a skeleton hunted for
         // one arrow at minute four on seed 22, a witch, a drowned). Other ways first.
-        if (RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body())) wait += 300;
+        if (habitatBot != null && !geared(habitatBot.body())) wait += RISKY_PREY.contains(type) ? 300 : bareRisk(type);
         // (Hurt down to eight hearts: no monster hunted for its drops till the hearts are back -
         // the brain puts such a hunt aside, and it should not be the plan either.)
         if (monster && habitatBot != null && habitatBot.body().getHealth() <= 8) wait += 600;

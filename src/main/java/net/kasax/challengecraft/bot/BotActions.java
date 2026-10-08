@@ -109,6 +109,17 @@ public final class BotActions {
         return throwawaySlot() >= 0;
     }
 
+    /** How many building blocks it may spend (the last few of the stone tools and furnaces are made of kept back). */
+    public int spendableBlocks() {
+        int crafting = 0, other = 0;
+        for (var s : bot.getInventory().getNonEquipmentItems()) {
+            if (!THROWAWAY.contains(s.getItem())) continue;
+            if (CRAFTING_STONE.contains(s.getItem())) crafting += s.getCount();
+            else other += s.getCount();
+        }
+        return other + Math.max(0, crafting - KEEP_CRAFTING_STONE);
+    }
+
     /**
      * The block to spend: the least useful first (dirt, netherrack, the stone kinds) and the ones
      * tools and furnaces are made of (cobblestone, blackstone, cobbled deepslate) last, never the

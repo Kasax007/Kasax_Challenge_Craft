@@ -86,6 +86,8 @@ public final class BotManager {
             if (body.isDeadOrDying()) {
                 body.stopInputs();
                 if (bot.lastDeath == null || body.level().getGameTime() - bot.lastDeath.time() > 100) {
+                    // (The blow that killed it, for the log: the bot is not ticked any more once dead.)
+                    bot.logHits();
                     var src = body.getLastDamageSource();
                     boolean gone = body.isInLava() || src != null && (src.is(net.minecraft.tags.DamageTypeTags.IS_FIRE) && body.isInLava()
                             || src.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD));
