@@ -2243,3 +2243,76 @@ Was auf HARD gemessen ist (20 Ticks pro Sekunde, Tode je 8 Läufe):
 
 Die Fixes selbst bleiben: Jeder geht auf einen beobachteten Tod zurück, und die Gametests
 bestehen. Ob sie zusammen die Todesrate auf HARD senken, zeigt erst die neue Messung.
+
+### 23.14 Erste HARD-Paare, und was die Tode darauf zeigen
+
+**Messung:** `8c9a695` gegen H (`08e3644`), beide Welten wirklich auf HARD („world hard“ in der
+Startzeile), 20 Ticks pro Sekunde, je 30 Minuten, gleiches Brett pro Seed.
+
+| Seed | `8c9a695` Felder | Tode | H Felder | Tode |
+| --- | --- | --- | --- | --- |
+| 77 | 4 | 1 (Zombie) | 6 | 1 (Skelett) |
+| 66 | 7 | 0 | 5 | 1 (Skelett) |
+| 88 | 4 | 1 (Pillager) | 3 | 1 (ertrunken) |
+| 44 | 3 | 0 | 4 | 1 (erstickt im Kies) |
+| **Summe** | **18** | **2** | **18** | **4** |
+
+Nach vier Paaren abgebrochen: Die Tode zeigten Lücken, deren Fixes den Stand stark verändern; die
+restlichen Seeds hätten einen veralteten Stand gemessen. Vier Paare sind für die Todesrate kein
+Beweis (siehe die Streuung in 23.9). Die beiden H-Tode durch Wasser und Kies sind seit H behoben
+(`AirTask`, der seitliche Weg aus dem Kies).
+
+**Die Tode und was ein Spieler anders gemacht hätte:**
+
+1. **Seed 88 (neu), Minute 26, „shot by Pillager“.**
+   - Bob hatte das Pillager-Feld schon: 0 Rüstung, Schild am Arm, 20 HP.
+   - Eine Patrouille schoss von mehreren Seiten, der Schild deckt nur eine.
+   - Er aß mitten im Beschuss. Der Essen-Reflex prüfte nur Monster näher als 8 Blöcke.
+   - Nach dem Eingraben kam er bei 16 HP sofort wieder heraus, mitten in dieselbe Patrouille, und
+     war 16 Sekunden später tot.
+2. **Seed 77 (neu), Minute 12, „slain by Zombie“.**
+   - Kein Schild, keine Rüstung, Steinschwert; Nacht, Spinnenjagd für die Bogensehne.
+   - Das Brett wollte kein Eisen, also kaufte Bob nie den Schild: Die Investition „Schild zuerst“
+     hing an `wantsIron()`.
+   - Die Säule gegen die Zombies begann erst bei 8 HP; zwei Zombie-Schläge auf HARD sind 9.
+3. **Seed 77 und 66 (H), „shot by Skeleton“**, beide in Höhlen mit Schild am Arm.
+   - 77: Bob aß zehnmal in 20 Sekunden, das Skelett 11 bis 13 Blöcke weit. Der Schildlauf brach
+     jedes Essen ab.
+   - 66: Er lief „hinter dem Schild“ weiter, das Skelett 4 bis 5 Blöcke weit.
+
+**Beim Testen gefunden:** Der Gametest `skeleton_cover` (Skelett, keine Waffe, nur Steinblöcke,
+Steinboden) endete diesmal tödlich. Bob konnte sich nicht eingraben (Stein, keine Spitzhacke) und
+baute deshalb eine Säule, auch gegen den Schützen. Oben war er das leichteste Ziel.
+
+**Fixes (`f603e35`):**
+
+| Was | Wo | Anlass |
+| --- | --- | --- |
+| Kein Essen, solange ein Schütze mit Sicht auf Bob zielt (bis 24 Blöcke; außer am Verhungern) | `Bot` (Essen-Reflex) | 1, 3 |
+| Ab zwei Schützen und Rüstung unter 6: außer Sicht (eingraben oder Box); das Gebiet einer Patrouille 10 min meiden | `Bot` (Schützen-Reflex) | 1, 3 |
+| Aus dem Versteck erst, wenn draußen keiner mehr wartet (höchstens 45 s länger) | `HideTask` | 1 |
+| **Box:** Wo Bob nicht graben kann, mauert er sich ein (vier Seiten, zwei hoch, Deckel). Das gilt gegen Schützen, Hexen und Spinnen und als Nachtversteck auf Sand oder Stein. Gegen Schützen nie mehr eine Säule. | `HideTask.boxed()`, `Bot.coverHere()`, `LockoutBrain` (Nacht) | Test |
+| Auf HARD der Schild auf jedem Brett, nicht nur bei Eisenbedarf; aber nur, wenn er höchstens 240 s kostet | `LockoutBrain` (invest) | 2 |
+| Ab zwei Zombies (jeder Art) oder Dienern, auf HARD mit Rüstung unter 6: eine Säule, bevor sie da sind; von oben, bis keiner mehr da ist. Nicht mit Spinne, Creeper oder Schütze dabei. | `Bot`, `PillarFightTask.untilClear()` | 2 |
+| Monsterjagd ohne Schild und Rüstung kostet im Planer 180 s mehr | `ObtainPlanner` | 2 |
+| Planer-Fehler: Ein Schild in der Nebenhand zählte nicht, Bob mit Schild am Arm galt als „ohne“ | `ObtainPlanner.geared` | beim Lesen |
+| Jeder Treffer im Log: Quelle, Abstand, wer sonst zielt, Rüstung, Schild oben oder nicht, Aufgabe. Der tödliche Treffer ist dabei. | `Bot.logHits`, `BotManager` | Auswertung |
+
+**Warum die 240-s-Grenze:** Runde 18 hatte gemessen, dass Eisen „bis zum Schild“ Bob mit
+Steinwerkzeug immer wieder in Höhlen schickte. Das ergab doppelt so viele Tode. Der Schild kommt
+deshalb nur, wenn Eisen in Sicht oder eine Höhle nah ist.
+
+**Gametests:** Neu und bestanden:
+
+| Test | Ergebnis |
+| --- | --- |
+| `patrol_two_sides` | 0 HP verloren, eingegraben |
+| `no_meal_under_fire` | isst erst, als das Skelett weg ist |
+| `zombie_pair_pillar` | beide Zombies tot, 0 HP verloren |
+| `box_against_skeleton` | eingemauert, 14,5 HP am Ende |
+
+`skeleton_cover` besteht wieder, mit 0 HP Verlust. Rot blieben nur die bekannten Wackelkandidaten
+(`night_shelter_bare`, `shield_walk_strays`, `respawn_after_death`, `portal_after_death`).
+
+**Nächste Messung:** `f603e35` auf beiden Arbeitskopien, die 8 Seeds je zweimal (16 Läufe, HARD,
+20 Ticks pro Sekunde), mit dem Treffer-Log. Auswertung pro Tod mit `ana/hits.py`.
