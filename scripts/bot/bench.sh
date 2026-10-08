@@ -21,6 +21,11 @@ set_prop rcon.password test
 set_prop rcon.port ${RCON_PORT:-25575}
 set_prop server-port ${SERVER_PORT:-25565}
 set_prop spawn-protection 0
+# The world's difficulty, the same as Bob's (or WORLD_DIFFICULTY): never left to whatever the
+# server.properties of this checkout happened to hold - one said easy, the other hard, and a
+# "paired" comparison of two builds was easy against hard for a whole day.
+WORLD=${WORLD_DIFFICULTY:-$DIFF}
+set_prop difficulty $WORLD
 # Bob plays with a player's sight: 24 chunks to see, the same to simulate.
 set_prop view-distance 24
 set_prop simulation-distance 24
@@ -38,7 +43,7 @@ sleep 3
 # boards died 3 times at 1.5 times the real pace and 18 times at 2.3 times.
 RATE=${TICK_RATE:-20}
 if [ "$RATE" = sprint ]; then PACE="tick sprint $((SECS * 20 + 400))"; else PACE="tick rate $RATE"; fi
-python3 $HERE/rcon.py "$PACE" "challengecraft_bot bench Bob $SECS $DIFF" > /dev/null
+python3 $HERE/rcon.py "difficulty $WORLD" "$PACE" "challengecraft_bot bench Bob $SECS $DIFF" > /dev/null
 for i in $(seq 1 4320); do sleep 5; grep -q "\[BOTBENCH\] idle:" $LOG && break; done
 python3 $HERE/rcon.py "challengecraft_bot coverage Bob" > /dev/null 2>&1 || true
 python3 $HERE/rcon.py stop > /dev/null 2>&1 || true

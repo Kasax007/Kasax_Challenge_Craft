@@ -53,7 +53,8 @@ public final class BotBenchmark {
         Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), board);
         bot.setBrain(new LockoutBrain(difficulty));
         RUNNING.add(new BotBenchmark(bot, ticks));
-        BotManager.LOG.info("[BOTBENCH] {} start at {} ({} s, {})", bot.name, bot.body().blockPosition().toShortString(), ticks / 20, difficulty);
+        BotManager.LOG.info("[BOTBENCH] {} start at {} ({} s, {}, world {})", bot.name, bot.body().blockPosition().toShortString(), ticks / 20, difficulty,
+                bot.body().level().getDifficulty().getSerializedName());
     }
 
     static void tickAll() {
