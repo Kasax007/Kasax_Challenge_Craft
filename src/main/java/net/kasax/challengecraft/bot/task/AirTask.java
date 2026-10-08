@@ -21,6 +21,10 @@ public final class AirTask implements BotTask {
 
     private Way way = Way.SEARCH;
     private boolean started, backTried;
+    /** Straight up did not get it any higher (a current, a waterfall): not again. */
+    private boolean upBlocked;
+    private int upTicks;
+    private double upFrom;
     /** Ticks with the head out, catching breath. */
     private int breathing;
     private int ticks, fails, stuck;
@@ -58,12 +62,22 @@ public final class AirTask implements BotTask {
         ServerLevel level = (ServerLevel) body.level();
         BlockPos feet = body.blockPosition();
         // Water straight up to the air (the commonest case: a dive for something on the bottom):
-        // swum up, nothing to work out.
-        if (openAbove(level, feet, 24)) {
-            bot.navigator().stop();
-            body.stopInputs();
-            body.jump = true;
-            return Result.RUNNING;
+        // swum up, nothing to work out - as long as that gets it higher. (Not rising - a current,
+        // water falling down a shaft - it drowned so twice on seed 77, swimming "up" in place.)
+        if (!upBlocked && openAbove(level, feet, 24)) {
+            if (upTicks++ == 0 || body.getY() > upFrom + 0.5) {
+                upFrom = body.getY();
+                if (upTicks > 1) upTicks = 1;
+            }
+            if (upTicks > 30) {
+                upBlocked = true;
+                bot.say("up for air: not getting higher here, another way");
+            } else {
+                bot.navigator().stop();
+                body.stopInputs();
+                body.jump = true;
+                return Result.RUNNING;
+            }
         }
         if (ticks % 20 == 1) {
             // (Measured over a second: swimming is slow, but not this slow.)
@@ -79,7 +93,9 @@ public final class AirTask implements BotTask {
             fails = 0;
             started = false;
             bot.navigator().stop();
+            Way was = way;
             way = next(bot, level, feet);
+            if (way != was && way != Way.BACK) bot.say("up for air: " + way.name().toLowerCase() + " instead");
         }
         switch (way) {
             case DIG -> {
@@ -175,12 +191,14 @@ public final class AirTask implements BotTask {
         return null;
     }
 
-    /** Nothing but water from the feet up to the air, at most {@code max} blocks. */
+    /** Nothing but still water from the feet up to the air, at most {@code max} blocks (water falling down a shaft is no way up). */
     private static boolean openAbove(ServerLevel level, BlockPos feet, int max) {
         for (int up = 1; up <= max; up++) {
             BlockPos q = feet.above(up);
             if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) return false;
-            if (level.getFluidState(q).isEmpty()) return true;
+            var fluid = level.getFluidState(q);
+            if (fluid.isEmpty()) return true;
+            if (!fluid.isSource()) return false;
         }
         return false;
     }

@@ -263,8 +263,15 @@ public final class LockoutBrain implements BotBrain {
         // tiles (they pay for themselves on the tiles after). A few tries, then without.
         stepKey = "invest";
         if (strategist.wantsIron() && bot.body().level().getGameTime() >= kitRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
-            for (var item : List.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.BUCKET)) {
-                if (ObtainPlanner.countAny(bot.body(), Set.of(item)) > 0) continue;
+            // (On hard the shield first - one ingot of the same trip down: the first iron went into
+            // the pickaxe and the bucket, and the shield came twenty minutes later or never, while
+            // most deaths were arrows.)
+            List<net.minecraft.world.item.Item> kit = new ArrayList<>();
+            if (bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD) kit.add(net.minecraft.world.item.Items.SHIELD);
+            kit.add(net.minecraft.world.item.Items.IRON_PICKAXE);
+            kit.add(net.minecraft.world.item.Items.BUCKET);
+            for (var item : kit) {
+                if (has(bot.body(), Set.of(item)) || item == net.minecraft.world.item.Items.BUCKET && has(bot.body(), Set.of(net.minecraft.world.item.Items.WATER_BUCKET, net.minecraft.world.item.Items.LAVA_BUCKET))) continue;
                 // (Not again at once if this fails, and each failure waits longer; four, and the
                 // kit is left to the tiles that need it.)
                 if (kitTries >= 4) break;

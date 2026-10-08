@@ -717,9 +717,23 @@ public final class MineTask implements BotTask {
                         bot.say("can't dig on here");
                         return Result.FAILED;
                     }
-                    BlockPos away = feet.offset(bot.body().getRandom().nextInt(13) - 6, 0, bot.body().getRandom().nextInt(13) - 6);
-                    // (Down here: a few blocks away down here, not up on the surface above them.)
-                    bot.interject(new GoToTask(SurfaceTask.underground(bot.body()) ? away : Explorer.ground(level, away, feet.getY()), 2));
+                    // (Down here: a few blocks away down here, not up on the surface above them.
+                    // Up here: at about this height and dry - not down a ravine into its pool, a
+                    // spot 26 blocks lower in the water drowned it on seed 77.)
+                    boolean below = SurfaceTask.underground(bot.body());
+                    BlockPos away = null;
+                    for (int i = 0; i < 8 && away == null; i++) {
+                        BlockPos c = feet.offset(bot.body().getRandom().nextInt(13) - 6, 0, bot.body().getRandom().nextInt(13) - 6);
+                        BlockPos g = below ? c : Explorer.ground(level, c, feet.getY());
+                        if (Math.abs(g.getY() - feet.getY()) > 4) continue;
+                        if (!level.getFluidState(g).isEmpty() || !level.getFluidState(g.below()).isEmpty()) continue;
+                        away = g;
+                    }
+                    if (away == null) {
+                        bot.say("can't dig on here");
+                        return Result.FAILED;
+                    }
+                    bot.interject(new GoToTask(away, 2));
                 }
                 return Result.RUNNING;
             }

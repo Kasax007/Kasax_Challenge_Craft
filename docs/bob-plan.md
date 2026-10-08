@@ -2169,3 +2169,43 @@ Routenwahl nur 150 s. Das Risiko spielte bei der Wahl der Ziele damit kaum eine 
 - Unter Tage gelten 0,02 zusätzliche Tode pro Minute (bisher 0,006).
 - Ein Ziel tief unten zählt das schon bei der Planung von oben, nachts ohne den bisherigen Rabatt.
 - Ein Schild senkt das Risiko wie 5 Rüstungspunkte.
+
+### 23.12 Gepaarter Vergleich `c2c1220` gegen `16b3040` (Echtzeit)
+
+Gleichzeitig, gleiche Seeds in gleicher Reihenfolge, 20 Ticks pro Sekunde, 30 min HARD:
+
+| Seed | `c2c1220` Felder / Tode | `16b3040` Felder / Tode |
+| --- | --- | --- |
+| 77 | 5 / 2 | 3 / 1 |
+| 66 | 3 / 0 | 1 / 3 |
+| 88 | 2 / 0 | 6 / 1 |
+| 44 | 4 / 0 | 3 / 0 |
+| 11 | 0 / 0 | 0 / 1 |
+| 22 | 3 / 0 | 3 / 3 |
+| 33 | 3 / 0 | 4 / 2 |
+| 55 | 1 / 1 | 2 / 4 |
+| **Summe** | **21 / 3** | **22 / 15** |
+
+**Ein Fünftel der Tode bei gleich vielen Feldern.** Diesmal ist der Unterschied klar: Bei
+18 Toden kommt eine Aufteilung von 3 zu 15 bei gleichen Chancen in weniger als 1 % der Fälle vor.
+(`16b3040` hatte bei seiner ersten Echtzeit-Messung 7 Tode, hier 15: Die Schwankung zwischen
+Messungen bleibt groß, deshalb wird gepaart gemessen.)
+
+**Die drei Tode von `c2c1220` und die Fixes danach:**
+
+- **Seed 77, zweimal ertrunken.** Beide Male lief die neue Luft-Logik im Zweig „gerade nach oben“,
+  kam aber nicht höher: einmal in einem Grundwassersee einer Höhle (y 21), einmal in einer
+  überfluteten Schlucht.
+  - Als „frei bis zur Luft“ zählt nur noch stehendes Wasser.
+  - Steigt Bob 1,5 s nicht, wechselt er die Strategie und schreibt das ins Log.
+  - In die Schlucht kam er über den Ausweichschritt der Bruchstein-Suche („ein paar Blöcke
+    weiter“). Der nahm die Oberfläche über einem zufälligen Punkt, 26 Blöcke tiefer im Wasser.
+    Ausweichpunkte müssen jetzt etwa auf gleicher Höhe liegen (±4) und trocken sein.
+- **Seed 55, Parched** (die Wüsten-Variante des Skeletts):
+  - In der Wüste hatte Bob erst nach 18 Minuten eine Steinspitzhacke.
+  - Nachts, ohne Essen und mit 4 Leben, wurde er erschossen.
+  - Der langsame Wüsten-Start bleibt offen.
+
+**Außerdem:** Auf HARD kommt der Schild jetzt zuerst in der Eisen-Investition, vor Spitzhacke und
+Eimer. Bisher ging das erste Eisen in Spitzhacke und Eimer, und der Schild kam erst nach 18 bis
+28 Minuten oder nie, obwohl die meisten Tode Pfeile waren.
