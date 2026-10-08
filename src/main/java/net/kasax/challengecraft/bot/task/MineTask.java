@@ -670,6 +670,10 @@ public final class MineTask implements BotTask {
         if (digTo == null) {
             BlockPos feet = nav.feet();
             if (digDepth == null) digDepth = depth != null ? depth : feet.getY() - 8;
+            // Rock: the staircase goes on down till it is in rock (its own steps then are the
+            // cobblestone) - not a tunnel along eight blocks down, through terracotta or dirt
+            // that never turns to stone: in the badlands it wore out pickaxe after pickaxe so.
+            if (depth == null && rock(level) && feet.getY() <= digDepth && feet.getY() > level.getMinY() + 12) digDepth = feet.getY() - 8;
             boolean down = feet.getY() > digDepth;
             BlockPos ahead = feet.relative(heading);
             stepTicks = 0;
@@ -743,6 +747,21 @@ public final class MineTask implements BotTask {
                 return Result.RUNNING;
             }
             bot.actions().breakTick(b);
+            if (++stepTicks > 600) {
+                digTo = null;
+                heading = heading.getClockWise();
+            }
+            return Result.RUNNING;
+        }
+        // (Sand or gravel still over the opening, or on its way down into it: not stepped in till
+        // it has settled - a tunnel into a gravel bank, stepped into while the bank came down,
+        // buried the head and it suffocated on seed 33.)
+        boolean settling = !level.getEntitiesOfClass(net.minecraft.world.entity.item.FallingBlockEntity.class,
+                new net.minecraft.world.phys.AABB(digTo).expandTowards(0, 10, 0).inflate(0.4)).isEmpty();
+        for (BlockPos b : digBlocks) {
+            if (!digBlocks.contains(b.above()) && level.getBlockState(b.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) settling = true;
+        }
+        if (settling) {
             if (++stepTicks > 600) {
                 digTo = null;
                 heading = heading.getClockWise();

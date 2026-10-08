@@ -306,6 +306,14 @@ public final class Bot {
                         return;
                     }
                 }
+                // A tall column of it over the head: out through the side (a block or two of
+                // wall) rather than up through it - every one dug lets the next one down, and
+                // the head stays buried all the while (seed 33: suffocated digging up a gravel bank).
+                net.minecraft.core.BlockPos side = sideWayOut(feet, q);
+                if (side != null) {
+                    actions.breakTick(side);
+                    return;
+                }
             }
             actions.breakTick(q);
             return;
@@ -339,6 +347,13 @@ public final class Bot {
         if (body.onGround()) {
             fallLogged = false;
             lastGround = body.blockPosition();
+        }
+        // (Out of air: what it was doing, for the log - several drownings came with nothing in
+        // the log to say how.)
+        if (body.getAirSupply() <= 0 && body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.tickCount % 20 == 0) {
+            BotManager.LOG.info("[Bot] {}: out of air at {} (eye block {}): {} | nav {} | diving {}", name, body.blockPosition().toShortString(),
+                    body.level().getBlockState(net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ())).getBlock().getName().getString(),
+                    status(), navigator.debug(), navigator.diving());
         }
         reflexes();
         // (Not in the middle of a fight or a flight: the plan waits till that is over.)
@@ -969,6 +984,39 @@ public final class Bot {
                 return;
             }
         }
+    }
+
+    /**
+     * Buried under a column of sand or gravel: the next block to dig of the quickest way out
+     * sideways (head height first, then the feet), or null if digging up through the column is
+     * quicker (a short one, a shovel at hand) or there is no side to go (no floor there, more of
+     * it falling in, water).
+     */
+    private net.minecraft.core.BlockPos sideWayOut(net.minecraft.core.BlockPos feet, net.minecraft.core.BlockPos q) {
+        var level = body.level();
+        // Up: each block of the column dug, and the next one's fall into its place.
+        int column = 0;
+        while (column < 16 && level.getBlockState(q.above(column)).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) column++;
+        double up = column * (tools.breakTicks(level.getBlockState(q)) + 6);
+        net.minecraft.core.BlockPos best = null;
+        double bestTicks = up;
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            var n = feet.relative(d);
+            if (level.getBlockState(n.below()).getCollisionShape(level, n.below()).isEmpty()) continue;
+            if (level.getBlockState(n.above(2)).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) continue;
+            double ticks = 0;
+            for (var p : new net.minecraft.core.BlockPos[] {n.above(), n}) {
+                var st = level.getBlockState(p);
+                if (st.getBlock() instanceof net.minecraft.world.level.block.FallingBlock || !st.getFluidState().isEmpty()) ticks = Double.POSITIVE_INFINITY;
+                for (var e : net.minecraft.core.Direction.values()) if (!level.getFluidState(p.relative(e)).isEmpty()) ticks = Double.POSITIVE_INFINITY;
+                if (!st.getCollisionShape(level, p).isEmpty()) ticks += tools.breakTicks(st);
+            }
+            if (ticks < bestTicks) {
+                bestTicks = ticks;
+                best = !level.getBlockState(n.above()).getCollisionShape(level, n.above()).isEmpty() ? n.above() : n;
+            }
+        }
+        return best;
     }
 
     /** A bowman (skeleton, pillager...) within {@code r} blocks out for it, in sight. */

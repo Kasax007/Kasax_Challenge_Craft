@@ -1940,6 +1940,9 @@ public final class LockoutBrain implements BotBrain {
             net.minecraft.core.BlockPos at = bot.memory().nearest((net.minecraft.server.level.ServerLevel) bot.body().level(),
                     bot.body().blockPosition(), st -> st.is(source), Set.of());
             if (at == null || at.distSqr(bot.body().blockPosition()) > 10 * 10) continue;
+            // (Not from under water: the gravel on a lake bed is a dive and a slow dig with the
+            // breath running out - "flint for later" drowned it on seed 88.)
+            if (!bot.body().level().getFluidState(at.above()).isEmpty()) continue;
             sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), item == net.minecraft.world.item.Items.SUGAR_CANE ? 3 : 1, planner);
             sideId = null;
             sideWant = item;
@@ -1949,6 +1952,10 @@ public final class LockoutBrain implements BotBrain {
             bot.interject(sideTask);
             return;
         }
+        // Food walking about right here (a cow, a pig, a sheep, a chicken) while the pack holds
+        // little: taken in passing, as every player does in the first minutes - most deaths had
+        // nothing to eat in the pack, and on hard no heart comes back without it.
+        if (foodAnimalNearby(bot)) return;
         // A tile that wants several different things (three kinds of flower): one more kind right
         // beside the way is a few seconds, and a third of that tile done.
         if (collectDistinctNearby(bot)) return;
@@ -1981,6 +1988,44 @@ public final class LockoutBrain implements BotBrain {
                 return;
             }
         }
+    }
+
+    private static final Set<net.minecraft.world.entity.EntityType<?>> FOOD_ANIMALS = Set.of(net.minecraft.world.entity.EntityTypes.COW,
+            net.minecraft.world.entity.EntityTypes.PIG, net.minecraft.world.entity.EntityTypes.SHEEP, net.minecraft.world.entity.EntityTypes.CHICKEN,
+            net.minecraft.world.entity.EntityTypes.MOOSHROOM);
+    private static final Set<net.minecraft.world.item.Item> RAW_MEAT = Set.of(net.minecraft.world.item.Items.BEEF, net.minecraft.world.item.Items.PORKCHOP,
+            net.minecraft.world.item.Items.MUTTON, net.minecraft.world.item.Items.CHICKEN);
+    private long foodChanceAt;
+
+    /** A food animal within a dozen blocks at about its own level, little to eat in the pack, nothing hostile after it: killed for its meat. */
+    private boolean foodAnimalNearby(Bot bot) {
+        var me = bot.body();
+        long now = me.level().getGameTime();
+        if (now < foodChanceAt) return false;
+        int points = 0;
+        for (var st : me.getInventory().getNonEquipmentItems()) {
+            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
+            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
+        }
+        if (points >= 16) return false;
+        if (!me.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me.getBoundingBox().inflate(16),
+                m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && m.getTarget() == me).isEmpty()) return false;
+        net.minecraft.world.entity.animal.Animal prey = null;
+        for (var a : me.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, me.getBoundingBox().inflate(12, 3, 12),
+                a -> a.isAlive() && !a.isBaby() && FOOD_ANIMALS.contains(a.getType()) && me.hasLineOfSight(a))) {
+            if (prey == null || a.distanceToSqr(me) < prey.distanceToSqr(me)) prey = a;
+        }
+        if (prey == null) return false;
+        foodChanceAt = now + 600;
+        sideTask = new net.kasax.challengecraft.bot.task.KillTask(Set.of(prey.getType()), RAW_MEAT,
+                ObtainPlanner.countAny(me, RAW_MEAT) + 1, 1).nearby(14);
+        sideId = null;
+        sideWant = null;
+        sideStarted = now;
+        sideBudget = 600;
+        bot.say("on the way: a " + prey.getType().toShortString() + " for food");
+        bot.interject(sideTask);
+        return true;
     }
 
     /** The monsters about all out in the open at its own level, and not more than one of them. */

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Bob alone in a Lockout game on a fresh world, headless and fast-forwarded:
+# Bob alone in a Lockout game on a fresh world, headless (at the real pace, or TICK_RATE):
 #   scripts/bot/bench.sh <seed> [seconds=600] [difficulty=hard]
 # Prints the [BOTBENCH] report (milestones, tiles, idle time, failures).
 set -e
@@ -32,7 +32,13 @@ CHALLENGECRAFT_BOARD_SEED=${BOARD_SEED:-$SEED} CHALLENGECRAFT_FULL_BOARD=1 CHALL
 for i in $(seq 1 120); do sleep 5; grep -q "Done (" $LOG && break; grep -q "BUILD FAILED" $LOG && { tail -20 $LOG; exit 1; }; done
 python3 $HERE/rcon.py "challengecraft_bot spawn Bob" > /dev/null
 sleep 3
-python3 $HERE/rcon.py "tick sprint $((SECS * 20 + 400))" "challengecraft_bot bench Bob $SECS $DIFF" > /dev/null
+# The game's pace: TICK_RATE ticks a second, the real game's 20 by default. "sprint" runs as
+# fast as the machine allows - quicker, but Bob's path searches take real milliseconds, so the
+# faster the machine, the more game ticks each one costs him: the same build on the same eight
+# boards died 3 times at 1.5 times the real pace and 18 times at 2.3 times.
+RATE=${TICK_RATE:-20}
+if [ "$RATE" = sprint ]; then PACE="tick sprint $((SECS * 20 + 400))"; else PACE="tick rate $RATE"; fi
+python3 $HERE/rcon.py "$PACE" "challengecraft_bot bench Bob $SECS $DIFF" > /dev/null
 for i in $(seq 1 4320); do sleep 5; grep -q "\[BOTBENCH\] idle:" $LOG && break; done
 python3 $HERE/rcon.py "challengecraft_bot coverage Bob" > /dev/null 2>&1 || true
 python3 $HERE/rcon.py stop > /dev/null 2>&1 || true

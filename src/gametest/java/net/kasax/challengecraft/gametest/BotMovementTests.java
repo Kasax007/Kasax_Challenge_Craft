@@ -526,6 +526,26 @@ public class BotMovementTests {
         });
     }
 
+    /**
+     * A gravel bank of sixteen come down on it, walls of stone round it, a stone pickaxe and no
+     * shovel: out through the wall at the side (two blocks of stone) - digging up through the
+     * bank by hand, one block after the other falling in, suffocates (seed 33).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void buriedUnderBank(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "buried_under_bank");
+        a.fill(19, FEET, 19, 21, FEET + 17, 21, Blocks.STONE);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE));
+        a.fill(20, FEET, 20, 20, FEET + 15, 20, Blocks.GRAVEL);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 600, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("buried_under_bank: suffocated");
+            if (h.getTick() < 200 || body.isInWall()) return false;
+            BotArena.LOG.info("[BOTTEST] buried_under_bank out with {} health", body.getHealth());
+            return true;
+        });
+    }
+
     /** A zombie standing on the straight way across (Baritone's mob avoidance): the way goes round it, a few blocks off. */
     @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
     public void wayRoundMonster(GameTestHelper h) {
