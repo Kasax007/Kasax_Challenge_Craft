@@ -251,6 +251,7 @@ public final class BotPathfinder {
      * way that gets at least five blocks away, or null.
      */
     public Result search(BlockPos start, Predicate<BlockPos> goal, BlockPos target, int maxNodes, long nanos) {
+        origin = start;
         // Standing in lava already (fallen in): out through it is the way, however dear - the
         // nearest ground clear of it.
         // (Or on magma, which burns as long as it is stood on: off it, whatever the way.)
@@ -647,11 +648,19 @@ public final class BotPathfinder {
         return !s.getCollisionShape(NO_WORLD, p).isEmpty() && (!dangerous(s) || escapeLava && s.is(Blocks.MAGMA_BLOCK));
     }
 
-    /** Set when the search starts with the head under water already: any way out goes. */
+    /** Set when the search starts with the head under water already: a way out goes. */
     private boolean underwaterStart;
+    /** Out of air (the search for it): any way through the water goes, however long under a roof. */
+    private boolean anyWater;
+    private BlockPos origin;
 
     public BotPathfinder fromUnderWater(boolean under) {
         this.underwaterStart = under;
+        return this;
+    }
+
+    public BotPathfinder anyWater(boolean any) {
+        this.anyWater = any;
         return this;
     }
 
@@ -661,7 +670,11 @@ public final class BotPathfinder {
      * with no breath anywhere, and that drowned the bot fifteen times on one benchmark.
      */
     private boolean breathAbove(BlockPos p) {
-        if (underwaterStart || !inWater(p.above())) return true;
+        if (!inWater(p.above())) return true;
+        // (Under water at the start: a few blocks of it to get out - not, for an errand, a way on
+        // under the roof of a flooded cave that only opened from the lake it swam in: drowned so
+        // on seed 88 going for stone. Short of air, any way goes - that search is for the air.)
+        if (underwaterStart && (anyWater || origin == null || p.distSqr(origin) <= 16)) return true;
         for (int i = 2; i <= 10; i++) {
             BlockPos q = p.above(i);
             if (!loaded(q)) return true;

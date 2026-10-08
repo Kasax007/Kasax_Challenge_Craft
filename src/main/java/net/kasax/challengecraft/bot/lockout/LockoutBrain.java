@@ -536,12 +536,10 @@ public final class LockoutBrain implements BotBrain {
     public static boolean nightReady(Bot bot) {
         var body = bot.body();
         boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
-        int food = 0;
+        int food = net.kasax.challengecraft.bot.task.EatTask.foodPoints(body);
         for (var st : body.getInventory().getNonEquipmentItems()) {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
             if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
-            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH) && !st.is(net.minecraft.world.item.Items.SPIDER_EYE)) food += f.nutrition() * st.getCount();
         }
         return armed && food >= 8 && (body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2) && body.getHealth() >= 12;
     }
@@ -578,11 +576,7 @@ public final class LockoutBrain implements BotBrain {
         }
         // And something to eat for the night (in the hole the hearts only come back with food).
         if (c < SHELTER_FROM - 300 && foodTriedDay != day) {
-            int points = 0;
-            for (var st : bot.body().getInventory().getNonEquipmentItems()) {
-                var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
-                if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += f.nutrition() * st.getCount();
-            }
+            int points = net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body());
             if (points < 8) {
                 foodTriedDay = day;
                 int have = ObtainPlanner.countAny(bot.body(), FOODS);
@@ -666,11 +660,9 @@ public final class LockoutBrain implements BotBrain {
     private static boolean nightThreat(Bot bot) {
         var body = bot.body();
         boolean armed = false;
-        int food = 0;
+        int food = net.kasax.challengecraft.bot.task.EatTask.foodPoints(body);
         for (var st : body.getInventory().getNonEquipmentItems()) {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
-            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) food += f.nutrition() * st.getCount();
         }
         if (!armed || body.getHealth() < 12 || food == 0 && body.getFoodData().getFoodLevel() < 14) return true;
         var about = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(24),
@@ -685,12 +677,10 @@ public final class LockoutBrain implements BotBrain {
         var body = bot.body();
         List<String> out = new ArrayList<>();
         boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
-        int food = 0;
+        int food = net.kasax.challengecraft.bot.task.EatTask.foodPoints(body);
         for (var st : body.getInventory().getNonEquipmentItems()) {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
             if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
-            var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) food += f.nutrition() * st.getCount();
         }
         if (!armed) out.add("no weapon");
         if (food < 8) out.add("food " + food);
@@ -868,11 +858,7 @@ public final class LockoutBrain implements BotBrain {
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(stone, ObtainPlanner.countAny(body, stone) + 64 - blocks, planner), 1800);
             return true;
         }
-        int points = 0;
-        for (var st : body.getInventory().getNonEquipmentItems()) {
-            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
-        }
+        int points = net.kasax.challengecraft.bot.task.EatTask.foodPoints(body);
         if (points < 24) {
             double cost = planner.estimate(bot, FOODS, ObtainPlanner.countAny(body, FOODS) + 6);
             if (cost > 240) return false;
@@ -1221,11 +1207,7 @@ public final class LockoutBrain implements BotBrain {
         long now = bot.body().level().getGameTime();
         if (now < nextFoodCheck) return false;
         nextFoodCheck = now + 600;
-        int points = 0;
-        for (var st : bot.body().getInventory().getNonEquipmentItems()) {
-            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
-        }
+        int points = net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body());
         // Nobody hunts for food with a full stomach and some in the pack: only once hunger has
         // started to bite - or with next to nothing left to eat (on hard the hearts only come
         // back with a full stomach: without food every fight is one hurt more till the last).
@@ -1716,6 +1698,17 @@ public final class LockoutBrain implements BotBrain {
             pause = 100;
             return;
         }
+        // Down to eight hearts and less while out after monsters (a tile's zombie, spiders for
+        // string): put aside - the hearts first (food, a hole to eat in), the hunt after. The
+        // choice of a tile already leaves monsters alone below twelve; a hunt under way went on
+        // for the zombie at three hearts on seed 66, and the zombie won.
+        if (now % 20 == 0 && bot.body().getHealth() <= 8 && (goalTask != null || running != null) && huntingMonsters(bot)) {
+            bot.say("too hurt (" + Math.round(bot.body().getHealth()) + " hp) to hunt monsters: hearts first");
+            if (targetId != null) restUntil.put(targetId, now + 1200);
+            drop(bot);
+            pause = 20;
+            return;
+        }
         if (goalTask != null && targetId != null && goalElapsed(now) > goalBudget) {
             // Well on the way (half way down to the ore, say): what is left is worth finishing.
             // By the situation, not the clock: what is left of this one against the best other
@@ -1783,11 +1776,7 @@ public final class LockoutBrain implements BotBrain {
         if (checkTicks % 300 == 0 && now >= foodInterjectAt && !(BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask)
                 && (goalTask != null || running != null) && !bot.targeted(10) && !sheltering(bot)
                 && !(nightComing(bot, SHELTER_FROM) && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body()))) {
-            int points = 0;
-            for (var st : bot.body().getInventory().getNonEquipmentItems()) {
-                var f = st.get(net.minecraft.core.component.DataComponents.FOOD);
-                if (f != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += f.nutrition() * st.getCount();
-            }
+            int points = net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body());
             int level = bot.body().getFoodData().getFoodLevel();
             boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
             // (Not before the stone tools - and a sword - unless the hunger is serious: a hunt
@@ -2002,11 +1991,7 @@ public final class LockoutBrain implements BotBrain {
         var me = bot.body();
         long now = me.level().getGameTime();
         if (now < foodChanceAt) return false;
-        int points = 0;
-        for (var st : me.getInventory().getNonEquipmentItems()) {
-            var food = st.get(net.minecraft.core.component.DataComponents.FOOD);
-            if (food != null && !st.is(net.minecraft.world.item.Items.ROTTEN_FLESH)) points += food.nutrition() * st.getCount();
-        }
+        int points = net.kasax.challengecraft.bot.task.EatTask.foodPoints(me);
         if (points >= 16) return false;
         if (!me.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me.getBoundingBox().inflate(16),
                 m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && m.getTarget() == me).isEmpty()) return false;
@@ -2026,6 +2011,17 @@ public final class LockoutBrain implements BotBrain {
         bot.say("on the way: a " + prey.getType().toShortString() + " for food");
         bot.interject(sideTask);
         return true;
+    }
+
+    /** A hunt for monsters somewhere in what it is doing (not a fight forced on it: those are reflexes). */
+    private static boolean huntingMonsters(Bot bot) {
+        for (BotTask t : bot.tasks()) {
+            BotTask in = BotTask.innermost(t);
+            if (t instanceof net.kasax.challengecraft.bot.task.HuntRoundTask) return true;
+            if (t instanceof net.kasax.challengecraft.bot.task.KillTask k && k.monsters()) return true;
+            if (in instanceof net.kasax.challengecraft.bot.task.KillTask inner && inner.monsters()) return true;
+        }
+        return false;
     }
 
     /** The monsters about all out in the open at its own level, and not more than one of them. */

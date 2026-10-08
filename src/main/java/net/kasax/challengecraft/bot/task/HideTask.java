@@ -169,13 +169,18 @@ public final class HideTask implements BotTask {
         return Result.RUNNING;
     }
 
-    /** A monster that would be waiting outside: within ten blocks (not an enderman, not a spider by day). */
+    /**
+     * A monster that would be waiting outside: within ten blocks (not an enderman, not a spider by
+     * day), or a bowman within twenty-four - one in the shade of a tree at dawn shot it as it
+     * climbed out with thirteen hearts and nothing to eat on seed 77.
+     */
     private static boolean monsterBy(BotPlayer body) {
         boolean day = !body.level().isDarkOutside();
         return !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
-                body.getBoundingBox().inflate(10, 5, 10), m -> m.isAlive()
+                body.getBoundingBox().inflate(24, 10, 24), m -> m.isAlive()
                         && !(m instanceof net.minecraft.world.entity.monster.Enderman)
-                        && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)).isEmpty();
+                        && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)
+                        && (m instanceof net.minecraft.world.entity.monster.RangedAttackMob || m.distanceToSqr(body) < 11 * 11)).isEmpty();
     }
 
     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {

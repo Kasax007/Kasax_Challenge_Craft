@@ -10,14 +10,23 @@ import net.minecraft.tags.FluidTags;
 /**
  * Out of air under a roof of water (a tunnel dug into a flooded cave, a sea cave): to the nearest
  * spot where the head is in the air, before anything else. Swimming up is not enough there.
+ * <p>
+ * As a player goes about it: open water straight up is swum up at once; else the nearest air the
+ * way finder knows of; not getting there, a thin roof with air over it is dug through, or else the
+ * way it came is swum back (the staircase it dug down into the flood); only last of all is a thick
+ * roof dug at.
  */
 public final class AirTask implements BotTask {
-    private boolean started;
+    private enum Way { SEARCH, BACK, SWIM, DIG }
+
+    private Way way = Way.SEARCH;
+    private boolean started, backTried;
     /** Ticks with the head out, catching breath. */
     private int breathing;
     private int ticks, fails, stuck;
-    private boolean digging;
     private net.minecraft.world.phys.Vec3 last;
+    /** The spot on its trail it swims back to: the last one with air. */
+    private BlockPos back;
 
     /** The head would be out of the water standing (or swimming) here. */
     public static boolean breathable(ServerLevel level, BlockPos feet) {
@@ -28,66 +37,93 @@ public final class AirTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
-        var b = bot.body();
+        var body = bot.body();
         // Head out: there until the lungs are nearly full again - a breath and straight back
         // under (the way on leads through the water) and the next breath is shorter, until
         // there is none. Meanwhile still, afloat (head kept up) or standing.
-        if (!b.isEyeInFluid(FluidTags.WATER)) {
-            if (b.getAirSupply() >= b.getMaxAirSupply() * 9 / 10 || ++breathing > 200) return Result.DONE;
+        if (!body.isEyeInFluid(FluidTags.WATER)) {
+            if (body.getAirSupply() >= body.getMaxAirSupply() * 9 / 10 || ++breathing > 200) return Result.DONE;
             bot.navigator().stop();
-            b.stopInputs();
-            if (b.isInWater()) b.jump = true;
+            body.stopInputs();
+            if (body.isInWater()) body.jump = true;
             return Result.RUNNING;
         }
-        if (breathing > 0 && b.getAirSupply() >= b.getMaxAirSupply() / 2) {
+        if (breathing > 0 && body.getAirSupply() >= body.getMaxAirSupply() / 2) {
             // (Bobbing under for a moment while waiting at the surface: up again, no new search.)
-            b.stopInputs();
-            b.jump = true;
+            body.stopInputs();
+            body.jump = true;
             return Result.RUNNING;
         }
-        if (++ticks > (digging ? 1600 : 400)) return Result.FAILED;
-        ServerLevel level = (ServerLevel) bot.body().level();
-        // Not getting anywhere (a flooded gap one block high, a block on top): straight up,
-        // digging out what is over the head, as a player would.
-        var body = bot.body();
+        if (++ticks > (way == Way.DIG ? 1600 : 600)) return Result.FAILED;
+        ServerLevel level = (ServerLevel) body.level();
+        BlockPos feet = body.blockPosition();
+        // Water straight up to the air (the commonest case: a dive for something on the bottom):
+        // swum up, nothing to work out.
+        if (openAbove(level, feet, 24)) {
+            bot.navigator().stop();
+            body.stopInputs();
+            body.jump = true;
+            return Result.RUNNING;
+        }
         if (ticks % 20 == 1) {
             // (Measured over a second: swimming is slow, but not this slow.)
             stuck = last != null && body.position().distanceToSqr(last) < 0.25 ? stuck + 1 : 0;
             last = body.position();
         }
-        if (stuck >= 1 || fails > 1) {
-            BlockPos head = BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
-            for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) {
-                if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() && level.getFluidState(q).isEmpty()) {
-                    // Standing on the bottom while at it: afloat, digging is five times slower.
-                    bot.navigator().stop();
-                    body.stopInputs();
-                    bot.sinkToDig = true;
-                    digging = true;
-                    bot.actions().breakTick(q);
-                    return Result.RUNNING;
+        // The way it is going about it gets it nowhere (two seconds without moving, or no way
+        // found twice): the next one. (Once in a while, not for good after one slow second -
+        // digging up through the rock of a flooded cave drowned it on seed 66, the staircase it
+        // had come down by right behind it.)
+        if ((stuck >= 2 || fails > 1) && way != Way.DIG) {
+            stuck = 0;
+            fails = 0;
+            started = false;
+            bot.navigator().stop();
+            way = next(bot, level, feet);
+        }
+        switch (way) {
+            case DIG -> {
+                BlockPos head = BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
+                for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) {
+                    if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() && level.getFluidState(q).isEmpty()) {
+                        // Standing on the bottom while at it: afloat, digging is five times slower.
+                        bot.navigator().stop();
+                        body.stopInputs();
+                        bot.sinkToDig = true;
+                        bot.actions().breakTick(q);
+                        return Result.RUNNING;
+                    }
+                }
+                // Through: up.
+                body.stopInputs();
+                body.jump = true;
+                return Result.RUNNING;
+            }
+            case SWIM -> {
+                bot.navigator().stop();
+                body.stopInputs();
+                body.jump = true;
+                BlockPos open = openColumn(level, feet);
+                if (open != null && (open.getX() != feet.getX() || open.getZ() != feet.getZ())) {
+                    body.lookAt(net.minecraft.world.phys.Vec3.atCenterOf(open.atY(feet.getY())));
+                    body.forward = 1f;
+                }
+                return Result.RUNNING;
+            }
+            case BACK -> {
+                if (!started) {
+                    bot.navigator().goTo(back);
+                    bot.navigator().forAir = true;
+                    started = true;
                 }
             }
-        }
-        // No way found by the search, again and again: up by hand - straight up where the water
-        // goes up to the air, else towards the nearest column of water that does (seed 88
-        // drowned twice at the sea's surface with "no way found", the walk under it taken up
-        // again after this gave up).
-        if (fails > 1) {
-            bot.navigator().stop();
-            body.stopInputs();
-            body.jump = true;
-            BlockPos feet = body.blockPosition();
-            BlockPos open = openColumn(level, feet);
-            if (open != null && (open.getX() != feet.getX() || open.getZ() != feet.getZ())) {
-                body.lookAt(net.minecraft.world.phys.Vec3.atCenterOf(open.atY(feet.getY())));
-                body.forward = 1f;
+            default -> {
+                if (!started) {
+                    bot.navigator().setGoal(p -> breathable(level, p), feet.above(8));
+                    bot.navigator().forAir = true;
+                    started = true;
+                }
             }
-            return Result.RUNNING;
-        }
-        if (!started) {
-            bot.navigator().setGoal(p -> breathable(level, p), bot.body().blockPosition().above(8));
-            started = true;
         }
         BotNavigator.Status s = bot.navigator().tick();
         if (s == BotNavigator.Status.FAILED) {
@@ -99,6 +135,56 @@ public final class AirTask implements BotTask {
         return Result.RUNNING;
     }
 
+    /**
+     * What to try next: a roof of a block or two with air over it, dug through; the way it came,
+     * back to the last spot of its trail with air; the nearest water open to the sky, swum to;
+     * last, whatever is over the head, dug at.
+     */
+    private Way next(Bot bot, ServerLevel level, BlockPos feet) {
+        if (thinRoof(level, BlockPos.containing(bot.body().getX(), bot.body().getEyeY(), bot.body().getZ()))) return Way.DIG;
+        if (!backTried) {
+            backTried = true;
+            back = trailBack(bot, level, feet);
+            if (back != null) {
+                bot.say("no air above: back the way I came, to " + back.toShortString());
+                return Way.BACK;
+            }
+        }
+        if (way != Way.SWIM && openColumn(level, feet) != null) return Way.SWIM;
+        return Way.DIG;
+    }
+
+    /** One or two solid blocks over the head, and air (not more water) right over them. */
+    private static boolean thinRoof(ServerLevel level, BlockPos head) {
+        for (int up = 1; up <= 3; up++) {
+            BlockPos q = head.above(up);
+            boolean solid = !level.getBlockState(q).getCollisionShape(level, q).isEmpty();
+            if (!solid) return up > 1 && level.getFluidState(q).isEmpty();
+        }
+        return false;
+    }
+
+    /** The last spot on the way it came (its trail, newest first) where the head is in the air, not too far back. */
+    private static BlockPos trailBack(Bot bot, ServerLevel level, BlockPos feet) {
+        var trail = bot.trail;
+        for (int i = trail.size() - 1, n = 0; i >= 0 && n < 12; i--, n++) {
+            BlockPos p = trail.get(i);
+            if (p.distSqr(feet) > 40 * 40) break;
+            for (int up = 0; up <= 1; up++) if (breathable(level, p.above(up))) return p.above(up);
+        }
+        return null;
+    }
+
+    /** Nothing but water from the feet up to the air, at most {@code max} blocks. */
+    private static boolean openAbove(ServerLevel level, BlockPos feet, int max) {
+        for (int up = 1; up <= max; up++) {
+            BlockPos q = feet.above(up);
+            if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) return false;
+            if (level.getFluidState(q).isEmpty()) return true;
+        }
+        return false;
+    }
+
     /** The nearest column (within six) where nothing but water stands between the feet's level and the air above. */
     private static BlockPos openColumn(ServerLevel level, BlockPos feet) {
         BlockPos best = null;
@@ -108,7 +194,7 @@ public final class AirTask implements BotTask {
                 double d = dx * dx + dz * dz;
                 if (d >= bestD) continue;
                 BlockPos p = feet.offset(dx, 0, dz);
-                for (int up = 0; up <= 10; up++) {
+                for (int up = 0; up <= 16; up++) {
                     BlockPos q = p.above(up);
                     if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) break;
                     if (level.getFluidState(q).isEmpty()) {

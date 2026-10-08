@@ -67,6 +67,12 @@ public final class KillTask implements BotTask {
         this.kills = kills;
     }
 
+    /** Whether it is after monsters (not animals, not fish). */
+    public boolean monsters() {
+        for (EntityType<?> t : types) if (t.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER) return true;
+        return false;
+    }
+
     /** Where a blow would not throw it into lava or off an edge (looked for every few ticks), and whether here would. */
     private net.minecraft.world.phys.Vec3 safeSpot;
     private boolean unsafe;
@@ -423,8 +429,22 @@ public final class KillTask implements BotTask {
     private LivingEntity nearest(BotPlayer body, ServerLevel level) {
         return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(within > 0 ? within : BotWorld.MOB_SIGHT),
                         e -> e.isAlive() && types.contains(e.getType()) && e != body && !unreachable.contains(e.getUUID()) && BotWorld.seesMob(body, e)
-                                && (only == null || e.getUUID().equals(only)))
+                                && (only == null || e.getUUID().equals(only)) && !downInTheDark(body, e))
                 .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
+    }
+
+    /**
+     * A monster down in a cave, hunted from up on the surface with no armour worth the name and
+     * no shield: not that one - the dark below is where the others are (a zombie for its tile,
+     * followed down to y 38, brought a skeleton's arrows and a creeper with it on seed 22). The
+     * night brings them up to the surface. (One that comes for it is the reflexes' business.)
+     */
+    private boolean downInTheDark(BotPlayer body, LivingEntity e) {
+        if (only != null || e.getType().getCategory() != net.minecraft.world.entity.MobCategory.MONSTER) return false;
+        if (body.getArmorValue() >= 6 || body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                || body.getInventory().countItem(net.minecraft.world.item.Items.SHIELD) > 0) return false;
+        if (SurfaceTask.underground(body)) return false;
+        return e.getY() < body.getY() - 6 && !body.level().canSeeSky(e.blockPosition().above());
     }
 
     private int crit, critWait, weaponCheck, strafeTicks, strafeFor = 20;

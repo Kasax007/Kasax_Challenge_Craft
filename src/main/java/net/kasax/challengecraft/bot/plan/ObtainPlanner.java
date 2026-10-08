@@ -355,8 +355,13 @@ public final class ObtainPlanner {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return Leaf.NONE;
         // In sight: a walk there and the fight, no luck needed.
-        // (One in sight that shoots: as dear without gear as one still to be found - see below.)
-        if (seen != null) return new Leaf(seen + (RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body()) ? 300 : 0), 0, mobPos.get(type));
+        // (One in sight that shoots, or any monster while hurt: as dear as one still to be found
+        // - see below.)
+        if (seen != null) {
+            double risk = RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body()) ? 300 : 0;
+            if (type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER && habitatBot != null && habitatBot.body().getHealth() <= 8) risk += 600;
+            return new Leaf(seen + risk, 0, mobPos.get(type));
+        }
         // Nether mobs only in the Nether, and the Overworld's not there.
         if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return Leaf.NONE;
         // One that lives somewhere in particular: the walk to the nearest such place it knows,
@@ -379,6 +384,9 @@ public final class ObtainPlanner {
         // without a shield or armour that is how the early deaths went (a skeleton hunted for
         // one arrow at minute four on seed 22, a witch, a drowned). Other ways first.
         if (RISKY_PREY.contains(type) && habitatBot != null && !geared(habitatBot.body())) wait += 300;
+        // (Hurt down to eight hearts: no monster hunted for its drops till the hearts are back -
+        // the brain puts such a hunt aside, and it should not be the plan either.)
+        if (monster && habitatBot != null && habitatBot.body().getHealth() <= 8) wait += 600;
         return new Leaf(walk + wait + effort, effort, at);
     }
 

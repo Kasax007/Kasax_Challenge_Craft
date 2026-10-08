@@ -193,8 +193,12 @@ public final class BotNavigator {
         setGoal(goal, steer, false);
     }
 
+    /** The walk is for air (set by the task after the goal): any way through the water goes. */
+    public boolean forAir;
+
     /** {@code pure}: the goal only does arithmetic on the position, so the search may run on a worker thread. */
     public void setGoal(Predicate<BlockPos> goal, BlockPos steer, boolean pure) {
+        this.forAir = false;
         this.goal = goal;
         this.target = steer.immutable();
         this.pureGoal = pure;
@@ -980,7 +984,7 @@ public final class BotNavigator {
         if (!ahead) for (long a : avoid) favoured.remove(a);
         BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf);
         finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
-        finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER));
+        finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)).anyWater(forAir);
         var guideFuture = guide(level, from);
         if (guideFuture != null && guideFuture.isDone()) finder.guided(guideOf(guideFuture));
         Predicate<BlockPos> g = goal;

@@ -40,6 +40,8 @@ public final class Bot {
         unreachable.put(p.immutable(), body.level().getGameTime());
     }
 
+    private static final net.minecraft.resources.Identifier OUTPOST = net.minecraft.resources.Identifier.parse("minecraft:pillager_outpost");
+
     /** Where a monster killed it: kept clear of for a while (an outpost's pillagers by the trees). */
     private final java.util.Map<net.minecraft.core.BlockPos, Long> dangerZones = new java.util.HashMap<>();
 
@@ -53,6 +55,16 @@ public final class Bot {
      * each time back for the trees beside it).
      */
     public boolean dangerous(net.minecraft.core.BlockPos p) {
+        // A pillager outpost it has seen: their crossbows reach well past its walls - nothing
+        // fetched from round it, before as after a death (seed 55: the trees beside one cost
+        // three lives, the first after a drowning that had marked nothing).
+        var outpost = senses.structure(OUTPOST);
+        if (outpost != null && body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            var b = outpost.box();
+            int dx = Math.max(0, Math.max(b.minX() - p.getX(), p.getX() - b.maxX()));
+            int dz = Math.max(0, Math.max(b.minZ() - p.getZ(), p.getZ() - b.maxZ()));
+            if (dx * dx + dz * dz < 40 * 40) return true;
+        }
         if (dangerZones.isEmpty()) return false;
         long now = body.level().getGameTime();
         dangerZones.values().removeIf(t -> now - t > 12000);
