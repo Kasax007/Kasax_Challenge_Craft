@@ -2063,6 +2063,8 @@ Runden mit acht Läufen sagen deshalb wenig über kleine Unterschiede.
 
 ### 23.10 Gepaarter Vergleich in Echtzeit (20 Ticks pro Sekunde)
 
+> **Korrektur (23.13):** Dieser Vergleich war verzerrt. `bob-bench` lief mit Welt-Schwierigkeit EASY, `bob-bench2` mit HARD. Der jeweils neue Stand lief auf EASY, der alte auf HARD.
+
 Beide Builds liefen gleichzeitig, mit denselben Seeds in derselben Reihenfolge und gleicher
 Rechnerlast, 30 min HARD:
 
@@ -2172,6 +2174,8 @@ Routenwahl nur 150 s. Das Risiko spielte bei der Wahl der Ziele damit kaum eine 
 
 ### 23.12 Gepaarter Vergleich `c2c1220` gegen `16b3040` (Echtzeit)
 
+> **Korrektur (23.13):** Dieser Vergleich war verzerrt. `bob-bench` lief mit Welt-Schwierigkeit EASY, `bob-bench2` mit HARD. Der jeweils neue Stand lief auf EASY, der alte auf HARD.
+
 Gleichzeitig, gleiche Seeds in gleicher Reihenfolge, 20 Ticks pro Sekunde, 30 min HARD:
 
 | Seed | `c2c1220` Felder / Tode | `16b3040` Felder / Tode |
@@ -2209,3 +2213,33 @@ Messungen bleibt groß, deshalb wird gepaart gemessen.)
 **Außerdem:** Auf HARD kommt der Schild jetzt zuerst in der Eisen-Investition, vor Spitzhacke und
 Eimer. Bisher ging das erste Eisen in Spitzhacke und Eimer, und der Schild kam erst nach 18 bis
 28 Minuten oder nie, obwohl die meisten Tode Pfeile waren.
+
+### 23.13 Korrektur: EASY gegen HARD
+
+`bench.sh` hat den Schwierigkeitsgrad der Welt nie gesetzt. Jede Arbeitskopie nahm, was in ihrer
+`server.properties` stand: `bob-bench` EASY (die Vorgabe des Servers), `bob-bench2` HARD. Das „hard“
+im Benchmark-Befehl ist nur Bobs Spielweise (`LockoutBrain.Difficulty`).
+
+In allen gepaarten Vergleichen lief der neue Stand auf `bob-bench`, also auf EASY, und der alte auf
+`bob-bench2` mit HARD. **Die Aussagen aus 23.10 und 23.12 („halb so viele“, „ein Fünftel der
+Tode“) sind damit hinfällig.** Auch die Regeln, die nur auf HARD greifen (zum Beispiel der Schild
+zuerst), wurden im neuen Stand nie gemessen. Bei den früheren Sprint-Runden lief jeder Seed immer
+auf derselben Arbeitskopie: 11, 22, 33 und 55 auf EASY, 77, 66, 88 und 44 auf HARD. Runden
+untereinander waren dort pro Seed vergleichbar, aber nur die Hälfte der Läufe war HARD.
+
+Was auf HARD gemessen ist (20 Ticks pro Sekunde, Tode je 8 Läufe):
+
+| Build | Tode auf HARD |
+| --- | --- |
+| H (`08e3644`) | 13 |
+| `16b3040` | 15 |
+
+**Fix (`8c9a695`):**
+
+- `bench.sh` setzt die Schwierigkeit der Welt fest (wie Bobs, oder `WORLD_DIFFICULTY`), in
+  `server.properties` und per Befehl beim Start.
+- Die Startzeile des Benchmarks nennt sie: „world hard“.
+- Neu gemessen wird gepaart auf HARD: der aktuelle Stand gegen H.
+
+Die Fixes selbst bleiben: Jeder geht auf einen beobachteten Tod zurück, und die Gametests
+bestehen. Ob sie zusammen die Todesrate auf HARD senken, zeigt erst die neue Messung.
