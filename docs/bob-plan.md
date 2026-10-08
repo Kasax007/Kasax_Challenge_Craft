@@ -1986,3 +1986,136 @@ wieder auf dem alten Stand.
   kostet. Auf Seed 55 hatte Bob bei Einbruch der Nacht noch keine Waffe.
 - Das flache Eisen bleibt im Umkreis von 24 Blöcken um die gefundene Stelle.
 - Ohne Rüstung jagt er Monster unterwegs nur einzeln, im Freien und auf seiner Höhe.
+
+### 23.9 Runden I bis L, und warum die Zahlen täuschten
+
+Gleiche Bretter, 30 min HARD, 8 Seeds. Die Spalten I bis L kamen mit den Fixes aus 23.8 und den
+folgenden Commits; „H wdh.“ ist derselbe Build wie H (`08e3644`), noch einmal gemessen:
+
+| Seed | H | H wdh. | I | J | K | L |
+| --- | --- | --- | --- | --- | --- | --- |
+| 77 | 7 / 0 | 4 / 4 | 4 / 2 | 5 / 1 | 4 / 0 | 5 / 2 |
+| 66 | 4 / 0 | 2 / 4 | 3 / 1 | 5 / 0 | 2 / 2 | 3 / 0 |
+| 88 | 4 / 0 | 2 / 3 | 3 / 1 | 2 / 2 | 6 / 0 | 3 / 1 |
+| 44 | 1 / 0 | 1 / 2 | 1 / 2 | 1 / 0 | 1 / 2 | 1 / 2 |
+| 11 | 3 / 1 | 1 / 0 | 0 / 1 | 3 / 0 | 0 / 1 | 0 / 1 |
+| 22 | 5 / 1 | 4 / 1 | 3 / 1 | 4 / 1 | 7 / 0 | 2 / 0 |
+| 33 | 6 / 0 | 2 / 1 | 7 / 1 | 6 / 1 | 5 / 0 | 3 / 2 |
+| 55 | 3 / 1 | 2 / 3 | 1 / 5 | 3 / 0 | 1 / 6 | 2 / 0 |
+| **Summe** | **33 / 3** | **18 / 18** | **22 / 14** | **29 / 5** | **26 / 11** | **19 / 8** |
+
+(Felder / Tode.)
+
+**Derselbe Build, 3 und 18 Tode.** Der Benchmark lief mit `/tick sprint`: so schnell, wie der
+Rechner kann. Bobs Wegsuchen brauchen aber echte Millisekunden. Je schneller der Server tickt,
+desto mehr Spiel-Ticks vergehen, bis eine Suche fertig ist: Bob steht oder läuft einen alten Weg,
+während die Monster in normalem Tempo kommen.
+
+| Runde | Echtzeit pro Lauf | Spieltempo | Tode |
+| --- | --- | --- | --- |
+| H | ca. 20 min | ca. 1,5× | 3 |
+| J, K | ca. 19 min | ca. 1,6× | 5, 11 |
+| I | ca. 17,5 min | ca. 1,7× | 14 |
+| L | ca. 16 min | ca. 1,9× | 8 |
+| H wdh. (anderer Host nach Container-Neustart) | 13–15 min | ca. 2,2× | 18 |
+
+Das Tempo schwankte also von Runde zu Runde. Ob es die Tode treibt, ist damit aber nicht gezeigt:
+In Echtzeit (23.10) hatte derselbe Build H 13 Tode, mehr als bei 1,5-fachem Tempo. Der größere Teil
+der Schwankung ist Zufall: **Derselbe Build auf denselben acht Brettern kam auf 3, 13 und 18 Tode.**
+Runden mit acht Läufen sagen deshalb wenig über kleine Unterschiede.
+
+**Neu:**
+
+- `bench.sh` läuft mit fester Tickrate, standardmäßig 20 wie im echten Spiel (`TICK_RATE=sprint`
+  für das alte Verhalten). So ist das Tempo bei jedem Lauf gleich und entspricht dem echten Spiel.
+- Verglichen wird gepaart: zwei Builds gleichzeitig, gleiche Seeds in gleicher Reihenfolge, also
+  bei gleicher Rechnerlast.
+- Entscheidend bleibt die einzelne Todesursache: Jeder Tod zeigt eine bestimmte Lücke, und deren
+  Fix lässt sich gezielt prüfen.
+
+**Fixes aus diesen Runden** (alle im aktuellen Stand, `16b3040`):
+
+- **Feuerstein:** Kies gilt nicht mehr als „überall im Gestein“. Für Feuerstein grub Bob Treppen
+  nach unten, in Schluchten und Höhlen; zwei Stürze und mehrere Tode unter Tage kamen daher.
+- **Hexen:** Bob wich nur ihren Tränken aus, bis einer traf. Jetzt greift er sie bewaffnet und mit
+  mindestens 12 Leben an, sonst gräbt er sich ein (Test `witch_rush`).
+- **Fernkämpfer in Sicht** kosten ohne Schild oder Rüstung im Planer genauso 300 s mehr wie
+  ungesehene.
+- **Luft:** Findet die Wegsuche keinen Weg nach oben, schwimmt Bob von Hand hoch, gerade nach oben
+  oder zur nächsten offenen Wassersäule. Bisher gab er nach vier Fehlschlägen auf. Geht ihm die
+  Luft aus, schreibt er Aufgabe und Weg ins Log.
+- **Gefahrenzonen:** Wo ein Monster ihn getötet hat (genauer: wo der Täter stand), baut er
+  10 Minuten lang im Umkreis von 28 Blöcken nichts ab. Auf Seed 55 wurde er sonst viermal vom
+  selben Außenposten erschossen, jedes Mal wieder an den Bäumen daneben.
+- **Heilen:** Er gräbt sich nicht ein, solange ein Nahkämpfer ihn aus höchstens 5 Blöcken angreift.
+  Der Zombie schlug ihn sonst im halb gegrabenen Loch tot.
+- **Badlands:** Die Treppe für Bruchstein geht weiter nach unten, bis sie im Stein ist. Bisher lief
+  der Tunnel waagrecht durch Terrakotta, Holzspitzhacke um Holzspitzhacke; auf Seed 11 hatte Bob
+  nach 30 Minuten keine Steinspitzhacke.
+- **Kies:**
+  - Einen gegrabenen Gang betritt er erst, wenn darüber nichts mehr nachrutscht.
+  - Ist er verschüttet und geht es seitlich schneller als nach oben, gräbt er sich durch die Wand
+    heraus (Test `buried_under_bank`: 16 Kies, nur Steinspitzhacke, heraus ohne Schaden).
+- **Wasser:** Gelegenheiten unterwegs holt er nicht vom Seegrund („Feuerstein für später“ ließ ihn
+  ertrinken).
+- **Essen:** Bei weniger als 16 Hungerpunkten im Gepäck nimmt er Kuh, Schwein, Schaf oder Huhn in
+  12 Blöcken im Vorbeigehen mit. Bei den meisten Toden hatte er nichts zu essen dabei.
+
+### 23.10 Gepaarter Vergleich in Echtzeit (20 Ticks pro Sekunde)
+
+Beide Builds liefen gleichzeitig, mit denselben Seeds in derselben Reihenfolge und gleicher
+Rechnerlast, 30 min HARD:
+
+| Seed | `16b3040` Felder / Tode | H (`08e3644`) Felder / Tode |
+| --- | --- | --- |
+| 77 | 6 / 1 | 4 / 1 |
+| 66 | 5 / 1 | 2 / 3 |
+| 88 | 5 / 1 | 3 / 0 |
+| 44 | 1 / 0 | 2 / 3 |
+| 11 | 1 / 0 | 0 / 1 |
+| 22 | 7 / 1 | 5 / 1 |
+| 33 | 5 / 0 | 3 / 3 |
+| 55 | 2 / 3 | 6 / 1 |
+| **Summe** | **32 / 7** | **25 / 13** |
+
+Der neue Stand hat fast nur halb so viele Tode und mehr Felder. Sicher ist der Unterschied bei
+20 Toden insgesamt nicht (eine Aufteilung von 7 zu 13 kommt bei gleichen Chancen in etwa einem
+Viertel der Fälle vor), die Richtung stimmt aber mit den einzelnen Toden überein: Bei H starben
+mehrere an genau den Lücken, die seitdem geschlossen sind (Zombie-Jagd unterwegs in eine Höhle,
+Skelette ohne Rückzug in die Erde).
+
+**Die Tode von `16b3040`:**
+
+| Ursache | Anzahl | Wo |
+| --- | --- | --- |
+| Ertrinken | 3 | See in einer Tropfsteinhöhle; Stein am Grund eines Sees; Eisen unter Wasser |
+| Plünderer | 2 | Seed 55: Bäume neben dem Außenposten nach dem Respawn |
+| Zombie | 2 | in Höhlen: mit 3 Leben weiter auf Zombie-Jagd; für die Zombie-Kachel hinab auf y 38 |
+
+**Fixes danach** (noch nicht gemessen):
+
+- **Luft:** neu aufgebaut, wie ein Spieler es macht:
+  - Freies Wasser bis zur Oberfläche über ihm: sofort hochschwimmen, ohne Wegsuche.
+  - Sonst die Wegsuche nach Luft.
+  - Kommt er dabei nicht voran: durch eine dünne Decke (1 bis 2 Blöcke, Luft darüber) graben.
+  - Sonst die eigene Spur zurück zur letzten Stelle mit Luft.
+  - Sonst zur nächsten offenen Wassersäule schwimmen; erst zuletzt nach oben graben.
+
+  Bisher schaltete er nach einer Sekunde Stillstand für immer auf „nach oben graben“, in
+  überfluteten Höhlen der häufigste Tod.
+- **Tauchen:** Beginnt eine Wegsuche mit dem Kopf unter Wasser, darf sie atemlose Wasserblöcke nur
+  noch im Umkreis von 4 Blöcken nutzen (zum Auftauchen), außer die Suche gilt der Luft selbst. Sonst
+  führte ein Weg zu Stein vom See aus durch eine überflutete Höhle.
+- **Essen:**
+  - Bei Verletzung isst er auch rohes Hähnchen und verdorbenes Fleisch. Der mögliche Hunger kostet
+    im Mittel weniger als einen Punkt; ohne Essen heilt er auf HARD gar nicht.
+  - Bei höchstens 6 Leben isst er einen goldenen Apfel.
+  - Der Vorrat zählt nur gutes Essen. Rohes Hähnchen zählt nicht mehr, sonst hielt er sich für
+    versorgt und heilte nicht.
+- **Zu verletzt:** Bei höchstens 8 Leben legt er eine Monsterjagd beiseite, und der Planer plant
+  dann keine.
+- **Keine Monster aus Höhlen:** Ohne Rüstung und Schild jagt er von der Oberfläche aus keine Monster,
+  die mehr als 6 Blöcke tiefer im Dunkeln stehen.
+- **Außenposten:** Im Umkreis von 40 Blöcken um einen gesehenen Plünderer-Außenposten holt er nichts,
+  von Anfang an.
+- **Morgen im Loch:** Er wartet auch, solange ein Skelett in 24 Blöcken steht.
