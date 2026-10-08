@@ -2119,3 +2119,53 @@ Skelette ohne Rückzug in die Erde).
 - **Außenposten:** Im Umkreis von 40 Blöcken um einen gesehenen Plünderer-Außenposten holt er nichts,
   von Anfang an.
 - **Morgen im Loch:** Er wartet auch, solange ein Skelett in 24 Blöcken steht.
+
+### 23.11 `136f031` in Echtzeit, und ein Gefahrenmodell nach Messung
+
+**Messung:** 8 Seeds, 20 Ticks pro Sekunde, nicht gepaart (beide Plätze liefen `136f031`).
+
+| Seed | 77 | 66 | 88 | 44 | 11 | 22 | 33 | 55 | Summe |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Felder | 5 | 2 | 7 | 0 | 0 | 4 | 2 | 1 | **21** |
+| Tode | 0 | 2 | 1 | 1 | 1 | 0 | 1 | 3 | **9** |
+
+Kein Ertrinken mehr, in keinem der 8 Läufe ging Bob die Luft aus. Gegenüber `16b3040` (32 / 7)
+liegt das im Rahmen der Schwankung, die Felder eher darunter.
+
+**Die Tode und was daraus folgte:**
+
+- **Skelette** (4×): beim Eisenabbau, bei einer Spinnenjagd nachts für Faden, beim Eingraben, im
+  Wasser. Dazu der Zombie-Fall unten.
+- **Seed 66, Hühnerjagd nachts:** Bob ging mit 8 Leben in der Dunkelheit Hühner jagen. Die
+  Essensregel „nachts keine weite Jagd“ nahm ausgerechnet Verletzte aus.
+  Fix: nachts keine weite Jagd, außer er verhungert gerade; erst das Loch, Essen bei Tag.
+- **Seed 11, Badlands:**
+  - Roter Sand: Eingraben ging nicht. Ein paar zufällige Schritte, dann 20 s Sperre, in der die
+    Eröffnung nachts Holz hacken ging.
+    Fix: Bob sucht im Umkreis von 16 Blöcken den nächsten Boden, in dem es geht, und gräbt sich
+    dort sofort ein.
+  - Eine gescheiterte Bruchstein-Suche markierte Stein als „fehlt hier“. Danach waren Schwert,
+    Axt, Schaufel und Ofen minutenlang „nicht machbar“ (auch auf Seed 55).
+    Fix: Stein, Tiefenschiefer und Netherrack werden nie als fehlend markiert.
+- **Seed 88:** Mit nur Eisenstiefeln stieg Bob nachts für Redstone in eine große Höhle Richtung
+  y −53. Eine Spinne und zwei Zombies brachten ihn von 20 auf 1 Leben.
+
+**Das Gefahrenmodell nachgemessen.** Aus etwa 1170 Spielminuten mit 55 Toden in den letzten
+Läufen:
+
+| Ort / Zeit | Minuten | Tode | Tode pro Stunde | im Modell bisher |
+| --- | --- | --- | --- | --- |
+| tief (y < 55), Tag | 136 | 11 | 4,9 | ca. 0,6 |
+| tief, Nacht | 36 | 2 | 3,3 | weniger als am Tag („durch die Nacht graben“) |
+| Oberfläche, Tag | 683 | 28 | 2,5 | ca. 0,24 |
+| Oberfläche, Nacht | 315 | 14 | 2,7 | ca. 2,0 |
+
+Unter Tage und am Tag lag das Modell um das Zehnfache zu tief, und ein Tod kostete in der
+Routenwahl nur 150 s. Das Risiko spielte bei der Wahl der Ziele damit kaum eine Rolle.
+
+**Kalibrierung:**
+
+- Ein Tod kostet 600 s.
+- Unter Tage gelten 0,02 zusätzliche Tode pro Minute (bisher 0,006).
+- Ein Ziel tief unten zählt das schon bei der Planung von oben, nachts ohne den bisherigen Rabatt.
+- Ein Schild senkt das Risiko wie 5 Rüstungspunkte.

@@ -621,6 +621,21 @@ public final class LockoutBrain implements BotBrain {
         }
         shelterRetryAt = now + 400;
         if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)) {
+            // Not here (water, sand, a berry bush): to the nearest ground where it can be done,
+            // and on with it the moment it is there - not a few steps anywhere and then, for
+            // twenty seconds, other work in the dark (seed 11: red sand all about, logs chopped
+            // at night, shot).
+            var ground = net.kasax.challengecraft.bot.task.HideTask.spotNear(bot, 16);
+            if (ground != null && !ground.equals(lastShelterSpot)) {
+                lastShelterSpot = ground;
+                bot.say("no ground to dig in here (" + net.kasax.challengecraft.bot.task.HideTask.shelterProblem(bot) + "): to "
+                        + ground.toShortString() + ", where there is");
+                shelterRetryAt = now + 20;
+                start(bot, new net.kasax.challengecraft.bot.task.GoToTask(ground, 0), 600);
+                if (!startRefused) return true;
+                startRefused = false;
+                return false;
+            }
             // (Not here - water, sand, a berry bush: a few steps off and again.)
             var r = bot.body().getRandom();
             var off = bot.body().blockPosition().offset(r.nextInt(9) - 4, 0, r.nextInt(9) - 4);
@@ -1135,6 +1150,8 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private boolean openingIron;
+    /** The last spot gone to for the night's hole (not the same one again if that did not work). */
+    private net.minecraft.core.BlockPos lastShelterSpot;
     private long nightDropAt, foodInterjectAt;
     /**
      * The night spent in a sealed tunnel of its own after iron instead of waiting in the hole.
@@ -1239,7 +1256,9 @@ public final class LockoutBrain implements BotBrain {
         var lv = bot.body().level();
         boolean night = lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
                 && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body());
-        if (night && cost > 30 && level > 6 && !hurt) return false;
+        // (Hurt makes that more true, not less: at eight hearts it went for a chicken in the
+        // dark and was shot on seed 66 - the hole till morning, and food by day.)
+        if (night && cost > 30 && level > 6) return false;
         // (No weapon yet, and one a few seconds off - the stone is there: that first. The hunt
         // goes quicker with it, and the night may come before the hunt is done.)
         if (!hurt && level > 6 && ObtainPlanner.countAny(bot.body(), OPENING.get(1)) == 0) {
@@ -1326,8 +1345,14 @@ public final class LockoutBrain implements BotBrain {
 
     // ---- odds and routes -------------------------------------------------------------------------
 
-    /** What a death costs: the respawn, the walk back for the things, the half-done work. */
-    private static final double DEATH_SECONDS = 150;
+    /**
+     * What a death costs: the respawn, the tools made again, the walk back for the things (if they
+     * are still there), the half-done work - and it is what the player minds most. (150 before:
+     * with the danger itself put a tenth of what it is, risk hardly counted in the choice at all.)
+     */
+    private static final double DEATH_SECONDS = 600;
+    /** The extra deaths per minute down in a cave or a mine, bare (measured: about twice the surface's). */
+    private static final double DEEP = 0.02;
 
     /**
      * How a tile looks from here, as odds rather than one number: the expected seconds, the part
@@ -1389,12 +1414,16 @@ public final class LockoutBrain implements BotBrain {
         // Longer than planned in earlier games or earlier tries: the extra is luck as well.
         luck = Math.min(mean, luck + Math.max(0, mean - plain));
         double h = hazard;
-        // Night on the surface: a tile done down below (ore, a cave's things) is out of it - the
-        // night's monsters are up here. So a player mines through the first nights.
+        // Work down below (ore, a cave's things) has the dangers of down there, planned from up
+        // here: measured on the benchmarks, a minute in a cave or a mine killed about twice as
+        // often as one on the surface, by day as by night. (Not the night's on the surface
+        // meanwhile, though: those are up here.)
         var lv = bot.body().level();
-        if (at != null && lv.dimension() == net.minecraft.world.level.Level.OVERWORLD && lv.isDarkOutside()
-                && at.getY() < lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()) - 8) {
-            h = Math.max(0.004, h - nightSurface(bot));
+        if (at != null && lv.dimension() == net.minecraft.world.level.Level.OVERWORLD
+                && at.getY() < lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()) - 8
+                && !net.kasax.challengecraft.bot.task.SurfaceTask.underground(bot.body())) {
+            if (lv.isDarkOutside()) h = Math.max(0.004, h - nightSurface(bot) * protection(bot.body()));
+            h += DEEP * protection(bot.body());
         }
         if (type != null) h *= 1.5; // (a fight)
         if (g.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER
@@ -1413,13 +1442,20 @@ public final class LockoutBrain implements BotBrain {
         double h = 0.004;
         if (level.dimension() == net.minecraft.world.level.Level.NETHER) h += 0.03;
         else if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && !underground) h += nightSurface(bot);
-        if (underground) h += 0.006;
+        if (underground) h += DEEP;
         int monsters = level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, body.getBoundingBox().inflate(16),
                 net.minecraft.world.entity.LivingEntity::isAlive).size();
         h += 0.008 * monsters;
-        h *= 1 - Math.min(0.5, body.getArmorValue() / 40.0);
+        h *= protection(body);
         if (body.getHealth() < 10) h *= 1.8;
         return h;
+    }
+
+    /** What armour (and a shield, as some five points of it) leaves of the danger: at best half. */
+    private static double protection(net.kasax.challengecraft.bot.BotPlayer body) {
+        boolean shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                || body.getInventory().countItem(net.minecraft.world.item.Items.SHIELD) > 0;
+        return 1 - Math.min(0.5, (body.getArmorValue() + (shield ? 5 : 0)) / 40.0);
     }
 
     /** The night's extra deaths per minute on the surface: twice as many without armour on hard. */

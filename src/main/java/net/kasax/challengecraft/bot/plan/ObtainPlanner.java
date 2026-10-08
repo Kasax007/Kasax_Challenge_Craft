@@ -119,7 +119,13 @@ public final class ObtainPlanner {
         failed.put(step.key(), gameTime + (step.key().startsWith("fill:water") ? 300 : 2400));
         // (Water is everywhere: one failed fill says nothing about water at large.)
         // (Ores and other things found deep down: not there where it looked; elsewhere, soon.)
-        for (Object source : step.sources()) if (source != Blocks.WATER) missing.put(source, gameTime + (oreLike(source) ? 2400 : 12000));
+        // (Nor the rock under every foot - stone, deepslate, netherrack: one dig for it that
+        // failed, pickaxes worn out on the badlands' terracotta, and every stone tool and the
+        // furnace counted as not to be had for minutes on seed 11. It is there; only deeper.)
+        for (Object source : step.sources()) {
+            if (source == Blocks.WATER || source == Blocks.STONE || source == Blocks.DEEPSLATE || source == Blocks.NETHERRACK) continue;
+            missing.put(source, gameTime + (oreLike(source) ? 2400 : 12000));
+        }
         scannedAt = -10_000; // look again
     }
 

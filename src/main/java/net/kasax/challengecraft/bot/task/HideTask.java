@@ -37,8 +37,12 @@ public final class HideTask implements BotTask {
     public static boolean possible(Bot bot) {
         BotPlayer body = bot.body();
         if (!body.onGround() || body.isInWater()) return false;
-        ServerLevel level = (ServerLevel) body.level();
-        BlockPos feet = body.blockPosition();
+        return possibleAt(bot, body.blockPosition());
+    }
+
+    /** Whether hiding with the feet at {@code feet} would work (see {@link #possible}). */
+    public static boolean possibleAt(Bot bot, BlockPos feet) {
+        ServerLevel level = (ServerLevel) bot.body().level();
         if (hurtsHere(level, feet)) return false;
         // (Nothing in the pack for the lid: what it digs out is the lid, if it drops - stone to a
         // pickaxe, dirt to a hand.)
@@ -85,8 +89,36 @@ public final class HideTask implements BotTask {
     public static String shelterProblem(Bot bot) {
         BotPlayer body = bot.body();
         if (!body.onGround() || body.isInWater()) return "not on dry ground";
-        ServerLevel level = (ServerLevel) body.level();
-        BlockPos feet = body.blockPosition();
+        return shelterProblemAt((ServerLevel) body.level(), body.blockPosition());
+    }
+
+    /**
+     * The nearest spot on the ground within {@code radius} (and not far up or down) where it can
+     * dig in, either way, or null - to go to instead of a few steps anywhere: on seed 11 red sand
+     * all about kept it from digging in, and the night went on with logs chopped in the dark.
+     */
+    public static BlockPos spotNear(Bot bot, int radius) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        BlockPos at = bot.body().blockPosition();
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                double d = dx * dx + dz * dz;
+                if (d > radius * radius || d >= bestD) continue;
+                BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.offset(dx, 0, dz));
+                if (Math.abs(top.getY() - at.getY()) > 6) continue;
+                if (!level.getBlockState(top).getCollisionShape(level, top).isEmpty() || !level.getFluidState(top).isEmpty()) continue;
+                if (possibleAt(bot, top) || shelterProblemAt(level, top) == null) {
+                    best = top;
+                    bestD = d;
+                }
+            }
+        }
+        return best;
+    }
+
+    static String shelterProblemAt(ServerLevel level, BlockPos feet) {
         if (hurtsHere(level, feet)) return "something that hurts here";
         for (int i = 1; i <= 4; i++) {
             BlockPos p = feet.below(i);
