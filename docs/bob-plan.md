@@ -2316,3 +2316,80 @@ deshalb nur, wenn Eisen in Sicht oder eine Höhle nah ist.
 
 **Nächste Messung:** `f603e35` auf beiden Arbeitskopien, die 8 Seeds je zweimal (16 Läufe, HARD,
 20 Ticks pro Sekunde), mit dem Treffer-Log. Auswertung pro Tod mit `ana/hits.py`.
+
+### 23.15 `f603e35` auf HARD, mit dem Treffer-Log
+
+**Messung:** `f603e35` auf beiden Arbeitskopien, Seeds 77 und 66 (je zweimal), HARD, 20 Ticks
+pro Sekunde, 30 Minuten. Danach abgebrochen: Die Tode zeigten wieder Lücken, die Fixes kommen in
+die nächste Runde.
+
+| Seed | Arbeitskopie | Felder | Tode |
+| --- | --- | --- | --- |
+| 77 | a (`bob-bench`) | 3 | 1 (Zombie, ohne Essen, siehe a) |
+| 77 | b (`bob-bench2`) | 6 | 1 (Zombie in der Höhle, siehe b) |
+| 66 | a | 4 | 0 |
+| 66 | b | 7 | 1 (Zombie-Dorfbewohner, siehe c) |
+| **Summe** | | **20** | **3** |
+
+Zum Vergleich auf denselben Brettern (23.14): `8c9a695` 11 Felder und 1 Tod, H 11 Felder und 2
+Tode, je ein Lauf pro Seed. Vier Läufe sagen über die Rate wenig; wichtiger sind die Ursachen.
+
+**(b) Seed 77, Arbeitskopie b, Minute 13: eine Höhle voller Monster.**
+
+- Bob stieg für Eisen „down through a cave“ hinab, ohne Rüstung, mit Schild.
+- Unten zielten auf ihn: 5 Zombies, 2 Skelette, ein Creeper (das Treffer-Log nennt sie).
+- Der Reflex griff ein Skelett auf 4 Blöcke an. Weil der Boden uneben war, lief Bob über den
+  Pfad, mit dem Schild unten: Pfeile mit 6 und 5 Schaden aus 4 und 3 Blöcken.
+- Danach trafen die Zombies (4,5 je Schlag). Das Eingraben begann mit einem Zombie direkt neben
+  ihm, und er wurde erschlagen.
+
+**(a) Seed 77, Arbeitskopie a, Minute 19: kein Essen, keine Heilung.**
+
+- Ab Minute 2 hatte Bob nichts zu essen. Die Suche nach Äpfeln war einmal gescheitert, danach galt
+  sie als zu teuer (über 150 s).
+- Stürze kosteten ihn bis Minute 10 acht HP. Dann traf ihn ein Skelett mit 7,5.
+- Die Nacht verbrachte er eingegraben bei 9 HP und Hungerwert 17. Auf HARD heilt man erst ab 18,
+  also heilte in 9 Minuten nichts.
+- Im Morgengrauen ging er aus dem Loch in eine Schlucht, deren Schatten die Zombies nicht
+  verbrennt. Zwei Schläge.
+
+**(c) Seed 66, Arbeitskopie b, Minute 7: ein Zombie-Dorfbewohner, unbeantwortet.**
+
+- Bob jagte eine Kuh für Rindfleisch (er hatte nichts zu essen), mit Steinschwert, ohne Schild.
+- Ein Zombie-Dorfbewohner traf ihn dreimal (19 → 14,5 → 10 → 5,5), ohne dass Bob zurückschlug.
+  Erst bei 5,5 HP lief er weg, zu spät.
+- Grund: Die Reflexe hielten Bob für „im Kampf“, sobald irgendeine `KillTask` lief, auch die
+  Jagd auf die Kuh. Im Kampf sind die Antworten auf einen Angreifer abgeschaltet.
+
+**Fixes (`61751df`):**
+
+| Was | Wo | Anlass |
+| --- | --- | --- |
+| Ab 4 Monstern, die auf Bob zielen (5 mit Rüstung ab 6, 6 ab 15): kein Kampf, sondern im Sprint zurück auf der eigenen Spur, mindestens 16 Blöcke und weg von der Gruppe; aus einer Höhle heißt das zurück ins Licht | `Bot` (Reflexe), `escapeCrumb` | b |
+| Eine Höhle mit 3 und mehr Monstern um den nächsten Wegpunkt (5 mit Rüstung): nicht diese; die Stelle 10 min meiden | `MineTask.explore` | b |
+| Auf dem Pfad zu einem Schützen bleibt der Schild oben (die Bedrohungssinne drehen ihn zum Schützen, die Schritte gehen weiter) | `KillTask`, `ThreatSense.shieldWalk` | b |
+| Mit wenig HP (unter 12) wartet das Versteck, solange irgendein Monster in 24 Blöcken ist, nicht nur ein Schütze oder eines in 11 | `HideTask.monsterBy` | a |
+| Auf HARD ohne Essensvorrat darf die Suche 300 s kosten (statt 150) | `LockoutBrain.needsFood` | a |
+| Auf HARD mit Vorrat: essen, sobald ein Herz fehlt und der Hunger unter 18 ist (sonst heilt nichts) | `Bot` (Essen-Reflex) | a |
+| „Im Kampf“ heißt: gegen etwas, das zurückschlägt. Die Jagd auf ein Tier schaltet die Reflexe nicht mehr ab | `Bot` (Reflexe) | c |
+| **Kupfer-Rüstung auf HARD:** nach dem Schild die Barren für zwei Teile auf einmal (erst Brust und Helm, dann Hose und Stiefel), solange höchstens 300 s. Kupfer: Brust 4, Hose 3, Helm 2, Stiefel 1, zusammen 10 Punkte; aus dem Spielcode gelesen | `LockoutBrain` (armour) | keiner der Läufe hatte je Rüstung |
+
+**Gametests:** Neu und bestanden:
+
+| Test | Ergebnis |
+| --- | --- |
+| `crowd_escape` | läuft die eigene Spur zurück, kein Kampf, 0 HP verloren |
+| `shield_on_the_path` | Schild oben auf dem Weg zum Skelett, Skelett tot, 0 HP verloren |
+| `zombie_during_cow_hunt` | antwortet dem Zombie noch während der Kuh-Jagd, 0 HP verloren |
+
+Die Tests aus 23.14 bestehen weiter. Im vollen Lauf waren nur zwei rot:
+
+- `night_shelter_bare`, der bekannte Ausfall.
+- `dig_into_cave`. Grund war die Sprung-Grenze unten; sie ist zurückgenommen. Der Test ist
+  danach nicht neu gelaufen, weil die Bob-Tests bis Montag pausieren. Er läuft dann als Erstes.
+
+Ein Versuch ist zurückgenommen: Beim Graben in eine Höhle sollte der Sprung höchstens 3 Blöcke tief
+sein (4 kosten ein Herz; im Treffer-Log kosteten Stürze bis zu 10 HP pro Lauf). Das brach
+`dig_into_cave`: Unter einer 3 Blöcke hohen Höhle kam Bob dann gar nicht mehr hinein. Die alte
+Grenze (4) gilt wieder. Die Stürze sind ein eigenes Thema für die nächste Runde: Meist kommen sie
+vom Abkommen vom Pfad an Kanten, nicht vom Graben.

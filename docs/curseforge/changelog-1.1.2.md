@@ -1,5 +1,7 @@
 ## Challenge Craft 1.1.2 — Minecraft 26.3
 
+*Everything new since 1.1.1.*
+
 **Now on Minecraft 26.3** (Fabric, Java 25). Older builds for 26.2 and 1.21.5 stay available.
 
 ### New challenges
@@ -12,14 +14,20 @@
 ### New features
 
 - 🔗 **Challenge Codes** — share a setup as a short code, seed included, and play someone else's run.
-- 💾 **Presets** — save and load your favorite setups.
+- 💾 **Presets** — save and load your favorite setups from the hub, world creation or `/challenges`.
 - 🏠 **Hub** — level, next unlock, recent runs and the daily at a glance.
+- 🔎 **Challenge selection** — search, category filters and collapsible sections; conflicting challenges tell you why.
+- 🖥️ **HUD settings** — move and resize the timer and the challenge cards; also reachable from Mod Menu.
+- ⌨️ **Key bindings** for the challenge screen, your progress and hiding the HUD, plus sound cues.
 - 🤖 **Lockout vs. Bob** — add an AI player to the Lockout Bingo lobby (Easy / Normal / Hard). *Early Development Stage.*
 - 🗺️ **Lockout Bingo** — all interaction goals are now in the pool, and the map opens the board by itself.
+- 🎨 Own item textures for the Lockout Bingo Map and the Force Item Tracker.
 
 ### Fixes
 
 - Mobs that die without a player (sunlight, falls, other mobs) no longer drop XP.
 - **500 Blocks = Item** no longer counts portal trips or teleports as walking.
 - Mouse buttons work again after Minecraft 26.3's input change.
-- Daily Challenge and **Level = Border** fixes.
+- The **Daily Challenge** started from the title screen keeps its slider values.
+- World creation no longer forgets the ticked challenges when the window is resized or you come back from a sub-screen.
+- **Level = Border** and **Damage = Border**: mobs spawn beyond the world border again.
