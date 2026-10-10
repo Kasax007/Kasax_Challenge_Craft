@@ -96,6 +96,7 @@ public final class KillTask implements BotTask {
     public Result tick(Bot bot) {
         // (Crouching only while fighting by an edge: set again below each tick it is.)
         bot.body().sneak = false;
+        roundToShooter = false;
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (collectTicks > 0) {
@@ -331,9 +332,14 @@ public final class KillTask implements BotTask {
         boolean openGround = groundTo(body, target);
         boolean charge = shooter && openGround && dist < 16 && Math.abs(target.getY() - body.getY()) < 2.5 && body.hasLineOfSight(target);
         boolean shieldOn = body.getOffhandItem().is(Items.SHIELD);
+        // The way round to a shooter (no straight run over this ground - a cave, a slope): the
+        // shield up towards it all the same, turned to it by the threat sense while the path is
+        // walked (seed 77, hard: two arrows from four and three blocks in a cave, the shield down
+        // on the path).
+        roundToShooter = shooter && shieldOn && !charge && dist > 4 && body.hasLineOfSight(target);
         // (The shield down, unless it is held up running at a shooter: it needs a quarter second
         // up before it blocks, so it is not lowered and raised again each tick.)
-        if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD) && !(charge && shieldOn)) body.releaseUsingItem();
+        if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD) && !(charge && shieldOn) && !roundToShooter) body.releaseUsingItem();
         if (charge && shieldOn) {
             // With a shield: up and walk straight at it - the arrows hit the shield (a bot is not
             // slowed holding it, only kept from sprinting), lowered in reach for the blow.
@@ -397,6 +403,13 @@ public final class KillTask implements BotTask {
     }
 
     private final Set<java.util.UUID> shotAt = new java.util.HashSet<>();
+
+    /** Walking the way round to a shooter this tick: the threat sense keeps the shield up towards it meanwhile. */
+    private boolean roundToShooter;
+
+    public boolean shieldWalkWanted() {
+        return roundToShooter;
+    }
 
     /** A bow or a crossbow and arrows: shoot it instead (once per mob). Whether it set about that. */
     private boolean shoot(Bot bot, LivingEntity mob) {

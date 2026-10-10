@@ -259,11 +259,14 @@ public final class HideTask implements BotTask {
      */
     private static boolean monsterBy(BotPlayer body) {
         boolean day = !body.level().isDarkOutside();
+        // (Few hearts left: anything within the twenty-four counts - two blows of a zombie that
+        // stood fifteen blocks off in the shade of a ravine at dawn ended it at nine hp on seed 77.)
+        double close = body.getHealth() < 12 ? 24 : 11;
         return !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
                 body.getBoundingBox().inflate(24, 10, 24), m -> m.isAlive()
                         && !(m instanceof net.minecraft.world.entity.monster.Enderman)
                         && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)
-                        && (m instanceof net.minecraft.world.entity.monster.RangedAttackMob || m.distanceToSqr(body) < 11 * 11)).isEmpty();
+                        && (m instanceof net.minecraft.world.entity.monster.RangedAttackMob || m.distanceToSqr(body) < close * close)).isEmpty();
     }
 
     /** The box going up, a block a tick: the sides at the feet, at the head, then the lid. */

@@ -1193,6 +1193,122 @@ public class BotStuntTests {
     }
 
     /**
+     * A skeleton up on a ledge three blocks high, twelve blocks off, a stair of blocks up to it; a
+     * sword and a shield (hard): the way round walked with the shield up towards it, not lowered
+     * on the path (seed 77: two arrows from four and three blocks in a cave, shield down).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 44)
+    public void shieldOnThePath(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "shield_on_the_path");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        // The ledge (x 30..34, three high) and a stair up to it from the south side.
+        a.fill(30, FEET, 14, 34, FEET + 2, 28, Blocks.STONE);
+        for (int i = 0; i < 3; i++) a.fill(27 + i, FEET, 27, 27 + i, FEET + i, 28, Blocks.STONE);
+        var sk = EntityTypes.SKELETON.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        sk.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        sk.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(32, FEET + 3, 20)));
+        sk.setPersistenceRequired();
+        level.addFreshEntity(sk);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        sk.setTarget(body);
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(680), 690, () -> {
+            if (sk.isAlive() && sk.getTarget() != body) sk.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().body() != body || !body.isAlive()) h.fail("shield_on_the_path: shot dead");
+            if (sk.isAlive() && h.getTick() < 650) return false;
+            BotArena.LOG.info("[BOTTEST] shield_on_the_path skeleton dead {}, lost {} health, shield walk {} ticks", !sk.isAlive(), 20 - low[0],
+                    a.bot().threats.shieldWalkTicks);
+            h.assertTrue(a.bot().threats.shieldWalkTicks > 0, "shield_on_the_path: the shield never up on the way");
+            return true;
+        });
+    }
+
+    /**
+     * Out after a cow for its beef, a stone sword, a zombie coming at it from behind (hard): the
+     * zombie answered and killed - a hunt for food is no fight that keeps the reflexes off (seed
+     * 66: a zombie villager hit it three times unanswered while it chased the cow, dead).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 44)
+    public void zombieDuringCowHunt(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "zombie_during_cow_hunt");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var cow = EntityTypes.COW.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        cow.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(36, FEET, 20)));
+        level.addFreshEntity(cow);
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(16, FEET, 20)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        z.setTarget(body);
+        float[] low = {20};
+        boolean[] answered = {false};
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.COW), java.util.Set.of(Items.BEEF), 1, 1), 880, () -> {
+            if (z.isAlive() && z.getTarget() != body) z.setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            // (Turned on the zombie while the cow still lived: the hunt did not keep it from that.)
+            if (cow.isAlive() && a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.KillTask k && k.target() == z)) answered[0] = true;
+            if (a.bot().body() != body || !body.isAlive()) h.fail("zombie_during_cow_hunt: killed");
+            if (z.isAlive() && h.getTick() < 850) return false;
+            BotArena.LOG.info("[BOTTEST] zombie_during_cow_hunt zombie dead {}, answered during the hunt {}, lost {} health", !z.isAlive(), answered[0], 20 - low[0]);
+            h.assertTrue(!z.isAlive(), "zombie_during_cow_hunt: the zombie still stands");
+            h.assertTrue(answered[0], "zombie_during_cow_hunt: the zombie only answered after the cow");
+            return true;
+        });
+    }
+
+    /**
+     * Five zombies coming at it from ahead after a walk across the arena, a stone sword, no armour
+     * (hard): no fight - away the way it came, at a run - and alive twenty seconds later (seed
+     * 77: a crowd in a cave, a skeleton rushed among them, dead).
+     */
+    @GameTest(environment = "challengecraft:strays", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 44)
+    public void crowdEscape(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "crowd_escape");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        a.spawn(-16, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        java.util.List<net.minecraft.world.entity.Mob> mobs = new java.util.ArrayList<>();
+        boolean[] fled = {false}, fought = {false};
+        float[] low = {20};
+        // The walk in first (that is the way back), then the crowd from ahead.
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(a.abs(22, FEET, 20), 1), 880, () -> {
+            if (mobs.isEmpty() && body.getX() > a.abs(20, FEET, 20).getX()) {
+                for (int z : new int[]{14, 17, 20, 23, 26}) {
+                    var m = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+                    m.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+                    m.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(34, FEET, z)));
+                    m.setPersistenceRequired();
+                    level.addFreshEntity(m);
+                    m.setTarget(body);
+                    mobs.add(m);
+                }
+            }
+            for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
+            if (!mobs.isEmpty()) {
+                low[0] = Math.min(low[0], body.getHealth());
+                if (a.bot().tasks().stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.GoToTask g && g.describe().contains("go to")
+                        && body.getX() < a.abs(8, FEET, 20).getX())) fled[0] = true;
+                if (a.bot().tasks().stream().anyMatch(t -> net.kasax.challengecraft.bot.BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.KillTask)) fought[0] = true;
+            }
+            if (a.bot().body() != body || !body.isAlive()) h.fail("crowd_escape: killed");
+            if (h.getTick() < 850) return false;
+            BotArena.LOG.info("[BOTTEST] crowd_escape fled {}, fought {}, lost {} health", fled[0], fought[0], 20 - low[0]);
+            h.assertTrue(fled[0], "crowd_escape: never ran back the way it came");
+            return true;
+        });
+    }
+
+    /**
      * Two zombies coming from eight blocks off, a stone sword and blocks, no armour, no shield
      * (hard): up on a pillar before they are there, both killed from above, little lost (seed 77:
      * toe to toe, then a pillar begun at eight hearts - too late).

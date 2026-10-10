@@ -299,6 +299,42 @@ public final class LockoutBrain implements BotBrain {
                 startRefused = false;
             }
         }
+        // On hard, armour too, from copper: it is in every cave wall, and one vein makes a set
+        // (chest 4, legs 3, helmet 2, boots 1 - a third off every zombie blow and arrow; no run
+        // had a single piece of armour, the iron always went to the board). The ingots for two
+        // pieces at a time, smelted together, then the pieces made. Only once the shield is in
+        // hand, and only while it comes cheap.
+        stepKey = "armour";
+        if (hard && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4
+                && bot.body().level().getGameTime() >= armourRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            List<net.minecraft.world.item.Item> missing = new ArrayList<>();
+            for (var piece : COPPER_SET.keySet()) if (armourSlotFree(bot.body(), piece)) missing.add(piece);
+            if (!missing.isEmpty()) {
+                armourRetryAt = bot.body().level().getGameTime() + 1200;
+                int have = ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.COPPER_INGOT));
+                int spare = have - planner.demandFor(net.minecraft.world.item.Items.COPPER_INGOT);
+                var first = missing.get(0);
+                if (spare >= COPPER_SET.get(first)) {
+                    bot.say("armour on hard: " + ObtainPlanner.name(first));
+                    start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(first), 1, planner), 1200);
+                    if (!startRefused) return;
+                    startRefused = false;
+                } else {
+                    int ingots = 0;
+                    for (int i = 0; i < Math.min(2, missing.size()); i++) ingots += COPPER_SET.get(missing.get(i));
+                    int want = Math.max(0, have - Math.max(0, spare)) + ingots;
+                    double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want);
+                    if (est <= COPPER_ARMOUR_MAX) {
+                        armourTries++;
+                        bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
+                        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want, planner),
+                                budget(est, 1200, 6000));
+                        if (!startRefused) return;
+                        startRefused = false;
+                    }
+                }
+            }
+        }
         // A bastion near in the Nether and gold of use on the board (bartering, gold tiles): its
         // chests and gold blocks, where few piglins watch. Once per bastion.
         if (!surviving && step(bot, "bastion", () -> bastionRaid(bot))) return;
@@ -1253,6 +1289,30 @@ public final class LockoutBrain implements BotBrain {
     private int kitTries;
     /** The shield on hard when nothing else wants iron: only for so many seconds of effort (iron in sight, a cave by). */
     private static final double SHIELD_ALONE_MAX = 240;
+    /** Copper armour on hard, in the order it is made, with the ingots each piece takes. */
+    private static final java.util.LinkedHashMap<net.minecraft.world.item.Item, Integer> COPPER_SET = new java.util.LinkedHashMap<>();
+    static {
+        COPPER_SET.put(net.minecraft.world.item.Items.COPPER_CHESTPLATE, 8);
+        COPPER_SET.put(net.minecraft.world.item.Items.COPPER_HELMET, 5);
+        COPPER_SET.put(net.minecraft.world.item.Items.COPPER_LEGGINGS, 7);
+        COPPER_SET.put(net.minecraft.world.item.Items.COPPER_BOOTS, 4);
+    }
+    /** At most this many seconds for the copper of two pieces. */
+    private static final double COPPER_ARMOUR_MAX = 300;
+    private long armourRetryAt;
+    private int armourTries;
+
+    /** Nothing worn in this piece's slot, and nothing in the pack for it either (it would be put on). */
+    private static boolean armourSlotFree(net.kasax.challengecraft.bot.BotPlayer body, net.minecraft.world.item.Item piece) {
+        var eq = new net.minecraft.world.item.ItemStack(piece).get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+        if (eq == null) return false;
+        if (!body.getItemBySlot(eq.slot()).isEmpty()) return false;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            var e = st.get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+            if (e != null && e.slot() == eq.slot() && net.kasax.challengecraft.bot.BotArmor.value(st) > 0) return false;
+        }
+        return true;
+    }
     private int netherFails;
 
     private boolean needsFood(Bot bot) {
@@ -1283,7 +1343,11 @@ public final class LockoutBrain implements BotBrain {
         // is not to be had without one, and on hard no heart comes back without food; 30 of 54
         // deaths had nothing to eat in the pack.)
         boolean opened = ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0;
-        double stockCost = bare ? (opened ? 150 : 60) : 25;
+        // (On hard twice that: there no heart comes back below eighteen shanks, and a bare pack
+        // was how most deaths began - seed 77: one failed search for apples at minute two, then
+        // nothing for seventeen minutes, a night in a hole at nine hp that healed nothing.)
+        boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+        double stockCost = bare ? (opened ? (hard ? 300 : 150) : (hard ? 120 : 60)) : 25;
         if (!hurt && (level >= 12 && cost > stockCost || cost > (level <= 6 ? 900 : bare ? Math.max(120, stockCost) : 90))) return false;
         if (hurt && cost > 900) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows

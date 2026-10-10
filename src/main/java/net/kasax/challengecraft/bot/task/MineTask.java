@@ -627,6 +627,17 @@ public final class MineTask implements BotTask {
                 caveSpot = null;
                 return caveGiveUp(bot, "no cave lower down");
             }
+            // A cave full of monsters (three and more about where it leads): not that one - a
+            // player turns round at the groaning and the rattling (seed 77, hard: five zombies, two
+            // skeletons and a creeper down one, and dead in it). Its ground is kept clear of a while.
+            int about = monstersAbout(level, caveSpot, 16);
+            if (about >= (bot.body().getArmorValue() >= 6 ? 5 : 3)) {
+                bot.say("a cave full of monsters (" + about + " about " + caveSpot.toShortString() + "): not that one");
+                caveVisited.add(caveSpot);
+                bot.markDanger(caveSpot);
+                caveSpot = null;
+                return Result.RUNNING;
+            }
             if (inBand) bandSpots++;
             bot.say((inBand ? "on through the cave for " : "down through a cave for ") + what + " (to " + caveSpot.toShortString() + ")");
             // Remember the way in: the spot it went underground from, to get out the same way.
@@ -642,6 +653,12 @@ public final class MineTask implements BotTask {
             nav.stop();
         }
         return Result.RUNNING;
+    }
+
+    /** Monsters (not endermen: they leave one be) within {@code r} blocks of {@code p}. */
+    private static int monstersAbout(ServerLevel level, BlockPos p, int r) {
+        return level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, new net.minecraft.world.phys.AABB(p).inflate(r),
+                m -> m.isAlive() && !(m instanceof net.minecraft.world.entity.monster.Enderman)).size();
     }
 
     private Result caveGiveUp(Bot bot, String why) {

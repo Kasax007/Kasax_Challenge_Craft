@@ -637,8 +637,11 @@ public final class Bot {
         // in the lava is the last one).
         if (top instanceof net.kasax.challengecraft.bot.task.LavaEscapeTask || top instanceof net.kasax.challengecraft.bot.task.AirTask
                 || top instanceof net.kasax.challengecraft.bot.task.ExtinguishTask || top instanceof net.kasax.challengecraft.bot.task.SnowEscapeTask) return;
-        // (A fight inside a hunt or a sequence counts too.)
-        boolean fighting = BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.KillTask
+        // (A fight inside a hunt or a sequence counts too. A fight: something that fights back - a
+        // cow hunted for its beef is no fight, and the reflexes stay on: a zombie villager hit it
+        // three times unanswered on seed 66 while it chased the cow, 19 hp to 5.)
+        BotTask inner = BotTask.innermost(top);
+        boolean fighting = inner instanceof net.kasax.challengecraft.bot.task.KillTask k && k.target() instanceof net.minecraft.world.entity.monster.Enemy
                 || top instanceof net.kasax.challengecraft.bot.task.ShootTask && tasks.stream().anyMatch(t -> t instanceof net.kasax.challengecraft.bot.task.KillTask);
         // Low on health with a monster close: get away first (and eat on the way), as a player
         // backs off rather than trade the last hearts — in a fight too, once it goes badly. A
@@ -671,6 +674,34 @@ public final class Bot {
         // (Not while running from something already - its own retreat - but on any other walk: a
         // creeper behind it on the way somewhere is no less a creeper.)
         boolean running = retreat != null && top == retreat;
+        // A crowd out for it (four and more close by - a cave full of them, the dark round a
+        // village): no fight at all, but away the way it came, at a run - in a cave that is back
+        // up into the light, where the zombies burn; arrows on the way end in the shield (seed 77,
+        // hard: five zombies, two skeletons and a creeper in a cave - a skeleton rushed at four
+        // blocks, a hole begun with the zombies at its elbow, dead). Better armour, more of them.
+        if (!running && !cornered && !welcomeExplosion
+                && !(BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.PillarFightTask)) {
+            var crowd = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(12, 6, 12),
+                    m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy);
+            int many = body.getArmorValue() >= 15 ? 6 : body.getArmorValue() >= 6 ? 5 : 4;
+            if (crowd.size() >= many) {
+                net.minecraft.world.phys.Vec3 centre = net.minecraft.world.phys.Vec3.ZERO;
+                java.util.Map<String, Integer> kinds = new java.util.TreeMap<>();
+                for (var m : crowd) {
+                    centre = centre.add(m.position());
+                    kinds.merge(m.getType().toShortString(), 1, Integer::sum);
+                }
+                centre = centre.scale(1.0 / crowd.size());
+                net.minecraft.core.BlockPos to = escapeCrumb(centre);
+                boolean back = to != null;
+                if (to == null) to = net.minecraft.core.BlockPos.containing(body.position().add(openWayFrom(centre, 24)));
+                say(crowd.size() + " after me " + kinds + ": away " + (back ? "the way I came" : "from them") + ", to " + to.toShortString());
+                actions.reset();
+                retreat = new net.kasax.challengecraft.bot.task.GoToTask(to, 2).sprinting();
+                reflex(retreat);
+                return;
+            }
+        }
         if (!running && !cornered) {
             // (Any enemy, not only the Monster kind: magma cubes and slimes are not of it.)
             for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(6),
@@ -1011,6 +1042,10 @@ public final class Bot {
         // (On hard, topped up sooner: the hearts only come back with a full stomach, and two blows
         // of a magma cube or a brute take twelve.)
         boolean hurt = body.getHealth() < body.getMaxHealth() * (body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD ? 0.8f : 0.6f) && food < 20;
+        // (On hard any heart missing, under eighteen shanks and with plenty in the pack: a bite,
+        // so the hearts come back at all - below eighteen they never do there.)
+        if (!hurt && body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD && body.getHealth() < body.getMaxHealth() && food < 18
+                && net.kasax.challengecraft.bot.task.EatTask.foodPoints(body) >= 8) hurt = true;
         // (Not with a monster at it: eating stands still for a second and a half. Unless starving.)
         // (Nor with a bowman drawing on it in sight, however far: the meal is a second and a half
         // with the shield down - seed 88, hard: shot dead eating, a patrol's crossbows about.)
@@ -1128,6 +1163,23 @@ public final class Bot {
             if (m.getTarget() == body && m.distanceTo(body) < 3) return true;
         }
         return false;
+    }
+
+    /**
+     * The way back it came (its trail, newest first): the first crumb some sixteen blocks and more
+     * off that lies away from {@code from} - known ground, and out of a cave the way in. Null if none.
+     */
+    private net.minecraft.core.BlockPos escapeCrumb(net.minecraft.world.phys.Vec3 from) {
+        net.minecraft.world.phys.Vec3 me = body.position();
+        net.minecraft.world.phys.Vec3 toThem = from.subtract(me);
+        for (int i = trail.size() - 1; i >= 0; i--) {
+            net.minecraft.core.BlockPos p = trail.get(i);
+            net.minecraft.world.phys.Vec3 c = net.minecraft.world.phys.Vec3.atBottomCenterOf(p);
+            double d = c.distanceToSqr(me);
+            if (d > 48 * 48) break;
+            if (d >= 16 * 16 && c.subtract(me).dot(toThem) < 0) return p;
+        }
+        return null;
     }
 
     /**

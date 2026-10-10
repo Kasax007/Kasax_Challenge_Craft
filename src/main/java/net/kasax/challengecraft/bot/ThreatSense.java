@@ -185,7 +185,8 @@ public final class ThreatSense {
      */
     private boolean shieldWalk() {
         var body = bot.body();
-        if (!shieldOn() || bot.current() instanceof net.kasax.challengecraft.bot.task.KillTask) return false;
+        // (Not in a fight - the sword is wanted - except on the way round to a shooter.)
+        if (!shieldOn() || BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask k && !k.shieldWalkWanted()) return false;
         net.minecraft.world.entity.Mob shooter = null;
         double best = Double.MAX_VALUE;
         for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(24),
