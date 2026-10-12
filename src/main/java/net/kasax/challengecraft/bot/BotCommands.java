@@ -225,6 +225,32 @@ final class BotCommands {
                                         .then(Commands.argument("difficulty", StringArgumentType.word())
                                                 .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.valueOf(
                                                         StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))))))
+                        // A self-play match: "versus 1800 hard Bob Alice:guardian=0,quick=0" - each bot a team of its own,
+                        // with its own knobs ([BOTVS] in the log).
+                        .then(Commands.literal("versus").then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))
+                                .then(Commands.argument("difficulty", StringArgumentType.word())
+                                        .then(Commands.argument("sides", StringArgumentType.greedyString()).executes(ctx -> {
+                                            java.util.List<Bot> bots = new java.util.ArrayList<>();
+                                            for (String side : StringArgumentType.getString(ctx, "sides").trim().split("\\s+")) {
+                                                String[] np = side.split(":", 2);
+                                                Bot b = BotManager.byName(np[0]);
+                                                if (b == null) {
+                                                    ctx.getSource().sendFailure(Component.literal("No such bot: " + np[0]));
+                                                    return 0;
+                                                }
+                                                b.params = BotParams.parse(np.length > 1 ? np[1] : "-");
+                                                bots.add(b);
+                                            }
+                                            if (bots.size() < 2 || bots.size() > 4) {
+                                                ctx.getSource().sendFailure(Component.literal("Two to four bots"));
+                                                return 0;
+                                            }
+                                            int seconds = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "seconds");
+                                            BotVersus.start(bots, seconds * 20, LockoutBrain.Difficulty.valueOf(
+                                                    StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT)));
+                                            ok(ctx, "versus: " + bots.size() + " bots, " + seconds + " s");
+                                            return 1;
+                                        })))))
                         .then(Commands.literal("fieldtest").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .then(Commands.argument("goals", StringArgumentType.string())
                                         .then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))

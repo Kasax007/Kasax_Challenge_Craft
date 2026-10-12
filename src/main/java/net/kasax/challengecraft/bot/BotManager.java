@@ -131,6 +131,7 @@ public final class BotManager {
             bot.tick();
         }
         BotBenchmark.tickAll();
+        BotVersus.tickAll();
         BotFieldTest.tickAll();
     }
 

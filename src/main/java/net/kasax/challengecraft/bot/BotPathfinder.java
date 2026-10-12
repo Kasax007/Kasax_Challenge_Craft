@@ -265,7 +265,7 @@ public final class BotPathfinder {
         // (Or on magma, which burns as long as it is stood on: off it, whatever the way.)
         escapeLava = loaded(start) && state(start).getFluidState().is(FluidTags.LAVA)
                 || loaded(start.below()) && state(start.below()).is(Blocks.MAGMA_BLOCK);
-        long until = nanos == Long.MAX_VALUE ? Long.MAX_VALUE : System.nanoTime() + nanos;
+        long until = nanos == Long.MAX_VALUE || BotNavigator.SIM ? Long.MAX_VALUE : System.nanoTime() + nanos;
         it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Node> nodes = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>();
         Node first = new Node(start);

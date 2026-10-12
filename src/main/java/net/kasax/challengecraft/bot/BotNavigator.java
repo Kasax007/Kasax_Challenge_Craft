@@ -20,6 +20,16 @@ public final class BotNavigator {
     /** A search on the server thread (goals that look at the world): nodes, and at most this long. */
     // (The node counts are the limit, so the same world gives the same way however busy the
     // machine is; the times only stop a search that would hold up the server.)
+    /**
+     * Self-play at the machine's own pace ({@code tick sprint}, CHALLENGECRAFT_BOT_SIM=1): no search
+     * stops on the clock (only on its count of nodes), and a search on the worker thread counts as
+     * found only after the ticks its nodes take at the real pace - however fast the machine. Else a
+     * faster pace gives every search more game ticks, and the bot plays worse the faster it runs
+     * (the same build died 3 times at 1.5 times the real pace and 18 times at 2.3 times).
+     */
+    public static final boolean SIM = "1".equals(System.getenv("CHALLENGECRAFT_BOT_SIM")) || Boolean.getBoolean("challengecraft.bot.sim");
+    /** Nodes a search goes through in a tick at the real pace (some hundred thousand a second). */
+    private static final int SIM_NODES_PER_TICK = 5000;
     private static final int BUDGET = 40000;
     private static final long SYNC_NANOS = 60_000_000L;
     /** A search on a worker thread (plain position goals): first try, and the longer one if that found nothing. */
@@ -122,7 +132,7 @@ public final class BotNavigator {
 
     /** The large view's way from {@code from} to the current goal, as points every {@code every} cells (for the log). */
     public java.util.List<BlockPos> wayPoints(int every) {
-        if (guideJob == null || !guideJob.isDone()) return java.util.List.of();
+        if (guideJob == null || !SIM && !guideJob.isDone()) return java.util.List.of();
         try {
             return guideJob.get().route(feet(), every);
         } catch (Exception e) {
@@ -1041,7 +1051,7 @@ public final class BotNavigator {
         finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
         finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)).anyWater(forAir);
         var guideFuture = guide(level, from);
-        if (guideFuture != null && guideFuture.isDone()) finder.guided(guideOf(guideFuture));
+        if (guideFuture != null && (SIM || guideFuture.isDone())) finder.guided(guideOf(guideFuture));
         Predicate<BlockPos> g = goal;
         BlockPos t = target;
         boolean hard = noWay > 0;
@@ -1062,6 +1072,7 @@ public final class BotNavigator {
         pendingGeneration = generation;
         pendingFrom = from;
         pendingFinder = finder;
+        pendingAt = level.getGameTime();
         pending = SEARCH.submit(() -> {
             // (The large view first, if it is still being worked out: a few milliseconds.)
             if (guideFuture != null) finder.guided(guideOf(guideFuture));
@@ -1086,7 +1097,7 @@ public final class BotNavigator {
             guideAt = now;
             guideCenter = from;
         }
-        if (walkEstimate == 0 && guideJob.isDone()) {
+        if (walkEstimate == 0 && (SIM || guideJob.isDone())) {
             BotTerrain.Field f = guideOf(guideJob);
             double t = f == null ? -1 : f.ticks(from.getX(), from.getZ());
             if (t > 0) {
@@ -1107,10 +1118,12 @@ public final class BotNavigator {
 
     private BlockPos pendingFrom;
     private BotPathfinder pendingFinder;
+    /** When the search on the worker thread was started (game ticks). */
+    private long pendingAt;
 
     /** A finished search on the worker thread: taken up. */
     private void pollSearch() {
-        if (pending == null || !pending.isDone()) return;
+        if (pending == null || !SIM && !pending.isDone()) return;
         BotPathfinder.Result r;
         try {
             r = pending.get();
@@ -1118,6 +1131,8 @@ public final class BotNavigator {
             BotManager.LOG.warn("[Bot] path search failed", e);
             r = null;
         }
+        // (Self-play: found after the ticks it takes at the real pace.)
+        if (SIM && r != null && bot.level().getGameTime() < pendingAt + (r.expanded() + SIM_NODES_PER_TICK - 1) / SIM_NODES_PER_TICK) return;
         boolean ahead = pendingAhead;
         pending = null;
         pendingAhead = false;

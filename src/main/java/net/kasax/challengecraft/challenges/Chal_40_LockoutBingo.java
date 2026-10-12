@@ -513,6 +513,16 @@ public final class Chal_40_LockoutBingo {
      * rest of the 25 tiles are drawn as usual.
      */
     public static void startSoloDebugRun(ServerPlayer player, List<String> forcedGoalIds) {
+        startDebugRun(List.of(player), forcedGoalIds);
+    }
+
+    /**
+     * A game for these players, each a team of its own (red, blue, green, yellow in that order) -
+     * bots against each other, for the self-play matches. The board is drawn as for one player
+     * (from the first one's id), with the forced goals first.
+     */
+    public static void startDebugRun(List<ServerPlayer> players, List<String> forcedGoalIds) {
+        ServerPlayer player = players.get(0);
         MinecraftServer server = player.level().getServer();
         if (server == null) {
             return;
@@ -522,8 +532,13 @@ public final class Chal_40_LockoutBingo {
         LockoutBingoSavedData data = getData(server);
         ensureCurrentRun(server, data);
         data.resetForRun(data.getRunId());
-        data.setTeam(player.getUUID(), player.getGameProfile().name(), LockoutBingoTeam.RED);
-        data.retainPlayers(Set.of(player.getUUID()));
+        Set<UUID> ids = new java.util.HashSet<>();
+        for (int i = 0; i < players.size(); i++) {
+            ServerPlayer p = players.get(i);
+            data.setTeam(p.getUUID(), p.getGameProfile().name(), LockoutBingoTeam.values()[i % LockoutBingoTeam.values().length]);
+            ids.add(p.getUUID());
+        }
+        data.retainPlayers(ids);
 
         long boardSeed = fixedBoardSeed(server, server.overworld().getSeed()
                 ^ server.overworld().getGameTime()
@@ -545,15 +560,15 @@ public final class Chal_40_LockoutBingo {
             }
         }
         data.setBoard(goals.stream().map(LockoutBingoGoal::id).toList(), boardSeed, server.overworld().getGameTime());
-        captureGoalStatBaselines(data, List.of(player), goals);
+        captureGoalStatBaselines(data, players, goals);
         data.setStarted(true);
         data.setEnded(false);
         data.setWinnerTeam(null);
         data.clearReady();
 
-        ensureMap(player, server.getTickCount());
+        for (ServerPlayer p : players) ensureMap(p, server.getTickCount());
         syncToAll(server);
-        ServerPlayNetworking.send(player, new LockoutBingoOpenScreenPacket(true));
+        for (ServerPlayer p : players) ServerPlayNetworking.send(p, new LockoutBingoOpenScreenPacket(true));
     }
 
     public static int debugClaimTiles(ServerPlayer player, int amount) {
