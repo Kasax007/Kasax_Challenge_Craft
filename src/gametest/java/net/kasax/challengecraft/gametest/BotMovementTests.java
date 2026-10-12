@@ -172,6 +172,46 @@ public class BotMovementTests {
         a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 1200, () -> a.near(30, FEET, 20, 1.6));
     }
 
+    /**
+     * A gap three wide over a ravine twelve deep (a leap fallen short there costs nine hearts, as
+     * in a game played against him): no leap - the way round over the land bridge at its end.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
+    public void noLongLeapOverRavine(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "no_long_leap_over_ravine");
+        a.fill(18, GROUND - 11, 0, 20, GROUND, 33, Blocks.AIR);
+        a.spawn(8, FEET, 20);
+        var body = a.bot().body();
+        a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 1600, () -> {
+            h.assertTrue(body.getY() > a.abs(0, FEET, 0).getY() - 1.5, "no_long_leap_over_ravine: fell in at " + body.position());
+            return a.near(30, FEET, 20, 1.6);
+        });
+    }
+
+    /** A gap three wide over water (falling short does no harm): leapt, with a run-up, never in the water. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void longLeapOverWater(GameTestHelper h) {
+        longLeap(h, "long_leap_over_water", 8);
+    }
+
+    /** The same gap from a standing start on its very edge: the jump at the last moment still carries him over. */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void longLeapStandingStart(GameTestHelper h) {
+        longLeap(h, "long_leap_standing_start", 17);
+    }
+
+    private static void longLeap(GameTestHelper h, String name, int fromX) {
+        BotArena a = BotArena.flat(h, name);
+        a.fill(18, GROUND - 4, 0, 20, GROUND, 39, Blocks.AIR);
+        a.fill(18, GROUND - 5, 0, 20, GROUND - 5, 39, Blocks.WATER);
+        a.spawn(fromX, FEET, 20);
+        var body = a.bot().body();
+        a.run(new GoToTask(a.abs(30, FEET, 20), 1.5), 600, () -> {
+            h.assertTrue(!body.isInWater() && body.getY() > a.abs(0, FEET, 0).getY() - 1.5, name + ": fell short, at " + body.position());
+            return a.near(30, FEET, 20, 1.6);
+        });
+    }
+
     /** Over a trench with blocks at hand: bridge it. */
     @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
     public void trenchBridge(GameTestHelper h) {

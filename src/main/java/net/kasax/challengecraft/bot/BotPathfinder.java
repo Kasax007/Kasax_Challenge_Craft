@@ -172,6 +172,14 @@ public final class BotPathfinder {
         return f * m;
     }
 
+    /** Landing spots of leaps that fell short before: no leap onto them again. */
+    private java.util.Set<Long> failedLeaps = java.util.Set.of();
+
+    public BotPathfinder notLeapingTo(java.util.Set<Long> landings) {
+        this.failedLeaps = landings;
+        return this;
+    }
+
     public BotPathfinder favouring(java.util.Set<Long> path) {
         this.favoured = path;
         return this;
@@ -448,28 +456,35 @@ public final class BotPathfinder {
             }
         }
         // Leap over a gap one to three wide (sprint-jumping), landing level or one lower.
+        // (A gap of one or two is cleared with a block and more to spare, from a standing start
+        // too; a gap of three only just, with the sprint - that one only where falling short does
+        // no harm: over water or a ditch, never over a ravine; there it is a bridge or the way
+        // round. Wider than one wants the sprint, and with too little food there is none.)
         if (!swimming && floor && clear(p.above(2))) {
             for (int i = 0; i < 4; i++) {
                 int dx = DIRS[i][0], dz = DIRS[i][1];
                 BlockPos first = p.offset(dx, 0, dz);
                 if (canStand(first) || !clear(first) || !clear(first.above()) || !clear(first.above(2))) continue;
+                // (The deepest drop under the gap so far that hurts: water breaks any fall.)
+                int worst = 0;
                 for (int gap = 1; gap <= 3; gap++) {
+                    if (gap > 1 && !abilities.sprint()) break;
                     BlockPos over = p.offset(dx * gap, 0, dz * gap);
                     if (!clear(over) || !clear(over.above()) || !clear(over.above(2)) || canStand(over)) break;
                     // (Not over the void or lava: a leap fallen short is the end - the Nether's
-                    // ledges over the lava sea. A short drop below is no matter.)
-                    // (And a leap that falls short is no small thing in the field either: only
-                    // over a drop that is harmless, or for a one-block gap a moderate one.)
+                    // ledges over the lava sea.)
+                    if (deadlyBelow(over)) break;
+                    if (!waterBelow(over)) worst = Math.max(worst, dropBelow(over));
                     // (Wary - in the Nether, where the ground is crumbling netherrack and the mobs
-                    // push: wider gaps only over a drop that does no harm.)
-                    if (deadlyBelow(over) || dropBelow(over) > (!abilities.wary() ? 12 : gap == 1 ? 8 : 4)) break;
+                    // push: a two-block gap too only over a drop that hurts little.)
+                    if (worst > (gap >= 3 ? MAX_FALL : !abilities.wary() ? 12 : gap == 1 ? 8 : 4)) break;
                     BlockPos land = p.offset(dx * (gap + 1), 0, dz * (gap + 1));
                     if (canStand(land) && clear(land.above()) && clear(land.above(2)) && !inWater(land)) {
-                        out.add(new Step(land, List.of(), null, true));
+                        if (!failedLeaps.contains(land.asLong())) out.add(new Step(land, List.of(), null, true));
                         break;
                     }
                     if (gap < 3 && clear(land) && clear(land.above()) && canStand(land.below()) && !inWater(land.below())) {
-                        out.add(new Step(land.below(), List.of(), null, true));
+                        if (!failedLeaps.contains(land.below().asLong())) out.add(new Step(land.below(), List.of(), null, true));
                         break;
                     }
                 }
@@ -604,6 +619,17 @@ public final class BotPathfinder {
             if (inWater(q) || solid(q)) return i - 1;
         }
         return 99;
+    }
+
+    /** Under {@code p}, water before any ground (a fall into it does no harm, however deep). */
+    private boolean waterBelow(BlockPos p) {
+        for (int i = 1; i <= 40; i++) {
+            BlockPos q = p.below(i);
+            if (!loaded(q)) return false;
+            if (inWater(q)) return true;
+            if (!clear(q)) return false;
+        }
+        return false;
     }
 
     /** Under {@code p}, lava before any ground, or no ground for forty blocks (a trench is no matter). */

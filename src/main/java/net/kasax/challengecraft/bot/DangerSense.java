@@ -235,6 +235,9 @@ public final class DangerSense {
         }
         Keys best = own;
         Outcome bestOut = first;
+        // (In the air over a gap, leaping: holding on is the most way across - braking or turning
+        // away only makes the leap shorter. Other keys then only if they come down safe.)
+        boolean leapingInAir = !body.onGround() && bot.navigator().leaping();
         for (Keys k : tries) {
             Outcome o = reckon(k);
             if (o.safe()) {
@@ -242,7 +245,7 @@ public final class DangerSense {
                 bestOut = o;
                 break;
             }
-            if (bestOut.worseThan(o)) {
+            if (!leapingInAir && bestOut.worseThan(o)) {
                 best = k;
                 bestOut = o;
             }

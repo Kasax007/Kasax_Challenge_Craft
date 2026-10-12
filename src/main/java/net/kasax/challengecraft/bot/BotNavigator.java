@@ -64,6 +64,15 @@ public final class BotNavigator {
     private boolean digging;
     private int stepTicks;
     private final java.util.Set<Long> avoid = new java.util.HashSet<>();
+    /**
+     * Landing spots of leaps that fell short, and the game time until which no leap onto them is
+     * planned again - over every goal (the spots to avoid go with each new goal, these not).
+     */
+    private final java.util.Map<Long, Long> failedLeaps = new java.util.HashMap<>();
+    private static final long LEAP_MEMORY = 20 * 60 * 20;
+    /** The leap under way: its step in the path (-1: none) and the block it is made from. */
+    private int leapIndex = -1;
+    private BlockPos leapFrom;
     private double lastDistance;
     private Status status = Status.IDLE;
     /** The goal only reads positions (no world): its search may run on the worker thread. */
@@ -775,33 +784,76 @@ public final class BotNavigator {
     }
 
     /**
-     * A leap over a gap: run at it sprinting, jump at the very edge, keep pushing forward in the
-     * air. Fallen short (below the landing): look for another way from down there.
+     * A leap over a gap: begun standing on the block it is made from (not still in the air from
+     * the step before), the shield down; a run at it sprinting, the jump at the last tick the feet
+     * are still on the edge (the most way over the gap), pushing on in the air. Fallen short
+     * (below the landing): that leap is not tried again for a while, and another way is looked for
+     * from down there.
      */
     private Status leap(BlockPos to, BlockPos feet) {
         double dx = to.getX() + 0.5 - bot.getX(), dz = to.getZ() + 0.5 - bot.getZ();
         double flat = Math.sqrt(dx * dx + dz * dz);
         if (bot.onGround() && feet.equals(to) && flat < 0.6 || bot.onGround() && flat < 0.4 && Math.abs(bot.getY() - to.getY()) < 0.6) {
             bot.sprintNow = false;
+            leapIndex = -1;
             advance();
             return status;
         }
         if (bot.getY() < to.getY() - 1.2) {
             bot.sprintNow = false;
+            leapIndex = -1;
+            failedLeaps.put(to.asLong(), bot.level().getGameTime() + LEAP_MEMORY);
+            avoid.add(to.asLong());
             dropPath("fell short"); // fell in
+            // (Not the rest of that way either: it went over the leap.)
+            rest = null;
             return status;
         }
+        if (leapIndex != index) {
+            // (Still in the air from the step before: the run-up starts once down.)
+            if (!bot.onGround()) {
+                bot.forward = 0;
+                bot.strafe = 0;
+                bot.jump = false;
+                return status;
+            }
+            leapIndex = index;
+            leapFrom = index > 0 ? path.get(index - 1).to() : standing(feet);
+        }
+        int ax = Integer.signum(to.getX() - leapFrom.getX()), az = Integer.signum(to.getZ() - leapFrom.getZ());
+        if (ax != 0 && az != 0) {
+            if (Math.abs(to.getX() - leapFrom.getX()) >= Math.abs(to.getZ() - leapFrom.getZ())) az = 0;
+            else ax = 0;
+        }
+        int gap = Math.abs(to.getX() - leapFrom.getX()) + Math.abs(to.getZ() - leapFrom.getZ()) - 1;
+        // (Too little food to sprint: over more than one block that is a leap that falls short.)
+        if (gap > 1 && bot.onGround() && bot.getFoodData().getFoodLevel() <= 6) {
+            leapIndex = -1;
+            avoid.add(to.asLong());
+            dropPath("leap without sprint");
+            holdStill();
+            return status;
+        }
+        // (A raised shield takes the sprint and most of the speed.)
+        if (bot.isUsingItem()) bot.releaseUsingItem();
         float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
         bot.setYRot(yaw);
         bot.setYHeadRot(yaw);
         bot.forward = 1f;
         bot.strafe = 0;
         bot.sprintNow = true;
-        // At the edge: the ground a little ahead is gone.
-        double ux = dx / Math.max(flat, 1e-3), uz = dz / Math.max(flat, 1e-3);
-        BlockPos ahead = BlockPos.containing(bot.getX() + ux * 0.45, bot.getY() - 0.5, bot.getZ() + uz * 0.45);
-        bot.jump = bot.onGround() && bot.level().getBlockState(ahead).getCollisionShape(bot.level(), ahead).isEmpty();
+        // The jump at the last moment on the edge: the feet hold till the body's middle is three
+        // tenths over it; jumped when the next tick (the speed now and the push) would take it past.
+        double edge = ax > 0 ? leapFrom.getX() + 1 - bot.getX() : ax < 0 ? bot.getX() - leapFrom.getX()
+                : az > 0 ? leapFrom.getZ() + 1 - bot.getZ() : bot.getZ() - leapFrom.getZ();
+        double speed = ax * bot.getDeltaMovement().x + az * bot.getDeltaMovement().z;
+        bot.jump = bot.onGround() && speed + 0.13 - edge >= 0.22;
         return status;
+    }
+
+    /** A leap under way (from the run-up to the landing): no shield raised, no dodge, no braking in the air. */
+    public boolean leaping() {
+        return path != null && index < path.size() && path.get(index).leap() && leapIndex == index;
     }
 
     private void advance() {
@@ -982,7 +1034,10 @@ public final class BotNavigator {
         if (!ahead && path != null) for (int i = index; i < path.size(); i++) favoured.add(path.get(i).to().asLong());
         else if (!ahead && rest != null) favoured.addAll(rest);
         if (!ahead) for (long a : avoid) favoured.remove(a);
-        BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf);
+        long now = level.getGameTime();
+        failedLeaps.values().removeIf(until -> until < now);
+        BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf)
+                .notLeapingTo(new java.util.HashSet<>(failedLeaps.keySet()));
         finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
         finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)).anyWater(forAir);
         var guideFuture = guide(level, from);
