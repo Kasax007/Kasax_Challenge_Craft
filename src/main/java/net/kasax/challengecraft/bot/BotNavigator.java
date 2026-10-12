@@ -28,8 +28,10 @@ public final class BotNavigator {
      * (the same build died 3 times at 1.5 times the real pace and 18 times at 2.3 times).
      */
     public static final boolean SIM = "1".equals(System.getenv("CHALLENGECRAFT_BOT_SIM")) || Boolean.getBoolean("challengecraft.bot.sim");
-    /** Nodes a search goes through in a tick at the real pace (some hundred thousand a second). */
-    private static final int SIM_NODES_PER_TICK = 5000;
+    /** Nodes a search goes through in a tick at the real pace (CHALLENGECRAFT_BOT_SIM_NODES; ten thousand: two hundred thousand a second). */
+    private static final int SIM_NODES_PER_TICK = Integer.parseInt(java.util.Objects.requireNonNullElse(System.getenv("CHALLENGECRAFT_BOT_SIM_NODES"), "10000"));
+    /** Ticks after it was started that the large view's way counts as worked out (self-play). */
+    private static final int SIM_GUIDE_TICKS = 10;
     private static final int BUDGET = 40000;
     private static final long SYNC_NANOS = 60_000_000L;
     /** A search on a worker thread (plain position goals): first try, and the longer one if that found nothing. */
@@ -132,7 +134,7 @@ public final class BotNavigator {
 
     /** The large view's way from {@code from} to the current goal, as points every {@code every} cells (for the log). */
     public java.util.List<BlockPos> wayPoints(int every) {
-        if (guideJob == null || !SIM && !guideJob.isDone()) return java.util.List.of();
+        if (guideJob == null || !guideReady(guideJob)) return java.util.List.of();
         try {
             return guideJob.get().route(feet(), every);
         } catch (Exception e) {
@@ -1051,7 +1053,7 @@ public final class BotNavigator {
         finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
         finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)).anyWater(forAir);
         var guideFuture = guide(level, from);
-        if (guideFuture != null && (SIM || guideFuture.isDone())) finder.guided(guideOf(guideFuture));
+        if (guideFuture != null && guideReady(guideFuture)) finder.guided(guideOf(guideFuture));
         Predicate<BlockPos> g = goal;
         BlockPos t = target;
         boolean hard = noWay > 0;
@@ -1097,7 +1099,7 @@ public final class BotNavigator {
             guideAt = now;
             guideCenter = from;
         }
-        if (walkEstimate == 0 && (SIM || guideJob.isDone())) {
+        if (walkEstimate == 0 && guideReady(guideJob)) {
             BotTerrain.Field f = guideOf(guideJob);
             double t = f == null ? -1 : f.ticks(from.getX(), from.getZ());
             if (t > 0) {
@@ -1106,6 +1108,11 @@ public final class BotNavigator {
             }
         }
         return guideJob;
+    }
+
+    /** Whether the large view's way may be used now: done (self-play: some ticks after it was started, waited for then). */
+    private boolean guideReady(java.util.concurrent.Future<BotTerrain.Field> f) {
+        return SIM ? bot.level().getGameTime() >= guideAt + SIM_GUIDE_TICKS : f.isDone();
     }
 
     private static BotTerrain.Field guideOf(java.util.concurrent.Future<BotTerrain.Field> f) {
@@ -1123,7 +1130,15 @@ public final class BotNavigator {
 
     /** A finished search on the worker thread: taken up. */
     private void pollSearch() {
-        if (pending == null || !SIM && !pending.isDone()) return;
+        if (pending == null) return;
+        if (SIM) {
+            // Self-play: the search runs on beside the game, and is waited for only where it is
+            // behind the game's time - the nodes so far fewer than the ticks since its start allow.
+            // So it is found in the same tick, however fast or slow the machine.
+            long allowed = (bot.level().getGameTime() - pendingAt) * SIM_NODES_PER_TICK;
+            while (!pending.isDone() && pendingFinder.progress < allowed) java.util.concurrent.locks.LockSupport.parkNanos(20_000);
+            if (!pending.isDone()) return;
+        } else if (!pending.isDone()) return;
         BotPathfinder.Result r;
         try {
             r = pending.get();

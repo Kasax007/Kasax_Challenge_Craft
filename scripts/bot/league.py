@@ -10,12 +10,14 @@ variant changes every game (no edge from the order the bots are ticked in). Ever
 the tiles after 5/10/20 minutes, and the sign test on the wins.
 """
 import argparse
+import concurrent.futures
 import json
 import math
 import os
 import random
 import subprocess
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -77,20 +79,42 @@ def main():
     ap.add_argument("--seconds", type=int, default=1800)
     ap.add_argument("--difficulty", default="hard")
     ap.add_argument("--out", default="league.jsonl")
+    ap.add_argument("--parallel", type=int, default=1,
+                    help="matches at once (each a server JVM started directly: run 'gradlew classes' first)")
     args = ap.parse_args()
     seeds = [int(s) for s in args.seeds.split(",") if s] or [random.randrange(-2**62, 2**62) for _ in range(args.games)]
+    root = os.path.dirname(os.path.dirname(HERE))
     results = []
-    for i, seed in enumerate(seeds):
-        names = ("Bob", "Alice") if i % 2 == 0 else ("Alice", "Bob")
-        sides = [f"{names[0]}:{args.a}", f"{names[1]}:{args.b}"]
-        r = play(seed, args.seconds, args.difficulty, sides, os.environ.copy())
+    lock = threading.Lock()
+    slots = list(range(args.parallel))
+
+    def game(i, seed):
+        with lock:
+            slot = slots.pop()
+        try:
+            env = os.environ.copy()
+            if args.parallel > 1:
+                # (Each slot its own run directory and ports, from the same compiled classes.)
+                run = os.path.join(root, f"run-{slot}")
+                os.makedirs(run, exist_ok=True)
+                env.update(DIRECT="1", RUNDIR=run, SERVER_PORT=str(25565 + slot), RCON_PORT=str(25575 + slot))
+            names = ("Bob", "Alice") if i % 2 == 0 else ("Alice", "Bob")
+            sides = [f"{names[0]}:{args.a}", f"{names[1]}:{args.b}"]
+            r = play(seed, args.seconds, args.difficulty, sides, env)
+        finally:
+            with lock:
+                slots.append(slot)
         if r is None:
-            continue
-        results.append(r)
-        with open(args.out, "a") as f:
-            f.write(json.dumps(r) + "\n")
-        line = ", ".join(f"{bot['name']}({bot['params']}) {bot['tiles']} tiles {bot['deaths']} deaths" for bot in r["bots"])
-        print(f"game {i + 1}/{len(seeds)} seed {seed}: {line} -> {r['winner']}", flush=True)
+            return
+        with lock:
+            results.append(r)
+            with open(args.out, "a") as f:
+                f.write(json.dumps(r) + "\n")
+            line = ", ".join(f"{bot['name']}({bot['params']}) {bot['tiles']} tiles {bot['deaths']} deaths" for bot in r["bots"])
+            print(f"game {len(results)}/{len(seeds)} seed {seed}: {line} -> {r['winner']}", flush=True)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as pool:
+        list(pool.map(lambda iv: game(*iv), enumerate(seeds)))
     summary(results, args.a, args.b)
 
 

@@ -172,6 +172,9 @@ public final class BotPathfinder {
         return f * m;
     }
 
+    /** Nodes gone through so far (every 256; read by the navigator in self-play to keep the search in game time). */
+    public volatile int progress;
+
     /** Landing spots of leaps that fell short before: no leap onto them again. */
     private java.util.Set<Long> failedLeaps = java.util.Set.of();
 
@@ -279,7 +282,10 @@ public final class BotPathfinder {
         java.util.Arrays.fill(bestScore, Double.MAX_VALUE);
         int expanded = 0;
         while (!open.isEmpty() && expanded < maxNodes) {
-            if ((expanded & 255) == 0 && System.nanoTime() > until) break;
+            if ((expanded & 255) == 0) {
+                progress = expanded;
+                if (System.nanoTime() > until) break;
+            }
             Node n = open.poll();
             if (n.closed) continue;
             n.closed = true;

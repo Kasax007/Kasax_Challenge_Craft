@@ -203,6 +203,20 @@ public final class BotKnowledge {
 
     /** As {@link #rarity(Block)}, for the dimension the bot is in: in the Nether it is the Nether's blocks that are around. */
     public static double rarity(Block block, boolean nether) {
+        // (Asked thousands of times a plan, and it only ever depends on the block: kept.)
+        var cache = nether ? RARITY_NETHER : RARITY;
+        Double known = cache.get(block);
+        if (known != null) return known;
+        double r = rarityOf(block, nether);
+        cache.put(block, r);
+        return r;
+    }
+
+    private static final java.util.Map<Block, Double> RARITY = new java.util.concurrent.ConcurrentHashMap<>(),
+            RARITY_NETHER = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.regex.Pattern STORAGE_BLOCK = java.util.regex.Pattern.compile("(iron|gold|diamond|emerald|lapis|redstone|coal|netherite)_block");
+
+    private static double rarityOf(Block block, boolean nether) {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
         if (nether) {
             return switch (id) {
@@ -226,7 +240,7 @@ public final class BotKnowledge {
         // Storage blocks and the copper building blocks (trial chambers): never worth a search,
         // the ore is (nine ingots a block only if one happens to be in sight).
         if (!id.contains("ore") && (id.contains("copper") || id.startsWith("raw_") && id.endsWith("_block")
-                || id.matches("(iron|gold|diamond|emerald|lapis|redstone|coal|netherite)_block"))) return 9000;
+                || STORAGE_BLOCK.matcher(id).matches())) return 9000;
         // Trees not in sight: the common kinds are a short walk away, the others need their biome.
         if (s.is(BlockTags.LOGS)) return id.contains("oak") && !id.contains("dark") || id.contains("birch") || id.contains("spruce") ? 30 : 150;
         if (s.is(BlockTags.SMALL_FLOWERS)) return id.equals("dandelion") || id.equals("poppy") ? 12 : 90;
