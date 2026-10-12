@@ -2515,6 +2515,25 @@ Tode nicht.
 Der Rest (~500 s) ist in der Cortex-Buchführung nicht erfasst. Deshalb schreibt jedes Match jetzt die
 Zeit je Wurzelaufgabe ins Ergebnis (`"time"`), und die Liga zeigt sie an.
 
+Nachträglich aus den Logs rekonstruiert (jede „->“-Zeile beginnt eine Wurzelaufgabe; Sekunden je
+Spiel, Standardvariante):
+
+| Wurzelaufgabe | s/Spiel |
+| --- | --- |
+| Essensvorrat | 262 |
+| eingegraben für die Nacht | 238 |
+| Schild | 98 |
+| Holz | 89 |
+| Bett holen | 81 |
+| eingemauert für die Nacht | 62 |
+| Eisenspitzhacke | 44 |
+| Steine fürs Kit | 40 |
+| tot, wartend auf die Dämmerung | 33 |
+
+Nacht und Essen zusammen: über die Hälfte jedes Spiels. In 24 Bot-Spielen wurden nur 36 Brettziele
+überhaupt angefangen (1,5 je Spiel), etwa 13 % der Zeit. Die Standardvariante beginnt sogar mit einem
+Essensvorrat (~74 s), noch vor dem ersten Holz.
+
 **Schnelle Felder:** Die Schätzungen waren oft zu optimistisch.
 
 | Feld | Schätzung | Was geschah |
@@ -2556,3 +2575,49 @@ In Spiel 6 kosteten drei solche Felder zusammen fast 5 Minuten, keines wurde geh
   Wächter Bob ein.
 - Die Ergebnisse jeder Partie enthalten jetzt die Zeit je Wurzelaufgabe. Gespielte Welten werden
   gelöscht (eine Liga hinterließ sonst 60 Welten zu je ~60 MB).
+
+### 24.8 Liga 2: Standard gegen `foodcap=60`
+
+Gleiche Bedingungen wie Liga 1 (12 Spiele, 20 min, HARD). Beide Seiten auf dem Stand von 24.7, also
+mit der neuen Nachtregel. `foodcap=60`: kein Essensvorrat ohne Hunger, wenn er mehr als 60 s kostet.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | 5 | 1,7 | 0,33 | 23,6 | 313 s | 0,6 / 1,2 / 1,7 |
+| `foodcap=60` | 7 | 1,7 | 0,58 | 21,6 | 237 s | 0,5 / 1,4 / 1,7 |
+
+Felder je Spiel gepaart: +0,00 (Standardfehler 0,91); Vorzeichentest auf die Siege p = 0,77. Ohne
+den frühen Vorrat kommt das erste Feld gut eine Minute früher, am Ende aber nicht mehr Felder, dafür
+fast doppelt so viele Tode. Die Standardregel bleibt.
+
+**Zeit je Wurzelaufgabe** (Standard, s/Spiel, neu gemessen): eingegraben für die Nacht 280,
+Essensvorrat 187, Eisenspitzhacke 106, Schild 92, eingemauert 79, Holz 78, Bett 49. Die Nacht kostete
+trotz der Regel ohne Rüstung noch fast ein Viertel. Die Gründe im Log sind fast alle „food 0/3/4/6“:
+weniger als 8 Nahrungspunkte im Gepäck, auch bei vollem Hungerbalken; dazu „no weapon“ nach Toden.
+
+**Die 11 Tode beider Seiten:**
+
+| Ursache | Anzahl |
+| --- | --- |
+| in einer Box, die nicht zuging („not every side would go in“); Pfeile aus 5–13 Blöcken, Zombies durch die Lücke, einmal beim Essen in der offenen Box | 4 |
+| ertrunken: unter Wasser in einem Gang beim Steinabbau, in einer überfluteten Mine | 2 |
+| Eisbär (für den Wächter kein Gegner, er zählte nur Monster) | 1 |
+| auf dem Kampfpfeiler: „low: away“, der Rückzug war ein Sturz in die Zombies | 1 |
+| Skelett in der Höhle, im Nahkampf mit gesenktem Schild | 1 |
+| übrige (Zombie, Skelett bei der Arbeit) | 2 |
+
+### 24.9 Korrekturen aus Liga 2
+
+- **Box an der Kante** (`HideTask`): Eine Seite über Luft (am Rand eines Absatzes) hat nichts, woran
+  sie gesetzt werden kann. Bob setzt erst einen Block darunter, gegen den Boden, auf dem er steht. Die
+  Meldung nennt jetzt jede offene Seite und den Grund („east feet: nothing to set it against“,
+  „zombie in it“, „no blocks left“). Test `box_at_ledge`.
+- **Kein Essen in einer offenen Box**, solange einer in 6 Blöcken hinter Bob her ist.
+- **Luft** (`AirTask`): Ein wassergeloggter Block über dem Kopf (Zaun, Stufe in einer überfluteten
+  Mine) wird abgebaut; vorher galt er als „Wasser“, und Bob sprang dagegen, bis er ertrank. Eine
+  Spinnwebe gilt nicht mehr als Luft. Test `air_past_waterlogged_fence`.
+- **Wächter**: zählt alles, was hinter Bob her ist, nicht nur Monster (Eisbär, Wolf, Golem, Bienen).
+- **Kampfpfeiler**: kein „low: away“ mehr während eines Kampfs vom Pfeiler.
+- **Satt für die Nacht** ist auch, wer einen Hungerbalken ab 16 hat, nicht nur, wer 8 Nahrungspunkte
+  im Gepäck trägt.
+- Volle Suite: 171 von 171 grün.

@@ -93,6 +93,31 @@ public class BotMovementTests {
         a.run(new SurfaceTask(), 1200, () -> a.feet().getY() >= FEET - 1 && a.bot().body().onGround());
     }
 
+    /**
+     * Under water at the bottom of a flooded shaft, a waterlogged fence across it overhead (a flooded
+     * mineshaft, where a self-play game drowned "digging up" at nothing): the fence dug away, up and out.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void airPastWaterloggedFence(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "air_past_waterlogged_fence");
+        a.fill(19, GROUND - 9, 19, 21, GROUND, 21, Blocks.STONE);
+        a.fill(20, GROUND - 8, 20, 20, GROUND, 20, Blocks.WATER);
+        a.fill(20, GROUND - 5, 20, 20, GROUND - 5, 20,
+                Blocks.OAK_FENCE.defaultBlockState().setValue(net.minecraft.world.level.block.FenceBlock.WATERLOGGED, true));
+        a.spawn(20, GROUND - 8, 20, new ItemStack(Items.IRON_AXE));
+        var body = a.bot().body();
+        body.setAirSupply(160);
+        // (Under first - the eyes' water is only known after a tick - then out.)
+        boolean[] under = {false}, out = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 900, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("air_past_waterlogged_fence: drowned");
+            boolean eyeIn = body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            under[0] |= eyeIn;
+            out[0] |= under[0] && !eyeIn && body.getY() > a.abs(0, GROUND - 5, 0).getY();
+            return out[0];
+        });
+    }
+
     /** A one-wide shaft with water three deep at the bottom (dug into an aquifer): up and out. */
     @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
     public void floodedNarrowShaft(GameTestHelper h) {

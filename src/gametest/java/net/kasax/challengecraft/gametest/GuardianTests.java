@@ -147,4 +147,26 @@ public class GuardianTests {
             return shut && h.getTick() > 100;
         });
     }
+
+    /**
+     * Walled in at the edge of a drop (one side of the box over thin air, as at a ledge in the
+     * self-play games, where a skeleton shot in through the side that would not go in): a block
+     * under that side first, then the side - the box shut all round, the lid on.
+     */
+    @GameTest(environment = "challengecraft:open_box", structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 24)
+    public void boxAtLedge(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "box_at_ledge");
+        a.fill(21, GROUND - 2, 0, 39, GROUND, 39, Blocks.AIR);
+        a.spawn(20, FEET, 20, new ItemStack(Items.COBBLESTONE, 20));
+        var body = a.bot().body();
+        a.run(net.kasax.challengecraft.bot.task.HideTask.boxed(), 600, () -> {
+            var feet = body.blockPosition();
+            boolean shut = true;
+            for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                shut &= !h.getLevel().getBlockState(feet.relative(d)).canBeReplaced() && !h.getLevel().getBlockState(feet.above().relative(d)).canBeReplaced();
+            }
+            shut &= !h.getLevel().getBlockState(feet.above(2)).canBeReplaced();
+            return shut && h.getTick() > 40;
+        });
+    }
 }

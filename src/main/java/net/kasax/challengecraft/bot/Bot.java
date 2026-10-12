@@ -793,8 +793,10 @@ public final class Bot {
                 // ground instead, below; most of the late deaths were "low, a skeleton: away".)
                 if (!creeper && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && (net.kasax.challengecraft.bot.task.HideTask.possible(this) || net.kasax.challengecraft.bot.task.HideTask.boxPossible(this))) continue;
                 // (From a magma cube sooner: they come in families, each split another two blows.)
-                if (creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
-                        + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0)) {
+                // (Not off a pillar it fights from: "away" is a fall into them - so died a game.)
+                if ((creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
+                        + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0))
+                        && !tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.PillarFightTask)) {
                     net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
                     say((creeper ? "a creeper hissing " + String.format("%.1f", m.distanceTo(body)) + " blocks off" : "low (" + Math.round(body.getHealth()) + " hp), a "
                             + m.getType().toShortString() + " at me") + ": away");

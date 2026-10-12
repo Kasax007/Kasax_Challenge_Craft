@@ -109,7 +109,10 @@ public final class Guardian {
         Difficulty diff = level.getDifficulty();
         double armour = body.getArmorValue(), tough = body.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
         List<Threat> threats = new ArrayList<>();
-        for (Mob m : level.getEntitiesOfClass(Mob.class, body.getBoundingBox().inflate(64, 24, 64), m -> m.isAlive() && m instanceof Enemy)) {
+        // (Not only monsters: a polar bear by its cub, a wolf, a golem, bees - after him, they are
+        // as deadly; a polar bear took eighteen hearts in two blows in a self-play game, unseen.)
+        for (Mob m : level.getEntitiesOfClass(Mob.class, body.getBoundingBox().inflate(64, 24, 64),
+                m -> m.isAlive() && (m instanceof Enemy || m.getTarget() == body))) {
             double d = m.distanceTo(body);
             boolean after = m.getTarget() == body;
             boolean sees = body.hasLineOfSight(m);

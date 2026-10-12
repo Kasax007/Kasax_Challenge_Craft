@@ -260,7 +260,11 @@ public final class HideTask implements BotTask {
             }
         }
         // Safe: eat, and wait for the hearts (natural regeneration wants a full-ish stomach).
-        if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0) {
+        // (Not in a box with a side still open and one about: a meal takes the hands for seconds,
+        // and the blows through the gap went unanswered - so died a self-play game, eating.)
+        boolean exposed = box && !sealed(level) && !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
+                body.getBoundingBox().inflate(6), m -> m.isAlive() && (m.getTarget() == body || body.getLastHurtByMob() == m)).isEmpty();
+        if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0 && !exposed) {
             bot.interject(new EatTask());
             return Result.RUNNING;
         }
@@ -340,6 +344,14 @@ public final class HideTask implements BotTask {
                 }
                 continue;
             }
+            // A side over a drop (at the edge of a ledge, a step down beside it): nothing to set
+            // it against. A block under it first, against the floor it stands on - as a player
+            // builds out over an edge.
+            if (!held(level, p) && p.getY() == top.getY() && level.getBlockState(p.below()).canBeReplaced()
+                    && held(level, p.below()) && bot.actions().placeSturdy(p.below())) {
+                placed++;
+                return Result.RUNNING;
+            }
             if (bot.actions().placeSturdy(p)) {
                 placed++;
                 return Result.RUNNING;
@@ -349,9 +361,27 @@ public final class HideTask implements BotTask {
         // tried again a while; then the box is as it is.)
         if (!open || ++lidTries > (untilDay ? 400 : 60)) {
             closed = true;
-            if (open) bot.say("box: not every side would go in");
+            if (open) bot.say("box: not every side would go in (" + gaps(bot, level) + ")");
         }
         return Result.RUNNING;
+    }
+
+    /** The sides still open and why, for the log: "east feet: nothing to set it against", ... */
+    private String gaps(Bot bot, ServerLevel level) {
+        List<String> out = new java.util.ArrayList<>();
+        for (BlockPos p : boxBlocks(top)) {
+            if (!level.getBlockState(p).canBeReplaced()) continue;
+            String where = p.getY() > top.getY() + 1 ? "lid"
+                    : net.minecraft.core.Direction.getApproximateNearest(p.getX() - top.getX(), 0, p.getZ() - top.getZ()).getName()
+                    + (p.getY() == top.getY() ? " feet" : " head");
+            var in = level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(p),
+                    e -> e.isAlive() && e != bot.body());
+            String why = !in.isEmpty() ? in.get(0).getType().toShortString() + " in it"
+                    : net.kasax.challengecraft.bot.BotActions.buildingBlocks(bot.body()) == 0 ? "no blocks left"
+                    : !held(level, p) ? "nothing to set it against" : "would not go";
+            out.add(where + ": " + why);
+        }
+        return String.join(", ", out);
     }
 
     /** Whether a block at {@code p} would have something beside it to be set against. */

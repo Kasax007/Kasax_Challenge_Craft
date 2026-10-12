@@ -101,7 +101,11 @@ public final class AirTask implements BotTask {
             case DIG -> {
                 BlockPos head = BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
                 for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) {
-                    if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() && level.getFluidState(q).isEmpty()) {
+                    // (A waterlogged block - a fence, a slab in a flooded mineshaft - is in the way
+                    // as much as a dry one: dug too. Left alone as "water", a fence over the head
+                    // drowned it there. And a cobweb in the water: swimming up through it takes
+                    // longer than any breath.)
+                    if (blocksTheWayUp(level, q) && level.getBlockState(q).getDestroySpeed(level, q) >= 0) {
                         // Standing on the bottom while at it: afloat, digging is five times slower.
                         bot.navigator().stop();
                         body.stopInputs();
@@ -170,6 +174,12 @@ public final class AirTask implements BotTask {
         return Way.DIG;
     }
 
+    /** Something over the head that keeps it from swimming up: a block (waterlogged or dry), a cobweb. */
+    private static boolean blocksTheWayUp(ServerLevel level, BlockPos q) {
+        var s = level.getBlockState(q);
+        return !s.getCollisionShape(level, q).isEmpty() || s.is(net.minecraft.world.level.block.Blocks.COBWEB);
+    }
+
     /** One or two solid blocks over the head, and air (not more water) right over them. */
     private static boolean thinRoof(ServerLevel level, BlockPos head) {
         for (int up = 1; up <= 3; up++) {
@@ -195,8 +205,9 @@ public final class AirTask implements BotTask {
     private static boolean openAbove(ServerLevel level, BlockPos feet, int max) {
         for (int up = 1; up <= max; up++) {
             BlockPos q = feet.above(up);
-            if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) return false;
+            if (blocksTheWayUp(level, q)) return false;
             var fluid = level.getFluidState(q);
+            // (Not water: the air - or a cobweb, which is no air - see blocksTheWayUp.)
             if (fluid.isEmpty()) return true;
             if (!fluid.isSource()) return false;
         }
@@ -214,7 +225,7 @@ public final class AirTask implements BotTask {
                 BlockPos p = feet.offset(dx, 0, dz);
                 for (int up = 0; up <= 16; up++) {
                     BlockPos q = p.above(up);
-                    if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) break;
+                    if (blocksTheWayUp(level, q)) break;
                     if (level.getFluidState(q).isEmpty()) {
                         best = p;
                         bestD = d;

@@ -662,7 +662,17 @@ public final class LockoutBrain implements BotBrain {
         // when a fight would be lost. Dug in for the night for want of armour, a fifth of every
         // self-play game went by. nightarmour=1: armour too, for the comparisons.)
         boolean armour = !nightArmour(bot) || body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2;
-        return armed && food >= 8 && armour && body.getHealth() >= 12;
+        return armed && fedForTheNight(body, food) && armour && body.getHealth() >= 12;
+    }
+
+    /**
+     * Food enough for a night out: some in the pack, or a stomach full enough to last it (a full
+     * bar is minutes of running and fighting, the hearts coming back all the while). Counted by
+     * the pack alone, a full stomach and an empty pack dug it in for the night - most of the
+     * nights hidden in the second self-play league were that.
+     */
+    private static boolean fedForTheNight(net.minecraft.world.entity.player.Player body, int foodPoints) {
+        return foodPoints >= 8 || body.getFoodData().getFoodLevel() >= 16;
     }
 
     private static net.minecraft.world.item.Item bedInPack(Bot bot) {
@@ -832,7 +842,7 @@ public final class LockoutBrain implements BotBrain {
             if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
         }
         if (!armed) out.add("no weapon");
-        if (food < 8) out.add("food " + food);
+        if (!fedForTheNight(body, food)) out.add("food " + food + ", hunger " + body.getFoodData().getFoodLevel());
         if (nightArmour(bot) && body.getArmorValue() < 6 && !(shield && body.getArmorValue() >= 2)) out.add("armour " + body.getArmorValue() + (shield ? "+shield" : ""));
         if (body.getHealth() < 12) out.add("hp " + Math.round(body.getHealth()));
         return String.join(", ", out);
