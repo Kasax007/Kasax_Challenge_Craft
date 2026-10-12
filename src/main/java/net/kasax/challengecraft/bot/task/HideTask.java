@@ -15,7 +15,7 @@ import java.util.List;
  */
 public final class HideTask implements BotTask {
     private static final int MAX_TICKS = 900;
-    private int ticks, dug, lidTries, reopened;
+    private int ticks, dug, lidTries, reopened, strays;
     private BlockPos top;
     private boolean closed;
 
@@ -186,6 +186,8 @@ public final class HideTask implements BotTask {
             if (level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) return false;
             if (level.getBlockState(p).canBeReplaced()) open++;
         }
+        // (And one on a wall for the lid to rest against, unless something is there already.)
+        if (level.getBlockState(feet.above(2)).canBeReplaced() && !held(level, feet.above(2))) open++;
         return (all ? net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) : bot.actions().spendableBlocks()) >= open;
     }
 
@@ -223,6 +225,12 @@ public final class HideTask implements BotTask {
                 lidTries = 0;
             }
         }
+        // The box not shut yet - a side that will not go in - and one at it through the gap: struck
+        // from where it stands, not stood still under its blows (in a self-play game a spider bit
+        // seven times through the one side that would not go in, and not one blow came back). A
+        // gap clear of it gets its block first; a blow throws it out of the gap. (Into the ground,
+        // the digging goes first: a few blows of the shovel and it is out of their reach.)
+        if (box && !sealed(level) && (closed || !sideClear(level, body)) && defend(bot, body, level)) return Result.RUNNING;
         if (box) {
             if (!closed) return boxIn(bot, body, level);
         } else {
@@ -294,15 +302,44 @@ public final class HideTask implements BotTask {
 
     /** The box going up, a block a tick: the sides at the feet, at the head, then the lid. */
     private Result boxIn(Bot bot, BotPlayer body, ServerLevel level) {
-        // Over the middle of the block first: a side block cannot go where a shoulder is.
-        if (!body.onGround() || !centred(body)) return Result.RUNNING;
+        if (!body.onGround()) return Result.RUNNING;
         // (Round where it stands now, until the first block is in: a dodge or a blow may have
         // moved it since the start.)
         if (placed == 0) top = body.blockPosition();
+        else if (!body.blockPosition().equals(top)) {
+            // Knocked out of the half-built box by a blow: back into it, a step or two away; else
+            // a new box where it stands.
+            double dx = top.getX() + 0.5 - body.getX(), dz = top.getZ() + 0.5 - body.getZ();
+            if (body.blockPosition().getY() == top.getY() && dx * dx + dz * dz < 9 && ++strays < 80) {
+                body.setYRot((float) (Math.atan2(dz, dx) * 180 / Math.PI) - 90f);
+                body.forward = 0.6f;
+                return Result.RUNNING;
+            }
+            top = body.blockPosition();
+            placed = 0;
+        }
+        strays = 0;
+        // Over the middle of the block first: a side block cannot go where a shoulder is.
+        if (!centred(body)) return Result.RUNNING;
         boolean open = false;
+        BlockPos lid = top.above(2);
         for (BlockPos p : boxBlocks(top)) {
             if (!level.getBlockState(p).canBeReplaced()) continue;
             open = true;
+            // The lid over the head touches nothing (the walls end at the head): a block on top
+            // of a wall first, for it to be set against - else every box stayed open at the top,
+            // and a spider came over the wall.
+            if (p.equals(lid) && !held(level, lid)) {
+                for (Direction d : Direction.Plane.HORIZONTAL) {
+                    BlockPos rest = lid.relative(d);
+                    if (level.getBlockState(rest).canBeReplaced() && !level.getBlockState(rest.below()).getCollisionShape(level, rest.below()).isEmpty()
+                            && bot.actions().placeSturdy(rest)) {
+                        placed++;
+                        return Result.RUNNING;
+                    }
+                }
+                continue;
+            }
             if (bot.actions().placeSturdy(p)) {
                 placed++;
                 return Result.RUNNING;
@@ -315,6 +352,79 @@ public final class HideTask implements BotTask {
             if (open) bot.say("box: not every side would go in");
         }
         return Result.RUNNING;
+    }
+
+    /** Whether a block at {@code p} would have something beside it to be set against. */
+    private static boolean held(ServerLevel level, BlockPos p) {
+        for (Direction d : Direction.values()) {
+            BlockPos q = p.relative(d);
+            if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    /** Whether the box is shut: every side in, and the lid. */
+    private boolean sealed(ServerLevel level) {
+        if (top == null) return false;
+        for (BlockPos p : boxBlocks(top)) if (level.getBlockState(p).canBeReplaced()) return false;
+        return true;
+    }
+
+    /**
+     * Whether a side of the box still open can have its block now: nothing standing in it, and
+     * something beside it to set the block against (the head's side over a gap at the feet has
+     * nothing until the gap is shut).
+     */
+    private boolean sideClear(ServerLevel level, BotPlayer body) {
+        if (top == null) return true;
+        for (BlockPos p : boxBlocks(top)) {
+            if (!level.getBlockState(p).canBeReplaced()) continue;
+            // (The lid: once a wall at the head is in, a block on it to rest the lid on - see boxIn.)
+            boolean against = held(level, p);
+            if (!against && p.equals(top.above(2))) {
+                for (Direction d : Direction.Plane.HORIZONTAL) against |= !level.getBlockState(top.above().relative(d)).canBeReplaced();
+            }
+            if (against && level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(p),
+                    e -> e.isAlive() && e != body).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    /**
+     * A monster in reach and in sight, after it (or in the way of a side of the box): struck at
+     * full strength with the best weapon, without a step out - the weapon held meanwhile, as the
+     * arm recharges. Returns whether there was one.
+     */
+    private boolean defend(Bot bot, BotPlayer body, ServerLevel level) {
+        net.minecraft.world.entity.Mob near = null;
+        double best = 3.0;
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(4),
+                m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+            // (Not an enderman or the like minding its own business: only what is after it, or
+            // stands where a side of the box goes.)
+            boolean after = m.getTarget() == body || body.getLastHurtByMob() == m;
+            boolean inTheWay = false;
+            if (box && top != null) {
+                for (BlockPos p : boxBlocks(top)) {
+                    if (level.getBlockState(p).canBeReplaced() && m.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(p))) inTheWay = true;
+                }
+            }
+            if (!after && !(inTheWay && !(m instanceof net.minecraft.world.entity.monster.Enderman))) continue;
+            double d = KillTask.hitDistance(body, m);
+            if (d < best && body.hasLineOfSight(m)) {
+                best = d;
+                near = m;
+            }
+        }
+        if (near == null) return false;
+        // (Not the block for the box in hand meanwhile: a change of item starts the arm's charge over.)
+        KillTask.equipWeapon(bot);
+        body.lookAt(near.getEyePosition());
+        if (body.getAttackStrengthScale(0.5f) >= 1f) {
+            body.attack(near);
+            body.swing(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+        }
+        return true;
     }
 
     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {

@@ -133,8 +133,9 @@ public final class Guardian {
                     hit = 1;
                     every = 40;
                 } else {
-                    // (Not every arrow finds a target on the move: some three in five.)
-                    hit = afterArmour(scaled(m.getMainHandItem().is(Items.TRIDENT) ? 8 : 4, diff), armour, tough) * 0.6;
+                    // (Not every arrow finds a target on the move: some three in four. A full draw
+                    // hits for more than the base - 7.5 of an arrow on hard in a self-play game.)
+                    hit = afterArmour(scaled(m.getMainHandItem().is(Items.TRIDENT) ? 8 : 5, diff), armour, tough) * 0.75;
                     every = diff == Difficulty.HARD ? 30 : 45;
                 }
                 if (m instanceof Ghast) hit *= 0.8;
@@ -246,7 +247,7 @@ public final class Guardian {
     public BotTask stepIn(BotTask top) {
         BotPlayer body = bot.body();
         if (!bot.params.on("guardian")) return null;
-        if (!body.isAlive() || body.isSpectator() || body.isInWater() || body.isInLava() || body.isPassenger()) return null;
+        if (!body.isAlive() || body.isSpectator() || body.isInLava() || body.isPassenger()) return null;
         if (top != null && protective(top)) return null;
         // (A creeper hissing close by: the reflexes run or raise the shield - a box is no help.)
         for (Creeper c : body.level().getEntitiesOfClass(Creeper.class, body.getBoundingBox().inflate(8), Creeper::isAlive)) {
@@ -264,8 +265,10 @@ public final class Guardian {
         boolean begun = body.tickCount - body.getLastHurtByMobTimestamp() < 30 && body.getLastHurtByMob() != null;
         for (Threat t : r.threats()) begun |= t.ranged || t.from == 0 && t.mob.getTarget() == body;
         if (!begun) return null;
-        // (Falling: once down. A jump in a fight, a step: the cover starts as he lands.)
-        if (!body.onGround() && body.fallDistance > 2) return null;
+        // (In the water no cover can be made: the reflexes take him ashore. Falling: once down. A
+        // jump in a fight, a step: the cover starts as he lands.)
+        if (body.isInWater()) return none(r, "in the water");
+        if (!body.onGround() && body.fallDistance > 2) return none(r, "falling");
         boolean shooters = false, climbers = false, jumpers = false, tall = false;
         for (Threat t : r.threats()) {
             shooters |= t.ranged;
@@ -317,7 +320,7 @@ public final class Guardian {
             how = night ? "dug in for the night" : "dug in";
             digs++;
         }
-        if (choice == null) return null;
+        if (choice == null) return none(r, "no cover here (blocks " + net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) + ", ground not to dig)");
         lastActAt = body.tickCount;
         if (body.tickCount - saidAt > 40) {
             saidAt = body.tickCount;
@@ -329,6 +332,21 @@ public final class Guardian {
                     + ": " + how);
         }
         return choice;
+    }
+
+    private int noneSaidAt = -1000;
+
+    /** A fight being lost, and no cover taken: why, in the log (once in two seconds) - the reflexes go on. */
+    private BotTask none(Reckoning r, String why) {
+        BotPlayer body = bot.body();
+        if (body.tickCount - noneSaidAt > 40) {
+            noneSaidAt = body.tickCount;
+            java.util.Map<String, Integer> kinds = new java.util.TreeMap<>();
+            for (Threat t : r.threats()) kinds.merge(t.mob.getType().toShortString(), 1, Integer::sum);
+            BotManager.LOG.info("[Bot] {}: guardian: {} at me, {} hp - gone in ~{} s, no cover: {}", bot.name, kinds,
+                    Math.round(body.getHealth()), String.format("%.1f", r.ticksLeft() / 20.0), why);
+        }
+        return null;
     }
 
     /** Ticks to dig in right here (three blocks down and the lid), or MAX_VALUE when it cannot be done. */

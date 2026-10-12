@@ -13,6 +13,12 @@ import java.util.Map;
  *   <li>{@code guardian} - 1: the guardian steps in when a fight is lost before it is won; 0: never.</li>
  *   <li>{@code quick} - seconds: a tile that takes no longer from where things stand is done before
  *       anything else (the opening, the kit); 0: no such tiles.</li>
+ *   <li>{@code shield} - 1: on hard the shield is got before the plan (one ingot); 0: only when a
+ *       tile or the iron kit brings it.</li>
+ *   <li>{@code foodcap} - seconds: a stock of food while not starving only if it costs no more
+ *       (-1, the default: the usual rule).</li>
+ *   <li>{@code nightarmour} - 0 (the default): geared for the night is a weapon, food and the
+ *       hearts; 1: armour too (6, or 2 and a shield), else dug in for the night.</li>
  * </ul>
  */
 public final class BotParams {

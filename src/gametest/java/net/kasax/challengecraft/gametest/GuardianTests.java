@@ -117,4 +117,34 @@ public class GuardianTests {
             return !zombie.isAlive();
         });
     }
+
+    /**
+     * Walled in on hard, a spider at him in the one side that will not go in (a
+     * self-play game: seven bites through the gap, not one blow back, dead): the spider struck
+     * from inside, the side put in once the gap is clear - alive, the box shut.
+     */
+    @GameTest(environment = "challengecraft:open_box", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void spiderInTheGap(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "spider_in_the_gap");
+        hard(h.getLevel());
+        h.getLevel().getServer().getCommands().performPrefixedCommand(h.getLevel().getServer().createCommandSourceStack().withSuppressedOutput(), "time set 1000");
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16));
+        var body = a.bot().body();
+        var spider = mob(h, a, EntityTypes.SPIDER, 22, FEET, 20);
+        // (By day, the spider kept at him: the clock is the whole server's, and left at night it
+        // kept a dead bot from its respawn in the tests after this one, waiting for the dawn.)
+        a.run(net.kasax.challengecraft.bot.task.HideTask.boxed(), 1200, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "spider_in_the_gap: died");
+            if (spider.isAlive() && spider.getTarget() != body) spider.setTarget(body);
+            var feet = body.blockPosition();
+            boolean shut = true;
+            for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                shut &= !h.getLevel().getBlockState(feet.relative(d)).canBeReplaced() && !h.getLevel().getBlockState(feet.above().relative(d)).canBeReplaced();
+            }
+            shut &= !h.getLevel().getBlockState(feet.above(2)).canBeReplaced();
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] spider_in_the_gap hp {} spider {} shut {}", body.getHealth(),
+                    spider.isAlive() ? spider.getHealth() : "dead", shut);
+            return shut && h.getTick() > 100;
+        });
+    }
 }

@@ -270,14 +270,16 @@ public final class LockoutBrain implements BotBrain {
         // played without it - seed 77: no iron tile on the board, so no iron and no shield, and
         // dead to the zombies on a spider hunt at minute twelve.)
         boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
-        boolean shieldWanted = hard && !has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD));
+        // (shield=0: not before the plan - for the self-play comparisons.)
+        boolean shieldFirst = hard && bot.params.on("shield");
+        boolean shieldWanted = shieldFirst && !has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD));
         if ((strategist.wantsIron() || shieldWanted) && bot.body().level().getGameTime() >= kitRetryAt
                 && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             // (On hard the shield first - one ingot of the same trip down: the first iron went into
             // the pickaxe and the bucket, and the shield came twenty minutes later or never, while
             // most deaths were arrows.)
             List<net.minecraft.world.item.Item> kit = new ArrayList<>();
-            if (hard) kit.add(net.minecraft.world.item.Items.SHIELD);
+            if (shieldFirst) kit.add(net.minecraft.world.item.Items.SHIELD);
             if (strategist.wantsIron()) {
                 kit.add(net.minecraft.world.item.Items.IRON_PICKAXE);
                 kit.add(net.minecraft.world.item.Items.BUCKET);
@@ -414,29 +416,47 @@ public final class LockoutBrain implements BotBrain {
         quickAt = now + 100;
         Choice best = null;
         int doable = 0;
+        double hz = hazard(bot);
         for (Choice c : choices(bot, -1)) {
             doable++;
             double cost = c.option().cost();
-            // (Not through a portal for it, and not one that ran over twice already.)
-            if (cost > quick || c.option().proxy() || quickTries.getOrDefault(c.tile().goal().id(), 0) >= 2) continue;
-            if (best == null || cost < best.option().cost()) best = c;
+            // (Not through a portal for it, and only once: a quick one that was not quick is
+            // left to the plan.)
+            if (cost > quick || c.option().proxy() || quickTries.getOrDefault(c.tile().goal().id(), 0) >= 1) continue;
+            if (best != null && cost >= best.option().cost()) continue;
+            // (Only what is sure: a tile whose estimate is mostly luck is no quick one - snow
+            // "four seconds away" was a walk of two hundred blocks in a self-play game.)
+            if (odds(bot, c, hz).luck() > 0.5 * cost + 2) continue;
+            best = c;
         }
         if (best == null) return false;
         quickTries.merge(best.tile().goal().id(), 1, Integer::sum);
         bot.say("quick tile, before anything else: " + best.tile().goal().title().getString() + " (~" + Math.round(best.option().cost()) + " s)");
-        startGoal(bot, best, doable);
+        startGoal(bot, best, doable, true);
         return !startRefused;
     }
 
-    /** A tile made the goal: its task started, with the time it may take and the bookkeeping for overruns. */
+    /**
+     * The tile under way was taken as a quick one: a tight budget (three times the estimate, a
+     * minute and a half at most) and no more than one extension, for progress only - in a
+     * self-play game three "quick" tiles took five minutes between them, and none was got.
+     */
+    private boolean goalQuick;
+
     private void startGoal(Bot bot, Choice pick, int doable) {
+        startGoal(bot, pick, doable, false);
+    }
+
+    /** A tile made the goal: its task started, with the time it may take and the bookkeeping for overruns. */
+    private void startGoal(Bot bot, Choice pick, int doable, boolean quick) {
         targetIndex = pick.tile().index();
         targetId = pick.tile().goal().id();
         goalTask = pick.option().task().get();
         starts.merge(pick.tile().goal().id(), 1, Integer::sum);
         goalStarted = bot.body().level().getGameTime();
         goalPaused = 0;
-        goalBudget = budget(pick.option().cost(), 1200, 9000);
+        goalBudget = quick ? budget(pick.option().cost(), 400, 1800) : budget(pick.option().cost(), 1200, 9000);
+        goalQuick = quick;
         goalEstimate = pick.option().cost();
         // (The plain estimate: before what experience and overruns added, else each overrun
         // would be measured against a figure that already had the last one in it.)
@@ -628,7 +648,7 @@ public final class LockoutBrain implements BotBrain {
         return bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && c >= from && c < DAWN;
     }
 
-    /** Ready for a night out on the surface, as a player would be: a weapon, food, armour or a shield, the hearts. */
+    /** Ready for a night out on the surface, as a player would be: a weapon, food and the hearts (armour too with nightarmour=1). */
     public static boolean nightReady(Bot bot) {
         var body = bot.body();
         boolean armed = false, shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
@@ -637,7 +657,12 @@ public final class LockoutBrain implements BotBrain {
             if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) armed = true;
             if (st.is(net.minecraft.world.item.Items.SHIELD)) shield = true;
         }
-        return armed && food >= 8 && (body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2) && body.getHealth() >= 12;
+        // (Armed, fed and well is geared enough: no armour asked for - the player's own rule, no
+        // standing down at night for the want of it; the guardian walls him in or digs him in
+        // when a fight would be lost. Dug in for the night for want of armour, a fifth of every
+        // self-play game went by. nightarmour=1: armour too, for the comparisons.)
+        boolean armour = !nightArmour(bot) || body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2;
+        return armed && food >= 8 && armour && body.getHealth() >= 12;
     }
 
     private static net.minecraft.world.item.Item bedInPack(Bot bot) {
@@ -793,6 +818,10 @@ public final class LockoutBrain implements BotBrain {
     }
 
     /** What is missing for the night, for the log. */
+    private static boolean nightArmour(Bot bot) {
+        return bot.params.get("nightarmour", 0) != 0;
+    }
+
     private static String nightGaps(Bot bot) {
         var body = bot.body();
         List<String> out = new ArrayList<>();
@@ -804,7 +833,7 @@ public final class LockoutBrain implements BotBrain {
         }
         if (!armed) out.add("no weapon");
         if (food < 8) out.add("food " + food);
-        if (body.getArmorValue() < 6 && !(shield && body.getArmorValue() >= 2)) out.add("armour " + body.getArmorValue() + (shield ? "+shield" : ""));
+        if (nightArmour(bot) && body.getArmorValue() < 6 && !(shield && body.getArmorValue() >= 2)) out.add("armour " + body.getArmorValue() + (shield ? "+shield" : ""));
         if (body.getHealth() < 12) out.add("hp " + Math.round(body.getHealth()));
         return String.join(", ", out);
     }
@@ -1386,6 +1415,9 @@ public final class LockoutBrain implements BotBrain {
         double stockCost = bare ? (opened ? (hard ? 300 : 150) : (hard ? 120 : 60)) : 25;
         if (!hurt && (level >= 12 && cost > stockCost || cost > (level <= 6 ? 900 : bare ? Math.max(120, stockCost) : 90))) return false;
         if (hurt && cost > 900) return false;
+        // (foodcap=<s>: a stock while not starving only if it costs no more - self-play comparisons.)
+        double cap = bot.params.get("foodcap", -1);
+        if (cap >= 0 && !hurt && level > 6 && cost > cap) return false;
         // At night on the surface a hunt across the fields is how a game is lost (and the cows
         // are hard to see): only food close by, unless the hunger is getting serious.
         var lv = bot.body().level();
@@ -1897,7 +1929,7 @@ public final class LockoutBrain implements BotBrain {
             if (extensions < 8 && left < Double.MAX_VALUE / 4) {
                 for (Choice c : choices(bot, targetIndex)) other = Math.min(other, c.option().cost() - strategist.bonus(c.tile().goal().id()));
             }
-            if (extensions < 8 && left < Double.MAX_VALUE / 4 && (progress && stalls < 3 || believed + 15 < other)) {
+            if (extensions < (goalQuick ? 1 : 8) && left < Double.MAX_VALUE / 4 && (progress && stalls < 3 || !goalQuick && believed + 15 < other)) {
                 extensions++;
                 goalEstimate = left;
                 goalBudget = goalElapsed(now) + budget(left, 600, 6000);

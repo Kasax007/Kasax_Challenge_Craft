@@ -68,6 +68,28 @@ def summary(results, a, b):
               f"  first tile {sum(firsts) / len(firsts) if firsts else float('nan'):6.0f} s"
               f"  after 5/10/20 min {mean('m5'):4.1f} {mean('m10'):4.1f} {mean('m20'):4.1f}")
     print(f"  sign test on the wins: p = {sign_test(wins[a], wins[b]):.3f}")
+    # The tiles game by game (the same board, the same world): the mean difference and how sure.
+    diffs = []
+    for r in results:
+        by = {bot["params"]: bot for bot in r["bots"]}
+        if a in by and b in by:
+            diffs.append(by[a]["tiles"] - by[b]["tiles"])
+    if len(diffs) >= 2:
+        mean = sum(diffs) / len(diffs)
+        sd = math.sqrt(sum((d - mean) ** 2 for d in diffs) / (len(diffs) - 1))
+        se = sd / math.sqrt(len(diffs))
+        t = mean / se if se > 0 else float("inf") if mean else 0.0
+        print(f"  tiles {a} minus {b}: {mean:+.2f} a game (standard error {se:.2f}, t = {t:.2f}, {len(diffs)} games)")
+    # Where the time went (the root task, the counts left out), per game on average.
+    for v in (a, b):
+        s = stats[v]
+        spent = {}
+        for x in s:
+            for what, secs in x.get("time", {}).items():
+                spent[what] = spent.get(what, 0) + secs
+        if spent:
+            top = sorted(spent.items(), key=lambda kv: -kv[1])[:8]
+            print(f"  {v}: " + ", ".join(f"{what} {secs / len(s):.0f} s" for what, secs in top))
 
 
 def main():

@@ -26,6 +26,8 @@ public final class BotVersus {
         int firstTile = -1, tiles;
         final int[] tilesAt = new int[4];
         final List<String> claims = new ArrayList<>();
+        /** Ticks spent per root task (what it set out to do), the counts left out. */
+        final java.util.Map<String, Integer> timeOn = new java.util.HashMap<>();
 
         Side(Bot bot, LockoutBingoTeam team) {
             this.bot = bot;
@@ -46,6 +48,7 @@ public final class BotVersus {
     }
 
     private static final int[] MARKS = {5, 10, 20, 30};
+    private static final java.util.regex.Pattern DIGITS = java.util.regex.Pattern.compile("[0-9]+");
 
     private final List<Side> sides = new ArrayList<>();
     private final int length;
@@ -85,6 +88,11 @@ public final class BotVersus {
     private boolean tick() {
         ticks++;
         var server = sides.get(0).bot.server();
+        for (Side s : sides) {
+            var root = s.bot.root();
+            String what = root == null ? "(nothing)" : DIGITS.matcher(root.describe()).replaceAll("#");
+            s.timeOn.merge(what.length() > 48 ? what.substring(0, 48) : what, 1, Integer::sum);
+        }
         if (ticks % 10 == 0) {
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(server)) {
                 if (t.claimedBy() == null) continue;
@@ -138,6 +146,13 @@ public final class BotVersus {
                     .append(",\"m5\":").append(s.tilesAt[0]).append(",\"m10\":").append(s.tilesAt[1])
                     .append(",\"m20\":").append(s.tilesAt[2]).append(",\"m30\":").append(s.tilesAt[3])
                     .append(",\"guardian\":[").append(s.bot.guardian.boxes).append(',').append(s.bot.guardian.pillars).append(',').append(s.bot.guardian.digs).append(']')
+                    .append(",\"time\":{");
+            int n = 0;
+            for (var e : s.timeOn.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(10).toList()) {
+                if (n++ > 0) json.append(',');
+                json.append('"').append(e.getKey().replace("\"", "'").replace("\\", "/")).append("\":").append(e.getValue() / 20);
+            }
+            json.append('}')
                     .append(",\"claims\":[");
             for (int c = 0; c < s.claims.size(); c++) {
                 if (c > 0) json.append(',');

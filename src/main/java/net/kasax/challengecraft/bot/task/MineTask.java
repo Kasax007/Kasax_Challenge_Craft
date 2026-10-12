@@ -518,23 +518,10 @@ public final class MineTask implements BotTask {
 
     /** Not buried far below the ground when it is a surface thing (and the bot is not down there too). */
     private boolean worthIt(ServerLevel level, Bot bot, BlockPos p) {
-        if (bot.dangerous(p)) return false;
-        // Under water: diving and digging there (five times slower) is not worth it while there
-        // are others on dry land.
         // (Not so for what lies under shallow water as a rule - clay on a river bed - or once a
         // while has gone by with nothing found on land: then it is dived for.)
         boolean diveFor = shallowWater(level, p) && (level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CLAY) || searchTicks > 600);
-        if (!bot.actions().inReach(p) && !diveFor) {
-            for (Direction d : Direction.values()) {
-                if (d != Direction.DOWN && !level.getFluidState(p.relative(d)).isEmpty()) return false;
-            }
-        }
-        // Below a river or a lake: the way down is through the water. Others first.
-        if (!bot.actions().inReach(p) && !diveFor && p.getY() < bot.body().getBlockY()) {
-            for (int y = p.getY() + 1; y <= Math.min(p.getY() + 24, bot.body().getBlockY() + 2); y++) {
-                if (!level.getFluidState(new BlockPos(p.getX(), y, p.getZ())).isEmpty()) return false;
-            }
-        }
+        if (!diggable(level, bot, p, diveFor)) return false;
         if (depth != null) {
             // One remembered far off against digging down for it here: the walk (some 2.5 blocks
             // a second over and under ground) must beat the dig down plus a minute's search at
@@ -559,6 +546,33 @@ public final class MineTask implements BotTask {
     }
 
     /** Water over it, at most four deep (a river bed, a pond: dived to and dug in a breath). */
+    /**
+     * Whether a block is dug for at all where it lies: not in a danger zone, not with water or
+     * lava beside it out of reach (diving and digging there is five times slower; unless it is
+     * dived for), not under a river or a lake (the way down is through the water). The planner
+     * counts a block it sees or remembers only if so - else it plans with ore the dig never goes
+     * for (a self-play game: lapis "26 s away" by water, then two minutes of tunnelling instead).
+     */
+    public static boolean diggable(ServerLevel level, Bot bot, BlockPos p, boolean diveFor) {
+        if (bot.dangerous(p)) return false;
+        if (!bot.actions().inReach(p) && !diveFor) {
+            for (Direction d : Direction.values()) {
+                if (d != Direction.DOWN && !level.getFluidState(p.relative(d)).isEmpty()) return false;
+            }
+        }
+        if (!bot.actions().inReach(p) && !diveFor && p.getY() < bot.body().getBlockY()) {
+            for (int y = p.getY() + 1; y <= Math.min(p.getY() + 24, bot.body().getBlockY() + 2); y++) {
+                if (!level.getFluidState(new BlockPos(p.getX(), y, p.getZ())).isEmpty()) return false;
+            }
+        }
+        return true;
+    }
+
+    /** {@link #diggable(ServerLevel, Bot, BlockPos, boolean)} with what is dived for as a rule (clay under shallow water). */
+    public static boolean diggable(ServerLevel level, Bot bot, BlockPos p) {
+        return diggable(level, bot, p, shallowWater(level, p) && level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CLAY));
+    }
+
     private static boolean shallowWater(ServerLevel level, BlockPos p) {
         int deep = 0;
         BlockPos q = p.above();

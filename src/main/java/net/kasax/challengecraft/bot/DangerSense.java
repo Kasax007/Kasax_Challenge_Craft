@@ -167,9 +167,16 @@ public final class DangerSense {
         overridden = false;
     }
 
+    /**
+     * How hard the guard has had to hold the task's keys of late (each step in adds one, each tick
+     * takes a fiftieth): a task's own moves kept from the same harm for seconds on end.
+     */
+    private double pressure;
+
     /** After the task pressed its keys: where they lead worked out, and other keys pressed if that is into harm. */
     void guard() {
         var body = bot.body();
+        pressure *= 0.98;
         if (!body.isAlive() || body.isSpectator() || body.getAbilities().flying || body.isPassenger() || body.isFallFlying()
                 || body.onClimbable() || body.isInWater() || body.isInLava()) {
             streak = 0;
@@ -266,6 +273,21 @@ public final class DangerSense {
         if (streak >= 20 && bot.navigator().status() == BotNavigator.Status.MOVING) {
             streak = 0;
             bot.navigator().guardStop();
+        }
+        // No walk of the navigator's but a task's own steps (a staircase dug down, a chase) that
+        // keep leading in, with no monster about: that task is given up after some seconds of it,
+        // for something else - in a self-play game it stood a minute at the edge of a drop of
+        // four, the guard braking every second, a stock of food never got.
+        pressure++;
+        if (pressure > 20 && bot.navigator().status() != BotNavigator.Status.MOVING && !bot.inReflex()
+                && body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(8),
+                        m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty()) {
+            pressure = 0;
+            BotTask stuck = bot.current();
+            if (stuck != null) {
+                bot.say("guard: kept from the same harm for seconds on end - " + stuck.describe() + " given up");
+                bot.fail(stuck);
+            }
         }
     }
 

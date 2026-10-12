@@ -446,6 +446,9 @@ public final class ObtainPlanner {
                     if (!unreachable.isEmpty() && unreachable.contains(m)) continue;
                     // Only what it could have seen (common rock anywhere it digs is seen enough).
                     if (!BotWorld.COMMON.contains(s.getBlock()) && !BotWorld.seen(level, m, eye)) continue;
+                    // (And only what the dig would go for: not the ore by the water - see MineTask.)
+                    if (!BotWorld.COMMON.contains(s.getBlock()) && s.getFluidState().isEmpty()
+                            && !net.kasax.challengecraft.bot.task.MineTask.diggable(level, bot, m)) continue;
                     blocks.put(s.getBlock(), reach);
                     positions.put(s.getBlock(), m.immutable());
                 }
@@ -454,6 +457,17 @@ public final class ObtainPlanner {
         // And what it remembers from further away (read from the chunks it has been near).
         for (Map.Entry<Block, BlockPos> e : bot.memory().nearestOfEach(level.dimension(), c, unreachable).entrySet()) {
             BlockPos p = e.getValue();
+            if (level.getChunkSource().getChunkNow(p.getX() >> 4, p.getZ() >> 4) != null && level.getFluidState(p).isEmpty()
+                    && !net.kasax.challengecraft.bot.task.MineTask.diggable(level, bot, p)) continue;
+            // (Ore remembered far off: the dig goes down right here instead when the walk is
+            // longer than the way down and a minute's search - as the dig itself decides (see
+            // MineTask.worthIt); a self-play game planned gold "29 s away" and tunnelled for iron.)
+            Integer depth = BotKnowledge.depth(e.getKey(), c.getY());
+            if (depth != null) {
+                double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
+                double walk = Math.sqrt(dx * dx + dz * dz) / 2.5 + Math.abs(p.getY() - c.getY());
+                if (walk > Math.max(0, c.getY() - depth) + 60) continue;
+            }
             // (By the way there over the land, not the straight line: across the bay is not near.)
             double reach = 4 + 1.15 * net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, c, p) + vertical(p.getY() - c.getY(), digPerBlock);
             Double known = blocks.get(e.getKey());

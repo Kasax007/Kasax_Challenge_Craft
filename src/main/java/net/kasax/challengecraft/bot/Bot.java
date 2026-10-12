@@ -228,6 +228,13 @@ public final class Bot {
         navigator.resumeFor(tasks.peek());
     }
 
+    private BotTask failNow;
+
+    /** {@code task} ends as failed on the next tick, as if it had said so itself (if it is on top then). */
+    public void fail(BotTask task) {
+        failNow = task;
+    }
+
     /** What the reflexes put on top (a fight, a retreat, the shield): the brain leaves the stack alone meanwhile. */
     private BotTask reflexTask;
 
@@ -391,7 +398,12 @@ public final class Bot {
             }
         }
         BotTask.Result r;
-        try {
+        if (task == failNow) {
+            // (Given up from outside - by the guard: a failure like any other, for the task under
+            // it and for the rule on loops.)
+            failNow = null;
+            r = BotTask.Result.FAILED;
+        } else try {
             sinkToDig = false;
             // A walk left off without a word (the task waits for something now, or steers by
             // itself): ended, or the body runs on with the last keys of it until a wall stops it.

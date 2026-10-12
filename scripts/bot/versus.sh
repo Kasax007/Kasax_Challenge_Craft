@@ -72,4 +72,6 @@ python3 $HERE/rcon.py stop > /dev/null 2>&1 || true
 # hang the server - the world is thrown away anyway: whatever still runs after 20 s is ended.)
 for i in $(seq 1 20); do kill -0 $(cat $RUN/server.pid) 2>/dev/null || break; sleep 1; done
 kill -0 $(cat $RUN/server.pid) 2>/dev/null && kill_tree $(cat $RUN/server.pid)
+# (The world is played out: only the log is kept - a league leaves sixty worlds otherwise.)
+[ "${KEEP_WORLD:-0}" = 1 ] || rm -rf $RUN/versus_$SEED
 grep "\[BOTVS\] result" $LOG | sed 's/.*\[BOTVS\] result //'

@@ -188,6 +188,25 @@ public class BotMovementTests {
         });
     }
 
+    /**
+     * Up in a crown that hangs out over a pit fifteen deep (a self-play game: the outer leaf broken,
+     * forty-one blocks down): along the crown to the trunk, and down that - not a heart lost.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void leafDescentOverPit(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "leaf_descent_over_pit");
+        a.fill(20, 1, 10, 30, GROUND, 30, Blocks.AIR);
+        a.fill(17, FEET, 20, 17, FEET + 5, 20, Blocks.OAK_LOG);
+        a.fill(15, FEET + 6, 18, 23, FEET + 6, 22,
+                Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        a.spawn(22, FEET + 7, 20);
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 1200, () -> {
+            h.assertTrue(body.getHealth() >= 19, "leaf_descent_over_pit: fell, " + body.getHealth() + " hp at " + body.position());
+            return body.onGround() && body.getY() < a.abs(0, FEET + 1, 0).getY();
+        });
+    }
+
     /** A gap three wide over water (falling short does no harm): leapt, with a run-up, never in the water. */
     @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
     public void longLeapOverWater(GameTestHelper h) {
@@ -494,6 +513,23 @@ public class BotMovementTests {
                 return "running blind";
             }
         };
+    }
+
+    /**
+     * A task that runs straight at a drop of four again and again (its own steps, no walk of the
+     * navigator's): the guard brakes, and after some seconds the task is given up - no stand at
+     * the edge for a minute, as a stock of food once was in a self-play game.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void guardGivesUpStuckTask(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "guard_gives_up_stuck_task");
+        a.fill(20, GROUND - 3, 0, 39, GROUND, 39, Blocks.AIR);
+        a.spawn(12, FEET, 20);
+        var body = a.bot().body();
+        a.run(blindRun(false), 400, () -> {
+            h.assertTrue(body.getHealth() >= 20, "guard_gives_up_stuck_task: fell, " + body.getHealth());
+            return h.getTick() > 40 && a.bot().current() == null && body.onGround();
+        });
     }
 
     /** Lava at the feet's height ahead and a task that runs straight at it: the guard stops him short. */

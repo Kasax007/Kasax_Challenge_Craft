@@ -2393,3 +2393,166 @@ sein (4 kosten ein Herz; im Treffer-Log kosteten Stürze bis zu 10 HP pro Lauf).
 `dig_into_cave`: Unter einer 3 Blöcke hohen Höhle kam Bob dann gar nicht mehr hinein. Die alte
 Grenze (4) gilt wieder. Die Stürze sind ein eigenes Thema für die nächste Runde: Meist kommen sie
 vom Abkommen vom Pfad an Kanten, nicht vom Graben.
+
+## 24. Runde 20: Die Partie gegen den Spieler – Wächter, Sprünge, schnelle Felder, Selbstspiel
+
+### 24.1 Die Partie (Log im Archiv: „Testrun Lockout against Bob“)
+
+Rot (der Spieler) gewann 13:2. Bob starb dreimal; daneben verlor er die ersten Minuten ohne Blick
+aufs Brett.
+
+| Zeit | Was | Ursache im Log |
+| --- | --- | --- |
+| 0–4 min | Eröffnung (Holz, Spitzhacke, Schwert, Essen, Axt, Schaufel, Blöcke) ohne ein einziges Feld | feste Eröffnung; der erste Plan kam erst bei 14:52 |
+| 1:40–8:46 | Räucherofen (Ofen + 4 Stämme) erst nach sieben Minuten, obwohl der Ofen ab Minute 2 da war | das Brett wurde in der Eröffnung nie angesehen |
+| 10:00 | Tod 1: Sprung über 3 Blöcke Lücke über einer 12 Blöcke tiefen Schlucht, zu kurz (9 HP), 15 s später derselbe Sprung noch einmal (9 HP), dann zwei Zombies | Sprünge bis 12 Blöcke Tiefe erlaubt; Absprung 0,45 Blöcke vor der Kante; der Wächter drehte ihn in der Luft weg; kein Gedächtnis für gescheiterte Sprünge (`avoid` wird bei jedem neuen Ziel geleert) |
+| 34:00 | Tod 2: Ghast-Feuerbälle in den Basaltdeltas, Rüstung 1, fünfmal gegessen unter Beschuss | Ghast und Lohe sind für das Spiel keine `RangedAttackMob`: für die Reflexe kein „Schütze“ |
+| 41:00 | Tod 3: ohne Waffe, ein Zombie; die Flucht kam nicht weg, dann Faustkampf | Schwellen nach festen HP-Marken („low: away“), keine Rechnung, wie schnell die Herzen weg sind |
+
+### 24.2 Sprünge (`3de845b`)
+
+- Eine Lücke von 3 Blöcken nur, wo ein Fehlsprung nichts kostet: über Wasser oder höchstens 3 Blöcke
+  Fall. Lücken von 1 und 2 Blöcken wie bisher (dort bleibt mehr als ein Block Reserve, auch aus dem
+  Stand). Breiter als 1 nur mit Sprint (Essen über 6).
+- Ausführung: erst auf dem Boden des Absprungblocks, Schild unten; Sprung im letzten Tick, in dem die
+  Füße noch auf der Kante stehen (nicht 0,45 Blöcke davor).
+- In der Luft: kein Schild, kein Ausweichen, der Bewegungswächter nimmt nur sichere Alternativen.
+- Ein gescheiterter Sprung ist 20 Minuten gesperrt (Landepunkt), über alle Ziele hinweg.
+- Tests: `no_long_leap_over_ravine`, `long_leap_over_water`, `long_leap_standing_start`.
+
+### 24.3 Der Wächter (`77030a7`)
+
+Bei jeder Reflexprüfung rechnet der Wächter, wie lange Bob noch lebt. Grundlage ist, wie hart jeder
+Gegner nach Rüstung und Schwierigkeit trifft, wie oft, ab wann (Weg in Reichweite, Schütze mit
+Sichtlinie), mit den 10 Ticks Unverwundbarkeit nach jedem Treffer. Dem stellt er die Dauer eines
+Kampfes gegenüber (Lebenspunkte der Gegner durch den Schaden pro Sekunde der besten Waffe, Anlauf
+zum Schützen).
+
+Gewinnt Bob den Kampf nicht rechtzeitig, und hat der Angriff begonnen, übernimmt der Wächter mit der
+schnellsten Deckung. Das gilt egal, was gerade läuft, auch eine Mahlzeit oder eine Flucht, die nicht
+vorankommt:
+
+| Lage | Deckung |
+| --- | --- |
+| Ghast | eingraben (Deckel aus Stein) |
+| nur Zombies und ihresgleichen | Säule, von oben schlagen (`PillarFightTask`) |
+| sonst | einmauern (Box), Säule oder eingraben; nachts ohne Waffe bis zum Morgen |
+
+Außerdem:
+
+- Ghast, Lohe, Hexe, Breeze und Shulker gelten als Schützen: kein Essen in ihrer Sichtlinie, keine
+  Säule unter ihnen, das Versteck bleibt zu, solange einer wartet.
+- Deckel und Box aus dem sprengfestesten Block im Gepäck; weggesprengt wird neu verschlossen; kein
+  Ausweichschritt aus dem Loch.
+- Tests: `unarmed_cornered`, `low_with_two_zombies`, `ghast_at_low_health`, `armed_fights_one_zombie`
+  (dort darf der Wächter nicht eingreifen). Die volle Suite: 161 grün, `return_to_sender` wackelt
+  unabhängig davon (auf dem alten Stand 1 von 4 rot).
+
+### 24.4 Schnelle Felder (`9e21b25`)
+
+Vor der Eröffnung, dem Kit und jeder Nebenaufgabe: das billigste offene Feld, wenn es von hier aus
+höchstens 30 s kostet (dieselbe Schätzung wie der Plan). Geprüft alle 5 s im Leerlauf, nicht durchs
+Portal, höchstens zwei Versuche je Feld. Im ersten Selbstspiel-Match auf Seed 77: „quick tile, before
+anything else: Arrow (~18 s)“, danach „Item Frame (~30 s)“.
+
+### 24.5 Selbstspiel: Bob gegen Bob (`142355c`, `8ac8ad1`)
+
+- Lockout-Debugspiele für 2 bis 4 Spieler, jeder sein eigenes Team; `/challengecraft_bot versus
+  <s> <schwierigkeit> Name[:k=v,..] ...`. Jeder Bob hat eigene Stellschrauben (`BotParams`:
+  `guardian=0|1`, `quick=<s>`).
+- Ergebnis als eine JSON-Zeile: Sieger, Felder, Felder nach 5/10/20/30 min, erstes Feld, Tode,
+  verlorene Herzen, Eingriffe des Wächters, alle Felder mit Sekunde.
+- `scripts/bot/versus.sh` spielt ein Match auf frischer Welt; `scripts/bot/league.py` spielt Variante
+  A gegen B über zufällige Seeds (Namen wechseln jede Partie) und rechnet Siege, Felder, Tode, Herzen
+  und den Vorzeichentest.
+- **Simulationsmodus** (`CHALLENGECRAFT_BOT_SIM=1`): Keine Suche bricht nach Uhrzeit ab, und eine
+  Suche im Hintergrund gilt erst nach den Ticks als gefunden, die ihre Knoten in Echtzeit kosten
+  (10 000 Knoten je Tick). Der Server wartet nur, wo die Suche hinter der Spielzeit liegt. So spielt
+  Bob bei `tick sprint` gleich wie in Echtzeit. Früher starb derselbe Stand bei 2,3-facher
+  Geschwindigkeit 18-mal statt 3-mal.
+- **Tempo** auf diesem Container (4 Kerne): mit zwei Bots und 24 Chunks Sicht etwa 1,7 bis 1,8-fache
+  Echtzeit pro Server. Zwei Server parallel teilen sich die Kerne, der Durchsatz bleibt etwa gleich.
+  Auf einem Rechner mit mehr Kernen skaliert es mit der Zahl der parallelen Matches.
+- Kleinigkeiten dabei: ein Server direkt aus den Startdateien von Loom (1 JVM statt 3);
+  `BotKnowledge.rarity` zwischengespeichert (eine bei jedem Aufruf neu kompilierte Regex stand in den
+  Stack-Samples); hängt der Server beim Stoppen (Stack-Überlauf im Chunk-Speichern des Spiels), wird
+  er nach 20 s beendet.
+
+### 24.6 Liga 1: Wächter und schnelle Felder an gegen aus
+
+12 Spiele zu 20 Minuten auf HARD, zufällige Seeds, Simulationsmodus, zwei Matches parallel. Beide
+Varianten spielen auf demselben Brett in derselben Welt. Die Namen wechseln jede Partie.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard (Wächter, schnelle Felder) | 5 | 1,7 | 0,42 | 14,5 | 311 s | 0,6 / 1,2 / 1,7 |
+| `guardian=0,quick=0` | 4 | 0,9 | 0,33 | 11,8 | 414 s | 0,3 / 0,6 / 0,9 |
+
+3 Spiele unentschieden; Vorzeichentest auf die Siege p = 1,0. Die Felder verdoppeln sich fast, die
+Tode nicht.
+
+**Die 5 Tode der Standardvariante** (3 davon derselbe Fehler: still in einer offenen Box):
+
+| Spiel | Tod | Ursache | Behoben |
+| --- | --- | --- | --- |
+| 5 | Zombie | „boxed in for the night“: eine Seite der Box ging nicht hinein; Bob stand still, während der Zombie durch die Lücke schlug | 24.7 |
+| 10 | Spinne | dasselbe, die Spinne stand in der Lücke: 7 Bisse, kein Schlag zurück | 24.7 |
+| 8 | Fall | Abstieg aus einer Baumkrone über einer Schlucht: das äußere Blatt abgebaut, 41 Blöcke tief | 24.7 |
+| 3 | Zombie | in einer Höhle auf einem Sims, Zombie und Skelett; ein Pfeil nahm 7,5 HP. Der Wächter griff erst bei 4 HP ein, wohl weil Bob nach jedem Treffer in der Luft war oder auf der Kante stand und keine Deckung ging. Jetzt steht der Grund im Log | Diagnose |
+| 12 | Zombie | der Wächter mauerte Bob bei 8 HP ein (4 Zombies, ein Skelett); ein Creeper sprengte die Box auf, die Lücke ging nicht wieder zu, ein Zombie schlug hindurch | 24.7 |
+
+**Wohin die Zeit ging** (Cortex-Buchführung, Sekunden je 20-Minuten-Spiel, Standardvariante):
+
+| Kategorie | s/Spiel |
+| --- | --- |
+| Essensvorrat („get apple…“), meist ohne Hunger, oft gescheitert | 182 |
+| Brettfelder | 125 |
+| Nacht (Bett suchen, eingemauert, eingegraben) | 118 |
+| Eröffnung (Holz, Werkzeuge) | 115 |
+| Investitionen (Eisenspitzhacke, Schild) | 89 |
+| Kit (Steine, Bündel) | 61 |
+
+Der Rest (~500 s) ist in der Cortex-Buchführung nicht erfasst. Deshalb schreibt jedes Match jetzt die
+Zeit je Wurzelaufgabe ins Ergebnis (`"time"`), und die Liga zeigt sie an.
+
+**Schnelle Felder:** Die Schätzungen waren oft zu optimistisch.
+
+| Feld | Schätzung | Was geschah |
+| --- | --- | --- |
+| Schneeball | ~4 s, alles Glück | Schnee lag ~260 Blöcke weit weg |
+| Keks | ~18 s | 100 s Weg, dann abgebrochen |
+| Lapis | ~26 s, 0 s Glück | ein erinnertes Erz am Wasser, das die Abbau-Aufgabe nie nimmt; stattdessen 2 Minuten Tunnel |
+| Goldbarren | ~29 s, 0 s Glück | Tunnel nach Eisen für die Eisenspitzhacke |
+
+In Spiel 6 kosteten drei solche Felder zusammen fast 5 Minuten, keines wurde geholt.
+
+### 24.7 Korrekturen aus Liga 1
+
+- **Box mit Lücke** (`HideTask`): Ist die Box noch nicht zu und ein Gegner trifft durch die Lücke
+  oder steht in einer Seite, schlägt Bob von seinem Platz aus zurück. Er hält dabei die beste Waffe
+  in der Hand; ein Wechsel zum Block würde die Schlagkraft neu aufladen. Eine freie Lücke wird zuerst
+  geschlossen. Wirft ihn ein Schlag aus der halbfertigen Box, geht er zurück hinein; ist das nicht
+  möglich, baut er eine neue. Test `spider_in_the_gap`: nachts auf HARD, die Spinne in der Lücke.
+- **Der Deckel der Box** ging nie hinein: Über dem Kopf grenzt er an keinen festen Block, denn die
+  Wände enden in Kopfhöhe. Jede Box meldete deshalb „not every side would go in“ und blieb oben
+  offen; eine Spinne kam so über die Wand. Jetzt kommt zuerst ein Block auf eine Wand, dann der
+  Deckel daneben. Die Box braucht damit einen Block mehr (10).
+- **Abstieg aus der Krone** (`LeafDescentTask`): Ein Blatt wird nur abgebaut, wenn darunter höchstens
+  2 Blöcke Luft sind. Sonst geht Bob über die Krone (±6 Blöcke) zu einer Stelle mit Stamm oder Laub
+  darunter; findet er keine, gibt er für 30 s auf. Test `leaf_descent_over_pit`.
+- **Wächter-Druck** (`DangerSense`): Bremst der Bewegungswächter dieselbe Aufgabe sekundenlang (eigene
+  Schritte der Aufgabe, kein Monster in 8 Blöcken), scheitert die Aufgabe. Das zählt als echter
+  Fehlschlag (`Bot.fail`), damit die Regel gegen Schleifen und das Gehirn ihn sehen. Test
+  `guard_gives_up_stuck_task`.
+- **Planer = Abbau**: Der Planer zählt einen gesehenen oder erinnerten Block nur, wenn die
+  Abbau-Aufgabe ihn auch holen würde: nicht neben Wasser oder Lava außer Reichweite, nicht unter einem
+  See, nicht in einer Gefahrenzone (`MineTask.diggable`). Bei erinnertem Erz gilt zusätzlich ihre
+  Regel „Weg gegen Abstieg plus eine Minute Suche“.
+- **Schnelle Felder strenger**: nur, wenn die Schätzung höchstens zur Hälfte Glück ist; nur ein
+  Versuch je Feld; Budget dreimal die Schätzung (20–90 s); höchstens eine Verlängerung, und die nur
+  bei echtem Fortschritt.
+- **Nacht ohne Rüstungspflicht** (Vorgabe des Spielers): Für die Nacht reichen Waffe, Essen und
+  Herzen. Rüstung verlangt nur noch `nightarmour=1`. Wird ein Kampf verloren, mauert oder gräbt der
+  Wächter Bob ein.
+- Die Ergebnisse jeder Partie enthalten jetzt die Zeit je Wurzelaufgabe. Gespielte Welten werden
+  gelöscht (eine Liga hinterließ sonst 60 Welten zu je ~60 MB).
