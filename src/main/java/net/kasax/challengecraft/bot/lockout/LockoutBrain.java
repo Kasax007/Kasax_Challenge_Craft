@@ -168,6 +168,10 @@ public final class LockoutBrain implements BotBrain {
         if (step(bot, "night", () -> nightPlan(bot))) return;
         // Gold on before the piglins see it (a helmet or boots; gold ore all about down there).
         if (step(bot, "gold", () -> goldGuard(bot))) return;
+        // A tile that takes seconds from where things stand (a smoker once the furnace is made, a
+        // flower at the feet): taken at once, before the opening's next tool, the kit or anything
+        // else - in a game against a player the smoker waited seven minutes beside a furnace.
+        if (!surviving && step(bot, "quick", () -> quickTile(bot))) return;
         // The opening every player plays: wood, a table, then stone tools (pickaxe and axe), before
         // anything else. They make every later goal quicker.
         if (step(bot, "opening", () -> opening(bot))) return;
@@ -394,6 +398,38 @@ public final class LockoutBrain implements BotBrain {
         // Off to the Nether: packed for it first - blocks to bridge and climb with (the way
         // home up to a portal on a ledge), and food (no animals worth the name down there).
         if (netherBound(bot, pick) && packForNether(bot)) return;
+        startGoal(bot, pick, choices.size());
+    }
+
+    /** Seconds from where things stand at most for a tile to be taken before everything else. */
+    static final double QUICK_SECONDS = 30;
+    private long quickAt;
+    private final Map<String, Integer> quickTries = new HashMap<>();
+
+    /** The cheapest open tile if it takes no more than {@link #QUICK_SECONDS} from here: started as the goal. */
+    private boolean quickTile(Bot bot) {
+        long now = bot.body().level().getGameTime();
+        double quick = bot.params.get("quick", QUICK_SECONDS);
+        if (now < quickAt || only != null || quick <= 0) return false;
+        quickAt = now + 100;
+        Choice best = null;
+        int doable = 0;
+        for (Choice c : choices(bot, -1)) {
+            doable++;
+            double cost = c.option().cost();
+            // (Not through a portal for it, and not one that ran over twice already.)
+            if (cost > quick || c.option().proxy() || quickTries.getOrDefault(c.tile().goal().id(), 0) >= 2) continue;
+            if (best == null || cost < best.option().cost()) best = c;
+        }
+        if (best == null) return false;
+        quickTries.merge(best.tile().goal().id(), 1, Integer::sum);
+        bot.say("quick tile, before anything else: " + best.tile().goal().title().getString() + " (~" + Math.round(best.option().cost()) + " s)");
+        startGoal(bot, best, doable);
+        return !startRefused;
+    }
+
+    /** A tile made the goal: its task started, with the time it may take and the bookkeeping for overruns. */
+    private void startGoal(Bot bot, Choice pick, int doable) {
         targetIndex = pick.tile().index();
         targetId = pick.tile().goal().id();
         goalTask = pick.option().task().get();
@@ -413,7 +449,7 @@ public final class LockoutBrain implements BotBrain {
         Odds po = odds(bot, pick, hazard(bot));
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, of that ~"
                 + Math.round(po.luck()) + " s luck, " + Math.round(100 * po.within(goalBudget / 20.0)) + "% within " + goalBudget / 20 + " s, "
-                + choices.size() + " doable" + (reason == null ? "" : ", " + reason) + ")");
+                + doable + " doable" + (reason == null ? "" : ", " + reason) + ")");
         start(bot, goalTask, goalBudget);
         if (startRefused) {
             // (A loop on this tile: the cortex set it aside; something else next time round.)
