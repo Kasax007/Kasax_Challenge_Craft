@@ -28,6 +28,10 @@ public final class Bot {
     public final DangerSense danger = new DangerSense(this);
     /** Arrows and fireballs seen coming, and side-stepped (see {@link ThreatSense}). */
     public final ThreatSense threats = new ThreatSense(this);
+    /** How long he has at the rate he is being hurt, and the quickest cover when a fight would not be won in time. */
+    public final Guardian guardian = new Guardian(this);
+    /** Knobs of its play (the self-play matches set them per bot). */
+    public BotParams params = BotParams.DEFAULT;
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
     /**
@@ -632,6 +636,23 @@ public final class Bot {
             reflex(new net.kasax.challengecraft.bot.task.LeafDescentTask());
             return;
         }
+        // The guardian: at the rate everything after him hurts him, how long he has - and when no
+        // fight is won in that time, the quickest cover here at once, whatever is going on (a
+        // meal, a run that gets nowhere, the plan): walled in, up a pillar, dug in.
+        if (tasks.stream().noneMatch(Guardian::protective)) {
+            BotTask cover = guardian.stepIn(top);
+            if (cover != null) {
+                actions.reset();
+                navigator.stop();
+                if (retreat != null && tasks.contains(retreat)) {
+                    cancel(retreat);
+                    retreat = null;
+                    body.hurry = false;
+                }
+                reflex(cover);
+                return;
+            }
+        }
         if (top instanceof net.kasax.challengecraft.bot.task.EatTask || top instanceof net.kasax.challengecraft.bot.task.HideTask) return;
         // Getting out of lava, out of the water, out of the fire: nothing else meanwhile (a meal
         // in the lava is the last one).
@@ -1135,8 +1156,10 @@ public final class Bot {
 
     /** A bowman (skeleton, pillager...) within {@code r} blocks out for it, in sight. */
     boolean shooterOnMe(double r) {
-        return !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(r),
-                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.RangedAttackMob && body.hasLineOfSight(m)).isEmpty();
+        // (A ghast's fireballs come from much further off than a bow's arrows.)
+        return !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(Math.max(r, 64)),
+                m -> m.isAlive() && m.getTarget() == body && Guardian.shooter(m)
+                        && m.distanceTo(body) <= (m instanceof net.minecraft.world.entity.monster.Ghast ? Math.max(r, 64) : r) && body.hasLineOfSight(m)).isEmpty();
     }
 
     /**

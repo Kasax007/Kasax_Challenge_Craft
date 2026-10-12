@@ -11,7 +11,8 @@
       "net.kasax.challengecraft.gametest.BotStuntTests",
       "net.kasax.challengecraft.gametest.BotPortalTests",
       "net.kasax.challengecraft.gametest.BotLobbyTests",
-      "net.kasax.challengecraft.gametest.ChallengeFixTests"
+      "net.kasax.challengecraft.gametest.ChallengeFixTests",
+      "net.kasax.challengecraft.gametest.GuardianTests"
     ]
   },
   "depends": {

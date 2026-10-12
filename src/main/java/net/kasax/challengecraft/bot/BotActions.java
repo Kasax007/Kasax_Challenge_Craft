@@ -148,6 +148,29 @@ public final class BotActions {
     /** Enough for a furnace: a player keeps that much stone rather than build with it. */
     private static final int KEEP_CRAFTING_STONE = 8;
 
+    /**
+     * Puts the building block that best stands up to a blast at {@code target} (a ghast's fireball
+     * tears dirt and netherrack open, not stone): for a lid over the head, a wall against fire from
+     * the sky. The stone kept back for a furnace is spent too - the hearts come first.
+     */
+    public boolean placeSturdy(BlockPos target) {
+        var items = bot.getInventory().getNonEquipmentItems();
+        int best = -1;
+        float bestResistance = -1;
+        for (int i = 0; i < items.size(); i++) {
+            var item = items.get(i).getItem();
+            if (!THROWAWAY.contains(item) || !(item instanceof BlockItem bi)) continue;
+            float r = bi.getBlock().getExplosionResistance();
+            if (r > bestResistance) {
+                bestResistance = r;
+                best = i;
+            }
+        }
+        if (best < 0) return false;
+        tools.select(best);
+        return placeHeld(target);
+    }
+
     /** Puts a throwaway block at {@code target}, against the block below it. */
     public boolean placeThrowaway(BlockPos target) {
         int slot = throwawaySlot();

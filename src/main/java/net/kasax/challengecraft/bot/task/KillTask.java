@@ -595,7 +595,7 @@ public final class KillTask implements BotTask {
     }
 
     /** Damage a second of full-strength blows: damage times attacks a second. */
-    static double dps(ItemStack s) {
+    public static double dps(ItemStack s) {
         var mods = s.get(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS);
         if (mods == null) return 4;
         double[] dmg = {1}, speed = {4};

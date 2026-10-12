@@ -15,7 +15,7 @@ import java.util.List;
  */
 public final class HideTask implements BotTask {
     private static final int MAX_TICKS = 900;
-    private int ticks, dug, lidTries;
+    private int ticks, dug, lidTries, reopened;
     private BlockPos top;
     private boolean closed;
 
@@ -171,6 +171,11 @@ public final class HideTask implements BotTask {
 
     /** Whether a box works here: dry ground, nothing that hurts in the spot, blocks enough for the open sides. */
     public static boolean boxPossible(Bot bot) {
+        return boxPossible(bot, false);
+    }
+
+    /** The same; in an emergency ({@code all}) the stone kept back for a furnace counts too. */
+    public static boolean boxPossible(Bot bot, boolean all) {
         BotPlayer body = bot.body();
         if (!body.onGround() || body.isInWater()) return false;
         ServerLevel level = (ServerLevel) body.level();
@@ -181,7 +186,7 @@ public final class HideTask implements BotTask {
             if (level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) return false;
             if (level.getBlockState(p).canBeReplaced()) open++;
         }
-        return bot.actions().spendableBlocks() >= open;
+        return (all ? net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) : bot.actions().spendableBlocks()) >= open;
     }
 
     /** Whether a pillar works here: room above the head for two more blocks, something to build with. */
@@ -205,6 +210,19 @@ public final class HideTask implements BotTask {
         if (top == null) top = body.blockPosition();
         if (up) return pillar(bot, body, level);
         body.stopInputs();
+        // (Blown open since - a ghast's fireball on the lid, a creeper by the box: closed again.)
+        if (closed && placed + dug > 0) {
+            boolean open = false;
+            if (box) {
+                for (BlockPos p : boxBlocks(top)) open |= level.getBlockState(p).canBeReplaced();
+            } else if (dug >= 3) {
+                open = level.getBlockState(body.blockPosition().above(2)).canBeReplaced();
+            }
+            if (open && reopened++ < 6) {
+                closed = false;
+                lidTries = 0;
+            }
+        }
         if (box) {
             if (!closed) return boxIn(bot, body, level);
         } else {
@@ -228,7 +246,8 @@ public final class HideTask implements BotTask {
                 BlockPos lid = body.blockPosition().above(2);
                 if (!body.onGround()) return Result.RUNNING; // (still dropping in: the head is in the way)
                 if (!level.getBlockState(lid).getCollisionShape(level, lid).isEmpty()) closed = true;
-                else if (!bot.actions().placeThrowaway(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
+                // (Stone, not dirt or netherrack, for the lid: a fireball on it does not tear it open.)
+                else if (!bot.actions().placeSturdy(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
                 return Result.RUNNING;
             }
         }
@@ -262,11 +281,15 @@ public final class HideTask implements BotTask {
         // (Few hearts left: anything within the twenty-four counts - two blows of a zombie that
         // stood fifteen blocks off in the shade of a ravine at dawn ended it at nine hp on seed 77.)
         double close = body.getHealth() < 12 ? 24 : 11;
+        // (A ghast after him waits up there as long as it likes: out into its fireballs again it was
+        // in the game against a player - it is no "monster" to the game, a mob of its own.)
+        if (!body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Ghast.class, body.getBoundingBox().inflate(48, 24, 48),
+                g -> g.isAlive() && g.getTarget() == body).isEmpty()) return true;
         return !body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,
                 body.getBoundingBox().inflate(24, 10, 24), m -> m.isAlive()
                         && !(m instanceof net.minecraft.world.entity.monster.Enderman)
                         && !(day && m instanceof net.minecraft.world.entity.monster.spider.Spider)
-                        && (m instanceof net.minecraft.world.entity.monster.RangedAttackMob || m.distanceToSqr(body) < close * close)).isEmpty();
+                        && (net.kasax.challengecraft.bot.Guardian.shooter(m) || m.distanceToSqr(body) < close * close)).isEmpty();
     }
 
     /** The box going up, a block a tick: the sides at the feet, at the head, then the lid. */
@@ -280,7 +303,7 @@ public final class HideTask implements BotTask {
         for (BlockPos p : boxBlocks(top)) {
             if (!level.getBlockState(p).canBeReplaced()) continue;
             open = true;
-            if (bot.actions().placeThrowaway(p)) {
+            if (bot.actions().placeSturdy(p)) {
                 placed++;
                 return Result.RUNNING;
             }

@@ -94,7 +94,9 @@ public final class ThreatSense {
         // (Out to be shot - a tile wants it: no shield, no dodge.)
         if (bot.current() instanceof net.kasax.challengecraft.bot.task.GetShotTask) return;
         // (Leaping a gap: a second at most, and a shield raised or a step aside is a leap that falls short.)
-        if (bot.navigator().leaping()) {
+        // (Digging in, walling in, up a pillar: a dodge is a step off the hole, out of the box, off
+        // the pillar - the cover is the answer to the arrows.)
+        if (bot.navigator().leaping() || BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.HideTask) {
             dodge = null;
             stand = null;
             return;
