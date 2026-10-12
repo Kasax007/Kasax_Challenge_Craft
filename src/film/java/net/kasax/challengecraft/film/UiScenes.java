@@ -34,6 +34,8 @@ final class UiScenes {
             case "ui_journey" -> u.journey();
             case "ui_summary" -> u.summary();
             case "ui_title" -> u.title();
+            case "ui_tutorial" -> u.tutorial();
+            case "ui_fib" -> u.fib();
             default -> {
                 return false;
             }
@@ -171,6 +173,55 @@ final class UiScenes {
         d.client(mc -> mc.setScreenAndShow(new TitleScreen()));
         d.run(10);
         d.shoot("ui_title", 3.0, null);
+        scale(4);
+    }
+
+    /** The tutorial's first step on the title screen, at the window sizes and GUI scales players use. */
+    private void tutorial() {
+        for (int[] v : new int[][]{{1920, 1080, 2}, {1920, 1080, 3}, {1920, 1080, 4}, {1280, 720, 2}, {2560, 1440, 3}, {1366, 768, 2}}) {
+            window(v[0], v[1]);
+            scale(v[2]);
+            d.client(mc -> {
+                net.kasax.challengecraft.client.tutorial.TutorialManager.replay();
+                mc.setScreenAndShow(new TitleScreen());
+            });
+            d.run(10);
+            d.still("tutorial_" + v[0] + "x" + v[1] + "_gui" + v[2]);
+        }
+        d.client(mc -> net.kasax.challengecraft.client.tutorial.TutorialManager.skip());
+        window(FilmDirector.WIDTH, FilmDirector.HEIGHT);
+        scale(4);
+    }
+
+    /** The Force Item Battle screens: the lobby, the battle running, the HUD card. */
+    private void fib() {
+        window(1920, 1080);
+        scale(3);
+        d.openWorld("fib", false, 45);
+        d.hud(true);
+        d.client(mc -> mc.setScreenAndShow(new net.kasax.challengecraft.client.screen.ForceItemTeamScreen()));
+        d.run(20);
+        d.still("fib_lobby");
+        // (One player: the battle's debug start - the button wants two.)
+        d.cmd("execute as @p run challengecraft_fib_debug_solo");
+        d.run(60);
+        d.client(mc -> mc.setScreenAndShow(new net.kasax.challengecraft.client.screen.ForceItemTeamScreen()));
+        d.run(20);
+        d.still("fib_running");
+        d.client(mc -> mc.setScreenAndShow(null));
+        d.run(20);
+        d.still("fib_hud");
+        scale(2);
+        d.run(5);
+        d.still("fib_hud_gui2");
+        d.client(mc -> mc.setScreenAndShow(new net.kasax.challengecraft.client.screen.ForceItemTeamScreen()));
+        d.run(20);
+        d.still("fib_running_gui2");
+        d.client(mc -> mc.setScreenAndShow(null));
+        scale(3);
+        d.cmd("execute as @p run challengecraft_fib_results");
+        d.run(120);
+        d.still("fib_results");
         scale(4);
     }
 

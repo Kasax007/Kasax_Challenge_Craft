@@ -87,6 +87,17 @@ public class ForceItemTeamScreen extends Screen {
                 btn -> onClose()));
     }
 
+    /**
+     * The panel goes in with the background, before the widgets: drawn after them (as it was), its
+     * opaque fill covered every button inside it - the teams, Solo, Start, the Joker - and only
+     * Done, below the panel, could be seen or found.
+     */
+    @Override
+    public void extractBackground(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
+        super.extractBackground(ctx, mouseX, mouseY, delta);
+        CraftUI.frame(ctx, panelX - 4, panelY - 4, panelW + 8, panelH + 8);
+    }
+
     @Override
     public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         // The lobby → running → ended transitions swap the button row.
@@ -96,7 +107,6 @@ public class ForceItemTeamScreen extends Screen {
 
         super.extractRenderState(ctx, mouseX, mouseY, delta);
 
-        CraftUI.frame(ctx, panelX - 4, panelY - 4, panelW + 8, panelH + 8);
         ctx.centeredText(font, title, width / 2, panelY + 6, CraftUI.TEXT_PRIMARY);
 
         ForceItemSyncPacket state = ForceItemClientState.get();

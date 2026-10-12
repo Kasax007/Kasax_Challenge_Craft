@@ -94,6 +94,15 @@ public class ForceItemResultsScreen extends Screen {
         addRenderableWidget(continueButton);
     }
 
+    private static final int PANEL_W = 320, PANEL_Y = 20;
+
+    /** The panel with the background, before the widgets (drawn after them, it would cover them). */
+    @Override
+    public void extractBackground(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
+        super.extractBackground(ctx, mouseX, mouseY, delta);
+        CraftUI.frame(ctx, width / 2 - PANEL_W / 2 - 4, PANEL_Y - 4, PANEL_W + 8, height - 60 + 8);
+    }
+
     @Override
     public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         boolean done = currentEntryFullyRevealed();
@@ -104,11 +113,9 @@ public class ForceItemResultsScreen extends Screen {
 
         super.extractRenderState(ctx, mouseX, mouseY, delta);
 
-        int panelW = 320;
+        int panelW = PANEL_W;
         int panelX = width / 2 - panelW / 2;
-        int panelY = 20;
-        int panelH = height - 60;
-        CraftUI.frame(ctx, panelX - 4, panelY - 4, panelW + 8, panelH + 8);
+        int panelY = PANEL_Y;
         ctx.centeredText(font, title, width / 2, panelY + 8, CraftUI.TEXT_PRIMARY);
 
         // Already fully revealed placements, compact, worst at the bottom of the block.

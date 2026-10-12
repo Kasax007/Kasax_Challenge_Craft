@@ -316,7 +316,7 @@ public class Chal_45_ForceItemBattle {
             "minecraft:egg", "minecraft:ender_chest",
             "minecraft:beacon", "minecraft:conduit",
             "minecraft:bell", "minecraft:lantern",
-            "minecraft:soul_lantern", "minecraft:chain",
+            "minecraft:soul_lantern", "minecraft:iron_chain",
             // --- 26.3 Wilderness Bound ---
             "minecraft:poplar_log", "minecraft:poplar_planks", "minecraft:poplar_sapling", "minecraft:poplar_shelf",
             "minecraft:red_shrub", "minecraft:shelf_mushroom", "minecraft:straw_bed", "minecraft:white_cushion",
@@ -644,7 +644,15 @@ public class Chal_45_ForceItemBattle {
                 : 0;
 
         List<ForceItemSyncPacket.PlayerEntry> entries = new ArrayList<>();
-        for (Map.Entry<UUID, String> named : data.getPlayerNames().entrySet()) {
+        Map<UUID, String> names = new java.util.LinkedHashMap<>(data.getPlayerNames());
+        // (In the lobby everyone online is in it - joined a team or not: the battle starts with
+        // them all. Listed only once in a team, the lobby's list stayed empty until someone did.)
+        if (data.getState() == ForceItemBattleSavedData.STATE_IDLE) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                if (!player.isSpectator()) names.putIfAbsent(player.getUUID(), player.getName().getString());
+            }
+        }
+        for (Map.Entry<UUID, String> named : names.entrySet()) {
             UUID uuid = named.getKey();
             entries.add(new ForceItemSyncPacket.PlayerEntry(
                     uuid,

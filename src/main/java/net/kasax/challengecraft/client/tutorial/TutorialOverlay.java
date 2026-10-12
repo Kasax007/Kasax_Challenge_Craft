@@ -24,6 +24,8 @@ public final class TutorialOverlay {
     private static final int DIM = 0xB0000000;
     private static final int CARD_W = 280;
     private static final int PAD = 10;
+    /** How far outside the target its ring is drawn. */
+    private static final int RING = 1;
 
     /** Skip button geometry, recomputed each frame; also used for hit-testing. */
     private static int skipX, skipY, skipW = 92, skipH = 20;
@@ -97,10 +99,13 @@ public final class TutorialOverlay {
             panel.scrollIntoView(target);
         }
 
-        int x1 = target.getX() - 4;
-        int y1 = target.getY() - scroll - 4;
-        int x2 = target.getX() + target.getWidth() + 4;
-        int y2 = target.getY() - scroll + target.getHeight() + 4;
+        // (The ring right at the widget's edge: four pixels out it stood clear of the box with a
+        // band of wash between, ran into the buttons round it, and read as fitting nothing - most
+        // of all at GUI scale 4, where the level button is small and the four pixels are sixteen.)
+        int x1 = target.getX() - RING;
+        int y1 = target.getY() - scroll - RING;
+        int x2 = target.getX() + target.getWidth() + RING;
+        int y2 = target.getY() - scroll + target.getHeight() + RING;
 
         if (panel != null) {
             y1 = Math.max(y1, panel.getY());
