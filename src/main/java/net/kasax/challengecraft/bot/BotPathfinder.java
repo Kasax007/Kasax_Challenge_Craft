@@ -285,6 +285,10 @@ public final class BotPathfinder {
             if ((expanded & 255) == 0) {
                 progress = expanded;
                 if (System.nanoTime() > until) break;
+                // (Called off - the walk dropped or set anew: the worker free for the next search.
+                // A called-off search ran on to its last node, and searches dropped every few
+                // ticks held up everyone's on the two workers - and self-play's whole server.)
+                if (Thread.currentThread().isInterrupted()) return null;
             }
             Node n = open.poll();
             if (n.closed) continue;

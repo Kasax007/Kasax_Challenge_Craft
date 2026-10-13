@@ -93,6 +93,10 @@ public final class ObtainPlanner {
     private Map<EntityType<?>, BlockPos> mobPos = Map.of();
     private Map<Block, BlockPos> hintPos = Map.of();
     private BlockPos villagePos, here;
+    /** Seconds a level of a staircase down takes with the pickaxe in hand (see refresh). */
+    private double digPerBlock = WOODEN_DIG;
+    /** The same with a wooden pickaxe (two blocks of stone, 23 ticks each, and the step). */
+    private static final double WOODEN_DIG = 2.7;
     /** Seconds until the monsters come out on the surface (0 at night). */
     private double untilNight;
 
@@ -427,6 +431,7 @@ public final class ObtainPlanner {
         here = c;
         // Seconds to dig one level of a staircase (two blocks of stone) with what it holds.
         double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
+        this.digPerBlock = digPerBlock;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         net.minecraft.world.phys.Vec3 eye = bot.body().getEyePosition();
         // (Not what it just found no way to: a tree up on a mesa is not wood at hand.)
@@ -741,7 +746,7 @@ public final class ObtainPlanner {
                 search = WATER_SEARCH;
             }
             if (seen == null) return Leaf.NONE;
-            double bucket = cost.getOrDefault(Items.BUCKET, INF);
+            double bucket = countAny(bot.body(), Set.of(Items.BUCKET)) > 0 ? 0 : cost.getOrDefault(Items.BUCKET, INF);
             return new Leaf(seen + 3 + bucket, search + searches.getOrDefault(Items.BUCKET, 0.0), visiblePos.get(fluid));
         }
         if (item == Items.OBSIDIAN) {
@@ -814,6 +819,12 @@ public final class ObtainPlanner {
             Integer depth = BotKnowledge.depth(block, here.getY());
             if (depth != null && depth < here.getY() - 4) {
                 at = new BlockPos(here.getX(), depth, here.getZ());
+                // The way down to that depth is work too, not luck: a staircase, as for what is
+                // seen down there (see vertical) - "Tuff, ~31 s" was sixty-four levels of it, given
+                // up on the way down after two minutes in a self-play league (the leagues' staircases:
+                // 701 levels in 2148 s, some 3 s a level with the stops on the way).
+                // (With the pickaxe the plan makes first if there is none in hand: a wooden one's pace at worst.)
+                double down = bot.params.on("descent") ? vertical(depth - here.getY(), Math.min(digPerBlock, WOODEN_DIG)) : 0;
                 // A cave known to reach down to that height: the way down is walked, and its
                 // walls show ore all along - much less looking about than a tunnel.
                 BlockPos cave = bot.memory().cave((net.minecraft.server.level.ServerLevel) bot.body().level(), here, depth, 12, 128, List.of());
@@ -822,7 +833,10 @@ public final class ObtainPlanner {
                     search -= cut;
                     find -= cut;
                     at = cave;
+                    // (On foot down the cave: the walk to it, and the levels at a walk.)
+                    if (bot.params.on("descent")) down = Math.sqrt(cave.distSqr(here)) / 4 + (here.getY() - cave.getY()) * 0.8;
                 }
+                find += down;
             }
         }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
@@ -1240,7 +1254,10 @@ public final class ObtainPlanner {
                 Block source = item == Items.WATER_BUCKET ? Blocks.WATER : item == Items.LAVA_BUCKET ? Blocks.LAVA : null;
                 boolean known = source != null && (visibleBlocks.containsKey(source) || source == Blocks.WATER && !nether);
                 if (known && !visiting.contains(Items.BUCKET) && !isFailed("fill:" + name(item), now)) {
-                    ways.add(new Way("fill:" + name(item), visibleBlocks.getOrDefault(source, WATER_SEARCH) + 3 + cost(Items.BUCKET), Kind.FILL, item));
+                    // (A bucket in the pack: none to make - its cost from scratch, iron dug for
+                    // deep down, put the filling of the one carried over the limit of a way.)
+                    double bucket = sim.count(Set.of(Items.BUCKET)) > 0 ? 0 : cost(Items.BUCKET);
+                    ways.add(new Way("fill:" + name(item), visibleBlocks.getOrDefault(source, WATER_SEARCH) + 3 + bucket, Kind.FILL, item));
                 }
             }
             // Bought from a villager.

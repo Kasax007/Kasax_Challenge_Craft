@@ -250,6 +250,41 @@ public class GuardianTests {
     }
 
     /**
+     * Two zombies at him on hard, no armour: up a pillar and from above; then a creeper comes
+     * (a self-play game: "kill creeper" took him down off the pillar, the zombies at his back -
+     * dead). The pillar is not left for the creeper; alive, not badly hurt.
+     */
+    @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 40)
+    public void creeperAtThePillar(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "creeper_at_the_pillar");
+        hard(h.getLevel());
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16));
+        var body = a.bot().body();
+        body.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        var z1 = mob(h, a, EntityTypes.ZOMBIE, 24, FEET, 20);
+        var z2 = mob(h, a, EntityTypes.ZOMBIE, 20, FEET, 24);
+        Mob[] creeper = {null};
+        h.runAfterDelay(140, () -> creeper[0] = mob(h, a, EntityTypes.CREEPER, 31, FEET, 20));
+        float[] low = {body.getHealth()};
+        boolean[] leftForCreeper = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 1300, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "creeper_at_the_pillar: died");
+            for (var z : List.of(z1, z2)) if (z.isAlive() && z.getTarget() != body) z.setTarget(body);
+            if (creeper[0] != null && creeper[0].isAlive() && creeper[0].getTarget() != body) creeper[0].setTarget(body);
+            low[0] = Math.min(low[0], body.getHealth());
+            // (Off the pillar after the creeper while a zombie still stands: the very thing.)
+            boolean pillar = a.bot().tasks().stream().anyMatch(t -> net.kasax.challengecraft.bot.BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.PillarFightTask);
+            if (!pillar && (z1.isAlive() || z2.isAlive()) && a.bot().current() instanceof net.kasax.challengecraft.bot.task.KillTask k
+                    && k.target() instanceof net.minecraft.world.entity.monster.Creeper) leftForCreeper[0] = true;
+            h.assertTrue(!leftForCreeper[0], "creeper_at_the_pillar: off the pillar after the creeper");
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] creeper_at_the_pillar hp {} lowest {} zombies {} {} creeper {} {}", body.getHealth(), low[0],
+                    z1.isAlive() ? z1.getHealth() : "dead", z2.isAlive() ? z2.getHealth() : "dead",
+                    creeper[0] == null ? "-" : creeper[0].isAlive() ? creeper[0].getHealth() : "gone", a.bot().status());
+            return h.getTick() > 1200 && low[0] >= 6;
+        });
+    }
+
+    /**
      * Walled in among flowers (a poppy at every side by the feet - a meadow, a flower forest): a
      * flower is no wall, a spider walks in through it and an arrow flies through - broken, the
      * block put in its place; the box shut all round.

@@ -376,7 +376,9 @@ public final class LockoutGoals {
                         one.task())));
             }
             case "take_fall_damage" -> fall(bot, planner, 5, false);
-            case "fall_20_blocks_and_survive" -> body.getHealth() >= 19 ? fall(bot, planner, 22, true) : null;
+            // (Twenty-one, not twenty: a fall of exactly twenty can come out a hair short of it;
+            // eighteen hearts' halves - from nineteen it lives, from twenty-two it would not.)
+            case "fall_20_blocks_and_survive" -> body.getHealth() >= 19 ? fall(bot, planner, 21, true) : null;
             case "stand_on_bedrock" -> {
                 if (!overworld(bot)) yield null;
                 int down = body.getBlockY() - (body.level().getMinY() + 1);

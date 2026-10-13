@@ -90,7 +90,24 @@ public final class EatTask implements BotTask {
             body.stopUsingItem();
             return Result.DONE;
         }
+        // A bow drawn on it near full, or an arrow on its way: the meal stopped, the shield wanted
+        // (the reflexes see to it) - eating, it is down for a second and a half. Not when starving.
+        // (League 5: a skeleton out of sight as the meal began, back in sight drawing - and the
+        // meal went on through the arrow.)
+        if (body.getFoodData().getFoodLevel() > 4 && shotAt(body)) {
+            body.stopUsingItem();
+            return Result.DONE;
+        }
         return body.isUsingItem() ? Result.RUNNING : Result.DONE;
+    }
+
+    /** A shooter after it in sight about to loose, or its arrow already on the way. */
+    static boolean shotAt(BotPlayer body) {
+        for (var m : body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(24),
+                m -> m.isAlive() && m.getTarget() == body && net.kasax.challengecraft.bot.Guardian.shooter(m))) {
+            if (body.hasLineOfSight(m) && KillTask.aboutToShoot(m) || net.kasax.challengecraft.bot.ThreatSense.incoming(body, m)) return true;
+        }
+        return false;
     }
 
     @Override

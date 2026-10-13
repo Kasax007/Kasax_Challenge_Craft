@@ -648,7 +648,9 @@ public final class Bot {
         }
         // Up in a tree's crown (the spawn can be up there; seed 66 jumped about on the leaves and
         // fell to its death): down through the leaves at once, a block's fall at a time.
-        if (body.onGround() && !(top instanceof net.kasax.challengecraft.bot.task.LeafDescentTask)
+        // (Not again while the way down is being walked along the crown: a self-play game started
+        // it afresh over its own walk every ten ticks, nine hundred times, the stack ever deeper.)
+        if (body.onGround() && tasks.stream().noneMatch(t -> t instanceof net.kasax.challengecraft.bot.task.LeafDescentTask)
                 && net.kasax.challengecraft.bot.task.LeafDescentTask.upATree(this)) {
             actions.reset();
             navigator.stop();
@@ -720,8 +722,10 @@ public final class Bot {
         // up into the light, where the zombies burn; arrows on the way end in the shield (seed 77,
         // hard: five zombies, two skeletons and a creeper in a cave - a skeleton rushed at four
         // blocks, a hole begun with the zombies at its elbow, dead). Better armour, more of them.
+        // (Not out of a hole or a box shut all round, though: in there they cannot get at it, and
+        // out of it - its hiding just over - it ran into the four of them and died walled in.)
         if (!running && !cornered && !welcomeExplosion
-                && !(BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.PillarFightTask)) {
+                && !(BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.PillarFightTask) && !Guardian.enclosed(body)) {
             var crowd = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(12, 6, 12),
                     m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy);
             int many = body.getArmorValue() >= 15 ? 6 : body.getArmorValue() >= 6 ? 5 : 4;
@@ -819,7 +823,14 @@ public final class Bot {
         }
         // A creeper coming for it, not hissing yet: dealt with before it gets close, as a player
         // does. With a weapon and the hearts for it, killed (hit, a step back, hit); else away.
-        if (!fighting && !welcomeExplosion && !running) {
+        // (Not down off a pillar it fights from, nor with others already at it: those first, the
+        // creeper left to the threat sense - away, or the shield, when it hisses. In a self-play
+        // league "kill creeper" took it off its pillar, two zombies at its back, and that was it.)
+        boolean onPillar = tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.PillarFightTask);
+        boolean othersAtMe = !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(4),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
+                        && !(m instanceof net.minecraft.world.entity.monster.Creeper)).isEmpty();
+        if (!fighting && !welcomeExplosion && !running && !onPillar && !othersAtMe) {
             for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(7),
                     c -> c.isAlive() && c.getTarget() == body && c.getSwellDir() <= 0 && body.hasLineOfSight(c))) {
                 boolean armed = false;
@@ -1092,7 +1103,11 @@ public final class Bot {
         // (Not with a monster at it: eating stands still for a second and a half. Unless starving.)
         // (Nor with a bowman drawing on it in sight, however far: the meal is a second and a half
         // with the shield down - seed 88, hard: shot dead eating, a patrol's crossbows about.)
-        if ((food <= 14 || hurt) && (food <= 4 || !targeted(8) && !shooterOnMe(24)) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
+        // (And not with a bowman after it a dozen blocks off, in sight or not: a step and it is in
+        // sight again, drawing - league 5, shot eating.)
+        boolean bowmanNear = !body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(12),
+                m -> m.isAlive() && m.getTarget() == body && Guardian.shooter(m)).isEmpty();
+        if ((food <= 14 || hurt) && (food <= 4 || !targeted(8) && !shooterOnMe(24) && !bowmanNear) && net.kasax.challengecraft.bot.task.EatTask.bestFood(body) >= 0) {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.EatTask());
         }

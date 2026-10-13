@@ -194,6 +194,25 @@ public class BotSkillTests {
                 () -> ObtainPlanner.countAny(body, Set.of(Items.COBBLESTONE)) >= 20 && a.near(20, FEET, 20, 1.5) && a.bot().current() == null);
     }
 
+    /**
+     * Blocks for the fall tile's pillar (soil or stone, whichever) on flat grass with no wall about:
+     * the grass of the field round about, a block deep - no staircase down for it (that took
+     * minutes in self-play, and by the water it could not be dug at all).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1400, skyAccess = true, padding = 8)
+    public void pillarBlocksFromTheField(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "pillar_blocks_from_the_field");
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        var blocks = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.NETHERRACK);
+        boolean[] deep = {false};
+        a.run(new ObtainTask(blocks, 23), 1400, () -> {
+            if (body.getY() < a.abs(0, FEET - 1, 0).getY() - 0.5) deep[0] = true;
+            h.assertTrue(!deep[0], "pillar_blocks_from_the_field: dug deeper than the field's one block");
+            return ObtainPlanner.countAny(body, blocks) >= 23 && a.bot().current() == null;
+        });
+    }
+
     /** A rock wall at hand: the cobblestone comes out of the wall, the ground it stands on stays whole. */
     @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
     public void cobbleFromWall(GameTestHelper h) {
@@ -237,6 +256,28 @@ public class BotSkillTests {
         int depth = a.abs(0, 4, 0).getY();
         a.run(new net.kasax.challengecraft.bot.task.MineTask("raw_iron", s -> s.is(Blocks.IRON_ORE), Set.of(Items.RAW_IRON), 1, depth), 2400,
                 () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 1);
+    }
+
+    /**
+     * Tuff, none in sight, from up here: the staircase down to where it is common counts in the
+     * estimate, a level at a time as for what is seen deep down (a self-play game planned it at
+     * "~31 s", sixty-four levels down, and gave up on the way) - and not with "descent=0".
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void plannerCountsTheWayDown(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "planner_counts_the_way_down");
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE));
+        h.runAfterDelay(20, () -> {
+            var bot = a.bot();
+            int levels = bot.body().blockPosition().getY() - net.kasax.challengecraft.bot.plan.BotKnowledge.depth(Blocks.TUFF, bot.body().blockPosition().getY());
+            double with = new ObtainPlanner().estimate(bot, Set.of(Items.TUFF), 1);
+            bot.params = net.kasax.challengecraft.bot.BotParams.parse("descent=0");
+            double without = new ObtainPlanner().estimate(bot, Set.of(Items.TUFF), 1);
+            bot.params = net.kasax.challengecraft.bot.BotParams.DEFAULT;
+            BotArena.LOG.info("[BOTTEST] planner_counts_the_way_down: {} levels, ~{} s (without the way down ~{} s)", levels, Math.round(with), Math.round(without));
+            if (with < without + levels * 1.5) h.fail("the way down not counted: ~" + Math.round(with) + " s for " + levels + " levels (without: ~" + Math.round(without) + " s)");
+            a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
+        });
     }
 
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */

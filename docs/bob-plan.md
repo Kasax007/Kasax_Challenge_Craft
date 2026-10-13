@@ -2784,3 +2784,99 @@ stärker profitiert hat (siehe unten).
 - Wäre Essen für die Nacht in der Dämmerung zu teuer, steht das im Log.
 - Neuer Schalter `copper=0`: keine Kupferrüstung auf HARD. Sie kostete in Liga 3 im Mittel 171 s pro
   Spiel. Liga 5 misst, ob sie sich neben dem Wächter noch lohnt.
+
+### 24.14 Liga 5: Standard gegen `copper=0` (`2e3ed0b`)
+
+Dieselben Seeds wie Liga 3 und 4. Das zwölfte Spiel habe ich abgebrochen: Die Standardseite hing ab
+Minute 2 in einer Dschungelkrone fest (siehe 24.15). Das Spiel misst also nichts über Kupfer. Es
+bleiben 11 Spiele.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | 6 | 1,91 | 0,27 | 26,0 | 351 s (8 Spiele) | 0,5 / 1,2 / 1,9 |
+| `copper=0` | 4 | 1,55 | 0,18 | 23,6 | 396 s (6 Spiele) | 0,4 / 0,6 / 1,5 |
+
+Ein Spiel endete unentschieden.
+
+- **Kupfer:** Ohne Kupferrüstung gibt es 0,36 Felder weniger (Standardfehler 0,93), also keinen
+  messbaren Unterschied. `copper` bleibt an.
+- **Standard gegen Liga 4, dieselben 11 Welten:** 2,18 → 1,91 Felder (gepaart −0,27, Standardfehler
+  0,76). Die Tode stiegen von 1 auf 3, die verlorenen Herzen von 16,5 auf 26,0. Die Nacht im Loch fiel
+  von 107 s auf 0 s pro Spiel (24.13). Das Kampfrisiko der Nacht ist damit sichtbar geworden.
+
+**Die Tode:**
+
+| Wer | Ursache |
+| --- | --- |
+| Standard | im Wasser unter einem Dorf ertrunken; „hoch“ ging dort nicht, „graben“ fand nichts |
+| Standard | Zombies, während Bob gegen einen Creeper kämpfte (der Creeper-Reflex zog ihn vom Turm) |
+| Standard | Enderman und Zombies beim Kupfer |
+| `copper=0` | Skelett beim Essen unter Beschuss |
+| `copper=0` | Skelett, nachts ohne Rüstung und Schild auf Essenssuche |
+
+**Wo die Zeit hinging:** Die Ziele bekamen zusammen 8535 s, die geholten davon nur 1127 s. Die
+meisten Abbrüche („dauert zu lange“) kamen von Schätzungen, die das Drei- bis Fünffache verfehlten:
+
+| Feld | Starts | geschätzt | tatsächlich |
+| --- | --- | --- | --- |
+| Fall 20 Blocks | 8 | 33 s | 165 s |
+| Firework Rocket | 8 | 29 s | 158 s |
+| Name Tag | 7 | 18 s | 113 s |
+| Tuff | 5 | 27 s | 118 s |
+
+### 24.15 Korrekturen aus Liga 5
+
+- **Baumkrone:**
+  - **Der Fehler:** Der Reflex „runter aus der Krone“ startete neu, sobald der Abstieg einen Weg
+    entlang der Krone einschob. Alle 10 Ticks kam ein neuer Abstieg auf den Stapel, im
+    abgebrochenen Spiel über 1100-mal. Die Wegsuche kam nie zum Ende, das Ziel lag einen Block
+    weiter über einer Ranke.
+  - **Jetzt:**
+    - Der Reflex wartet, solange ein Abstieg läuft.
+    - Stellen über Ranken zählen nicht als Halt.
+    - Eine nicht erreichte Stelle wird nicht noch einmal versucht.
+    - Gibt es keinen Weg entlang der Krone, nimmt Bob einen Sturz von wenigen Herzen in Kauf.
+  - Test: `leaf_descent_past_vine`. Auf dem alten Stand schlägt er fehl, mit 109 Abstiegen auf dem
+    Stapel.
+- **Wegsuche:** Eine abgebrochene Suche lief bisher bis zum letzten Knoten weiter (bis 600 000). Die
+  zwei Such-Threads waren damit belegt. Im Selbstspiel wartet der Server auf die Suchen, deshalb fiel
+  er auf ~2 TPS. Eine abgebrochene Suche hört jetzt sofort auf.
+- **Ertrinken unter dem Strudel:**
+  - Bob sucht sich eine andere Säule mit stehendem Wasser, wenn:
+    - an der Stelle das Schwimmen nach oben nichts bringt (fallendes Wasser über einem Strudel), und
+    - über dem Kopf nichts zu graben ist.
+  - Fallendes Wasser zählt nicht mehr als Weg nach oben.
+  - In einer Blasensäule selbst gibt es Luft, wie im Spiel. Der Test `air_past_whirlpool` hat deshalb
+    den Kopf im fallenden Wasser darüber. Auf dem alten Stand ertrinkt Bob darin.
+- **Creeper am Turm:** Der Creeper-Reflex greift nicht mehr, solange Bob auf dem Turm kämpft oder
+  andere Monster an ihm sind. Test: `creeper_at_the_pillar`.
+- **Essen unter Beschuss:** Bob bricht die Mahlzeit ab, wenn:
+  - ein Schütze auf ihn zielt und gerade schießt, oder ein Pfeil unterwegs ist, und
+  - der Hunger nicht drängt (Essen über 4).
+- **Nachts Essen holen:** nur noch mit Schild oder Rüstung ab 6.
+- **Fall 20 Blocks:**
+  - **Fallhöhe:** Bob misst die Fallhöhe auf der Seite, von der er springt. Bisher zählte er ab
+    seinem Startpunkt: Aus einem Loch fiel er nur 19 Blöcke, und das Feld zählte nicht. Gewollt sind
+    21 Blöcke, denn genau 20 können knapp darunter landen. Sie kosten 18 halbe Herzen.
+  - **Sicherheit:** Bob springt nie, wo der Sturz tötet, und baut für einen tödlichen Sturz keinen
+    Block.
+  - **Standort:** Er baut nur unter freiem Himmel. Auf einem Berg hatte er sich vorher durch den
+    Fels nach oben gegraben.
+  - **Steinvorrat:** Der Turm darf auch die Steine verbauen, die Bob sonst für einen Ofen zurückhält.
+  - **Erde ohne Treppe:** Erde und Gestein holt Bob jetzt aus dem Boden ringsum, einen Block tief,
+    wenn keine Wand da ist. Bisher grub er eine Treppe nach unten, und am Wasser ging das gar nicht.
+  - Tests: `fall_from_hole`, `no_deadly_fall`, `pillar_blocks_from_the_field`.
+- **Der Weg nach unten kostet:** Ein ungesehener Block in der Tiefe (Tuffstein, Erze) kostet im Plan
+  jetzt auch die Treppe dorthin, wie ein gesehener. Ist eine Höhle nach unten bekannt, zählt der Weg
+  durch die Höhle. In den Ligen kostete eine Treppenstufe im Mittel ~3 s (701 Stufen in 2148 s).
+  Ohne Spitzhacke in der Hand rechnet der Plan mit dem Tempo einer Holzspitzhacke, denn die macht
+  er zuerst. Neuer Schalter `descent=0`: der alte Plan ohne Abstieg. Liga 6 misst den Unterschied.
+- **Eingegraben bleiben:**
+  - **Der Fehler:** In `night_shelter_bare` endete das Eingraben nach 45 s, obwohl draußen noch drei
+    Zombies und ein Skelett warteten. Bob lief vor der Menge davon, aus dem Loch heraus, und starb
+    eingemauert im Freien.
+  - **Jetzt:** Nachts bleibt Bob im Loch, solange sie warten (bis zur Obergrenze von 135 s). Die
+    Flucht vor einer Menge greift nicht, solange er rundum eingeschlossen ist.
+- **Ein Eimer im Gepäck** kostet beim Füllen nichts mehr. Bisher zählte der Planer seine Herstellung
+  mit (Eisen aus der Tiefe). Mit dem Abstieg lag dadurch schon das Wasserholen über der Grenze eines
+  Weges (Tests `water_unseen`, `water_not_xray`).

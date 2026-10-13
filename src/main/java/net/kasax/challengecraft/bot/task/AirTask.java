@@ -31,6 +31,12 @@ public final class AirTask implements BotTask {
     private net.minecraft.world.phys.Vec3 last;
     /** The spot on its trail it swims back to: the last one with air. */
     private BlockPos back;
+    /** Columns swum for that did not get it up (a current, falling water): not again. */
+    private final java.util.Set<BlockPos> triedColumns = new java.util.HashSet<>();
+    private BlockPos swimColumn;
+    /** Ticks in the dig with nothing over the head to dig, and not rising. */
+    private int idleDig;
+    private double idleDigFrom;
 
     /** The head would be out of the water standing (or swimming) here. */
     public static boolean breathable(ServerLevel level, BlockPos feet) {
@@ -100,6 +106,27 @@ public final class AirTask implements BotTask {
         switch (way) {
             case DIG -> {
                 BlockPos head = BlockPos.containing(body.getX(), body.getEyeY(), body.getZ());
+                // Nothing over the head to dig, and the swim up gets it no higher (water falling
+                // down on it, a current): another column, not "up" into it till the air is gone -
+                // so it drowned under a village's waterfall in a self-play league.
+                boolean nothingToDig = true;
+                for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) nothingToDig &= !blocksTheWayUp(level, q);
+                if (nothingToDig) {
+                    if (idleDig++ == 0 || body.getY() > idleDigFrom + 0.5) {
+                        idleDigFrom = body.getY();
+                        idleDig = 1;
+                    }
+                    if (idleDig > 30) {
+                        idleDig = 0;
+                        triedColumns.add(feet.atY(0));
+                        BlockPos other = openColumn(level, feet, triedColumns);
+                        if (other != null) {
+                            way = Way.SWIM;
+                            swimColumn = other;
+                            bot.say("up for air: no way up here, to the still water at " + other.toShortString());
+                        }
+                    }
+                } else idleDig = 0;
                 for (BlockPos q : new BlockPos[]{head.above(), head.above(2)}) {
                     // (A waterlogged block - a fence, a slab in a flooded mineshaft - is in the way
                     // as much as a dry one: dug too. Left alone as "water", a fence over the head
@@ -123,7 +150,8 @@ public final class AirTask implements BotTask {
                 bot.navigator().stop();
                 body.stopInputs();
                 body.jump = true;
-                BlockPos open = openColumn(level, feet);
+                BlockPos open = swimColumn != null && !triedColumns.contains(swimColumn.atY(0)) ? swimColumn : openColumn(level, feet, triedColumns);
+                swimColumn = open;
                 if (open != null && (open.getX() != feet.getX() || open.getZ() != feet.getZ())) {
                     body.lookAt(net.minecraft.world.phys.Vec3.atCenterOf(open.atY(feet.getY())));
                     body.forward = 1f;
@@ -170,7 +198,9 @@ public final class AirTask implements BotTask {
                 return Way.BACK;
             }
         }
-        if (way != Way.SWIM && openColumn(level, feet) != null) return Way.SWIM;
+        if (way == Way.SWIM && swimColumn != null) triedColumns.add(swimColumn.atY(0));
+        swimColumn = null;
+        if (openColumn(level, feet, triedColumns) != null) return Way.SWIM;
         return Way.DIG;
     }
 
@@ -214,8 +244,12 @@ public final class AirTask implements BotTask {
         return false;
     }
 
-    /** The nearest column (within six) where nothing but water stands between the feet's level and the air above. */
-    private static BlockPos openColumn(ServerLevel level, BlockPos feet) {
+    /**
+     * The nearest column (within six) where nothing but still water stands between the feet's
+     * level and the air above - not water falling down, which no one swims up - leaving out the
+     * columns already tried.
+     */
+    private static BlockPos openColumn(ServerLevel level, BlockPos feet, java.util.Set<BlockPos> tried) {
         BlockPos best = null;
         double bestD = Double.MAX_VALUE;
         for (int dx = -6; dx <= 6; dx++) {
@@ -223,14 +257,17 @@ public final class AirTask implements BotTask {
                 double d = dx * dx + dz * dz;
                 if (d >= bestD) continue;
                 BlockPos p = feet.offset(dx, 0, dz);
+                if (tried.contains(p.atY(0))) continue;
                 for (int up = 0; up <= 16; up++) {
                     BlockPos q = p.above(up);
                     if (blocksTheWayUp(level, q)) break;
-                    if (level.getFluidState(q).isEmpty()) {
+                    var fluid = level.getFluidState(q);
+                    if (fluid.isEmpty()) {
                         best = p;
                         bestD = d;
                         break;
                     }
+                    if (!fluid.isSource()) break;
                 }
             }
         }

@@ -180,6 +180,21 @@ public final class BotActions {
     }
 
     /**
+     * Puts a building block at {@code target}, the stone kept back for a furnace too (a pillar
+     * that is the point itself, the fall tile's: twenty-odd blocks, not twenty less the eight).
+     */
+    public boolean placeAnyBlock(BlockPos target) {
+        int slot = throwawaySlot();
+        if (slot < 0) {
+            var items = bot.getInventory().getNonEquipmentItems();
+            for (int i = 0; i < items.size() && slot < 0; i++) if (THROWAWAY.contains(items.get(i).getItem())) slot = i;
+        }
+        if (slot < 0) return false;
+        tools.select(slot);
+        return placeHeld(target);
+    }
+
+    /**
      * Puts down a block item (a crafting table, a furnace) next to the bot, on the ground and out of
      * its way. Returns where it went, or null when there is no spot within reach.
      */

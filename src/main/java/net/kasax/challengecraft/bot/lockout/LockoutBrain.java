@@ -677,6 +677,13 @@ public final class LockoutBrain implements BotBrain {
         return armed && fedForTheNight(body, food) && armour && body.getHealth() >= 12;
     }
 
+    /** A shield (on the arm or in the pack) or armour worth the name. */
+    private static boolean shieldOrArmour(Bot bot) {
+        var body = bot.body();
+        return body.getArmorValue() >= 6 || body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                || ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.SHIELD)) > 0;
+    }
+
     /** {@link #nightReady} but for the hearts: geared, armed and fed, only hurt. */
     private static boolean nightReadyBarHearts(Bot bot) {
         var body = bot.body();
@@ -794,9 +801,11 @@ public final class LockoutBrain implements BotBrain {
         }
         shelterRetryAt = now + 400;
         // Armed and well, only the food short: something to eat close by first if it is quick (a
-        // cow in sight, a furnace in the pack), once a night - then on with the night.
+        // cow in sight, a furnace in the pack), once a night - then on with the night. Only with a
+        // shield or armour: bare, the hunt in the dark met a skeleton and a creeper in league 5
+        // (dead). In the hole the hunger does not drop - it waits for the morning there.
         if (armed(bot) && bot.body().getHealth() >= 12 && !fedForTheNight(bot.body(), net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body()))
-                && (!nightArmour(bot) || nightReadyBarHearts(bot)) && nightFoodTriedDay != day) {
+                && shieldOrArmour(bot) && nightFoodTriedDay != day) {
             nightFoodTriedDay = day;
             int have = ObtainPlanner.countAny(bot.body(), FOODS);
             double est = planner.estimate(bot, FOODS, have + 2);

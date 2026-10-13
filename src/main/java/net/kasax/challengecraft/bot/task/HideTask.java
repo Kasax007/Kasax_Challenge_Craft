@@ -245,7 +245,11 @@ public final class HideTask implements BotTask {
         if (!body.isAlive()) return Result.DONE;
         // (Out of time, but hurt with one still by the hole: a while longer - out at 11 hp into
         // the zombie that waited, it died on seed 44.)
-        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay || body.getHealth() >= 16 && window == null || !monsterBy(body))) return Result.DONE;
+        // (Nor out of the hole at night with them still waiting by it, healthy or not: out at
+        // full health into three zombies and a skeleton, walled in again in the open, dead - a
+        // while longer, as long as they stay, up to the limit.)
+        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay
+                || body.getHealth() >= 16 && window == null && !(level.isDarkOutside() && monsterBy(body)) || !monsterBy(body))) return Result.DONE;
         // (Called for mid-jump, or thrown up by a blow: from where it lands.)
         if (top == null) {
             if (!body.onGround()) return Result.RUNNING;
@@ -331,7 +335,7 @@ public final class HideTask implements BotTask {
         // (The hearts back, but the bowmen still by the hole: a while longer, as long as they stay
         // and the time lasts - seed 88, hard: out at full health into the same patrol, and shot.)
         boolean waiting = monsterBy(body);
-        if (body.getHealth() >= 16 && (!waiting || ticks > MAX_TICKS) || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !waiting) return Result.DONE;
+        if (body.getHealth() >= 16 && (!waiting || ticks > MAX_TICKS && !level.isDarkOutside()) || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !waiting) return Result.DONE;
         return Result.RUNNING;
     }
 

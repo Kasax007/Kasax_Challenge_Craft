@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.PressurePlateBlock;
 import java.util.List;
 
 import static net.kasax.challengecraft.gametest.BotArena.FEET;
+import static net.kasax.challengecraft.gametest.BotArena.GROUND;
 import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
 
 /** The things Lockout asks to do rather than to have. */
@@ -32,12 +33,41 @@ public class BotStuntTests {
         a.run(new FallTask(5, false), 600, () -> a.bot().body().getHealth() < 20 && a.bot().body().onGround());
     }
 
-    /** Twenty-two up and off without the water bucket (it carries one): badly hurt, alive. */
+    /**
+     * Twenty-one up and off without the water bucket (it carries one): badly hurt, alive - the
+     * eighteen halves of a heart that only a fall of twenty-one takes (the tile wants twenty).
+     */
     @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
     public void fallTwentyAndSurvive(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "fall_20");
         a.spawn(20, FEET, 20, new ItemStack(Items.DIRT, 30), new ItemStack(Items.WATER_BUCKET));
-        a.run(new FallTask(22, true), 1200, () -> a.bot().body().isAlive() && a.bot().body().getHealth() <= 5 && a.bot().body().onGround());
+        a.run(new FallTask(21, true), 1200, () -> a.bot().body().isAlive() && a.bot().body().getHealth() <= 2.5 && a.bot().body().onGround());
+    }
+
+    /**
+     * From the bottom of a hole two deep (dug in for the night): built up until the ground beside
+     * the pillar lies twenty-one below - not twenty-one over the hole's floor (a self-play game so
+     * fell nineteen onto the grass beside it, and had no tile for it).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
+    public void fallFromHole(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "fall_from_hole");
+        a.fill(20, GROUND - 1, 20, 20, GROUND, 20, Blocks.AIR);
+        a.spawn(20, FEET - 2, 20, new ItemStack(Items.DIRT, 30));
+        var body = a.bot().body();
+        a.run(new FallTask(21, true), 1200, () -> body.isAlive() && body.onGround() && body.getHealth() <= 2.5
+                && body.getY() > a.abs(0, FEET, 0).getY() - 0.5);
+    }
+
+    /** Ten halves of a heart left: no fall of twenty-one (it would kill) - not a block built for one. */
+    @GameTest(structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
+    public void noDeadlyFall(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "no_deadly_fall");
+        a.spawn(20, FEET, 20, new ItemStack(Items.DIRT, 30));
+        var body = a.bot().body();
+        body.setHealth(10);
+        a.run(new FallTask(21, true), 200, () -> a.bot().current() == null && body.isAlive() && body.getHealth() >= 10
+                && body.getY() < a.abs(0, FEET, 0).getY() + 0.5);
     }
 
     /** Down through the stone to stand on the bedrock at the bottom. */

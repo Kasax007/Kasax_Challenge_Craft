@@ -21,6 +21,8 @@ import java.util.Map;
  *       hearts; 1: armour too (6, or 2 and a shield), else dug in for the night.</li>
  *   <li>{@code copper} - 1 (the default): on hard, copper armour once the shield is in hand; 0:
  *       none (only what the board's iron and the chests bring).</li>
+ *   <li>{@code descent} - 1 (the default): what is dug for deep down and not seen yet costs the
+ *       staircase down to it in the plan; 0: only the looking about down there (as before).</li>
  * </ul>
  */
 public final class BotParams {
