@@ -2978,3 +2978,81 @@ Von den gestarteten Zielen holte Bob 36 % (20 von 55) statt 23 % in den Ligen 4 
   - **Tests:** `creeper_kill_shield` (mit Schild am Arm; auf dem alten Stand explodierte der
     Creeper). `creeper_kill` braucht jetzt 76 statt 169 Ticks.
 - **Offen:** der Tod durch den Ertrunkenen mit Dreizack (einer in 24 Spielerpartien).
+
+### 24.18 Liga 7: Standard gegen `quick=60` (`9aefa0a`)
+
+Dieselben 12 Seeds wie die Ligen 3 bis 6. `quick=60` nimmt ein Feld vor allem anderen, wenn es von
+hier aus höchstens 60 s kostet (Standard: 30 s).
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | 5 | 1,9 | 0,25 | 18,5 | 332 s | 0,4 / 1,1 / 1,9 |
+| `quick=60` | 7 | 2,2 | 0,25 | 16,0 | 546 s | 0,2 / 0,9 / 2,2 |
+
+Der Abstand beträgt −0,25 Felder pro Spiel (Standardfehler 0,64, t = −0,39), der Vorzeichentest
+ergibt p = 0,77. `quick=60` bringt also nichts Messbares, das erste Feld kommt sogar später. Die
+Grenze bleibt bei 30 s.
+
+**Gegen Liga 6:**
+- Der Standard holte 1,92 statt 2,67 Felder (gepaart −0,75, Standardfehler 0,76).
+- Der Gegner war aber stärker: In Liga 6 spielte er `descent=0` (1,33 Felder), in Liga 7 `quick=60`
+  (2,17 Felder). Im Lockout schließen sich Felder gegenseitig aus. Zusammen holten beide Bots 4,0
+  (Liga 6) und 4,1 (Liga 7) Felder pro Spiel. Einen Rückschritt zeigt das nicht.
+- Mehr Tode: 6 statt 4 in 12 Spielen.
+
+**Die 6 Tode:**
+
+| Wer | Ursache |
+| --- | --- |
+| Standard | drei Wölfe, Box gewählt, die Wölfe standen in den Wandfeldern: drei Bisse durch die Lücken |
+| `quick=60` | vier Zombies und eine Spinne, Box gewählt, die Zombies standen in den Wandfeldern |
+| Standard | Erdloch, der Deckel ging nicht drauf (ein Zombie im Deckelfeld). Nach 20 Versuchen galt das Loch trotzdem als geschlossen, „zu schwach für die Nacht“: im offenen Loch geblieben, beim Essen erschossen |
+| Standard | nachts ohne Waffe und Schild, die Box gegen Skelett und Zombie war zu langsam: zwei Pfeile |
+| `quick=60` | zweimal: Kampfturm am Hang, vom Turm in die Tiefe gestoßen (5 Blöcke), unten von Zombies erschlagen |
+
+In mindestens drei der sechs Fälle stand der Gegner schon dort, wo die Deckung hin sollte. Dasselbe
+Muster zeigt der wackelige Test `brawl_magma_pair` (Magmawürfel in den Wandfeldern).
+
+**Schießpulver:** Die neue Creeper-Jagd holte in Liga 7 das Pulver. „Firework Rocket“ scheiterte
+trotzdem (0 von 4): einmal an 3 Minuten in einer Box bei vollen Herzen gegen Skelett und Zombie, und
+an acht Abstechern „on the way: coal for later“, jeder für einen einzigen Kohleblock.
+
+### 24.19 Korrekturen aus Liga 7
+
+- **Keine Box, wenn schon etwas in ihren Seiten steht** (`Guardian`):
+  - **Der Fehler:** Wölfe, Zombies oder Magmawürfel standen schon in den Feldern, in die die
+    Blöcke der Box sollten. Dort geht kein Block hinein, und sie schlagen durch die Lücken, während
+    Bob es versucht. So starben in Liga 7 zwei Bots (drei Wölfe, vier Zombies), und so verlor
+    `brawl_magma_pair` alle Herzen bis auf eines.
+  - **Jetzt:**
+    - Steht in einer offenen Seite der Box etwas Lebendiges, wählt der Wächter keine Box.
+    - Er nimmt stattdessen die Säule, wo sie gegen diese Gegner hilft: nicht gegen Schützen,
+      Kletterer, Springer oder große Gegner.
+    - Sonst schickt er Bob weg, solange Platz zum Laufen ist. Die Flucht ist die vom Pulk, auf dem
+      Weg zurück, wo es geht, und zählt dann jeden Verfolger, auch Wölfe.
+    - Erst danach kommt das Eingraben.
+  - **Test:** `wolves_at_his_heels` (drei Wölfe, 9 Herzen, auf hart). Auf dem alten Stand starb
+    Bob in 2 von 2 Läufen, jetzt lebt er in 3 von 3.
+  - **Magmawürfel:** Der alte Stand starb in 2 von 5 Läufen von `brawl_magma_cube`, der neue in
+    keinem von 9.
+  - **Nur anstelle einer möglichen Box:** Hat Bob keine Blöcke für eine Box, kämpft er weiter wie
+    bisher. In einer ersten Fassung lief er in `brawl_zombie_trio` ohne Blöcke zwei Zombies im Kreis
+    davon und verlor 13 HP. Jetzt verliert er 0 bis 8,2 HP wie der alte Stand; der Test wackelt wie
+    vorher an der Grenze von 8.
+- **Das Loch, dessen Deckel nicht draufgeht** (`HideTask`):
+  - **Was bisher geschah:** Stand ein Monster im Deckelfeld, gab Bob nach einer Sekunde auf und
+    nannte das Loch „geschlossen“. Dann galt die Regel „zu schwach für die Nacht“, und Bob blieb im
+    offenen Loch und aß dort.
+  - **Jetzt:** Bob schlägt das Monster aus dem Deckelfeld und versucht länger, den Deckel zu setzen
+    (10 statt 1 s).
+  - Die Nachtregel gilt nur noch, wenn der Deckel wirklich drauf ist. Bob isst in einem offenen
+    Loch nicht, solange etwas hinter ihm her ist.
+  - Einen eigenen Test dafür gibt es nicht. Die Lage aus der Liga ließ sich nicht verlässlich
+    nachstellen.
+- **Testkorrektur `shield_block`:** Der Zombie kam erst nach 4 Sekunden. Ohne Monster in der Nähe
+  bricht die Schild-Aufgabe vorher ab. In der Gesamtsuite stand bisher immer eines aus den Tests
+  nebenan herum; allein lief der Test auch auf dem alten Stand rot. Jetzt kommt der Zombie nach einer
+  Sekunde.
+- **Erz „für später“ am Weg:** Bob nimmt jetzt die ganze Ader mit, bis zu dem, was das Brett noch
+  braucht. Bisher war es ein Block pro Abstecher: achtmal „coal for later“ hintereinander, zwei
+  Minuten vom Budget für „Firework Rocket“.

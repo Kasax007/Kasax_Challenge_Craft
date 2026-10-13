@@ -50,7 +50,21 @@ public final class Guardian {
 
     private final Bot bot;
     /** How often it stepped in, and with what (for the benchmarks). */
-    public int boxes, pillars, digs;
+    public int boxes, pillars, digs, runs;
+    /** When it last sent him running (no cover to be had in time, room to run): the reflexes take him off. */
+    private int runAt = -1000;
+
+    /** Whether it wants him away from what is after him, this tick (see {@link #stepIn}). */
+    public boolean wantsRun() {
+        return bot.body().tickCount - runAt <= 2;
+    }
+
+    /** The middle of what is after him. */
+    private static net.minecraft.world.phys.Vec3 centre(Reckoning r) {
+        net.minecraft.world.phys.Vec3 c = net.minecraft.world.phys.Vec3.ZERO;
+        for (Threat t : r.threats()) c = c.add(t.mob.position());
+        return r.threats().isEmpty() ? c : c.scale(1.0 / r.threats().size());
+    }
     private int saidAt = -1000, lastActAt = -1000;
 
     Guardian(Bot bot) {
@@ -332,6 +346,12 @@ public final class Guardian {
         }
         BotTask choice = null;
         String how = null;
+        // Something already standing in the sides of the box (a wolf at his heels, a zombie, a
+        // magma cube): the blocks will not go in there, and it strikes through the gap while he
+        // tries - three bites through the gaps of a box killed a self-play game, four zombies in
+        // its sides another, a test brawl lost all but a heart to magma cubes that way. No box
+        // then: a pillar, where that works, else away from them while there is room to run.
+        boolean boxTaken = HideTask.boxSidesTaken(bot) > 0;
         int digTicks = digTicks();
         // (At night with nothing to fight with, the hole is for the night: out in the morning,
         // when the zombies burn - out at midnight, the same ones are waiting.)
@@ -346,7 +366,7 @@ public final class Guardian {
             choice = new net.kasax.challengecraft.bot.task.PillarFightTask(reachless).untilClear();
             how = "up a pillar, and from above";
             pillars++;
-        } else if (HideTask.boxPossible(bot, true)) {
+        } else if (HideTask.boxPossible(bot, true) && !boxTaken) {
             choice = HideTask.boxed();
             how = "walled in";
             boxes++;
@@ -354,12 +374,19 @@ public final class Guardian {
             choice = HideTask.upward();
             how = "up a pillar";
             pillars++;
+        } else if (boxTaken && HideTask.boxPossible(bot, true) && bot.roomToRun(centre(r), 8)) {
+            // (The reflexes run: the same way off as from a crowd, the way it came if it can.
+            // Only instead of the box it would have built: with no blocks for one, the fight goes
+            // on as before - two zombies chased round a test arena took two thirds of the hearts.)
+            runAt = body.tickCount;
+            runs++;
+            return none(r, "something in the sides of the box: away from them instead");
         } else if (digTicks < Integer.MAX_VALUE) {
             choice = night ? HideTask.shelter() : new HideTask();
             how = night ? "dug in for the night" : "dug in";
             digs++;
         }
-        if (choice == null) return none(r, "no cover here (box: " + HideTask.boxProblem(bot, true) + "; ground not to dig)");
+        if (choice == null) return none(r, "no cover here (box: " + (boxTaken ? "something in its sides" : HideTask.boxProblem(bot, true)) + "; ground not to dig)");
         lastActAt = body.tickCount;
         if (body.tickCount - saidAt > 40) {
             saidAt = body.tickCount;

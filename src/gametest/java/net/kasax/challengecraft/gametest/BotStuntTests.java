@@ -712,14 +712,17 @@ public class BotStuntTests {
                         new net.minecraft.world.phys.AABB(a.abs(20, FEET, 30)).inflate(0.6)).isEmpty());
     }
 
-    /** A shield and a zombie: a hit blocked. */
+    /**
+     * A shield and a zombie: a hit blocked. (The zombie comes a second in: four seconds with none
+     * about, the task gave up - in the full suite there was always one from the tests next door.)
+     */
     @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
     public void shieldBlock(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "shield");
         a.spawn(20, FEET, 20, new ItemStack(Items.SHIELD));
         var z = EntityTypes.ZOMBIE.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
         z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
-        h.runAfterDelay(80, () -> {
+        h.runAfterDelay(20, () -> {
             h.getLevel().addFreshEntity(z);
             z.setTarget(a.bot().body());
         });

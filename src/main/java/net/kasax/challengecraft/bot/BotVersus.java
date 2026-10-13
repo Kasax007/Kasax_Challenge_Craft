@@ -145,7 +145,7 @@ public final class BotVersus {
                     .append(",\"first\":").append(s.firstTile)
                     .append(",\"m5\":").append(s.tilesAt[0]).append(",\"m10\":").append(s.tilesAt[1])
                     .append(",\"m20\":").append(s.tilesAt[2]).append(",\"m30\":").append(s.tilesAt[3])
-                    .append(",\"guardian\":[").append(s.bot.guardian.boxes).append(',').append(s.bot.guardian.pillars).append(',').append(s.bot.guardian.digs).append(']')
+                    .append(",\"guardian\":[").append(s.bot.guardian.boxes).append(',').append(s.bot.guardian.pillars).append(',').append(s.bot.guardian.digs).append(',').append(s.bot.guardian.runs).append(']')
                     .append(",\"time\":{");
             int n = 0;
             for (var e : s.timeOn.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(10).toList()) {

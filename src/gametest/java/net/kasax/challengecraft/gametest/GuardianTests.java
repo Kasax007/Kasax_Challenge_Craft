@@ -108,6 +108,33 @@ public class GuardianTests {
         });
     }
 
+    /**
+     * Three wolves at him (one struck by mistake), nine hearts, a stone sword and blocks, on hard:
+     * not walled in with the wolves standing in the sides of the box (a self-play league game:
+     * three bites through the gaps, dead) - up out of their reach, or away from them - and alive.
+     */
+    @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 700, skyAccess = true, padding = 40)
+    public void wolvesAtHisHeels(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "wolves_at_his_heels");
+        hard(h.getLevel());
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 32));
+        var first = a.bot().body();
+        first.setHealth(18);
+        List<net.minecraft.world.entity.animal.wolf.Wolf> wolves = new java.util.ArrayList<>();
+        for (int[] at : new int[][]{{21, 20}, {20, 21}, {19, 20}}) {
+            var w = mob(h, a, EntityTypes.WOLF, at[0], FEET, at[1]);
+            w.startPersistentAngerTimer();
+            wolves.add(w);
+        }
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 700, () -> {
+            h.assertTrue(a.bot().body() == first, "wolves_at_his_heels: died");
+            for (var w : wolves) if (w.isAlive() && w.getTarget() != first) w.setTarget(first);
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] wolves_at_his_heels hp {} guardian {}/{}/{}/{}", first.getHealth(),
+                    a.bot().guardian.boxes, a.bot().guardian.pillars, a.bot().guardian.digs, a.bot().guardian.runs);
+            return h.getTick() > 600;
+        });
+    }
+
     /** One zombie, a stone sword, full health, on hard: a fight he wins - the guardian keeps out of it. */
     @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 40)
     public void armedFightsOneZombie(GameTestHelper h) {

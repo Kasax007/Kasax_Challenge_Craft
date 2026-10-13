@@ -724,12 +724,15 @@ public final class Bot {
         // blocks, a hole begun with the zombies at its elbow, dead). Better armour, more of them.
         // (Not out of a hole or a box shut all round, though: in there they cannot get at it, and
         // out of it - its hiding just over - it ran into the four of them and died walled in.)
+        // (Or fewer, when the guardian found no cover to be had in time - wolves at its heels,
+        // something standing where the box would go - and room to run: anything after it then.)
         if (!running && !cornered && !welcomeExplosion
                 && !(BotTask.innermost(top) instanceof net.kasax.challengecraft.bot.task.PillarFightTask) && !Guardian.enclosed(body)) {
+            boolean told = guardian.wantsRun();
             var crowd = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(12, 6, 12),
-                    m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy);
+                    m -> m.isAlive() && m.getTarget() == body && (told || m instanceof net.minecraft.world.entity.monster.Enemy));
             int many = body.getArmorValue() >= 15 ? 6 : body.getArmorValue() >= 6 ? 5 : 4;
-            if (crowd.size() >= many) {
+            if (crowd.size() >= many || told && !crowd.isEmpty()) {
                 net.minecraft.world.phys.Vec3 centre = net.minecraft.world.phys.Vec3.ZERO;
                 java.util.Map<String, Integer> kinds = new java.util.TreeMap<>();
                 for (var m : crowd) {

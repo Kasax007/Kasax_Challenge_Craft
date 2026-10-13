@@ -2234,7 +2234,16 @@ public final class LockoutBrain implements BotBrain {
             // (Not from under water: the gravel on a lake bed is a dive and a slow dig with the
             // breath running out - "flint for later" drowned it on seed 88.)
             if (!bot.body().level().getFluidState(at.above()).isEmpty()) continue;
-            sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), item == net.minecraft.world.item.Items.SUGAR_CANE ? 3 : 1, planner);
+            // (The whole vein while here, up to what the board still wants: one coal a trip was
+            // eight trips "for later" in a row in a self-play league game, two minutes of a
+            // Firework Rocket's budget.)
+            int still = Math.max(1, planner.boardDemand.getOrDefault(item, 1) - ObtainPlanner.countAny(bot.body(), Set.of(item)));
+            int vein = 0;
+            for (net.minecraft.core.BlockPos p : net.minecraft.core.BlockPos.betweenClosed(at.offset(-2, -2, -2), at.offset(2, 2, 2))) {
+                if (bot.body().level().getBlockState(p).is(source)) vein++;
+            }
+            int take = item == net.minecraft.world.item.Items.SUGAR_CANE ? 3 : item == net.minecraft.world.item.Items.FLINT ? 1 : Math.max(1, Math.min(still, vein));
+            sideTask = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), take, planner);
             sideId = null;
             sideWant = item;
             sideStarted = bot.body().level().getGameTime();

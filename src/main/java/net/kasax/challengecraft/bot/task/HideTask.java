@@ -189,6 +189,29 @@ public final class HideTask implements BotTask {
         return out;
     }
 
+    /** Whether it is shut in right now: the box sealed all round, or the hole's lid in over the head. */
+    private boolean shutNow(ServerLevel level, BotPlayer body) {
+        return box ? sealed(level) : shut(level, body.blockPosition().above(2));
+    }
+
+    /**
+     * How many of the box's open sides have something alive standing in them (a block cannot go
+     * in there until it is struck out of the way).
+     */
+    public static int boxSidesTaken(Bot bot) {
+        BlockPos feet = standing(bot);
+        if (feet == null) return 0;
+        BotPlayer body = bot.body();
+        ServerLevel level = (ServerLevel) body.level();
+        int taken = 0;
+        for (BlockPos p : boxBlocks(feet)) {
+            if (shut(level, p)) continue;
+            if (!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(p),
+                    e -> e.isAlive() && e != body).isEmpty()) taken++;
+        }
+        return taken;
+    }
+
     /** Whether a box works here: dry ground, nothing that hurts in the spot, blocks enough for the open sides. */
     public static boolean boxPossible(Bot bot) {
         return boxPossible(bot, false);
@@ -247,7 +270,8 @@ public final class HideTask implements BotTask {
         // the hearts are back, not out after two minutes to look for food - at 5 hp twice out
         // into the dark in a self-play league game, shot the second time. Dead it would wait for
         // the dawn as well, and with nothing in the pack.
-        boolean weakNight = closed && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && body.getHealth() < 10;
+        // (Shut in for real: not in a hole whose lid would not go in - a sitting target there.)
+        boolean weakNight = closed && shutNow(level, body) && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && body.getHealth() < 10;
         if (weakNight && !saidWeak) {
             saidWeak = true;
             bot.say("too weak for the night (" + Math.round(body.getHealth()) + " hp): in here till it is light or the hearts are back");
@@ -319,15 +343,25 @@ public final class HideTask implements BotTask {
                 BlockPos lid = body.blockPosition().above(2);
                 if (!body.onGround()) return Result.RUNNING; // (still dropping in: the head is in the way)
                 if (!level.getBlockState(lid).getCollisionShape(level, lid).isEmpty()) closed = true;
-                // (Stone, not dirt or netherrack, for the lid: a fireball on it does not tear it open.)
-                else if (!bot.actions().placeSturdy(lid) && ++lidTries > (untilDay ? 400 : 20)) closed = true; // (it will not go: as it is)
+                else {
+                    // Something standing where the lid goes (a zombie come to the edge, half in the
+                    // hole): struck out of it, and longer to get the lid in - not given up after a
+                    // second and the hole left open with it there (a self-play league game: "too
+                    // weak for the night" in an open hole, shot from its edge while eating).
+                    boolean inLid = !level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(lid),
+                            e -> e.isAlive() && e != body).isEmpty();
+                    if (inLid && defend(bot, body, level)) return Result.RUNNING;
+                    // (Stone, not dirt or netherrack, for the lid: a fireball on it does not tear it open.)
+                    if (!bot.actions().placeSturdy(lid) && ++lidTries > (untilDay ? 400 : inLid ? 200 : 20)) closed = true; // (it will not go: as it is)
+                }
                 return Result.RUNNING;
             }
         }
         // Safe: eat, and wait for the hearts (natural regeneration wants a full-ish stomach).
         // (Not in a box with a side still open and one about: a meal takes the hands for seconds,
         // and the blows through the gap went unanswered - so died a self-play game, eating.)
-        boolean exposed = box && !sealed(level) && !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
+        // (Nor in a hole whose lid would not go in.)
+        boolean exposed = !shutNow(level, body) && !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class,
                 body.getBoundingBox().inflate(6), m -> m.isAlive() && (m.getTarget() == body || body.getLastHurtByMob() == m)).isEmpty();
         if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0 && !exposed) {
             bot.interject(new EatTask());
@@ -652,6 +686,9 @@ public final class HideTask implements BotTask {
                 for (BlockPos p : boxBlocks(top)) {
                     if (!shut(level, p) && m.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(p))) inTheWay = true;
                 }
+            } else if (!box) {
+                BlockPos lid = body.blockPosition().above(2);
+                inTheWay = !shut(level, lid) && m.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(lid));
             }
             if (!after && !(inTheWay && !(m instanceof net.minecraft.world.entity.monster.Enderman))) continue;
             double d = KillTask.hitDistance(body, m);
