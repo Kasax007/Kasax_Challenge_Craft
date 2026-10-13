@@ -2,6 +2,9 @@
 
 > Fortschritt: Schritte 1–7 umgesetzt (siehe `docs/konzept-bot.md`, Abschnitt „Stand“). Seitdem
 > Testphase mit ganzen Brettern, siehe Abschnitt 6.
+>
+> **Aktueller Stand und Übergabe (13.10.2026): Abschnitt 25** – wo alles liegt, was gemessen ist,
+> was offen ist und wie es weitergeht. Die Entwicklung ruht dort.
 
 Stand: 30.09.2026. Dieser Plan ist die Arbeitsgrundlage, um Bob ohne Rückfragen Schritt für Schritt
 zu einem ebenbürtigen Lockout-Gegner zu machen. Jeder Schritt hat messbare Abnahmekriterien; ein
@@ -3056,3 +3059,182 @@ an acht Abstechern „on the way: coal for later“, jeder für einen einzigen K
 - **Erz „für später“ am Weg:** Bob nimmt jetzt die ganze Ader mit, bis zu dem, was das Brett noch
   braucht. Bisher war es ein Block pro Abstecher: achtmal „coal for later“ hintereinander, zwei
   Minuten vom Budget für „Firework Rocket“.
+
+### 24.20 Liga 8: Spiegelpartie auf `52b4f05`
+
+Beide Seiten mit demselben Code; `quick=30` ist der Standardwert, also kein Unterschied. Dieselben
+12 Seeds. Die Spiele liefen nach einem Neustart des Containers etwa in Echtzeit, die Liga dauerte
+2,5 statt 1,2 Stunden.
+
+| Seite | Siege | Tiles | Tode | Herzen verloren | erstes Tile |
+| --- | --- | --- | --- | --- | --- |
+| A (`-`) | 6 | 2,33 | 0,25 | 18,3 | 394 s |
+| B (`quick=30`, gleicher Code) | 4 | 1,50 | 0,50 | 28,4 | 443 s |
+
+Zwei Spiele endeten unentschieden.
+
+- **Das Rauschen:** Identischer Code unterscheidet sich hier um +0,83 Tiles pro Spiel
+  (Standardfehler 0,72) und um 3 gegen 6 Tode. So groß ist das Rauschen einer Liga mit 12 Spielen.
+  Unterschiede dieser Größe in den Ligen 2 bis 7 sind deshalb kein Beleg für oder gegen einen Knopf.
+- **Gegen Liga 7:** Zusammen holten beide Bots 3,83 Tiles pro Spiel (Liga 7: 4,08, Liga 6: 4,00).
+  Der Standard gepaart gegen Liga 7: +0,42 Tiles (Standardfehler 0,68). Der Essensvorrat brauchte
+  153 statt 265 s pro Spiel.
+- **Tode:** 9 in 24 Bot-Partien (Liga 7: 6, Liga 6: 4). Die Box-Korrektur greift bei ihrem
+  Muster (Tests oben), die Todesrate drückt sie in der Liga nicht messbar.
+
+**Die 9 Tode:**
+
+| Ursache | Anzahl | Was passierte |
+| --- | --- | --- |
+| Box, die nicht rechtzeitig zuging | 3 | Bei der Wahl stand noch nichts in den Seiten; Zombies und eine Spinne kamen während des Baus hinein (zweimal bei vollen Herzen gegen 2 bis 3 Gegner, einmal nach Beinahe-Ertrinken) |
+| Kampfturm | 2 | Zombies trafen Bob auf dem Turm, je drei- bis viermal |
+| nachts ohne Essen und Rüstung, Skelett | 2 | einmal beim Eingraben erschossen, einmal beim Essen eines Kekses unter Pfeilen |
+| Creeper | 1 | explodierte während eines Skelettkampfs |
+| Pulk bei 7 HP | 1 | Flucht ins Wasser, dort keine Deckung möglich, keine Blöcke mehr |
+
+## 25. Stand am 13.10.2026 – Übergabe
+
+Die Entwicklung ruht hier. Dieser Abschnitt sagt, wo alles liegt, was gemessen ist, was offen ist
+und wie es weitergeht.
+
+### Wo alles liegt
+
+- **Challenge Craft:** Branch `26.3-lockout-bot`, Stand `52b4f05` plus dieser Doku-Commit. Nie
+  direkt nach `26.3` pushen.
+- **Bob-Bot** (eigenständiger Mod, github `Kasax007/Bob-Bot`): `main`, Stand `f9a7b64`. Die Motor-Korrekturen
+  der Runde 20 bis einschließlich 24.19 sind portiert, alle 50 Tests grün.
+- **Ligaergebnisse:** `docs/bob-leagues/league1.jsonl` bis `league8.jsonl`, je Spiel und Bot:
+  Tiles, Tode, Herzen, erstes Tile, Zeit je Wurzelaufgabe.
+- **Auswertungswerkzeuge:** `scripts/bot/analysis/` (siehe unten).
+- **Fertig, aber ungetestet:** `docs/bob-pending/pillar-crouch.patch` (siehe „Offen“, Punkt 1).
+
+### Was gemessen ist
+
+Ligen auf denselben 12 Seeds, 20 Minuten, hart, Bob gegen Bob. „Tiles“ und „Tode“ gelten je Bot
+und Spiel, „beide“ sind die Tiles beider Bots zusammen pro Spiel.
+
+| Liga | Stand | Standard: Tiles | Standard: Tode | erstes Tile | beide | Gegenvariante |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3 | `5066d74` | 2,33 | 0,17 | 247 s | 3,08 | `guardian=0`: 0,75 Tiles, 0,67 Tode |
+| 4 | `5bf6d38` | 2,08 | 0,08 | 492 s | 3,83 | `guardian=0`: 1,75 Tiles, 0,58 Tode |
+| 5 | `2e3ed0b` | 1,91 | 0,27 | 351 s | 3,45 | `copper=0`: 1,55 Tiles, 0,18 Tode |
+| 6 | `b3cca4e` | 2,67 | 0,08 | 247 s | 4,00 | `descent=0`: 1,33 Tiles, 0,25 Tode |
+| 7 | `9aefa0a` | 1,92 | 0,25 | 332 s | 4,08 | `quick=60`: 2,17 Tiles, 0,25 Tode |
+| 8 | `52b4f05` | 2,33 | 0,25 | 394 s | 3,83 | gleicher Stand (Spiegel): 1,50 Tiles, 0,50 Tode |
+
+**Lesart:**
+- Im Lockout schließen sich die Tiles der beiden Bots aus. Ein starker Gegner drückt die Tiles des
+  Standards. „Beide“ ist darum das bessere Maß für den Fortschritt des Codes.
+- Die Unterschiede einer Liga sind meist kleiner als ihr Standardfehler (0,6 bis 0,9 Tiles).
+  Erst über mehrere Ligen wird ein Trend sicher.
+- Die Tode sind selten (2 bis 9 je 24 Bot-Partien). Jeder wurde einzeln ausgewertet; die Ursachen
+  und Korrekturen stehen in 24.10 bis 24.20.
+
+**Fazit der Messungen:**
+- Seit Liga 3 holen beide Bots zusammen mehr Tiles: 3,1 → 3,8 → 3,5 → 4,0 → 4,1 → 3,8 pro Spiel.
+- Die Tode liegen bei 0,2 bis 0,4 je Bot-Partie. Auf null gingen sie nie.
+- Die Spiegelpartie (Liga 8) zeigt, wie groß das Rauschen ist: Gleicher Code unterscheidet sich
+  um 0,8 Tiles und um 3 gegen 6 Tode. Ein Knopf muss deshalb in mehreren Ligen oder in größeren
+  Ligen überzeugen.
+
+### Offen, nach Nutzen geordnet
+
+1. **Deckung unter Druck** (Liga 8: 5 von 9 Toden, Liga 7: alle 6):
+   - **Box:** Sie braucht etwa eine Sekunde mit freien Seiten. Kommen Zombies oder eine Spinne
+     während des Baus hinein, geht sie nicht zu, und sie schlagen durch die Lücken. Die Korrektur
+     aus 24.19 prüft die Seiten nur bei der Wahl.
+   - **Kampfturm:** Zombies trafen Bob noch auf dem Turm (Bau zu langsam, Hang daneben) oder
+     stießen ihn herunter.
+   - **Ansätze:**
+     - Deckung nur, wenn der nächste Nahkämpfer noch 3 bis 4 Blöcke weg ist. Sonst kämpfen
+       (Schild und Schwert gegen 1 bis 2 Gegner) oder im Sprint weg.
+     - Die Box-Seiten während des Baus weiter prüfen und abbrechen, sobald etwas hineinkommt.
+     - Der fertige Patch `docs/bob-pending/pillar-crouch.patch` (mit `git apply`): Bob duckt sich
+       auf dem Kampfturm und auf dem Versteck-Turm. Die Kante hält einen geduckten Spieler auch
+       gegen den Rückstoß. Dazu gehört der Test `pillar_by_a_drop` (eine Grube 6 tief hinter ihm,
+       zwei Zombies). Noch zu tun: gegen den alten Stand prüfen, dann die Brawl-, Wächter- und
+       Turmtests und die volle Suite.
+2. **Nachts ohne Rüstung und Essen** (2 Tode in Liga 8):
+   - Ein Skelett erschießt Bob beim Eingraben oder beim Essen.
+   - Gegen Pfeile hilft nur der Schild (er war da, aber unten) oder eine Deckung, die schon steht.
+   - Ansatz: das Essen nie unter Beschuss; Rüstung früher (Eisen statt Kupfer, wenn welches liegt).
+3. **Lange Boxzeiten bei voller Gesundheit:**
+   - Ohne Waffe gegen Skelett und Zombie heißt es „a fight not to be won“. Bob wartet dann bis zu
+     3 Minuten in der Box, während das Skelett draußen wartet. So scheiterte eine Firework Rocket.
+   - Mögliche Wege: mit Schild aus der Box auf den Schützen zu, oder sich unterirdisch wegtunneln
+     (Sichtlinie brechen).
+4. **Die Eröffnung ist der größte Zeitfresser** (je Bot und Spiel, Wurzelaufgaben, Liga 7/8):
+
+   | Aufgabe | Zeit |
+   | --- | --- |
+   | Essensvorrat | 150 bis 220 s |
+   | Schild | 110 bis 160 s |
+   | Holz | 90 bis 130 s |
+   | Eisenspitzhacke | 40 bis 80 s |
+   | Kupfer | 50 bis 100 s |
+
+   Das erste Tile kommt nach 330 bis 390 s. Weniger Vorrat kostete in Liga 2 doppelt so viele
+   Tode; schneller muss das Holen selbst werden, nicht das Weglassen.
+5. **Zu optimistische Schätzungen für Mob-Ziele:**
+
+   | Ziel | geschätzt | wirklich (Mittel) |
+   | --- | --- | --- |
+   | Skeleton | 27 s | 247 s |
+   | Name Tag | 18 s | 110 s |
+   | Arrow | 21 s | 100 s |
+   | Firework Rocket | 30 s | 158 s |
+
+   Die Erfahrung (`GoalExperience`) lernt höchstens den Faktor 2 und vergisst 20 % pro Spiel; das
+   fängt Faktoren 4 bis 9 nicht auf. Ansatz: die Schätzung selbst (Suchzeit nach Mobs, Tageszeit,
+   Gelände) oder eine höhere Kappung.
+6. **Wölfe:** Vermutlich trifft ein Schwertschwung (Sweep) im Zombiekampf einen Wolf daneben, und
+   das Rudel greift an (Liga 7). Abhilfe: nicht im Stand schlagen, wenn ein neutraler Mob neben dem
+   Ziel steht (Sprung- und Sprintschläge schwingen nicht).
+7. **Ertrunkener mit Dreizack** (ein Tod in Liga 6) und **Beinahe-Ertrinken** beim Schild-Holen
+   (Liga 8): noch nicht angesehen.
+
+### Bekannte wackelige Tests
+
+| Test | Verhalten |
+| --- | --- |
+| `brawl_zombie_trio` | verliert 0 bis 8,2 HP; die Grenze ist 8 |
+| `brawl_magma_pair` | streut 0 bis 12,5 HP |
+| `brawl_enderman` | unter Last einmal 10,5 HP, allein immer 0 |
+| `vein_beyond_count` | einmal in sieben Suiten |
+
+Die drei Brawl-Tests streuen auf dem alten wie dem neuen Stand gleich.
+
+### So geht es weiter
+
+- **Arbeitsbäume:** `/home/user/bob-dev` (Branch `bob-dev-tmp`, entwickeln), `/home/user/bob-bench`
+  (losgelöst, Ligen). Fertige Arbeit: in `bob-dev` committen, dann in
+  `/home/user/Kasax_Challenge_Craft` `git merge --ff-only bob-dev-tmp` und `git push origin
+  26.3-lockout-bot`.
+- **In einem frischen Container** die Arbeitsbäume neu anlegen (aus dem Klon von
+  `Kasax_Challenge_Craft`, Branch `26.3-lockout-bot`): `git worktree add -b bob-dev-tmp
+  ../bob-dev` und `git worktree add --detach ../bob-bench`. Bob-Bot getrennt klonen
+  (`Kasax007/Bob-Bot`, `main`).
+- **Java 25, Gradle offline:** `export JAVA_HOME=$(ls -d /opt/jdk25/*/ | head -1)`.
+- **GameTests:**
+  - Ein Filter: `rm -rf build/run/gameTest/world; sh ./gradlew runGameTest --offline -q
+    -PbotTest="challengecraft-gametest:bot_stunt_tests_*creeper*"`.
+  - Mehrere hintereinander: `scripts/bot/analysis/gametests.sh <Arbeitsbaum> <Ausgabe> <Filter>...`.
+  - Die volle Suite dauert etwa 7 Minuten, 187 Tests.
+- **Liga** (in `bob-bench`, 12 Seeds, 20 min, hart, 2 parallel; 70 Minuten bei voller Fahrt, nach
+  einem Container-Neustart bis 2,5 Stunden):
+  `git checkout --detach <commit>; sh ./gradlew classes --offline -q; sh ./gradlew --stop -q; SIM=1
+  python3 scripts/bot/league.py --a "-" --b "<knob=wert>" --seeds "$SEEDS" --seconds 1200
+  --difficulty hard --parallel 2 --out ligaN.jsonl`. Die Seeds der Ligen 3 bis 8:
+  `2116751832253586494,-2951244321692375177,4416150436638669970,-117881894249851791,1815133796020248645,-987677620420906123,4038013524106796838,2582075177845500251,-2038481054814894292,-2332405236789101522,1668062389011540959,-3882669516007583803`.
+- **Auswertung** (`scripts/bot/analysis/`, auf die Spiel-Logs `run-*/versus_<seed>.log` einer Liga):
+
+  | Werkzeug | zeigt |
+  | --- | --- |
+  | `deaths.py` | jeden Tod mit den Treffern davor |
+  | `goals.py` | jedes Ziel: Schätzung, echte Zeit, Ausgang |
+  | `steps.py` | Planschritte |
+  | `roots.py`, `cortex_time.py` | Zeit je Wurzelaufgabe |
+  | `compare.py vorher.jsonl nachher.jsonl` | zwei Ligen gepaart auf denselben Seeds |
+
+  Achtung: Die Spiel-Logs überschreiben sich je Seed mit der nächsten Liga.
+- **Höchstens zwei JVMs gleichzeitig:** Eine Liga belegt beide. Tests erst danach.

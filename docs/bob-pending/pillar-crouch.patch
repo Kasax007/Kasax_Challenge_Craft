@@ -1,0 +1,108 @@
+diff --git a/src/gametest/java/net/kasax/challengecraft/gametest/BotStuntTests.java b/src/gametest/java/net/kasax/challengecraft/gametest/BotStuntTests.java
+index 743c105..c5e7400 100644
+--- a/src/gametest/java/net/kasax/challengecraft/gametest/BotStuntTests.java
++++ b/src/gametest/java/net/kasax/challengecraft/gametest/BotStuntTests.java
+@@ -982,6 +982,42 @@ public class BotStuntTests {
+         });
+     }
+ 
++    /**
++     * Two zombies at it on the edge of a drop (a pit six deep at its back), a pillar fight: not
++     * knocked off the pillar into the pit by their blows - crouched up there, the edge holds it
++     * (two self-play league deaths: a pillar on a slope, a blow, five blocks down to the zombies).
++     */
++    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 24)
++    public void pillarByADrop(GameTestHelper h) {
++        BotArena a = BotArena.flat(h, "pillar_by_a_drop");
++        var level = h.getLevel();
++        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
++        a.fill(21, BotArena.GROUND - 6, 14, 30, BotArena.GROUND, 26, Blocks.AIR);
++        java.util.List<net.minecraft.world.entity.monster.zombie.Zombie> zombies = new java.util.ArrayList<>();
++        for (int[] at : new int[][]{{18, 19}, {18, 21}}) {
++            var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
++            z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
++            z.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 20 * 600));
++            z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(at[0], FEET, at[1])));
++            z.setPersistenceRequired();
++            level.addFreshEntity(z);
++            zombies.add(z);
++        }
++        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 32));
++        var body = a.bot().body();
++        double floor = a.abs(0, FEET, 0).getY() - 0.5;
++        boolean[] fell = {false};
++        a.run(new net.kasax.challengecraft.bot.task.PillarFightTask(zombies.get(0)).untilClear(), 1300, () -> {
++            for (var z : zombies) if (z.isAlive() && z.getTarget() != body) z.setTarget(body);
++            if (a.bot().body() != body || !body.isAlive()) h.fail("pillar_by_a_drop: killed");
++            fell[0] |= body.getY() < floor;
++            h.assertTrue(!fell[0], "pillar_by_a_drop: knocked off into the pit");
++            if (zombies.stream().anyMatch(net.minecraft.world.entity.LivingEntity::isAlive) && h.getTick() < 1200) return false;
++            BotArena.LOG.info("[BOTTEST] pillar_by_a_drop hp {} zombies left {}", body.getHealth(), zombies.stream().filter(net.minecraft.world.entity.LivingEntity::isAlive).count());
++            return true;
++        });
++    }
++
+     private static void brawlFromPillar(GameTestHelper h, String name, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type) {
+         brawlFromPillar(h, name, type, a -> { });
+     }
+diff --git a/src/main/java/net/kasax/challengecraft/bot/task/HideTask.java b/src/main/java/net/kasax/challengecraft/bot/task/HideTask.java
+index 4982c16..5f3c23b 100644
+--- a/src/main/java/net/kasax/challengecraft/bot/task/HideTask.java
++++ b/src/main/java/net/kasax/challengecraft/bot/task/HideTask.java
+@@ -258,7 +258,10 @@ public final class HideTask implements BotTask {
+     @Override
+     public Result tick(Bot bot) {
+         Result r = step(bot);
+-        if (r != Result.RUNNING) lowerShield(bot.body());
++        if (r != Result.RUNNING) {
++            lowerShield(bot.body());
++            bot.body().sneak = false; // (up from the crouch on the pillar)
++        }
+         return r;
+     }
+ 
+@@ -756,6 +759,8 @@ public final class HideTask implements BotTask {
+     }
+ 
+     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {
++        // (Crouched, as on a fighting pillar: a blow's push does not carry it off the top.)
++        body.sneak = true;
+         int height = body.blockPosition().getY() - top.getY();
+         // Knocked off (a hit sends it flying): start a new pillar from where it landed.
+         if (body.onGround() && placed > 0 && height < placed && (body.blockPosition().getX() != top.getX() || body.blockPosition().getZ() != top.getZ())) {
+@@ -772,6 +777,7 @@ public final class HideTask implements BotTask {
+             return Result.RUNNING;
+         }
+         body.stopInputs();
++        body.sneak = true;
+         if (body.getFoodData().getFoodLevel() < 20 && EatTask.bestFood(body) >= 0) {
+             bot.interject(new EatTask());
+             return Result.RUNNING;
+diff --git a/src/main/java/net/kasax/challengecraft/bot/task/PillarFightTask.java b/src/main/java/net/kasax/challengecraft/bot/task/PillarFightTask.java
+index 13bf9dd..e64df55 100644
+--- a/src/main/java/net/kasax/challengecraft/bot/task/PillarFightTask.java
++++ b/src/main/java/net/kasax/challengecraft/bot/task/PillarFightTask.java
+@@ -67,6 +67,12 @@ public final class PillarFightTask implements BotTask {
+ 
+     @Override
+     public Result tick(Bot bot) {
++        Result r = step(bot);
++        if (r != Result.RUNNING) bot.body().sneak = false; // (up from the crouch)
++        return r;
++    }
++
++    private Result step(Bot bot) {
+         BotPlayer body = bot.body();
+         ServerLevel level = (ServerLevel) body.level();
+         if (untilClear && !target.isAlive()) {
+@@ -100,6 +106,10 @@ public final class PillarFightTask implements BotTask {
+             height = 0;
+         }
+         body.stopInputs();
++        // Crouched, building and up there: a blow's push does not carry it off the pillar's one
++        // block of top (the edge holds a crouching player). Two self-play league deaths were a
++        // pillar on a slope, a blow, five blocks down into the zombies.
++        body.sneak = true;
+         // High enough that its reach (up to the top of its body, a little more - and a hoglin
+         // leaps as it strikes) misses the feet: three. Not getting higher for a while: fought
+         // from where it is.
