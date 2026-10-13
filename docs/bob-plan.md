@@ -2621,3 +2621,113 @@ weniger als 8 Nahrungspunkte im Gepäck, auch bei vollem Hungerbalken; dazu „n
 - **Satt für die Nacht** ist auch, wer einen Hungerbalken ab 16 hat, nicht nur, wer 8 Nahrungspunkte
   im Gepäck trägt.
 - Volle Suite: 171 von 171 grün.
+
+### 24.10 Liga 3: Standard gegen `guardian=0`
+
+12 Spiele zu 20 Minuten auf HARD auf dem Stand `5066d74`, Simulationsmodus, zwei Matches parallel.
+Sie misst, was der Wächter nach den Box-Korrekturen wert ist.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard (mit Wächter) | 8 | 2,3 | 0,17 | 21,5 | 247 s | 0,4 / 1,5 / 2,3 |
+| `guardian=0` | 3 | 0,8 | 0,67 | 25,9 | 484 s | 0,1 / 0,2 / 0,8 |
+
+- Ein Spiel endete unentschieden.
+- Felder je Spiel gepaart: +1,58 (Standardfehler 0,76, t = 2,07).
+- Vorzeichentest auf die Siege: p = 0,23.
+
+Der Wächter bleibt an: Er verhindert drei von vier Toden, und die so gewonnene Zeit fließt in
+Felder.
+
+**Die 10 Tode:**
+
+| Variante | Ursache | Anzahl |
+| --- | --- | --- |
+| Standard | Kampf gegen einen Enderman vom Pfeiler, dazu ein Skelett; Sturz vom Pfeiler, eingegraben bei 4 HP, dann ein Pfeil | 1 |
+| Standard | zweimal „no cover here“ mit 56 Blöcken im Gepäck, Grund unbekannt (vermutlich mitten im Sprung); dann Zombie am Pfeiler, ein Pfeil | 1 |
+| `guardian=0` | Skelett aus 3–4 Blöcken, Schild unten | 3 |
+| `guardian=0` | Zombies am Kampfpfeiler, ohne Rüstung | 2 |
+| `guardian=0` | Enderman am Pfeiler | 1 |
+| `guardian=0` | Zombie beim Eingraben | 1 |
+| `guardian=0` | ertrunken beim Steinabbau | 1 |
+
+**Wohin die Zeit ging** (Sekunden je 20-Minuten-Spiel):
+
+| Wurzelaufgabe | Standard | `guardian=0` |
+| --- | --- | --- |
+| Essensvorrat | 210 | 187 |
+| Kupfer für Rüstung | 171 | 59 |
+| Schild | 123 | 96 |
+| eingegraben für die Nacht | 95 | 230 |
+| Eisenspitzhacke | 81 | 67 |
+| Holz | 70 | 108 |
+| eingemauert für die Nacht | 45 | – |
+| Bündel | 44 | – |
+
+**Befunde aus den Logs:**
+
+- **Box-Schleife:** In einem Tunnel warteten zwei Zombies vor einer geschlossenen Box. Der Wächter
+  zählte sie als Gegner, obwohl sie nicht an Bob kamen. Er mauerte ihn deshalb 14-mal hintereinander
+  neu ein, 472 s lang.
+- **Stein:** Gesucht war „Stein, sechs unter der Oberfläche“. Die Treppe ging auf diese Höhe und
+  von dort waagerecht weiter. In einer Savanne lag dort nur Erde. Bob fand keinen Stein, also weder
+  Spitzhacke noch Schwert, und grub sich nachts deshalb ein. Das kostete in einem Spiel beide Seiten
+  alle Felder.
+- **Nacht:** Die Gründe fürs Eingraben waren „no weapon“ (3-mal), „hp 12“ und „food 4, hunger 15“. Jede
+  Nacht dauerte dann 300 bis 550 s.
+- **Schild-Timing:** Ein Test mit Tick-Protokoll zeigte den Fehler. Bob hielt den Schild, solange das
+  Skelett spannte, und senkte ihn in dem Tick, in dem es losließ. Der Pfeil fliegt aber noch 1 bis 2
+  Ticks und traf dann den gesenkten Schild. Senkte Bob ihn kurz vor dem Schuss für einen Schlag,
+  war der Schild erst nach 5 Ticks wieder wirksam. Beides kostete je 6 HP aus nächster Nähe.
+- **Schätzungen:**
+  - „Essen für den Start, ~46 s“ hieß in Wahrheit Spitzhacke, Treppe, Ofen und Jagd; nach zwei
+    Minuten gab Bob auf.
+  - Ein Blumentopf (drei Ziegel) galt als „27 s“; allein das Brennen dauert 30 s.
+
+### 24.11 Korrekturen aus Liga 3 (`5bf6d38`)
+
+- **Schild in der offenen Box** (`HideTask`): Bleibt eine Seite offen und schießt ein Schütze herein,
+  hebt Bob den Schild zu ihm. Zwischen zwei Schlägen auf einen Gegner in der Lücke hebt er ihn
+  ebenfalls; zum Schlag senkt er ihn. Test `skeleton_at_the_gap`: Bob hat zu wenige Blöcke für die
+  Box, ein Skelett schießt aus 12 Blöcken. Ergebnis: 20 von 20 HP, der Schild fängt alle Pfeile.
+- **Fenster zum Zuschlagen:** Ist Bob ganz eingeschlossen, gesund und bewaffnet, und wartet draußen
+  einer, der nur im Nahkampf trifft, öffnet er auf Fußhöhe ein Fenster zu ihm. Er schlägt geduckt
+  hindurch. Der Zombie kann nicht zurückschlagen: Seine Augen liegen über dem Loch, er sieht Bob also
+  nicht, passt nicht hinein, und seine Reichweite endet einen Schritt zu früh. Danach setzt Bob den
+  Block wieder ein. Steht der Nächste an einer anderen Seite, öffnet er dort ein Fenster. Test
+  `zombies_at_the_box`: zwei Zombies auf HARD, beide tot, 0 HP verloren.
+- **Wächter:**
+  - Ist Bob eingeschlossen, zählen Nahkämpfer nicht.
+  - Ein Schild am Arm zählt gegen Schützen, wenn nur Schützen und alle auf einer Seite hinter ihm
+    her sind (Test `lone_bowman_behind_shield`).
+  - Mitten im Sprung baut er die Deckung dort, wo Bob landet, statt „keine Deckung“ zu melden.
+  - Findet er keine Box, steht der Grund im Log.
+- **Box:** Blumen, Setzlinge und Fackeln gelten nicht mehr als Wand; Bob baut sie ab und setzt einen
+  Block (Test `flowers_round_the_box`).
+- **Schild-Timing** (`KillTask`): Bob hält den Schild oben, solange der Bogen fast gespannt ist (ab 10
+  Ticks) oder die Armbrust geladen ist. Er hält ihn auch, solange ein Pfeil des Gegners noch in der
+  Luft ist. Er schlägt erst danach, und der nächste Pfeil braucht über eine Sekunde. Auf den letzten
+  Schritten zum Schützen bleibt der Schild ebenfalls oben. Bricht eine Aufgabe ab, senkt Bob einen
+  gehobenen Schild.
+- **Nacht:**
+  - Fehlen nur Herzen (Bob ist bewaffnet und satt), heilt er sich in einem Loch oder einer Box, bis
+    die Herzen zurück sind, nicht die ganze Nacht.
+  - Hat er in der Dämmerung keine Waffe, holt er zuerst ein Schwert, wenn es bis 90 s kostet; ein
+    hölzernes reicht.
+  - „Satt“ zählt Magen und Gepäck zusammen (ab 18).
+- **Stein:** Die Treppe geht für Gestein immer weiter nach unten, bis sie im Fels ist, egal welche
+  Höhe gewünscht war. Die Eröffnung baut den Stein für alle Steinwerkzeuge und einen Ofen in einem Gang
+  ab, statt in vier.
+- **Planer:** Ein Ofen braucht 10 s pro Stück, nicht 6. Ist kein Ofen im Gepäck und keiner in der
+  Nähe, rechnet der Planer pro Stück einen Anteil für den Ofenbau dazu.
+- **Tests:**
+  - Tests, die den Tag brauchen, stellen die Uhr selbst; Nacht-Tests stellen sie danach zurück. Die
+    Uhr gilt für den ganzen Server: Eine Nacht aus einem früheren Test ließ tote Bots auf die Dämmerung
+    warten, und deren Schlaf-Test scheiterte daran.
+  - Der Schlaf-Test startet nur mit seinen eigenen Bots.
+  - Die Testmonster sind feuerfest, damit sie in der Sonne nicht verbrennen.
+  - Volle Suite: 169 von 171 grün. `brawl_zombie_trio` (8,17 HP verloren, Grenze 8) und
+    `return_to_sender` sind einzeln wiederholt grün.
+- **Bob-Bot** (`d1374e4`): dieselben Korrekturen und Tests. Ein Fenster bricht Bob dort nie durch
+  eine Wand, die ein Spieler gebaut hat. Eine Fackel eines Spielers bleibt stehen; die Seite gilt dann
+  als Lücke. 37 von 37 Tests grün.
