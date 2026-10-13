@@ -2731,3 +2731,56 @@ Felder.
 - **Bob-Bot** (`d1374e4`): dieselben Korrekturen und Tests. Ein Fenster bricht Bob dort nie durch
   eine Wand, die ein Spieler gebaut hat. Eine Fackel eines Spielers bleibt stehen; die Seite gilt dann
   als Lücke. 37 von 37 Tests grün.
+
+### 24.12 Liga 4: dieselben 12 Seeds auf dem neuen Stand (`5bf6d38`)
+
+Dieselben Varianten (Standard gegen `guardian=0`) und Seeds wie Liga 3. So lassen sich beide Ligen
+Welt für Welt vergleichen.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | 4 | 2,1 | 0,08 | 15,8 | 492 s | 0,6 / 0,9 / 2,1 |
+| `guardian=0` | 6 | 1,8 | 0,58 | 28,9 | 456 s | 0,2 / 0,9 / 1,8 |
+
+Zwei Spiele endeten unentschieden. Der Abstand zwischen den Varianten ist diesmal klein (+0,33 Felder,
+Standardfehler 0,89). Grund ist vor allem, dass `guardian=0` von den Nacht- und Stein-Korrekturen
+stärker profitiert hat (siehe unten).
+
+**Liga 3 gegen Liga 4, dieselbe Welt** (Mittel je Spiel):
+
+| | Standard L3 | Standard L4 | `guardian=0` L3 | `guardian=0` L4 |
+| --- | --- | --- | --- | --- |
+| Felder | 2,33 | 2,08 | 0,75 | 1,75 |
+| Tode | 0,17 | 0,08 | 0,67 | 0,58 |
+| Herzen verloren | 21,5 | 15,8 | 25,9 | 28,9 |
+| eingemauert (Wächter + Nacht) | 84 s | 4 s | – | – |
+| eingegraben für die Nacht | 95 s | 141 s | 230 s | 107 s |
+| Schild | 123 s | 176 s | 96 s | 131 s |
+
+- Beide Seiten zusammen holen 3,8 statt 3,1 Felder pro Spiel und sterben 0,66- statt 0,84-mal.
+- Die Box-Schleife ist weg.
+- Der Standard verlor dabei ein Viertel weniger Herzen und starb in 12 Spielen nur einmal.
+- Im Lockout zählt pro Seite auch, was die andere zuerst holt. Das erste Feld und die Felder einer
+  einzelnen Seite schwanken deshalb von Welt zu Welt stark. In vier Welten kam das erste Feld der
+  Standardvariante früher, in vier später.
+
+**Was übrig bleibt:**
+
+- Die Nacht im Loch kostete den Standard mehr als vorher. Die Gründe im Log sind jetzt fast nur noch
+  „food 0, hunger 13/15“: Bob ist gesund, aber hat kein Essen im Gepäck.
+- Wo der Wächter keine Deckung fand, steht jetzt der Grund im Log: „in the water“ (3-mal), „falling“,
+  „something that hurts here“. Die rätselhaften „no cover here (blocks 56)“ mitten im Sprung kommen
+  nicht mehr vor.
+- Der eine Tod des Standards: Zombies und ein Creeper. Bob kämpfte gegen den Creeper, während ihn zwei
+  Zombies trafen. Dann kam der Rückzug vor der Menge, bei 3,5 HP eingegraben, zu spät.
+
+### 24.13 Korrekturen aus Liga 4 (`2e3ed0b`)
+
+- **Satt für die Nacht** ist auch, wer gesund ist und weit vom Hunger (Hungerbalken ab 12, HP ab 18).
+  Das entspricht der Regel des Spielers: nachts weiterspielen, nur vorsichtiger, es sei denn, die
+  Nacht lässt sich verschlafen. Der Wächter sieht nach dem Kampf.
+- Fehlt bei Einbruch der Nacht nur das Essen, holt Bob erst etwas in der Nähe, wenn das unter einer
+  Minute kostet, einmal pro Nacht.
+- Wäre Essen für die Nacht in der Dämmerung zu teuer, steht das im Log.
+- Neuer Schalter `copper=0`: keine Kupferrüstung auf HARD. Sie kostete in Liga 3 im Mittel 171 s pro
+  Spiel. Liga 5 misst, ob sie sich neben dem Wächter noch lohnt.
