@@ -19,6 +19,8 @@ import java.util.Map;
  *       (-1, the default: the usual rule).</li>
  *   <li>{@code nightarmour} - 0 (the default): geared for the night is a weapon, food and the
  *       hearts; 1: armour too (6, or 2 and a shield), else dug in for the night.</li>
+ *   <li>{@code copper} - 1 (the default): on hard, copper armour once the shield is in hand; 0:
+ *       none (only what the board's iron and the chests bring).</li>
  * </ul>
  */
 public final class BotParams {

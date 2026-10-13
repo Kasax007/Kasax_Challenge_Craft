@@ -311,7 +311,8 @@ public final class LockoutBrain implements BotBrain {
         // pieces at a time, smelted together, then the pieces made. Only once the shield is in
         // hand, and only while it comes cheap.
         stepKey = "armour";
-        if (hard && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4
+        // (copper=0: none of it - self-play comparisons; it cost three minutes a game in league 3.)
+        if (hard && bot.params.on("copper") && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4
                 && bot.body().level().getGameTime() >= armourRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             List<net.minecraft.world.item.Item> missing = new ArrayList<>();
             for (var piece : COPPER_SET.keySet()) if (armourSlotFree(bot.body(), piece)) missing.add(piece);
@@ -636,7 +637,7 @@ public final class LockoutBrain implements BotBrain {
 
     /** Dusk: from here on, ready for the night or making ready (monsters come out from about 13000). */
     static final long DUSK = 10000, SHELTER_FROM = 12600, DAWN = 23200;
-    private long bedTriedDay = -1, foodTriedDay = -1, weaponTriedDay = -1, shelterRetryAt;
+    private long bedTriedDay = -1, foodTriedDay = -1, weaponTriedDay = -1, nightFoodTriedDay = -1, shelterRetryAt;
 
     /** What it fights with at night, when it has none: the cheapest sword (a wooden one will do). */
     private static final Set<net.minecraft.world.item.Item> NIGHT_WEAPONS = Set.of(net.minecraft.world.item.Items.WOODEN_SWORD,
@@ -694,7 +695,11 @@ public final class LockoutBrain implements BotBrain {
         // (And what is in the stomach and the pack together: "food 4, hunger 15" - nineteen
         // shanks - dug a self-play game in till the morning.)
         int hunger = body.getFoodData().getFoodLevel();
-        return foodPoints >= 8 || hunger >= 16 || hunger + foodPoints >= 18;
+        // (Or well and far from starving: the hearts do not come back below eighteen shanks, but
+        // a night's work takes five or six, and the guardian sees to a fight going badly - "food
+        // 0, hunger 13/15" dug it in for half the nights of the fourth league. The player's own
+        // rule: on through the night, only more carefully, unless it can be slept away.)
+        return foodPoints >= 8 || hunger >= 16 || hunger + foodPoints >= 18 || hunger >= 12 && body.getHealth() >= 18;
     }
 
     private static net.minecraft.world.item.Item bedInPack(Bot bot) {
@@ -748,6 +753,7 @@ public final class LockoutBrain implements BotBrain {
                 foodTriedDay = day;
                 int have = ObtainPlanner.countAny(bot.body(), FOODS);
                 double est = planner.estimate(bot, FOODS, have + 4);
+                if (est > 180) bot.say("dusk soon and little to eat (" + points + "), but food would take ~" + Math.round(est) + " s");
                 if (est <= 180) {
                     bot.say("dusk soon and little to eat (" + points + "): food for the night (~" + Math.round(est) + " s)");
                     nextErrand = "food";
@@ -787,6 +793,21 @@ public final class LockoutBrain implements BotBrain {
             return false;
         }
         shelterRetryAt = now + 400;
+        // Armed and well, only the food short: something to eat close by first if it is quick (a
+        // cow in sight, a furnace in the pack), once a night - then on with the night.
+        if (armed(bot) && bot.body().getHealth() >= 12 && !fedForTheNight(bot.body(), net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body()))
+                && (!nightArmour(bot) || nightReadyBarHearts(bot)) && nightFoodTriedDay != day) {
+            nightFoodTriedDay = day;
+            int have = ObtainPlanner.countAny(bot.body(), FOODS);
+            double est = planner.estimate(bot, FOODS, have + 2);
+            if (est <= 60) {
+                bot.say("night, " + nightGaps(bot) + ": something to eat close by first (~" + Math.round(est) + " s)");
+                nextErrand = "food";
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 2, planner), 1800);
+                if (!startRefused) return true;
+                startRefused = false;
+            }
+        }
         // Armed and fed, only the hearts short: into the ground (or walled in) till they are back -
         // a minute, not the night. (At nightfall with twelve hearts a self-play game dug in till
         // the morning, five minutes of a twenty-minute game.)
