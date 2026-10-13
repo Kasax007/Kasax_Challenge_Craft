@@ -372,7 +372,7 @@ public final class LockoutGoals {
                 // (Hurt already: the hearts back first, then the fall.)
                 double heal = Math.max(0, 18 - body.getHealth()) * 4;
                 yield new Option(one.cost() + heal + (falls - 1) * 45, () -> new SequenceTask("hearts back, then a fall", List.of(
-                        () -> bot.body().getHealth() >= 18 ? null : new net.kasax.challengecraft.bot.task.WaitTask(Math.max(20, (int) ((18 - bot.body().getHealth()) * 80))),
+                        () -> bot.body().getHealth() >= 18 ? null : net.kasax.challengecraft.bot.task.WaitTask.pause(Math.max(20, (int) ((18 - bot.body().getHealth()) * 80))),
                         one.task())));
             }
             case "take_fall_damage" -> fall(bot, planner, 5, false);

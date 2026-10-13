@@ -17,7 +17,7 @@ public final class HideTask implements BotTask {
     private static final int MAX_TICKS = 900;
     private int ticks, dug, lidTries, reopened, strays;
     private BlockPos top;
-    private boolean closed;
+    private boolean closed, saidWeak;
 
     /** Something that hurts in the spot itself (a berry bush, a cactus beside it, fire): no shelter there. */
     static boolean hurtsHere(ServerLevel level, BlockPos feet) {
@@ -243,13 +243,22 @@ public final class HideTask implements BotTask {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (!body.isAlive()) return Result.DONE;
+        // Too weak for the night (under five hearts, in the dark): in here till it is light or
+        // the hearts are back, not out after two minutes to look for food - at 5 hp twice out
+        // into the dark in a self-play league game, shot the second time. Dead it would wait for
+        // the dawn as well, and with nothing in the pack.
+        boolean weakNight = closed && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && body.getHealth() < 10;
+        if (weakNight && !saidWeak) {
+            saidWeak = true;
+            bot.say("too weak for the night (" + Math.round(body.getHealth()) + " hp): in here till it is light or the hearts are back");
+        }
         // (Out of time, but hurt with one still by the hole: a while longer - out at 11 hp into
         // the zombie that waited, it died on seed 44.)
         // (Nor out of the hole at night with them still waiting by it, healthy or not: out at
         // full health into three zombies and a skeleton, walled in again in the open, dead - a
         // while longer, as long as they stay, up to the limit.)
-        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay
-                || body.getHealth() >= 16 && window == null && !(level.isDarkOutside() && monsterBy(body)) || !monsterBy(body))) return Result.DONE;
+        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 13000 || !weakNight && (ticks > 3 * MAX_TICKS || untilDay
+                || body.getHealth() >= 16 && window == null && !(level.isDarkOutside() && monsterBy(body)) || !monsterBy(body)))) return Result.DONE;
         // (Called for mid-jump, or thrown up by a blow: from where it lands.)
         if (top == null) {
             if (!body.onGround()) return Result.RUNNING;
@@ -335,7 +344,8 @@ public final class HideTask implements BotTask {
         // (The hearts back, but the bowmen still by the hole: a while longer, as long as they stay
         // and the time lasts - seed 88, hard: out at full health into the same patrol, and shot.)
         boolean waiting = monsterBy(body);
-        if (body.getHealth() >= 16 && (!waiting || ticks > MAX_TICKS && !level.isDarkOutside()) || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !waiting) return Result.DONE;
+        if (body.getHealth() >= 16 && (!waiting || ticks > MAX_TICKS && !level.isDarkOutside())
+                || body.getFoodData().getFoodLevel() < 18 && ticks > 200 && !waiting && !weakNight) return Result.DONE;
         return Result.RUNNING;
     }
 

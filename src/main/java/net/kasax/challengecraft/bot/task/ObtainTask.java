@@ -20,9 +20,15 @@ public final class ObtainTask implements BotTask {
     private final ObtainPlanner planner;
     private final boolean craftOnly;
     private Set<Item> keep = Set.of();
+    /** How many of each of {@link #keep} it held when it began: those stay, the rest may be used. */
+    private java.util.Map<Item, Integer> kept;
     private BotTask step;
     private ObtainPlanner.Step stepPlan;
     private int failures, recheck;
+    /** The pack as it was when the step began, and the same step done for nothing how often in a row. */
+    private long packBefore;
+    private String idleKey;
+    private int idleRuns;
 
     public ObtainTask(Set<Item> items, int count) {
         this(items, count, new ObtainPlanner());
@@ -49,7 +55,7 @@ public final class ObtainTask implements BotTask {
         return count;
     }
 
-    /** Items not to use up while getting these (see {@link ObtainPlanner#plan(Bot, java.util.Collection, int, boolean, Set)}). */
+    /** Items not to use up while getting these, as many as it holds when it begins (see {@link ObtainPlanner#plan(Bot, java.util.Collection, int, boolean, java.util.Map)}). */
     public ObtainTask keeping(Set<Item> keep) {
         this.keep = Set.copyOf(keep);
         return this;
@@ -57,8 +63,15 @@ public final class ObtainTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
+        // (What it held of them at the start, not all it will ever hold: the red dye made for the
+        // orange one is there to be used - kept along with the first, it was made again and
+        // again, thirty-six times in a self-play game, and never an orange one.)
+        if (kept == null) {
+            kept = new java.util.HashMap<>();
+            for (Item k : keep) kept.put(k, ObtainPlanner.countAny(bot.body(), Set.of(k)));
+        }
         if (step == null) {
-            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, keep);
+            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, kept);
             if (p instanceof ObtainPlanner.Have) return Result.DONE;
             if (p instanceof ObtainPlanner.Stuck s) {
                 bot.say("can't get " + ObtainPlanner.names(items) + ": " + s.why());
@@ -74,12 +87,13 @@ public final class ObtainTask implements BotTask {
             }
             step = st.task();
             stepPlan = st;
+            packBefore = pack(bot);
             bot.say("  " + step.describe());
         }
         // Out searching for one kind (spruce) while another that does as well (oak) comes into
         // sight: the plan again, every few seconds, and the other way if it now comes out first.
         if (step instanceof MineTask m && m.searching() && stepPlan != null && ++recheck % 100 == 0) {
-            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, keep);
+            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, kept);
             // (Only another source of the same thing: not off to something else the plan now
             // puts first - halfway down a staircase for iron, back up for wood.)
             if (p instanceof ObtainPlanner.Step st && !st.key().equals(stepPlan.key())
@@ -105,6 +119,20 @@ public final class ObtainTask implements BotTask {
         }
         bot.navigator().stop();
         bot.actions().reset();
+        // Done, and the pack just as it was - the third time running for the same step: it does
+        // nothing, as a failure (a "buy flint" that was done at once without a trade, planned
+        // again and again, 173 times in half a minute of a self-play game).
+        if (r == Result.DONE) {
+            if (pack(bot) == packBefore && stepPlan.key().equals(idleKey)) {
+                if (++idleRuns >= 3) {
+                    r = Result.FAILED;
+                    idleRuns = 0;
+                }
+            } else {
+                idleKey = pack(bot) == packBefore ? stepPlan.key() : null;
+                idleRuns = idleKey == null ? 0 : 1;
+            }
+        }
         if (r == Result.FAILED) {
             bot.say("  x " + step.describe());
             if (stepPlan != null && !(step instanceof CraftTask c && c.missingIngredients())) planner.markFailed(stepPlan, bot.body().level().getGameTime());
@@ -112,6 +140,15 @@ public final class ObtainTask implements BotTask {
         }
         step = null;
         return Result.RUNNING;
+    }
+
+    /** What is in the pack, as one number (the same pack, the same number). */
+    private static long pack(Bot bot) {
+        long h = 17;
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+            h = h * 31 + (st.isEmpty() ? 0 : net.minecraft.core.registries.BuiltInRegistries.ITEM.getId(st.getItem()) * 128L + st.getCount());
+        }
+        return h;
     }
 
     @Override

@@ -280,6 +280,42 @@ public class BotSkillTests {
         });
     }
 
+    /**
+     * "5 dye colours", red and yellow already collected, orange next: another red and yellow made
+     * for it, and the orange - the first red and yellow kept. (Keeping every red dye there ever
+     * was, it made red dye thirty-six times in a self-play game, and never the orange.)
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
+    public void orangeKeepsRedAndYellow(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "orange_keeps_red_and_yellow");
+        a.spawn(20, FEET, 20, new ItemStack(Items.DYE.pick(net.minecraft.world.item.DyeColor.RED)), new ItemStack(Items.DYE.pick(net.minecraft.world.item.DyeColor.YELLOW)), new ItemStack(Items.POPPY, 2),
+                new ItemStack(Items.DANDELION, 2));
+        var body = a.bot().body();
+        var kinds = Set.of(Items.DYE.pick(net.minecraft.world.item.DyeColor.RED), Items.DYE.pick(net.minecraft.world.item.DyeColor.YELLOW), Items.DYE.pick(net.minecraft.world.item.DyeColor.ORANGE));
+        a.run(new ObtainTask(Set.of(Items.DYE.pick(net.minecraft.world.item.DyeColor.ORANGE)), 1, new ObtainPlanner()).keeping(kinds), 400,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.DYE.pick(net.minecraft.world.item.DyeColor.ORANGE))) >= 1 && ObtainPlanner.countAny(body, Set.of(Items.DYE.pick(net.minecraft.world.item.DyeColor.RED))) >= 1
+                        && ObtainPlanner.countAny(body, Set.of(Items.DYE.pick(net.minecraft.world.item.DyeColor.YELLOW))) >= 1 && a.bot().current() == null);
+    }
+
+    /**
+     * Three flint from a gravel bank six high: the gravel taken from the top of its columns,
+     * nothing coming down on the head (a self-play game dug at the foot of a gravel bank and
+     * suffocated in what came down).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
+    public void flintFromAGravelBank(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "flint_from_a_gravel_bank");
+        a.fill(24, FEET, 17, 28, FEET + 5, 23, Blocks.GRAVEL);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SHOVEL));
+        var body = a.bot().body();
+        boolean[] buried = {false};
+        a.run(new ObtainTask(Set.of(Items.FLINT), 3), 3600, () -> {
+            buried[0] |= body.isInWall();
+            h.assertTrue(!buried[0], "flint_from_a_gravel_bank: buried in the gravel");
+            return ObtainPlanner.countAny(body, Set.of(Items.FLINT)) >= 3 && a.bot().current() == null;
+        });
+    }
+
     /** Oak trees about: an apple is known to come from their leaves (one break in two hundred). */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void applesFromLeaves(GameTestHelper h) {

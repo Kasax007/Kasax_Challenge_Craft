@@ -52,7 +52,7 @@ public final class KillTask implements BotTask {
         return target;
     }
     private BlockPos deathSpot;
-    private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown;
+    private int killed, collectTicks, repath, explores, chaseTicks, direct, exploreTicks, lookCooldown, creeperWait;
     private final Explorer explorer = new Explorer(2400);
     private boolean triedMemory;
     private final java.util.Set<Integer> unreachableDrops = new java.util.HashSet<>();
@@ -116,6 +116,22 @@ public final class KillTask implements BotTask {
             bot.navigator().stop();
         }
         if (done(bot)) return Result.DONE;
+        // A creeper hissing close by and a shield on the arm: up, turned to it, and kept up till it
+        // has gone off or calmed down - not lowered for a blow or a step. (Lowered by the fight and
+        // raised by the threat sense every tick, it never came up far enough to block: blown up at
+        // 1.3 blocks with the shield on the arm in a self-play league, twenty hearts' halves.)
+        if (!bot.welcomeExplosion && body.getOffhandItem().is(Items.SHIELD)) {
+            var hiss = net.kasax.challengecraft.bot.ThreatSense.hissingNear(body, 4.5);
+            // (Not the one it is out after, with room to run: a blow and away - see below.)
+            if (hiss != null && !bot.huntingCreeper(hiss)) {
+                if (walking) bot.navigator().stop();
+                walking = false;
+                body.stopInputs();
+                body.lookAt(hiss.getEyePosition());
+                if (!body.isUsingItem() || !body.getUseItem().is(Items.SHIELD)) body.gameMode.useItem(body, level, body.getOffhandItem(), InteractionHand.OFF_HAND);
+                return Result.RUNNING;
+            }
+        }
 
         if (target == null || !target.isAlive() || target.distanceTo(body) > (within > 0 ? within * 1.5 : BotWorld.MOB_SIGHT)) {
             if (target != null && !target.isAlive() && target.getLastHurtByMob() == body) {
@@ -169,39 +185,47 @@ public final class KillTask implements BotTask {
         // Up in the air (a phantom, a ghast, a blaze over the lava): arrows, if it has a bow.
         if (target.getY() - body.getY() > 3.5 && dist > REACH && shoot(bot, target)) return Result.RUNNING;
         body.strafe = 0f; // (a sidestep lasts only while the bow is drawn, below)
-        // A creeper is hit from just outside the three blocks at which it starts to hiss (the
-        // arm reaches its body, not its middle), with a running blow that throws it back.
+        // A creeper is hit from just outside the three blocks (middle to middle) at which it
+        // starts to hiss - the arm reaches its body, not its middle: waited for at the edge of
+        // reach, and backed off from while the arm comes back. The blow throws it back some three
+        // blocks, and the arm is ready again before it is back. (Stepped in at a run for the
+        // blow, it was inside the three blocks before the blow landed, and hissing: in a
+        // self-play league one was hunted three times over that way, run from each time.)
+        // Hissing all the same: a blow if it is in reach (it throws it back), and back - the
+        // threat sense runs from it, and out of seven blocks it calms down.
         boolean creeperTarget = target instanceof net.minecraft.world.entity.monster.Creeper;
-        if (creeperTarget && hit <= 3.9 && hit > HIT) {
+        if (creeperTarget && hit <= 3.9) {
+            var c = (net.minecraft.world.entity.monster.Creeper) target;
             if (walking) {
                 bot.navigator().stop();
                 walking = false;
             }
+            if (++weaponCheck % 10 == 1) equipWeapon(bot);
             body.lookAt(target.getEyePosition());
-            boolean ready = body.getAttackStrengthScale(0.5f) >= 1f;
-            if (!ready) {
-                // Waiting for the arm: just out of its range, backing off if it comes on.
-                body.forward = hit < 3.3 ? -1f : 0f;
-                keepFooting(body);
-                return Result.RUNNING;
-            }
-            if (hit > 2.9) {
-                // Ready: one step in at a run, the blow lands as it comes into reach.
-                body.forward = 1f;
-                body.sprintNow = body.getFoodData().getFoodLevel() > 6;
-                return Result.RUNNING;
-            }
-            body.attack(target);
-            body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
-            body.forward = -1f;
             body.sprintNow = false;
-            keepFooting(body);
-            if (!target.isAlive()) {
-                killed++;
-                deathSpot = target.blockPosition();
-                collectTicks = 40;
-                target = null;
+            // (The shield down: held up, it slows the steps back.)
+            if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD)) body.releaseUsingItem();
+            boolean ready = body.getAttackStrengthScale(0.5f) >= 1f;
+            boolean hissing = c.getSwellDir() > 0;
+            if (ready && hit <= 2.95 || hissing && hit <= 3.0 && c.hurtTime == 0) {
+                body.attack(target);
+                body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
+                body.forward = -1f;
+                keepFooting(body);
+                creeperWait = 0;
+                if (!target.isAlive()) {
+                    killed++;
+                    deathSpot = target.blockPosition();
+                    collectTicks = 40;
+                    target = null;
+                }
+                return Result.RUNNING;
             }
+            double apart = Math.sqrt(c.distanceToSqr(body));
+            // (Not coming on - it has not seen it, or cannot get closer: a step in after a second.)
+            boolean stepIn = ready && hit > 3.3 && (c.getTarget() != body || ++creeperWait > 20);
+            body.forward = hissing || apart < 3.2 ? -1f : stepIn ? 0.5f : 0f;
+            keepFooting(body);
             return Result.RUNNING;
         }
         if (hit <= HIT) {
@@ -214,7 +238,6 @@ public final class KillTask implements BotTask {
             // (The weapon in hand: after a dig or a meal it may be the pickaxe or the bread.)
             if (++weaponCheck % 10 == 1) equipWeapon(bot);
             body.lookAt(target.getEyePosition());
-            boolean creeper = target instanceof net.minecraft.world.entity.monster.Creeper;
             body.forward = 0f;
             float strength = body.getAttackStrengthScale(0.5f);
             boolean ready = strength >= 1f;
@@ -224,13 +247,7 @@ public final class KillTask implements BotTask {
             int pack = level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(4.5),
                     m -> m.isAlive() && (m.getTarget() == body || m instanceof net.minecraft.world.entity.monster.Enemy && m.distanceTo(body) < 3)).size();
             if (!ready) {
-                // Recharging: a creeper is kept at arm's length (it goes off close up).
-                if (creeper) {
-                    body.forward = hit < 2.6 ? -1f : 0f;
-                    keepFooting(body);
-                    return Result.RUNNING;
-                }
-                // Anything else: kept at the edge of reach - in reach of the sword, out of reach
+                // Recharging: kept at the edge of reach - in reach of the sword, out of reach
                 // of its arms - and circled round meanwhile (side to side, a new side now and
                 // then or at a wall), as players fight: what comes at it walks into the blow.
                 // (A magma cube or a slime: at the very edge of reach, it leaps the gap.)
@@ -293,12 +310,12 @@ public final class KillTask implements BotTask {
                 return Result.RUNNING;
             }
             // Ready: shield down, then the blow; a jump first for a critical hit (half again as
-            // hard) when there is time for one (not at a creeper: it would close in).
+            // hard) when there is time for one.
             if (body.isUsingItem()) {
                 body.releaseUsingItem();
                 return Result.RUNNING;
             }
-            if (!creeper && !(target instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob)
+            if (!(target instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob)
                     && pack <= 1 && crit == 0 && body.onGround() && !body.isInWater() && hit < HIT - 0.4 && opened) {
                 body.jump = true;
                 crit = 1;
@@ -311,7 +328,7 @@ public final class KillTask implements BotTask {
             }
             // More than one at it: a sprinting blow instead (it knocks the mob well back, time
             // for the next): a step forward at a run, then the hit.
-            if (!creeper && pack >= 2 && crit == 0 && !body.isSprinting() && body.getFoodData().getFoodLevel() > 6) {
+            if (pack >= 2 && crit == 0 && !body.isSprinting() && body.getFoodData().getFoodLevel() > 6) {
                 body.sprintNow = true;
                 body.forward = 1f;
                 crit = 2;

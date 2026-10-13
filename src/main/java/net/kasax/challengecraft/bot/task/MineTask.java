@@ -156,7 +156,7 @@ public final class MineTask implements BotTask {
                     List<BlockPos> seen = new ArrayList<>();
                     for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), sealed ? 5 : searching ? 12 : 28, sealed ? 4 : searching ? 8 : 20, blocks, true, skip, 12)) {
                         // (A trunk from the bottom: that one is in reach from the ground.)
-                        for (int i = 0; i < 12 && blocks.test(level.getBlockState(p.below())) && !skip.contains(p.below()); i++) p = p.below();
+                        p = endOfColumn(level, p);
                         if (!seen.contains(p) && worthIt(level, bot, p)) seen.add(p);
                     }
                     if (!seen.isEmpty()) {
@@ -184,7 +184,7 @@ public final class MineTask implements BotTask {
             if (target == null) return search(bot);
             // A trunk (or any column of them) is taken from the bottom: that one is in reach from
             // the ground, the top ones only from a pillar.
-            for (int i = 0; i < 12 && blocks.test(level.getBlockState(target.below())) && !skip.contains(target.below()); i++) target = target.below();
+            target = endOfColumn(level, target);
             if (searching) {
                 bot.navigator().stop();
                 if (explorer != null) explorer.pause(bot);
@@ -376,6 +376,22 @@ public final class MineTask implements BotTask {
             }
         }
         return best;
+    }
+
+    /**
+     * Where a column of these is taken: a trunk from the bottom (in reach from the ground), but
+     * sand and gravel from the top - from the bottom the rest of the column comes down, onto the
+     * head of one standing by it (a self-play game dug for flint under a gravel bank and
+     * suffocated in what came down, digging up through it for seventeen seconds).
+     */
+    private BlockPos endOfColumn(ServerLevel level, BlockPos p) {
+        if (level.getBlockState(p).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) {
+            for (int i = 0; i < 12 && level.getBlockState(p.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+                    && blocks.test(level.getBlockState(p.above())) && !skip.contains(p.above()); i++) p = p.above();
+            return p;
+        }
+        for (int i = 0; i < 12 && blocks.test(level.getBlockState(p.below())) && !skip.contains(p.below()); i++) p = p.below();
+        return p;
     }
 
     /** An ore of the vein being taken still in the wall a few steps away. */

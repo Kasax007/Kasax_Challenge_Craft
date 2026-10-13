@@ -486,7 +486,21 @@ public class BotStuntTests {
     // (A batch of its own, well apart: an explosion would hurt the tests next door.)
     @GameTest(environment = "challengecraft:demolition", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 90)
     public void creeperKill(GameTestHelper h) {
-        BotArena a = BotArena.flat(h, "creeper_kill");
+        creeperHunt(h, "creeper_kill", false);
+    }
+
+    /**
+     * The same with a shield on the arm: not held up to let it go off (the gunpowder gone with
+     * it), nor run from far off - kept at the edge of reach, and killed (a self-play league hunted
+     * creepers for a rocket ten times, never once with the powder).
+     */
+    @GameTest(environment = "challengecraft:demolition", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 90)
+    public void creeperKillShield(GameTestHelper h) {
+        creeperHunt(h, "creeper_kill_shield", true);
+    }
+
+    private static void creeperHunt(GameTestHelper h, String name, boolean shield) {
+        BotArena a = BotArena.flat(h, name);
         var level = h.getLevel();
         level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
         var c = EntityTypes.CREEPER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
@@ -494,11 +508,79 @@ public class BotStuntTests {
         c.setPersistenceRequired();
         level.addFreshEntity(c);
         a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        if (shield) body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        int[] hisses = {0};
+        boolean[] was = {false};
         a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.CREEPER), java.util.Set.of(), 0, 1), 1200, () -> {
-            if (a.bot().body().getHealth() < 12) h.fail("hurt by the creeper: " + a.bot().body().getHealth());
-            if (!c.isAlive() && c.getHealth() > 0) h.fail("it went off");
-            return !c.isAlive();
+            if (body.getHealth() < 12) h.fail(name + ": hurt by the creeper: " + body.getHealth());
+            if (!c.isAlive() && c.getHealth() > 0) h.fail(name + ": it went off");
+            boolean hiss = c.isAlive() && c.getSwellDir() > 0;
+            if (hiss && !was[0]) hisses[0]++;
+            was[0] = hiss;
+            if (c.isAlive()) return false;
+            BotArena.LOG.info("[BOTTEST] {} killed it on tick {}, {} hiss(es), {} hp", name, h.getTick(), hisses[0], body.getHealth());
+            return true;
         });
+    }
+
+    /**
+     * In a fight with a zombie, a shield on the arm, nowhere to run (two ways off just failed), and
+     * a creeper lit under three and a half blocks off: the shield up towards it and kept up till it
+     * has gone off - not lowered for the next blow at the zombie (a self-play league: lowered by
+     * the fight and raised again by the threat sense every tick, it never blocked - twenty hearts'
+     * halves).
+     */
+    @GameTest(environment = "challengecraft:demolition", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 90)
+    public void creeperAtAFight(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "creeper_at_a_fight");
+        var level = h.getLevel();
+        level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 20 * 600));
+        // (A tough one for the first ten seconds: the fight still on when the creeper goes off.)
+        z.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.RESISTANCE, 200, 2));
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(23, FEET, 20)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        var c = EntityTypes.CREEPER.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        c.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(22, FEET, 23)));
+        c.setPersistenceRequired();
+        level.addFreshEntity(c);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        float[] low = {20};
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(java.util.Set.of(EntityTypes.ZOMBIE), java.util.Set.of(), 0, 1), 900, () -> {
+            if (z.isAlive() && z.getTarget() != body) z.setTarget(body);
+            if (c.isAlive()) {
+                cornered(a.bot());
+                // (Lit once the fight is on and it is close: it goes off where it stands.)
+                if (h.getTick() > 20 && !c.isIgnited() && c.distanceTo(body) < 3.5) c.ignite();
+            }
+            low[0] = Math.min(low[0], body.getHealth());
+            if (a.bot().body() != body || !body.isAlive()) h.fail("creeper_at_a_fight: dead");
+            // (Done when the creeper has gone off and the zombie is dead.)
+            if (c.isAlive() || z.isAlive()) return false;
+            BotArena.LOG.info("[BOTTEST] creeper_at_a_fight lost {} health", 20 - low[0]);
+            h.assertTrue(20 - low[0] <= 10, "creeper_at_a_fight: lost " + (20 - low[0]));
+            return true;
+        });
+    }
+
+    /** As if the last two ways off had just failed: no running from here (the reflexes stand and fight). */
+    private static void cornered(net.kasax.challengecraft.bot.Bot bot) {
+        try {
+            var at = net.kasax.challengecraft.bot.Bot.class.getDeclaredField("retreatFailedAt");
+            var fails = net.kasax.challengecraft.bot.Bot.class.getDeclaredField("retreatFails");
+            at.setAccessible(true);
+            fails.setAccessible(true);
+            at.setInt(bot, bot.body().tickCount);
+            fails.setInt(bot, 2);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** The same with nothing to fight with: kept away from (alive at the end). */
@@ -884,8 +966,27 @@ public class BotStuntTests {
         brawlFromPillar(h, "brawl_enderman", EntityTypes.ENDERMAN);
     }
 
+    /**
+     * The same enderman with the bot in a dip a block deep (the ground round it a block higher, as
+     * on a slope): the pillar a block higher too - on the step beside it the enderman's arms reach
+     * a block further up (in a self-play game it struck at a bot on its pillar for half the hearts).
+     */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void brawlEndermanSlope(GameTestHelper h) {
+        brawlFromPillar(h, "brawl_enderman_slope", EntityTypes.ENDERMAN, a -> {
+            a.fill(13, FEET, 17, 19, FEET, 23, Blocks.GRASS_BLOCK);
+            a.fill(16, FEET, 20, 16, FEET, 20, Blocks.AIR);
+        });
+    }
+
     private static void brawlFromPillar(GameTestHelper h, String name, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type) {
+        brawlFromPillar(h, name, type, a -> { });
+    }
+
+    private static void brawlFromPillar(GameTestHelper h, String name, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type,
+                                        java.util.function.Consumer<BotArena> terrain) {
         BotArena a = BotArena.flat(h, name);
+        terrain.accept(a);
         var level = h.getLevel();
         level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
         var brute = type.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
@@ -1488,6 +1589,47 @@ public class BotStuntTests {
             BotArena.LOG.info("[BOTTEST] night_shelter_bare alive with {} health, {}", body.getHealth(), a.bot().current() == null ? "-" : a.bot().current().describe());
             BotArena.day(h); // (the clock back for the batches after this one)
             return true;
+        });
+    }
+
+    /**
+     * Dug in at night with five hearts and nothing to eat, the zombie that drove it in gone: in the
+     * hole till it is light (or the hearts are back), not out after the usual minute - at 5 hp it
+     * went out into the dark twice in a self-play game, and was shot the second time.
+     * (A batch of its own: the night shelter test sets the shared clock to day when it ends.)
+     */
+    @GameTest(environment = "challengecraft:weak_night", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 44)
+    public void weakStaysInTheHole(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "weak_stays_in_the_hole");
+        var level = h.getLevel();
+        var src = level.getServer().createCommandSourceStack().withSuppressedOutput();
+        level.getServer().getCommands().performPrefixedCommand(src, "difficulty hard");
+        level.getServer().getCommands().performPrefixedCommand(src, "time set 18000");
+        a.fill(-20, BotArena.GROUND - 4, -20, BotArena.SIZE + 19, BotArena.GROUND - 1, BotArena.SIZE + 19, Blocks.DIRT);
+        var z = EntityTypes.ZOMBIE.create(level, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        z.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        z.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(26, FEET, 20)));
+        z.setPersistenceRequired();
+        level.addFreshEntity(z);
+        a.spawn(20, FEET, 20);
+        var body = a.bot().body();
+        body.setHealth(5);
+        body.getFoodData().setFoodLevel(17);
+        boolean[] hid = {false}, out = {false};
+        // (Dug in as the guardian digs in: the plain hole, not the night's shelter of a bot with
+        // nothing in hand - that one stays till the morning anyway.)
+        a.run(new net.kasax.challengecraft.bot.task.HideTask(), 1550, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("weak_stays_in_the_hole: killed");
+            if (z.isAlive() && z.getTarget() != body && !hid[0]) z.setTarget(body);
+            boolean hiding = a.bot().tasks().stream().anyMatch(t -> net.kasax.challengecraft.bot.BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.HideTask);
+            if (hiding) hid[0] = true;
+            // (Dug in: the zombie gone, nothing waits outside any more.)
+            if (hid[0] && z.isAlive() && h.getTick() > 300) z.discard();
+            if (hid[0] && !hiding) out[0] = true;
+            h.assertTrue(!out[0], "weak_stays_in_the_hole: out of the hole at " + body.getHealth() + " hp in the dark");
+            if (h.getTick() < 1500) return false;
+            BotArena.day(h); // (the clock back for the batches after this one)
+            return hid[0];
         });
     }
 

@@ -151,6 +151,40 @@ public class BotMovementTests {
         });
     }
 
+    /**
+     * Buried in a gravel bank (a self-play game dug for flint under one, the head in the gravel
+     * that came down, and suffocated digging "free" for seventeen seconds): out alive, a shovel
+     * in the pack.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void outOfAGravelBank(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "out_of_a_gravel_bank");
+        a.fill(17, FEET, 17, 23, FEET + 9, 23, Blocks.GRAVEL);
+        a.fill(20, FEET, 20, 20, FEET, 20, Blocks.AIR);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 600, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("out_of_a_gravel_bank: suffocated");
+            return !body.isInWall() && h.getTick() > 100 && body.getHealth() > 0;
+        });
+    }
+
+    /** The same with the head at the corner of four columns of gravel (it stood off the middle of a block). */
+    @GameTest(structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void outOfAGravelBankOffCentre(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "out_of_a_gravel_bank_off_centre");
+        a.fill(17, FEET, 17, 24, FEET + 9, 24, Blocks.GRAVEL);
+        a.fill(20, FEET, 20, 21, FEET, 21, Blocks.AIR);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.STONE_PICKAXE));
+        var body = a.bot().body();
+        var corner = a.abs(21, FEET, 21);
+        body.teleportTo(corner.getX(), corner.getY(), corner.getZ());
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 600, () -> {
+            if (a.bot().body() != body || !body.isAlive()) h.fail("out_of_a_gravel_bank_off_centre: suffocated");
+            return !body.isInWall() && h.getTick() > 100 && body.getHealth() > 0;
+        });
+    }
+
     /** A one-wide shaft with water three deep at the bottom (dug into an aquifer): up and out. */
     @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
     public void floodedNarrowShaft(GameTestHelper h) {

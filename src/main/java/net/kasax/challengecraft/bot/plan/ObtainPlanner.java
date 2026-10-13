@@ -112,7 +112,8 @@ public final class ObtainPlanner {
     private int budget;
     private final Map<List<Object>, Integer> impossible = new HashMap<>();
     private Set<Item> assumeHeld = Set.of();
-    private Set<Item> keep = Set.of();
+    /** How many of which items a plan must leave as they are (see {@link #plan(Bot, Collection, int, boolean, Map)}). */
+    private Map<Item, Integer> keep = Map.of();
 
     /**
      * A step failed: avoid its way for two minutes, and if it searched for its blocks or mobs and
@@ -156,14 +157,15 @@ public final class ObtainPlanner {
      * crafting recipe (a "craft X" goal counts crafting, not having).
      */
     public Plan plan(Bot bot, Collection<Item> accept, int count, boolean craftOnly) {
-        return plan(bot, accept, count, craftOnly, Set.of());
+        return plan(bot, accept, count, craftOnly, Map.of());
     }
 
     /**
      * ... and {@code keep}: items the bot holds for something else (the red dye already collected
-     * for "5 dye colours") are not to be used up on the way: the plan acts as if they were not there.
+     * for "5 dye colours") are not to be used up on the way: the plan acts as if that many of them
+     * were not there (more of them, made on the way, may be used).
      */
-    public Plan plan(Bot bot, Collection<Item> accept, int count, boolean craftOnly, Set<Item> keep) {
+    public Plan plan(Bot bot, Collection<Item> accept, int count, boolean craftOnly, Map<Item, Integer> keep) {
         refresh(bot);
         this.craftOnly = craftOnly;
         this.keep = keep;
@@ -172,7 +174,7 @@ public final class ObtainPlanner {
             return plan(bot, Set.copyOf(accept), count, 0, new HashSet<>());
         } finally {
             this.craftOnly = false;
-            this.keep = Set.of();
+            this.keep = Map.of();
         }
     }
 
@@ -1008,7 +1010,10 @@ public final class ObtainPlanner {
 
     private Plan plan(Bot bot, Set<Item> accept, int count, int depth, Set<Item> visiting) {
         Sim sim = Sim.of(bot.body());
-        for (Item k : keep) if (!accept.contains(k)) sim.inv.remove(k);
+        // (Only as many as are to be kept: more of them made on the way may be used.)
+        keep.forEach((k, n) -> {
+            if (!accept.contains(k)) sim.inv.computeIfPresent(k, (i, have) -> have > n ? have - n : null);
+        });
         if (sim.count(accept) >= count) return new Have();
         startSearch();
         long t0 = System.nanoTime();

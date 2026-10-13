@@ -245,10 +245,17 @@ public final class BotKnowledge {
         if (s.is(BlockTags.LOGS)) return id.contains("oak") && !id.contains("dark") || id.contains("birch") || id.contains("spruce") ? 30 : 150;
         if (s.is(BlockTags.SMALL_FLOWERS)) return id.equals("dandelion") || id.equals("poppy") ? 12 : 90;
         return switch (id) {
-            case "dirt", "grass_block", "sand", "gravel", "short_grass", "tall_grass", "fern", "large_fern" -> 3;
+            case "dirt", "grass_block", "short_grass", "tall_grass", "fern", "large_fern" -> 3;
+            // (Sand and gravel are not under every foot: by the water, in a desert, on a mountain -
+            // the leagues' digs for them took a quarter of a minute when found at all; "a glass
+            // bottle, ~26 s" was a walk to a beach and given up.)
+            case "sand", "gravel" -> 15;
             // Under a few blocks of dirt anywhere: dig down.
             case "stone", "andesite", "diorite", "granite" -> 8;
-            case "sandstone", "red_sand", "snow", "snow_block", "water", "sugar_cane", "coarse_dirt" -> 15;
+            case "sandstone", "red_sand", "snow", "snow_block", "water", "coarse_dirt" -> 15;
+            // (Sugar cane only grows at the water's edge: the leagues' searches for it took 37 s
+            // in the middle, 48 s on average - "a name tag, ~18 s" was mostly that search.)
+            case "sugar_cane" -> 40;
             case "coal_ore", "deepslate", "tuff" -> 30;
             case "copper_ore", "deepslate_coal_ore" -> 40;
             case "iron_ore" -> 55;

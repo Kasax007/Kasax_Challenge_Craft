@@ -23,6 +23,8 @@ public final class PillarFightTask implements BotTask {
     private BlockPos base;
     private int ticks, placed, lastPlaced, placedAt, waiting;
     private boolean shot, untilClear;
+    /** How much higher than the pillar's foot the ground right beside it stands (a slope): that much higher up. */
+    private int rise;
 
     public PillarFightTask(LivingEntity target) {
         this.target = target;
@@ -84,6 +86,7 @@ public final class PillarFightTask implements BotTask {
             // (Called for mid-jump, or thrown up by a blow: from where it lands.)
             if (!body.onGround() && !body.isInWater()) return Result.RUNNING;
             base = body.blockPosition();
+            rise = rise(level, base);
             bot.navigator().stop();
             bot.actions().reset();
         }
@@ -92,6 +95,7 @@ public final class PillarFightTask implements BotTask {
         if (body.onGround() && placed > 0 && height < placed
                 && (body.blockPosition().getX() != base.getX() || body.blockPosition().getZ() != base.getZ())) {
             base = body.blockPosition();
+            rise = rise(level, base);
             placed = 0;
             height = 0;
         }
@@ -99,7 +103,9 @@ public final class PillarFightTask implements BotTask {
         // High enough that its reach (up to the top of its body, a little more - and a hoglin
         // leaps as it strikes) misses the feet: three. Not getting higher for a while: fought
         // from where it is.
-        int need = 3;
+        // (An enderman on the slope beside the pillar stands a block higher, and its reach with
+        // it: two of a self-play game's deaths were at an enderman's hands, one on a pillar.)
+        int need = 3 + rise;
         if (placed > lastPlaced) {
             lastPlaced = placed;
             placedAt = ticks;
@@ -144,6 +150,29 @@ public final class PillarFightTask implements BotTask {
             body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);
         }
         return Result.RUNNING;
+    }
+
+    /**
+     * The ground beside the foot of the pillar (the eight blocks round it, where one stands that
+     * strikes at it), how much higher than the foot at most: 0 to 2.
+     */
+    private static int rise(ServerLevel level, BlockPos base) {
+        int rise = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                for (int up = 2; up > rise; up--) {
+                    BlockPos p = base.offset(dx, up, dz);
+                    if (!level.getBlockState(p.below()).getCollisionShape(level, p.below()).isEmpty()
+                            && level.getBlockState(p).getCollisionShape(level, p).isEmpty()
+                            && level.getBlockState(p.above()).getCollisionShape(level, p.above()).isEmpty()) {
+                        rise = up;
+                        break;
+                    }
+                }
+            }
+        }
+        return rise;
     }
 
     @Override

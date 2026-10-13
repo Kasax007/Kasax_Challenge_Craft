@@ -2880,3 +2880,101 @@ meisten Abbrüche („dauert zu lange“) kamen von Schätzungen, die das Drei- 
 - **Ein Eimer im Gepäck** kostet beim Füllen nichts mehr. Bisher zählte der Planer seine Herstellung
   mit (Eisen aus der Tiefe). Mit dem Abstieg lag dadurch schon das Wasserholen über der Grenze eines
   Weges (Tests `water_unseen`, `water_not_xray`).
+
+### 24.16 Liga 6: Standard gegen `descent=0` (`b3cca4e`)
+
+Dieselben 12 Seeds wie die Ligen 3 bis 5. Beide Seiten haben alle Korrekturen aus 24.15. `descent=0`
+lässt nur den Abstieg im Plan weg.
+
+| Variante | Siege | Felder | Tode | Herzen verloren | erstes Feld | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard | 7 | 2,7 | 0,08 | 15,7 | 247 s | 0,6 / 1,2 / 2,7 |
+| `descent=0` | 3 | 1,3 | 0,25 | 17,8 | 526 s | 0,2 / 0,6 / 1,3 |
+
+Zwei Spiele endeten unentschieden. Der Abstand beträgt +1,33 Felder pro Spiel (Standardfehler 0,72,
+t = 1,85). Der Abstieg im Plan bleibt Standard.
+
+**Gegen Liga 5, dieselben 11 Welten (Standard):**
+
+| | Liga 5 | Liga 6 |
+| --- | --- | --- |
+| Felder | 1,91 | 2,55 (gepaart +0,64, Standardfehler 0,81) |
+| Tode | 0,27 | 0,09 |
+| Herzen verloren | 26,0 | 15,6 |
+| erstes Feld | 351 s | 224 s |
+| Schild | 176 s | 99 s |
+| Eisenspitzhacke | 95 s | 50 s |
+| Bruchstein | 65 s | 11 s (der Bodenabbau statt der Treppe) |
+
+Von den gestarteten Zielen holte Bob 36 % (20 von 55) statt 23 % in den Ligen 4 und 5.
+
+**Die Tode:**
+
+| Wer | Ursache |
+| --- | --- |
+| Standard | Creeper |
+| `descent=0` | nachts mit 5 HP aus dem Loch, erschossen (siehe unten) |
+| `descent=0` | Ertrunkener mit Dreizack |
+| `descent=0` | im Kies erstickt, beim Graben nach Feuerstein |
+
+### 24.17 Korrekturen aus Liga 6
+
+- **Zwei Schleifen aus den Liga-Logs:**
+  - **„5 Dye Colors“:** Für das orange Färbemittel hielt der Plan *jedes* rote Färbemittel zurück,
+    auch das gerade dafür hergestellte. Bob stellte rotes Färbemittel 36-mal her und nie das orange.
+    Zurückgehalten wird jetzt nur, was beim Beginn des Schritts schon da war. Test:
+    `orange_keeps_red_and_yellow`.
+  - **„buy flint from a fletcher“:** Der Schritt war 173-mal in einer halben Minute sofort
+    „fertig“, ohne Handel. Ein Schritt, der dreimal hintereinander nichts am Gepäck ändert, gilt
+    jetzt als gescheitert. Der Plan nimmt dann einen anderen Weg.
+- **Kampfturm am Hang:** Steht der Boden neben dem Turm höher, baut Bob den Turm entsprechend höher
+  (bis zu 2 Blöcke mehr). Ein Enderman (2,9 Blöcke hoch) auf der Stufe daneben erreichte Bob sonst
+  auch auf 3 Blöcken. Test: `brawl_enderman_slope`.
+- **Schwach in der Nacht:**
+  - **Der Fehler:** Mit 5 HP und nichts zu essen stieg Bob nach 135 s aus dem Loch, um nachts Essen
+    zu suchen (Liga 6, Spiel 4). Beim zweiten Mal wurde er erschossen.
+  - **Jetzt:** Unter 10 HP bleibt er eingegraben, bis es hell ist oder die Herzen zurück sind. Nach
+    einem Tod würde er ohnehin bis zur Dämmerung warten, nur ohne Gepäck. Test:
+    `weak_stays_in_the_hole`.
+- **Suchzeiten aus den Ligen:**
+  - Ungesehener Sand und Kies kosten im Plan jetzt 15 s statt 3 s. Beides liegt nicht überall,
+    sondern am Wasser, in der Wüste oder im Gebirge.
+  - Zuckerrohr kostet 40 s statt 15 s. In den Ligen dauerte die Suche im Median 37 s, im Mittel
+    48 s.
+  - „Name Tag, ~18 s“ und „Potion, ~26 s“ waren vor allem diese Suchen und wurden abgebrochen.
+- **Warten wartet:** Eine Pause zu Fuß war sofort vorbei. Sie war nur für das Reiten gebaut.
+  Davon betroffen waren das Heilen vor dem nächsten Sturz („10 Hearts Missing“) und das Warten auf
+  die Landung, das im Log zu „-> wait“-Ketten führte.
+- **Kies und Sand von oben:** Eine Säule aus Kies oder Sand baut Bob jetzt von oben ab, nicht
+  mehr von unten wie einen Baumstamm. Von unten rutscht der Rest nach, auf den Kopf dessen, der
+  daneben steht. In Liga 6 grub Bob unter einer Kiesbank nach Feuerstein und erstickte. Er grub sich
+  17 Sekunden lang nach oben „frei“, und die Säule rutschte immer nach. Tests:
+  `flint_from_a_gravel_bank` (drei Feuersteine aus einer 6 Blöcke hohen Bank), dazu
+  `out_of_a_gravel_bank` (auch nicht mittig), wo das Freigraben mit Schaufel klappt. Alle drei
+  bestehen auch auf dem alten Stand: Sie sichern das neue Vorgehen ab, die Lage aus der Liga
+  bilden sie nicht nach.
+- **Schild gegen den zischenden Creeper im Kampf:**
+  - **Der Fehler:** Bob kämpfte mit Schild gegen einen Zombie, als ein Creeper zischte (Liga 6).
+    Der Kampf senkte den Schild für jeden Schlag, die Gefahrenwahrnehmung hob ihn im selben Tick
+    wieder. Ein Schild blockt aber erst 5 Ticks nach dem Heben, also blockte er nie. Die Explosion
+    kostete 20 halbe Herzen. Das passiert, wenn kein Rückzug möglich ist (zwei Rückzüge gerade
+    gescheitert): Dann übernimmt kein Reflex, und der Kampf läuft weiter.
+  - **Jetzt:** Zischt ein Creeper näher als 4,5 Blöcke, bleibt Bob stehen, schaut ihn an und hält
+    den Schild oben, bis er explodiert ist oder aufgibt. Erst dann geht der Kampf weiter. Test:
+    `creeper_at_a_fight` (eingekesselt, der Creeper unter 3,5 Blöcken gezündet). Er besteht auch
+    auf dem alten Stand: Die Lage aus der Liga ließ sich nicht genau nachstellen, der Test sichert
+    das neue Verhalten ab.
+- **Creeper-Jagd für Schießpulver:**
+  - **Der Fehler:** In den Liga-Logs begann Bob „Firework Rocket“ siebenmal und holte es nie. Ein
+    Versuch dauerte im Mittel 194 s, geschätzt waren 26 s. Für den Schlag lief Bob im Sprint auf
+    den Creeper zu und war dabei schon innerhalb der 3 Blöcke, ab denen er zischt. Dann floh Bob
+    16 Blöcke weit und kam zurück, oder er hielt den Schild hoch, bis der Creeper explodierte. Das
+    Pulver war damit weg.
+  - **Jetzt:** Bob wartet am Rand der Reichweite und schlägt knapp außerhalb der 3 Blöcke zu. Der
+    Schlag wirft den Creeper etwa 3 Blöcke zurück. Solange der Arm nachlädt, weicht Bob zurück.
+    Zischt der Creeper doch, gibt es einen Schlag, wenn er in Reichweite ist, und ein paar Schritte
+    weg: Über 7 Blöcke beruhigt er sich, und die Jagd geht weiter. Schild und lange Flucht gibt es
+    nur noch, wenn kein Platz zum Weglaufen ist oder Bob unter 12 HP hat.
+  - **Tests:** `creeper_kill_shield` (mit Schild am Arm; auf dem alten Stand explodierte der
+    Creeper). `creeper_kill` braucht jetzt 76 statt 169 Ticks.
+- **Offen:** der Tod durch den Ertrunkenen mit Dreizack (einer in 24 Spielerpartien).

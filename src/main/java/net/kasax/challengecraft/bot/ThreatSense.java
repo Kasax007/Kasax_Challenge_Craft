@@ -43,6 +43,21 @@ public final class ThreatSense {
         this.bot = bot;
     }
 
+    /** The nearest creeper hissing (its fuse burning) within {@code r} blocks, or null. */
+    public static net.minecraft.world.entity.monster.Creeper hissingNear(BotPlayer body, double r) {
+        net.minecraft.world.entity.monster.Creeper best = null;
+        double bestD = r;
+        for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(r),
+                c -> c.isAlive() && c.getSwellDir() > 0)) {
+            double d = c.distanceTo(body);
+            if (d <= bestD) {
+                bestD = d;
+                best = c;
+            }
+        }
+        return best;
+    }
+
     /** After the task pressed its keys: a dodge, if something is coming that would hit. */
     void react() {
         var body = bot.body();
@@ -57,7 +72,9 @@ public final class ThreatSense {
             for (var c : body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, body.getBoundingBox().inflate(7),
                     c -> c.isAlive() && c.getSwellDir() > 0)) {
                 double d = c.distanceTo(body);
-                if (d < 4 && body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)) {
+                // (Out after this one with room to run: a blow and away, not the shield - it would
+                // blow, and the gunpowder with it.)
+                if (d < 4 && body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) && !bot.huntingCreeper(c)) {
                     body.lookAt(c.getEyePosition());
                     if (!body.isUsingItem()) body.gameMode.useItem(body, body.level(), body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
                     bot.danger.steer(0, 0);

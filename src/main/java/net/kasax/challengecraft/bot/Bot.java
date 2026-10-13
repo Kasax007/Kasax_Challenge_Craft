@@ -766,6 +766,8 @@ public final class Bot {
                     }
                     return;
                 }
+                // (Out after it, with room to run: the hunt and the threat sense deal with it.)
+                if (creeper && huntingCreeper((net.minecraft.world.entity.monster.Creeper) m)) continue;
                 // Hissing too close to get clear (its blast reaches some seven blocks): behind
                 // the shield, facing it, if there is one - that takes the blast.
                 if (creeper && m.distanceTo(body) < 3 && body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
@@ -1242,6 +1244,27 @@ public final class Bot {
         return null;
     }
 
+    /** How far the way {@link #openWayFrom} last found is open (blocks, less a little for the ways aside). */
+    public double openWayFree;
+
+    /** Room to run from a threat at {@code from}: at least {@code blocks} of open ground some way off it. */
+    public boolean roomToRun(net.minecraft.world.phys.Vec3 from, double blocks) {
+        openWayFrom(from, blocks + 2);
+        return openWayFree >= blocks;
+    }
+
+    /**
+     * Out after this creeper (its gunpowder, the kill) with the hearts for it and room to run:
+     * a hiss is answered with a blow and a few steps away (the threat sense), not with the shield
+     * (it would blow, the powder gone with it) or a long way off (in a self-play league one was
+     * hunted three times over that way, and the rocket never made).
+     */
+    public boolean huntingCreeper(net.minecraft.world.entity.monster.Creeper c) {
+        return BotTask.innermost(current()) instanceof net.kasax.challengecraft.bot.task.KillTask k
+                && k.after(net.minecraft.world.entity.EntityTypes.CREEPER) && !welcomeExplosion
+                && body.getHealth() >= 12 && roomToRun(c.position(), 5);
+    }
+
     /**
      * Which way to run from a threat at {@code from}: straight away from it, or up to ninety
      * degrees off that, whichever has the most open ground ahead (not into a wall or a corner).
@@ -1291,6 +1314,7 @@ public final class Bot {
                 best = dir.scale(length);
             }
         }
+        openWayFree = bestFree;
         return best;
     }
 
