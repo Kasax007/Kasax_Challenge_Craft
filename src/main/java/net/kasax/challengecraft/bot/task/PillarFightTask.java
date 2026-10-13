@@ -81,6 +81,8 @@ public final class PillarFightTask implements BotTask {
         if (ticks % 100 == 0) bot.say("on the pillar: " + target.getType().toShortString() + " at " + String.format("%.1f", KillTask.hitDistance(body, target))
                 + ", its health " + Math.round(target.getHealth()));
         if (base == null) {
+            // (Called for mid-jump, or thrown up by a blow: from where it lands.)
+            if (!body.onGround() && !body.isInWater()) return Result.RUNNING;
             base = body.blockPosition();
             bot.navigator().stop();
             bot.actions().reset();

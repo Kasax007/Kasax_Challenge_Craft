@@ -544,6 +544,9 @@ public final class ObtainPlanner {
 
     private Map<Item, Double> computeCosts(Bot bot) {
         BotKnowledge k = BotKnowledge.get(bot.server());
+        boolean furnace = countAny(bot.body(), Set.of(Items.FURNACE)) > 0 || BotWorld.nearest((ServerLevel) bot.body().level(),
+                bot.body().blockPosition(), StationTaskRange.RANGE, 8, st -> st.is(Blocks.FURNACE), false, bot.unreachableStations) != null;
+        furnaceShare = furnace ? 0 : 12;
         Map<Item, Double> cost = new IdentityHashMap<>();
         Map<Item, Double> search = new IdentityHashMap<>();
         Map<Item, BlockPos> at = new IdentityHashMap<>();
@@ -840,23 +843,38 @@ public final class ObtainPlanner {
         return new Leaf(cost.get(best), searches.getOrDefault(best, 0.0), anchors.get(best));
     }
 
-    private static double routeCost(BotKnowledge.Route r, Map<Item, Double> cost) {
+    private double routeCost(BotKnowledge.Route r, Map<Item, Double> cost) {
         if (r instanceof BotKnowledge.CraftRoute c) {
             double sum = 1;
             for (Ingredient i : c.ingredients()) sum += cheapest(i, cost);
             return sum / c.yield();
         }
         BotKnowledge.SmeltRoute s = (BotKnowledge.SmeltRoute) r;
-        return cheapest(s.input(), cost) + 6;
+        return cheapest(s.input(), cost) + SMELT_SECONDS + furnaceShare;
     }
+
+    /**
+     * No furnace in the pack and none at hand: one to be made (eight stone dug, a table) before
+     * anything is smelted - a share of it on every item smelted, as for a batch of four. Left
+     * out, "food for the start, ~46 s" was a pickaxe, a staircase down, a furnace and a hunt,
+     * and given up after two minutes.
+     */
+    private double furnaceShare;
+
+    /**
+     * A furnace's time for one item: ten seconds. (Six were counted, and three bricks for a flower
+     * pot were "27 s" in a self-play game - half a minute of smelting alone. Big batches go faster
+     * over two or three furnaces, but the common ones are small: three ingots, a brick or two.)
+     */
+    private static final double SMELT_SECONDS = 10;
 
     /**
      * {@link #routeCost} with the searching parts of the ingredients added up, and the place of
      * the dearest ingredient that has one (the iron for the bucket: where the iron is).
      */
-    private static Leaf routeLeaf(BotKnowledge.Route r, Map<Item, Double> cost, Map<Item, Double> search, Map<Item, BlockPos> at) {
+    private Leaf routeLeaf(BotKnowledge.Route r, Map<Item, Double> cost, Map<Item, Double> search, Map<Item, BlockPos> at) {
         List<Ingredient> ings = r instanceof BotKnowledge.CraftRoute c ? c.ingredients() : List.of(((BotKnowledge.SmeltRoute) r).input());
-        double sum = r instanceof BotKnowledge.CraftRoute ? 1 : 6, luck = 0, dearest = -1;
+        double sum = r instanceof BotKnowledge.CraftRoute ? 1 : SMELT_SECONDS + furnaceShare, luck = 0, dearest = -1;
         BlockPos where = null;
         for (Ingredient i : ings) {
             Item pick = null;

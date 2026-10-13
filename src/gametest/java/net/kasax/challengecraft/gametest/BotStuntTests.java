@@ -1456,6 +1456,7 @@ public class BotStuntTests {
             if (a.bot().body() != body || !body.isAlive()) h.fail("night_shelter_bare: killed");
             if (h.getTick() < 1300) return false;
             BotArena.LOG.info("[BOTTEST] night_shelter_bare alive with {} health, {}", body.getHealth(), a.bot().current() == null ? "-" : a.bot().current().describe());
+            BotArena.day(h); // (the clock back for the batches after this one)
             return true;
         });
     }

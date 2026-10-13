@@ -135,7 +135,9 @@ public class BotSkillTests {
                         () -> new net.kasax.challengecraft.bot.task.MineTask("the bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of(bed), 1).knownOnly())),
                 1200, () -> {
                     if (body.isSleeping()) slept[0] = true;
-                    return slept[0] && ObtainPlanner.countAny(body, Set.of(bed)) > 0 && a.bot().current() == null;
+                    boolean done = slept[0] && ObtainPlanner.countAny(body, Set.of(bed)) > 0 && a.bot().current() == null;
+                    if (done) BotArena.day(h); // (the clock back for the batches after this one)
+                    return done;
                 });
     }
 
@@ -149,6 +151,9 @@ public class BotSkillTests {
         BotArena a = BotArena.flat(h, "sleep_waits_for_others");
         var level = h.getLevel();
         var server = level.getServer();
+        // (Only these two in the world: a bot left over from a test that failed before this one
+        // counts as a player awake, and the night would never pass.)
+        for (var left : java.util.List.copyOf(net.kasax.challengecraft.bot.BotManager.all())) net.kasax.challengecraft.bot.BotManager.remove(server, left);
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "time set 14000");
         // (Every one of them asleep is needed: the usual "one in bed" rule would let it through.)
         level.getGameRules().set(net.minecraft.world.level.gamerules.GameRules.PLAYERS_SLEEPING_PERCENTAGE, 100, server);
@@ -166,7 +171,10 @@ public class BotSkillTests {
                 net.kasax.challengecraft.bot.task.SleepTask::new)));
         a.run(new net.kasax.challengecraft.bot.task.WaitTask(800), 900, () -> {
             boolean ok = other.body().isSleeping() && net.kasax.challengecraft.bot.lockout.LockoutBrain.nightWouldPass(a.bot());
-            if (ok) net.kasax.challengecraft.bot.BotManager.remove(server, other);
+            if (ok) {
+                net.kasax.challengecraft.bot.BotManager.remove(server, other);
+                BotArena.day(h); // (the clock back for the batches after this one)
+            }
             return ok;
         });
     }
@@ -512,6 +520,7 @@ public class BotSkillTests {
     @GameTest(structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 8)
     public void portalAfterDeath(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "portal_after_death");
+        BotArena.day(h); // (see respawnAfterDeath)
         var level = h.getLevel();
         a.fill(24, FEET, 20, 27, FEET + 4, 20, Blocks.OBSIDIAN);
         a.fill(25, FEET + 1, 20, 26, FEET + 3, 20, Blocks.AIR);
@@ -626,6 +635,9 @@ public class BotSkillTests {
     @GameTest(structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 8)
     public void respawnAfterDeath(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "respawn");
+        // (By day: the clock is the whole server's, and a night test before this one left it at
+        // night - a bot dead at night waits for the dawn, and this one waited past its time.)
+        BotArena.day(h);
         a.spawn(20, FEET, 20);
         var bot = a.bot();
         boolean[] died = {false};

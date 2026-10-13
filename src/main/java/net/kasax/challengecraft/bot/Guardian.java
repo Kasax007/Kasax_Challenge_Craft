@@ -72,6 +72,22 @@ public final class Guardian {
         return hand.getItem() instanceof ProjectileWeaponItem || hand.is(Items.TRIDENT);
     }
 
+    /** A shooter whose arrows (or bolts, or trident) a raised shield stops: a skeleton, a pillager - not a witch, a ghast, a blaze. */
+    static boolean bowman(Threat t) {
+        return t.ranged && t.mob instanceof RangedAttackMob && t.mob instanceof Enemy && !(t.mob instanceof Witch);
+    }
+
+    /** Walls round the feet and the head, and a lid: nothing that walks gets at him. */
+    static boolean enclosed(BotPlayer body) {
+        var level = body.level();
+        var feet = body.blockPosition();
+        if (!HideTask.shut(level, feet.above(2))) return false;
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            if (!HideTask.shut(level, feet.relative(d)) || !HideTask.shut(level, feet.above().relative(d))) return false;
+        }
+        return true;
+    }
+
     /** How far it hurts from: a ghast from far off, the rest from bow range. */
     public static double shootingRange(Entity e) {
         return e instanceof Ghast ? 64 : e instanceof Blaze ? 32 : 24;
@@ -109,6 +125,10 @@ public final class Guardian {
         Difficulty diff = level.getDifficulty();
         double armour = body.getArmorValue(), tough = body.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
         List<Threat> threats = new ArrayList<>();
+        // Shut in - a box round him, a hole with a lid: what only strikes close cannot get at him.
+        // (Two zombies at a sealed box were "at him" all the same, and walled him in again and
+        // again: fourteen times in a self-play game, five minutes of it.)
+        boolean shutIn = enclosed(body);
         // (Not only monsters: a polar bear by its cub, a wolf, a golem, bees - after him, they are
         // as deadly; a polar bear took eighteen hearts in two blows in a self-play game, unseen.)
         for (Mob m : level.getEntitiesOfClass(Mob.class, body.getBoundingBox().inflate(64, 24, 64),
@@ -150,7 +170,7 @@ public final class Guardian {
                 continue;
             }
             // A creeper: the reflexes see to those (away, or behind the shield); a blast is no rate.
-            if (m instanceof Creeper) continue;
+            if (m instanceof Creeper || shutIn) continue;
             if (!after && !(d < 6 && sees && !(m instanceof Enderman))) continue;
             if (d > 24) continue;
             double dmg = m.getAttributes().hasAttribute(Attributes.ATTACK_DAMAGE) ? m.getAttributeValue(Attributes.ATTACK_DAMAGE) : 2;
@@ -160,6 +180,22 @@ public final class Guardian {
             double reach = 1.9 + m.getBbWidth() / 2;
             int from = (int) Math.ceil(Math.max(0, d - reach) / chaseSpeed(m)) + (after ? 0 : 20);
             threats.add(new Threat(m, hit, every, from, false));
+        }
+        // A shield on the arm and nothing but bowmen after him, all to one side: the threat sense
+        // keeps it up towards them on his way, and most of the arrows end in it - as good as
+        // raised. (In a self-play game a lone skeleton twelve blocks off, a ledge higher, "was not
+        // to be fought": walled in, the box would not shut, five arrows through the gap - and the
+        // shield on the arm, down.)
+        if (!body.isBlocking() && !threats.isEmpty() && threats.stream().allMatch(Guardian::bowman) && bot.threats.shieldWalkOpen()) {
+            Mob nearest = null;
+            for (Threat t : threats) if (nearest == null || t.mob.distanceToSqr(body) < nearest.distanceToSqr(body)) nearest = t.mob;
+            var to = nearest.position().subtract(body.position()).multiply(1, 0, 1);
+            boolean oneSide = to.lengthSqr() >= 16;
+            for (Threat t : threats) {
+                var d = t.mob.position().subtract(body.position()).multiply(1, 0, 1);
+                oneSide &= d.lengthSqr() > 0.01 && d.normalize().dot(to.normalize()) > 0.2;
+            }
+            if (oneSide) threats.replaceAll(t -> new Threat(t.mob, t.perHit * 0.3, t.every, t.from, true));
         }
         double hp = body.getHealth() + body.getAbsorptionAmount();
         double[] at = new double[HORIZON + 1];
@@ -323,7 +359,7 @@ public final class Guardian {
             how = night ? "dug in for the night" : "dug in";
             digs++;
         }
-        if (choice == null) return none(r, "no cover here (blocks " + net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) + ", ground not to dig)");
+        if (choice == null) return none(r, "no cover here (box: " + HideTask.boxProblem(bot, true) + "; ground not to dig)");
         lastActAt = body.tickCount;
         if (body.tickCount - saidAt > 40) {
             saidAt = body.tickCount;
@@ -356,7 +392,7 @@ public final class Guardian {
     private int digTicks() {
         if (!HideTask.possible(bot)) return Integer.MAX_VALUE;
         BotPlayer body = bot.body();
-        var feet = body.blockPosition();
+        var feet = HideTask.standing(bot);
         double ticks = 10;
         for (int i = 1; i <= 3; i++) ticks += bot.tools().breakTicks(body.level().getBlockState(feet.below(i))) + 4;
         return (int) Math.ceil(ticks);

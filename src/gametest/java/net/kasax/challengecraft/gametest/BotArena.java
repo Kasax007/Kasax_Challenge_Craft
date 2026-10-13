@@ -69,6 +69,15 @@ public final class BotArena {
         return a;
     }
 
+    /**
+     * The clock to morning (one o'clock in the day): it is the whole server's, so a test that
+     * wants night sets it back when done, and one that must not run at night sets it first.
+     */
+    public static void day(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "time set 1000");
+    }
+
     public GameTestHelper helper() {
         return helper;
     }

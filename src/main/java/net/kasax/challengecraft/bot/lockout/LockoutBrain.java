@@ -636,7 +636,18 @@ public final class LockoutBrain implements BotBrain {
 
     /** Dusk: from here on, ready for the night or making ready (monsters come out from about 13000). */
     static final long DUSK = 10000, SHELTER_FROM = 12600, DAWN = 23200;
-    private long bedTriedDay = -1, foodTriedDay = -1, shelterRetryAt;
+    private long bedTriedDay = -1, foodTriedDay = -1, weaponTriedDay = -1, shelterRetryAt;
+
+    /** What it fights with at night, when it has none: the cheapest sword (a wooden one will do). */
+    private static final Set<net.minecraft.world.item.Item> NIGHT_WEAPONS = Set.of(net.minecraft.world.item.Items.WOODEN_SWORD,
+            net.minecraft.world.item.Items.STONE_SWORD, net.minecraft.world.item.Items.IRON_SWORD);
+
+    private static boolean armed(Bot bot) {
+        for (var st : bot.body().getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
+        }
+        return false;
+    }
 
     private static long clock(Bot bot) {
         return bot.body().level().getOverworldClockTime() % 24000;
@@ -665,6 +676,14 @@ public final class LockoutBrain implements BotBrain {
         return armed && fedForTheNight(body, food) && armour && body.getHealth() >= 12;
     }
 
+    /** {@link #nightReady} but for the hearts: geared, armed and fed, only hurt. */
+    private static boolean nightReadyBarHearts(Bot bot) {
+        var body = bot.body();
+        boolean shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)
+                || ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.SHIELD)) > 0;
+        return body.getArmorValue() >= 6 || shield && body.getArmorValue() >= 2;
+    }
+
     /**
      * Food enough for a night out: some in the pack, or a stomach full enough to last it (a full
      * bar is minutes of running and fighting, the hearts coming back all the while). Counted by
@@ -672,7 +691,10 @@ public final class LockoutBrain implements BotBrain {
      * nights hidden in the second self-play league were that.
      */
     private static boolean fedForTheNight(net.minecraft.world.entity.player.Player body, int foodPoints) {
-        return foodPoints >= 8 || body.getFoodData().getFoodLevel() >= 16;
+        // (And what is in the stomach and the pack together: "food 4, hunger 15" - nineteen
+        // shanks - dug a self-play game in till the morning.)
+        int hunger = body.getFoodData().getFoodLevel();
+        return foodPoints >= 8 || hunger >= 16 || hunger + foodPoints >= 18;
     }
 
     private static net.minecraft.world.item.Item bedInPack(Bot bot) {
@@ -693,6 +715,20 @@ public final class LockoutBrain implements BotBrain {
         long now = level.getGameTime(), c = clock(bot);
         long day = level.getOverworldClockTime() / 24000;
         net.minecraft.world.item.Item bed = bedInPack(bot);
+        // A weapon first (gone with a death, or the stone for one never found): made before the
+        // dark if it comes quickly - a wooden one will do - rather than the night in a hole for
+        // the want of it (a self-play game: "no weapon", dug in till morning, five minutes).
+        if (c < SHELTER_FROM + 600 && weaponTriedDay != day && !armed(bot)) {
+            weaponTriedDay = day;
+            double est = planner.estimate(bot, NIGHT_WEAPONS, 1);
+            if (est <= 90) {
+                bot.say("dusk and nothing to fight with: a sword first (~" + Math.round(est) + " s)");
+                nightPrep = new net.kasax.challengecraft.bot.task.ObtainTask(NIGHT_WEAPONS, 1, planner);
+                start(bot, nightPrep, 2400);
+                if (!startRefused) return true;
+                startRefused = false;
+            }
+        }
         // Before dusk proper: a bed, if it comes cheap (the sheep are in sight, wool in the pack).
         if (bed == null && c < SHELTER_FROM - 300 && bedTriedDay != day) {
             bedTriedDay = day;
@@ -751,6 +787,20 @@ public final class LockoutBrain implements BotBrain {
             return false;
         }
         shelterRetryAt = now + 400;
+        // Armed and fed, only the hearts short: into the ground (or walled in) till they are back -
+        // a minute, not the night. (At nightfall with twelve hearts a self-play game dug in till
+        // the morning, five minutes of a twenty-minute game.)
+        int foodPoints = net.kasax.challengecraft.bot.task.EatTask.foodPoints(bot.body());
+        if (armed(bot) && fedForTheNight(bot.body(), foodPoints) && (!nightArmour(bot) || nightReadyBarHearts(bot))) {
+            BotTask heal = net.kasax.challengecraft.bot.task.HideTask.possible(bot) ? new net.kasax.challengecraft.bot.task.HideTask()
+                    : net.kasax.challengecraft.bot.task.HideTask.boxPossible(bot) ? net.kasax.challengecraft.bot.task.HideTask.boxed() : null;
+            if (heal != null) {
+                bot.say("night, " + nightGaps(bot) + ": " + heal.describe() + " till the hearts are back");
+                start(bot, heal, 1800);
+                if (!startRefused) return true;
+                startRefused = false;
+            }
+        }
         // (No digging in here - sand, bare stone and no pickaxe - but blocks in the pack: walled in
         // where it stands, at once, rather than a walk in the dark to softer ground.)
         if (!net.kasax.challengecraft.bot.task.HideTask.possible(bot) && !net.kasax.challengecraft.bot.task.HideTask.shelterPossible(bot)
@@ -1261,6 +1311,15 @@ public final class LockoutBrain implements BotBrain {
                 continue;
             }
             bot.say("opening: " + ObtainPlanner.names(want));
+            // The stone for all the stone tools still to come (and a furnace) dug in the one go,
+            // while the rock is right there: four trips down a staircase for three, two, three
+            // and one cobblestone were the opening's slowest minute.
+            int stone = 0;
+            for (int i = openingStep; i < OPENING.size(); i++) {
+                if (ObtainPlanner.countAny(bot.body(), OPENING.get(i)) == 0) stone += i == 0 || i == 2 ? 3 : i == 1 ? 2 : 1;
+            }
+            if (ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.FURNACE)) == 0) stone += 8;
+            planner.boardDemand.merge(net.minecraft.world.item.Items.COBBLESTONE, stone, Math::max);
             start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(want, 1, planner), 2400);
             return true;
         }

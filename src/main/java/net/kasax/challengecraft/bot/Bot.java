@@ -199,6 +199,7 @@ public final class Bot {
         tasks.clear();
         navigator.stop();
         navigator.forgetSuspended();
+        lowerShield();
         tasks.push(task);
         say("-> " + task.describe());
     }
@@ -210,6 +211,12 @@ public final class Bot {
         navigator.forgetSuspended();
         actions.reset();
         body.stopInputs();
+        lowerShield();
+    }
+
+    /** A shield raised for what was going on comes down with it (whoever still wants it raises it again). */
+    private void lowerShield() {
+        if (body.isUsingItem() && body.getUseItem().is(net.minecraft.world.item.Items.SHIELD)) body.releaseUsingItem();
     }
 
     /**
@@ -225,6 +232,7 @@ public final class Bot {
         navigator.stop();
         actions.reset();
         body.stopInputs();
+        lowerShield();
         navigator.resumeFor(tasks.peek());
     }
 

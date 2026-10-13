@@ -97,6 +97,7 @@ public final class KillTask implements BotTask {
         // (Crouching only while fighting by an edge: set again below each tick it is.)
         bot.body().sneak = false;
         roundToShooter = false;
+        chargeBehindShield = false;
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (collectTicks > 0) {
@@ -282,6 +283,15 @@ public final class KillTask implements BotTask {
                 return Result.RUNNING;
             }
             body.strafe = 0f;
+            // A bow drawn on it near full (a crossbow loaded): the shield up - or kept up - till
+            // the arrow is in it, the blow just after; the next one takes a second to draw. (Lowered
+            // for the blow just then, the arrow came in the quarter second the shield takes to come
+            // up again: six hearts a time at arm's length, the shield on the arm.)
+            if (shield && (aboutToShoot(target) || net.kasax.challengecraft.bot.ThreatSense.incoming(body, target))) {
+                body.lookAt(target.getEyePosition());
+                if (!body.isUsingItem()) body.gameMode.useItem(body, level, body.getOffhandItem(), InteractionHand.OFF_HAND);
+                return Result.RUNNING;
+            }
             // Ready: shield down, then the blow; a jump first for a critical hit (half again as
             // hard) when there is time for one (not at a creeper: it would close in).
             if (body.isUsingItem()) {
@@ -335,8 +345,10 @@ public final class KillTask implements BotTask {
         // The way round to a shooter (no straight run over this ground - a cave, a slope): the
         // shield up towards it all the same, turned to it by the threat sense while the path is
         // walked (seed 77, hard: two arrows from four and three blocks in a cave, the shield down
-        // on the path).
-        roundToShooter = shooter && shieldOn && !charge && dist > 4 && body.hasLineOfSight(target);
+        // on the path). Up to the edge of reach: in a self-play league three arrows came from
+        // between three and four blocks, the shield down on the last steps.
+        roundToShooter = shooter && shieldOn && !charge && hit > HIT && body.hasLineOfSight(target);
+        chargeBehindShield = charge && shieldOn;
         // (The shield down, unless it is held up running at a shooter: it needs a quarter second
         // up before it blocks, so it is not lowered and raised again each tick.)
         if (body.isUsingItem() && body.getUseItem().is(Items.SHIELD) && !(charge && shieldOn) && !roundToShooter) body.releaseUsingItem();
@@ -409,6 +421,22 @@ public final class KillTask implements BotTask {
 
     public boolean shieldWalkWanted() {
         return roundToShooter;
+    }
+
+    /** A bow drawn on it near full, a crossbow loaded, a trident raised: the shot is about to come (the one loosed already: see ThreatSense.incoming). */
+    static boolean aboutToShoot(LivingEntity t) {
+        if (!(t instanceof net.minecraft.world.entity.monster.RangedAttackMob) || t instanceof net.minecraft.world.entity.monster.Witch) return false;
+        var hand = t.getMainHandItem();
+        if (hand.getItem() instanceof net.minecraft.world.item.CrossbowItem) return net.minecraft.world.item.CrossbowItem.isCharged(hand);
+        return t.isUsingItem() && t.getTicksUsingItem() >= 10;
+    }
+
+    /** Running straight at a shooter behind the raised shield this tick. */
+    private boolean chargeBehindShield;
+
+    /** Whether the shield is up towards the shooter it is after (on the way round, or running at it). */
+    public boolean shieldTowardsShooter() {
+        return roundToShooter || chargeBehindShield;
     }
 
     /** A bow or a crossbow and arrows: shoot it instead (once per mob). Whether it set about that. */

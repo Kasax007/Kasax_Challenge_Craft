@@ -35,9 +35,28 @@ public final class HideTask implements BotTask {
 
     /** Whether hiding right here works: solid ground two deep, nothing liquid, something to dig with. */
     public static boolean possible(Bot bot) {
+        BlockPos feet = standing(bot);
+        return feet != null && possibleAt(bot, feet);
+    }
+
+    /**
+     * Where its feet are on the ground: where it stands, or - in the air for a moment, a jump in a
+     * fight, thrown up by a blow - where it lands, a block or so below. Null in the water, or
+     * falling further. (Asked mid-jump, every way out had been "no cover here" with a hundred
+     * blocks in the pack - a dozen times in a self-play league.)
+     */
+    public static BlockPos standing(Bot bot) {
         BotPlayer body = bot.body();
-        if (!body.onGround() || body.isInWater()) return false;
-        return possibleAt(bot, body.blockPosition());
+        if (body.isInWater()) return null;
+        BlockPos feet = body.blockPosition();
+        if (body.onGround()) return feet;
+        if (body.fallDistance > 2 || body.isPassenger()) return null;
+        var level = body.level();
+        for (int down = 1; down <= 2; down++) {
+            BlockPos under = feet.below(down);
+            if (!level.getBlockState(under).getCollisionShape(level, under).isEmpty()) return under.above();
+        }
+        return null;
     }
 
     /** Whether hiding with the feet at {@code feet} would work (see {@link #possible}). */
@@ -88,8 +107,9 @@ public final class HideTask implements BotTask {
     /** Why no shelter can be dug here (null: it can). */
     public static String shelterProblem(Bot bot) {
         BotPlayer body = bot.body();
-        if (!body.onGround() || body.isInWater()) return "not on dry ground";
-        return shelterProblemAt((ServerLevel) body.level(), body.blockPosition());
+        BlockPos feet = standing(bot);
+        if (feet == null) return "not on dry ground";
+        return shelterProblemAt((ServerLevel) body.level(), feet);
     }
 
     /**
@@ -176,49 +196,73 @@ public final class HideTask implements BotTask {
 
     /** The same; in an emergency ({@code all}) the stone kept back for a furnace counts too. */
     public static boolean boxPossible(Bot bot, boolean all) {
+        return boxProblem(bot, all) == null;
+    }
+
+    /** Why no box can go up here (null: it can) - for the log when no cover is to be had. */
+    public static String boxProblem(Bot bot, boolean all) {
         BotPlayer body = bot.body();
-        if (!body.onGround() || body.isInWater()) return false;
+        BlockPos feet = standing(bot);
+        if (feet == null) return body.isInWater() ? "in the water" : "not on the ground";
         ServerLevel level = (ServerLevel) body.level();
-        BlockPos feet = body.blockPosition();
-        if (hurtsHere(level, feet) || level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) return false;
+        if (hurtsHere(level, feet)) return "something that hurts here";
+        if (level.getBlockState(feet.below()).getCollisionShape(level, feet.below()).isEmpty()) return "no floor";
         int open = 0;
         for (BlockPos p : boxBlocks(feet)) {
-            if (level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) return false;
-            if (level.getBlockState(p).canBeReplaced()) open++;
+            if (level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) return "lava beside";
+            if (!shut(level, p)) open++;
         }
         // (And one on a wall for the lid to rest against, unless something is there already.)
-        if (level.getBlockState(feet.above(2)).canBeReplaced() && !held(level, feet.above(2))) open++;
-        return (all ? net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) : bot.actions().spendableBlocks()) >= open;
+        if (!shut(level, feet.above(2)) && !held(level, feet.above(2))) open++;
+        int blocks = all ? net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) : bot.actions().spendableBlocks();
+        return blocks >= open ? null : "blocks " + blocks + " of " + open;
     }
 
     /** Whether a pillar works here: room above the head for two more blocks, something to build with. */
     public static boolean pillarPossible(Bot bot) {
         BotPlayer body = bot.body();
-        if (!body.onGround() || body.isInWater() || !bot.actions().hasThrowaway()) return false;
+        BlockPos feet = standing(bot);
+        if (feet == null || !bot.actions().hasThrowaway()) return false;
         ServerLevel level = (ServerLevel) body.level();
-        BlockPos head = body.blockPosition().above();
+        BlockPos head = feet.above();
         for (int i = 1; i <= 4; i++) if (!level.getBlockState(head.above(i)).getCollisionShape(level, head.above(i)).isEmpty()) return false;
         return true;
     }
 
+    /** The shield raised here (towards a bowman shooting in through a gap): lowered again on the way out. */
+    private boolean shielding;
+
     @Override
     public Result tick(Bot bot) {
+        Result r = step(bot);
+        if (r != Result.RUNNING) lowerShield(bot.body());
+        return r;
+    }
+
+    private Result step(Bot bot) {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (!body.isAlive()) return Result.DONE;
         // (Out of time, but hurt with one still by the hole: a while longer - out at 11 hp into
         // the zombie that waited, it died on seed 44.)
-        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay || body.getHealth() >= 16 || !monsterBy(body))) return Result.DONE;
-        if (top == null) top = body.blockPosition();
+        if (++ticks > (untilDay ? 13000 : MAX_TICKS) && (ticks > 3 * MAX_TICKS || untilDay || body.getHealth() >= 16 && window == null || !monsterBy(body))) return Result.DONE;
+        // (Called for mid-jump, or thrown up by a blow: from where it lands.)
+        if (top == null) {
+            if (!body.onGround()) return Result.RUNNING;
+            top = body.blockPosition();
+        }
         if (up) return pillar(bot, body, level);
         body.stopInputs();
+        // Shut in, well and armed, and something that only strikes close waiting at the box: struck
+        // through a window at the feet (see windowFight).
+        if (box && windowFight(bot, body, level)) return Result.RUNNING;
         // (Blown open since - a ghast's fireball on the lid, a creeper by the box: closed again.)
         if (closed && placed + dug > 0) {
             boolean open = false;
             if (box) {
-                for (BlockPos p : boxBlocks(top)) open |= level.getBlockState(p).canBeReplaced();
+                for (BlockPos p : boxBlocks(top)) open |= !shut(level, p);
             } else if (dug >= 3) {
-                open = level.getBlockState(body.blockPosition().above(2)).canBeReplaced();
+                open = !shut(level, body.blockPosition().above(2));
             }
             if (open && reopened++ < 6) {
                 closed = false;
@@ -230,7 +274,15 @@ public final class HideTask implements BotTask {
         // seven times through the one side that would not go in, and not one blow came back). A
         // gap clear of it gets its block first; a blow throws it out of the gap. (Into the ground,
         // the digging goes first: a few blows of the shovel and it is out of their reach.)
-        if (box && !sealed(level) && (closed || !sideClear(level, body)) && defend(bot, body, level)) return Result.RUNNING;
+        boolean stuck = box && !sealed(level) && (closed || !sideClear(level, body)
+                || net.kasax.challengecraft.bot.BotActions.buildingBlocks(body) == 0);
+        if (stuck && defend(bot, body, level)) return Result.RUNNING;
+        // The same with a bowman shooting in through the gap from afar: the shield up towards it
+        // while no block can go in, as a player waits behind it (in a self-play game a skeleton
+        // twelve blocks off put five arrows through the side that would not go in - the shield on
+        // the arm, down). A side that keeps refusing to go in is tried again once a second.
+        if ((stuck || box && !closed && lidTries > 10 && ticks % 20 != 0) && shieldAgainstShooter(body, level)) return Result.RUNNING;
+        lowerShield(body);
         if (box) {
             if (!closed) return boxIn(bot, body, level);
         } else {
@@ -328,8 +380,15 @@ public final class HideTask implements BotTask {
         boolean open = false;
         BlockPos lid = top.above(2);
         for (BlockPos p : boxBlocks(top)) {
-            if (!level.getBlockState(p).canBeReplaced()) continue;
+            if (shut(level, p)) continue;
             open = true;
+            // A flower, a sapling, a torch where a side goes: no wall, and nothing goes in where it
+            // stands - broken first (a moment's work), as a player clears the spot.
+            var there = level.getBlockState(p);
+            if (!there.canBeReplaced() && there.getDestroySpeed(level, p) >= 0 && there.getDestroySpeed(level, p) < 1) {
+                bot.actions().breakTick(p);
+                return Result.RUNNING;
+            }
             // The lid over the head touches nothing (the walls end at the head): a block on top
             // of a wall first, for it to be set against - else every box stayed open at the top,
             // and a spider came over the wall.
@@ -370,13 +429,15 @@ public final class HideTask implements BotTask {
     private String gaps(Bot bot, ServerLevel level) {
         List<String> out = new java.util.ArrayList<>();
         for (BlockPos p : boxBlocks(top)) {
-            if (!level.getBlockState(p).canBeReplaced()) continue;
+            if (shut(level, p)) continue;
             String where = p.getY() > top.getY() + 1 ? "lid"
                     : net.minecraft.core.Direction.getApproximateNearest(p.getX() - top.getX(), 0, p.getZ() - top.getZ()).getName()
                     + (p.getY() == top.getY() ? " feet" : " head");
             var in = level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(p),
                     e -> e.isAlive() && e != bot.body());
+            var there = level.getBlockState(p);
             String why = !in.isEmpty() ? in.get(0).getType().toShortString() + " in it"
+                    : !there.canBeReplaced() ? net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(there.getBlock()).getPath() + " in it"
                     : net.kasax.challengecraft.bot.BotActions.buildingBlocks(bot.body()) == 0 ? "no blocks left"
                     : !held(level, p) ? "nothing to set it against" : "would not go";
             out.add(where + ": " + why);
@@ -396,8 +457,18 @@ public final class HideTask implements BotTask {
     /** Whether the box is shut: every side in, and the lid. */
     private boolean sealed(ServerLevel level) {
         if (top == null) return false;
-        for (BlockPos p : boxBlocks(top)) if (level.getBlockState(p).canBeReplaced()) return false;
+        for (BlockPos p : boxBlocks(top)) if (!shut(level, p)) return false;
         return true;
+    }
+
+    /**
+     * Whether a side of the box (or the lid) at {@code p} is in: something solid there, at least
+     * half a block high. A flower, a sapling, a torch is no wall - a spider walks in through it,
+     * an arrow flies through - though nothing can be put where it stands until it is broken.
+     */
+    public static boolean shut(net.minecraft.world.level.BlockGetter level, BlockPos p) {
+        var shape = level.getBlockState(p).getCollisionShape(level, p);
+        return !shape.isEmpty() && shape.max(net.minecraft.core.Direction.Axis.Y) >= 0.5;
     }
 
     /**
@@ -408,16 +479,145 @@ public final class HideTask implements BotTask {
     private boolean sideClear(ServerLevel level, BotPlayer body) {
         if (top == null) return true;
         for (BlockPos p : boxBlocks(top)) {
-            if (!level.getBlockState(p).canBeReplaced()) continue;
+            if (shut(level, p)) continue;
             // (The lid: once a wall at the head is in, a block on it to rest the lid on - see boxIn.)
             boolean against = held(level, p);
             if (!against && p.equals(top.above(2))) {
-                for (Direction d : Direction.Plane.HORIZONTAL) against |= !level.getBlockState(top.above().relative(d)).canBeReplaced();
+                for (Direction d : Direction.Plane.HORIZONTAL) against |= shut(level, top.above().relative(d));
             }
             if (against && level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new net.minecraft.world.phys.AABB(p),
                     e -> e.isAlive() && e != body).isEmpty()) return true;
         }
         return false;
+    }
+
+    /** The window at the feet of the box, opened to strike through (see windowFight); null while there is none. */
+    private BlockPos window;
+    private int windowIdle;
+
+    private static boolean armed(BotPlayer body) {
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
+        }
+        return false;
+    }
+
+    /** One that only strikes close and is out for it: a zombie, a spider - not a bowman, not a creeper (a blow, and it may blow the box open). */
+    private static boolean closeStriker(net.minecraft.world.entity.Mob m, BotPlayer body) {
+        return m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && !net.kasax.challengecraft.bot.Guardian.shooter(m)
+                && !(m instanceof net.minecraft.world.entity.monster.Creeper) && !(m instanceof net.minecraft.world.entity.monster.Enderman)
+                && (m.getTarget() == body || body.getLastHurtByMob() == m);
+    }
+
+    /**
+     * The side to open towards {@code m}: the one it is at, else the other one it is towards (it
+     * stands at a corner) - where there is room outside for it to come to; null when neither has.
+     */
+    private Direction windowSide(ServerLevel level, net.minecraft.world.entity.Entity m) {
+        double dx = m.getX() - (top.getX() + 0.5), dz = m.getZ() - (top.getZ() + 0.5);
+        Direction ew = dx > 0 ? Direction.EAST : Direction.WEST, ns = dz > 0 ? Direction.SOUTH : Direction.NORTH;
+        for (Direction d : Math.abs(dx) > Math.abs(dz) ? new Direction[]{ew, ns} : new Direction[]{ns, ew}) {
+            BlockPos outside = top.relative(d, 2);
+            if (!shut(level, outside) && !shut(level, outside.above())) return d;
+        }
+        return null;
+    }
+
+    /**
+     * Shut in, well and armed, with something that only strikes close waiting at the box (two
+     * zombies at a box in a tunnel kept it walled in fourteen times over in a self-play game,
+     * five minutes): a window at the feet towards the nearest, and it is struck through that,
+     * crouched - as players do. It cannot strike back: its eyes are a head higher than the hole
+     * (it does not see in, and a mob strikes only what it sees), it cannot get into a hole a block
+     * high, and its reach ends a step short. Shut again once nothing has shown in it a while, or
+     * the one waiting stands at another side (a window there next). Whether the window is in use.
+     */
+    private boolean windowFight(Bot bot, BotPlayer body, ServerLevel level) {
+        if (top == null || !body.onGround() || !body.blockPosition().equals(top)) {
+            // (Out of the box - a blow, a dodge: the window is left as it is, the box sees to the gap.)
+            window = null;
+            return false;
+        }
+        net.minecraft.world.entity.Mob near = null;
+        double best = Double.MAX_VALUE;
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(5, 2, 5), m -> closeStriker(m, body))) {
+            double d = m.distanceToSqr(body);
+            if (d < best) {
+                best = d;
+                near = m;
+            }
+        }
+        boolean fit = armed(body) && body.getHealth() >= 12;
+        if (window == null) {
+            if (near == null || !fit || !sealed(level)) return false;
+            Direction side = windowSide(level, near);
+            if (side == null) return false;
+            BlockPos w = top.relative(side);
+            var st = level.getBlockState(w);
+            // (Not through bedrock, nor a long dig; nothing liquid beyond that would run in.)
+            if (st.getDestroySpeed(level, w) < 0 || bot.tools().breakTicks(st) > 40) return false;
+            if (!level.getFluidState(w.relative(side)).isEmpty() || !level.getFluidState(w.above()).isEmpty()) return false;
+            window = w;
+            windowIdle = 0;
+            bot.say("shut in, a " + near.getType().toShortString() + " waiting outside: a window at the feet to strike through");
+        }
+        // Crouched: the eyes low enough to see out through a hole at the feet.
+        body.sneak = true;
+        if (shut(level, window)) {
+            if (!fit || near == null) {
+                window = null;
+                return false;
+            }
+            bot.actions().breakTick(window);
+            return true;
+        }
+        // Open: whatever shows in it within reach, struck at full strength.
+        net.minecraft.world.entity.Mob target = null;
+        net.minecraft.world.phys.Vec3 aim = null;
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(4, 2, 4), m -> closeStriker(m, body))) {
+            var p = seenThrough(body, level, m);
+            if (p != null) {
+                target = m;
+                aim = p;
+                break;
+            }
+        }
+        if (target != null && fit) {
+            windowIdle = 0;
+            KillTask.equipWeapon(bot);
+            body.lookAt(aim);
+            if (body.getAttackStrengthScale(0.5f) >= 1f) {
+                body.attack(target);
+                body.swing(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+            }
+            return true;
+        }
+        // Nothing in it: a while (a blow throws them back a step or two, they come again), then
+        // shut - at once when no longer fit or nothing waits; soon when the one waiting stands at
+        // another side.
+        Direction now = near == null ? null : windowSide(level, near);
+        boolean elsewhere = now != null && !top.relative(now).equals(window);
+        if (++windowIdle > 80 || !fit || near == null || elsewhere && windowIdle > 20) {
+            if (shut(level, window) || bot.actions().placeSturdy(window) || windowIdle > 200) window = null;
+        }
+        return true;
+    }
+
+    /** A point of {@code m} within reach that the eyes see through the window (low on its body: the hole is at the feet), or null. */
+    private static net.minecraft.world.phys.Vec3 seenThrough(BotPlayer body, ServerLevel level, net.minecraft.world.entity.Mob m) {
+        var eye = body.getEyePosition();
+        var b = m.getBoundingBox();
+        for (double up : new double[]{0.15, 0.4, 0.7}) {
+            double y = b.minY + up;
+            if (y > b.maxY) break;
+            var p = new net.minecraft.world.phys.Vec3(net.minecraft.util.Mth.clamp(eye.x, b.minX + 0.05, b.maxX - 0.05), y,
+                    net.minecraft.util.Mth.clamp(eye.z, b.minZ + 0.05, b.maxZ - 0.05));
+            if (eye.distanceTo(p) > 3.0) continue;
+            var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, p, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                    net.minecraft.world.level.ClipContext.Fluid.NONE, body));
+            if (hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS) return p;
+        }
+        return null;
     }
 
     /**
@@ -436,7 +636,7 @@ public final class HideTask implements BotTask {
             boolean inTheWay = false;
             if (box && top != null) {
                 for (BlockPos p : boxBlocks(top)) {
-                    if (level.getBlockState(p).canBeReplaced() && m.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(p))) inTheWay = true;
+                    if (!shut(level, p) && m.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(p))) inTheWay = true;
                 }
             }
             if (!after && !(inTheWay && !(m instanceof net.minecraft.world.entity.monster.Enderman))) continue;
@@ -451,10 +651,57 @@ public final class HideTask implements BotTask {
         KillTask.equipWeapon(bot);
         body.lookAt(near.getEyePosition());
         if (body.getAttackStrengthScale(0.5f) >= 1f) {
+            // (The shield down first: no blow from behind it.)
+            if (body.isUsingItem()) {
+                body.releaseUsingItem();
+                shielding = false;
+                return true;
+            }
             body.attack(near);
             body.swing(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+        } else if (body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)) {
+            // Between blows the shield up towards it: its blows end in it, as a player trades blows.
+            raiseShield(body, level);
         }
         return true;
+    }
+
+    /**
+     * Something shooting at it (a bowman, a blaze, a ghast) within its range and in sight, while
+     * the box stands open: the shield up towards the nearest. Whether there was one (and a shield
+     * on the arm). (Not a witch: her potions go round a shield.)
+     */
+    private boolean shieldAgainstShooter(BotPlayer body, ServerLevel level) {
+        if (!body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)) return false;
+        net.minecraft.world.entity.Mob shooter = null;
+        double best = Double.MAX_VALUE;
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(64, 24, 64),
+                m -> m.isAlive() && m.getTarget() == body && net.kasax.challengecraft.bot.Guardian.shooter(m)
+                        && !(m instanceof net.minecraft.world.entity.monster.Witch))) {
+            double d = m.distanceTo(body);
+            if (d < best && d <= net.kasax.challengecraft.bot.Guardian.shootingRange(m) && body.hasLineOfSight(m)) {
+                best = d;
+                shooter = m;
+            }
+        }
+        if (shooter == null) return false;
+        body.lookAt(shooter.getEyePosition());
+        raiseShield(body, level);
+        return true;
+    }
+
+    private void raiseShield(BotPlayer body, ServerLevel level) {
+        if (!body.isUsingItem() || !body.getUseItem().is(net.minecraft.world.item.Items.SHIELD)) {
+            if (body.isUsingItem()) body.releaseUsingItem();
+            body.gameMode.useItem(body, level, body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
+        }
+        shielding = true;
+    }
+
+    private void lowerShield(BotPlayer body) {
+        if (!shielding) return;
+        shielding = false;
+        if (body.isUsingItem() && body.getUseItem().is(net.minecraft.world.item.Items.SHIELD)) body.releaseUsingItem();
     }
 
     private Result pillar(Bot bot, BotPlayer body, ServerLevel level) {

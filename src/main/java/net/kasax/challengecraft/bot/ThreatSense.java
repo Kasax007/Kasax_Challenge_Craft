@@ -187,6 +187,19 @@ public final class ThreatSense {
     }
 
     /**
+     * Whether the shield would go up towards a bowman now (see {@link #shieldWalk}): one on the
+     * arm, no task that wants the hands (a fight with something else), nothing striking close.
+     */
+    public boolean shieldWalkOpen() {
+        var body = bot.body();
+        if (!shieldOn() || bot.current() instanceof net.kasax.challengecraft.bot.task.GetShotTask) return false;
+        if (BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask k && !k.shieldTowardsShooter()) return false;
+        return body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(3),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
+                        && !(m instanceof net.minecraft.world.entity.monster.RangedAttackMob)).isEmpty();
+    }
+
+    /**
      * A shooter (skeleton, stray, pillager) after Bob in sight, and a shield on the arm: the shield
      * stays up towards it while Bob goes on his way - a bot loses only the sprint with the shield
      * raised, and every arrow ends in it. Not while something strikes close: then the sword is wanted.
@@ -206,8 +219,10 @@ public final class ThreatSense {
                 shooter = m;
             }
         }
-        // (One within four blocks is a fight, not a shield walk: at arm's length it shoots point-blank.)
-        if (shooter == null || best < 16) return false;
+        // (One within four blocks is a fight, not a shield walk: at arm's length it shoots point-blank.
+        // Unless the fight is on the way round to it, out of reach still: the shield up meanwhile.)
+        boolean round = BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.KillTask kt && kt.shieldWalkWanted();
+        if (shooter == null || best < 16 && !round) return false;
         // Something close enough to strike: a fight, not a shield walk (the reflexes start it).
         if (!body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(3),
                 m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
@@ -255,6 +270,18 @@ public final class ThreatSense {
             free = d;
         }
         return free;
+    }
+
+    /**
+     * An arrow (or bolt, or fireball) of {@code owner}'s on its way and about to hit {@code body}
+     * - in the air still the tick after it was loosed: the shield lowered then is lowered too soon.
+     */
+    public static boolean incoming(net.kasax.challengecraft.bot.BotPlayer body, net.minecraft.world.entity.Entity owner) {
+        AABB me = body.getBoundingBox().inflate(0.35);
+        for (Projectile p : body.level().getEntitiesOfClass(Projectile.class, me.inflate(16), pr -> pr.isAlive() && pr.getOwner() == owner)) {
+            if (hitsIn(p, me) <= 10) return true;
+        }
+        return false;
     }
 
     /**

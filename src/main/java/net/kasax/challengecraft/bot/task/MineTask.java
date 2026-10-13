@@ -704,7 +704,9 @@ public final class MineTask implements BotTask {
             // Rock: the staircase goes on down till it is in rock (its own steps then are the
             // cobblestone) - not a tunnel along eight blocks down, through terracotta or dirt
             // that never turns to stone: in the badlands it wore out pickaxe after pickaxe so.
-            if (depth == null && rock(level) && feet.getY() <= digDepth && feet.getY() > level.getMinY() + 12) digDepth = feet.getY() - 8;
+            // (Whatever height was asked for: "stone, six under the surface" was a tunnel through
+            // a savanna's dirt at the surface's own height for minutes in a self-play game.)
+            if (rock(level) && feet.getY() <= digDepth && feet.getY() > level.getMinY() + 12) digDepth = feet.getY() - 8;
             boolean down = feet.getY() > digDepth;
             BlockPos ahead = feet.relative(heading);
             stepTicks = 0;
