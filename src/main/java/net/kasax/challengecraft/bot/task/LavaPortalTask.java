@@ -123,6 +123,16 @@ public final class LavaPortalTask implements BotTask {
         return level.getFluidState(p).is(FluidTags.LAVA) && level.getFluidState(p).isSource();
     }
 
+    /** The fewest lava sources round a pool to cast at (the mould takes some, the rest are spares). */
+    public static final int MIN_SOURCES = 10;
+
+    /** Lava sources round {@code pool}, as {@link #plan} counts them before casting. */
+    public static int sourcesAround(ServerLevel level, BlockPos pool) {
+        int n = 0;
+        for (BlockPos q : BlockPos.betweenClosed(pool.offset(-10, -3, -10), pool.offset(10, 3, 10))) if (lavaSource(level, q)) n++;
+        return n;
+    }
+
     private Result plan(Bot bot, ServerLevel level) {
         BotPlayer body = bot.body();
         if (BotInventory.slotOf(body, Items.WATER_BUCKET) < 0) {
@@ -137,7 +147,7 @@ public final class LavaPortalTask implements BotTask {
         if (resume(bot, level, pool)) return Result.RUNNING;
         List<BlockPos> sources = new ArrayList<>();
         for (BlockPos q : BlockPos.betweenClosed(pool.offset(-10, -3, -10), pool.offset(10, 3, 10))) if (lavaSource(level, q)) sources.add(q.immutable());
-        if (sources.size() < 10) return fail(bot, "only " + sources.size() + " lava sources here");
+        if (sources.size() < MIN_SOURCES) return fail(bot, "only " + sources.size() + " lava sources here");
         double best = Double.MAX_VALUE;
         BlockPos bestStand = null, bestOrigin = null;
         Direction bestAhead = null;

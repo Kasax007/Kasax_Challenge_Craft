@@ -50,7 +50,7 @@ public final class Guardian {
 
     private final Bot bot;
     /** How often it stepped in, and with what (for the benchmarks). */
-    public int boxes, pillars, digs, runs;
+    public int boxes, pillars, digs, runs, fights;
     /** When it last sent him running (no cover to be had in time, room to run): the reflexes take him off. */
     private int runAt = -1000;
 
@@ -69,6 +69,19 @@ public final class Guardian {
 
     Guardian(Bot bot) {
         this.bot = bot;
+    }
+
+    /**
+     * A new body (after a death): its ticks start again at nought, so every mark kept in the old
+     * body's ticks goes. (Kept, "it wants him away" stayed true for the new body until its clock
+     * passed the old one's: in a game on the user's laptop Bob ran from every lone zombie and
+     * from the very creeper he was hunting for its powder, for an hour after his first death.)
+     */
+    void newBody() {
+        runAt = -1000;
+        saidAt = -1000;
+        lastActAt = -1000;
+        noneSaidAt = -1000;
     }
 
     // ---- what hurts from afar ----------------------------------------------------------------------
@@ -344,8 +357,6 @@ public final class Guardian {
             if (!net.kasax.challengecraft.bot.task.PillarFightTask.reachless(t.mob)) onlyReachless = false;
             else if (reachless == null || t.mob.distanceToSqr(body) < reachless.distanceToSqr(body)) reachless = t.mob;
         }
-        BotTask choice = null;
-        String how = null;
         // Something already standing in the sides of the box (a wolf at his heels, a zombie, a
         // magma cube): the blocks will not go in there, and it strikes through the gap while he
         // tries - three bites through the gaps of a box killed a self-play game, four zombies in
@@ -357,36 +368,121 @@ public final class Guardian {
         // when the zombies burn - out at midnight, the same ones are waiting.)
         boolean bare = body.getInventory().getNonEquipmentItems().stream()
                 .noneMatch(st -> st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES));
-        boolean night = bare && body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && body.level().isDarkOutside();
+        boolean dark = body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && body.level().isDarkOutside();
+        boolean night = bare && dark;
+        boolean boxPossible = HideTask.boxPossible(bot, true), pillarPossible = HideTask.pillarPossible(bot);
+        boolean roomToRun = bot.roomToRun(centre(r), 8);
+        // The rules' way out.
+        net.kasax.challengecraft.bot.learn.CoverOption rule;
+        String ruleWhy = null;
         if (ghast && digTicks < r.ticksLeft()) {
-            choice = new HideTask();
-            how = "dug in";
-            digs++;
-        } else if (onlyReachless && reachless != null && r.ticksLeft() >= 40 && HideTask.pillarPossible(bot)) {
-            choice = new net.kasax.challengecraft.bot.task.PillarFightTask(reachless).untilClear();
-            how = "up a pillar, and from above";
-            pillars++;
-        } else if (HideTask.boxPossible(bot, true) && !boxTaken) {
-            choice = HideTask.boxed();
-            how = "walled in";
-            boxes++;
-        } else if (!shooters && !climbers && !jumpers && !tall && HideTask.pillarPossible(bot)) {
-            choice = HideTask.upward();
-            how = "up a pillar";
-            pillars++;
-        } else if (boxTaken && HideTask.boxPossible(bot, true) && bot.roomToRun(centre(r), 8)) {
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.DIG;
+        } else if (onlyReachless && reachless != null && r.ticksLeft() >= 40 && pillarPossible) {
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.PILLAR_FIGHT;
+        } else if (crossbows(r) >= 2 && roomToRun) {
+            // Pillagers: where two shoot, more come (an outpost spawns them for as long as one
+            // stands in it, a patrol is five) - and the box is no cover from bolts out of every
+            // side: boxed in four times at an outpost on the user's laptop, the last time shot
+            // dead in it through the shield. Away, out of their range: they do not follow far.
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.RUN;
+            ruleWhy = "pillagers keep coming: away out of their range, not a box";
+        } else if (boxPossible && !boxTaken) {
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.BOX;
+        } else if (!shooters && !climbers && !jumpers && !tall && pillarPossible) {
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.PILLAR;
+        } else if (boxTaken && boxPossible && !climbers && !tall && roomToRun) {
+            // (Not from a spider, nor from an enderman: both are quicker than he is - two
+            // spiders bit him six times on a run in a game on the user's laptop, and an
+            // enderman after him closes any gap in a blink.)
             // (The reflexes run: the same way off as from a crowd, the way it came if it can.
             // Only instead of the box it would have built: with no blocks for one, the fight goes
             // on as before - two zombies chased round a test arena took two thirds of the hearts.)
-            runAt = body.tickCount;
-            runs++;
-            return none(r, "something in the sides of the box: away from them instead");
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.RUN;
+            ruleWhy = "something in the sides of the box: away from them instead";
+        } else if ((climbers || tall) && !shooters && armed(body) && body.getHealth() >= 8) {
+            // A spider or an enderman at him, armed, with the hearts for it: the fight, toe to toe
+            // and behind the shield - a hole is dug too slowly with a spider at the rim (bitten
+            // through the digging, dead in it), and there is no running from either.
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.FIGHT;
+            ruleWhy = "too quick to run from, too close to dig in front of: standing to fight";
         } else if (digTicks < Integer.MAX_VALUE) {
-            choice = night ? HideTask.shelter() : new HideTask();
-            how = night ? "dug in for the night" : "dug in";
-            digs++;
+            rule = night ? net.kasax.challengecraft.bot.learn.CoverOption.SHELTER : net.kasax.challengecraft.bot.learn.CoverOption.DIG;
+        } else {
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.FIGHT;
+            ruleWhy = "no cover here (box: " + (boxTaken ? "something in its sides" : HideTask.boxProblem(bot, true)) + "; ground not to dig)";
         }
-        if (choice == null) return none(r, "no cover here (box: " + (boxTaken ? "something in its sides" : HideTask.boxProblem(bot, true)) + "; ground not to dig)");
+        // The ways that can be taken here at all (for the learnt choice, and for the journal).
+        var possible = java.util.EnumSet.of(net.kasax.challengecraft.bot.learn.CoverOption.FIGHT);
+        if (boxPossible && !boxTaken) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.BOX);
+        if (pillarPossible) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.PILLAR);
+        if (pillarPossible && reachless != null) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.PILLAR_FIGHT);
+        if (roomToRun) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
+        if (digTicks < Integer.MAX_VALUE) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.DIG);
+        if (digTicks < Integer.MAX_VALUE && dark) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.SHELTER);
+        possible.add(rule);
+        // Which one: the rules, the learnt model, or (in the arena) a random one - and kept to
+        // for the rest of the fight once chosen otherwise than by the rules.
+        net.kasax.challengecraft.bot.learn.CoverOption pick;
+        String how;
+        if (episode != null && episode.committed != null && possible.contains(episode.committed)) {
+            pick = episode.committed;
+            how = episode.how;
+        } else {
+            double[] x = net.kasax.challengecraft.bot.learn.Situation.cover(bot, r, boxPossible, boxTaken, pillarPossible, digTicks, roomToRun);
+            var choice = bot.cover.choose(bot, x, possible, rule);
+            pick = choice.option();
+            how = choice.how();
+            if (episode == null) episode = new Episode(bot, r, x, possible, rule, choice);
+            else if (!episode.path.get(episode.path.size() - 1).equals(pick.name())) episode.path.add(pick.name());
+            if (!how.equals("rule")) episode.committed = pick;
+        }
+        if (episode != null) episode.decisions++;
+        if (pick != rule) ruleWhy = null;
+        return take(r, pick, how, reachless, ruleWhy);
+    }
+
+    /** The way out chosen, set going: the task for it (a cover), or none (the reflexes fight on, or run). */
+    private BotTask take(Reckoning r, net.kasax.challengecraft.bot.learn.CoverOption pick, String how, Mob reachless, String why) {
+        BotPlayer body = bot.body();
+        String by = how.equals("rule") ? "" : " (" + how + ")";
+        BotTask choice;
+        String said;
+        switch (pick) {
+            case DIG -> {
+                choice = new HideTask();
+                said = "dug in";
+                digs++;
+            }
+            case SHELTER -> {
+                choice = HideTask.shelter();
+                said = "dug in for the night";
+                digs++;
+            }
+            case PILLAR_FIGHT -> {
+                choice = new net.kasax.challengecraft.bot.task.PillarFightTask(reachless).untilClear();
+                said = "up a pillar, and from above";
+                pillars++;
+            }
+            case BOX -> {
+                choice = HideTask.boxed();
+                said = "walled in";
+                boxes++;
+            }
+            case PILLAR -> {
+                choice = HideTask.upward();
+                said = "up a pillar";
+                pillars++;
+            }
+            case RUN -> {
+                runAt = body.tickCount;
+                runs++;
+                return none(r, (why != null ? why : "away from them") + by);
+            }
+            default -> {
+                if (why == null || !why.startsWith("no cover")) fights++;
+                return none(r, (why != null ? why : "standing to fight") + by);
+            }
+        }
         lastActAt = body.tickCount;
         if (body.tickCount - saidAt > 40) {
             saidAt = body.tickCount;
@@ -395,9 +491,133 @@ public final class Guardian {
             bot.say("guardian: " + kinds + " at me, " + Math.round(body.getHealth()) + " hp - gone in ~"
                     + String.format("%.1f", r.ticksLeft() / 20.0) + " s, a fight "
                     + (r.fightTicks() == Integer.MAX_VALUE ? "not to be won" : "~" + String.format("%.1f", r.fightTicks() / 20.0) + " s")
-                    + ": " + how);
+                    + ": " + said + by);
         }
         return choice;
+    }
+
+    // ---- the journal: each fight gone badly, the way chosen and how it ended ------------------
+
+    /**
+     * One fight gone badly: the situation when the guardian first stepped in, what could be done,
+     * what the rules would have done and what was done, and - once it is over (they are dead or
+     * gone, half a minute passed, or he died) - how it ended.
+     */
+    private static final class Episode {
+        final String id = net.kasax.challengecraft.bot.learn.Journal.newId();
+        final long start;
+        final double[] x;
+        final java.util.Set<net.kasax.challengecraft.bot.learn.CoverOption> possible;
+        final net.kasax.challengecraft.bot.learn.CoverOption rule, first;
+        final String how;
+        final double[][] predicted;
+        final float hp0;
+        float minHp;
+        final int damage0;
+        final List<Mob> mobs = new ArrayList<>();
+        final List<String> path = new ArrayList<>();
+        net.kasax.challengecraft.bot.learn.CoverOption committed;
+        int decisions;
+        long calmSince = -1;
+
+        Episode(Bot bot, Reckoning r, double[] x, java.util.Set<net.kasax.challengecraft.bot.learn.CoverOption> possible,
+                net.kasax.challengecraft.bot.learn.CoverOption rule, net.kasax.challengecraft.bot.learn.CoverPolicy.Choice choice) {
+            BotPlayer body = bot.body();
+            this.start = body.level().getGameTime();
+            this.x = x;
+            this.possible = java.util.EnumSet.copyOf(possible);
+            this.rule = rule;
+            this.first = choice.option();
+            this.how = choice.how();
+            this.predicted = choice.predicted();
+            this.hp0 = body.getHealth();
+            this.minHp = hp0;
+            this.damage0 = body.getStats().getValue(net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.DAMAGE_TAKEN));
+            for (Threat t : r.threats()) mobs.add(t.mob);
+            path.add(first.name());
+        }
+    }
+
+    private Episode episode;
+    /** Extra context for the journal (the arena's scenario), or null. */
+    public com.google.gson.JsonObject context;
+    /** Called when a fight's record is written (the arena counts its episodes by it). */
+    public java.util.function.Consumer<com.google.gson.JsonObject> onEpisode;
+
+    /** Whether a fight gone badly is being followed (from the first stepping in to its end). */
+    public boolean inEpisode() {
+        return episode != null;
+    }
+
+    /** Each tick: the lowest the hearts went, and whether the fight is over. */
+    public void track() {
+        Episode e = episode;
+        if (e == null) return;
+        BotPlayer body = bot.body();
+        e.minHp = Math.min(e.minHp, body.getHealth());
+        long now = body.level().getGameTime();
+        if (body.tickCount % 10 != 0) return;
+        boolean after = false;
+        for (Mob m : e.mobs) {
+            if (m.isAlive() && !m.isRemoved() && m.level() == body.level() && m.distanceToSqr(body) < 24 * 24 && m.getTarget() == body) after = true;
+        }
+        if (after) e.calmSince = -1;
+        else if (e.calmSince < 0) e.calmSince = now;
+        if (e.calmSince >= 0 && now - e.calmSince >= 60) finish("calm");
+        else if (now - e.start > 600) finish("timeout");
+    }
+
+    /** Ends the fight's record now (the arena's fight is over), if one is open. */
+    public void endEpisode(String why) {
+        if (episode != null) finish(why);
+    }
+
+    /** He died: the fight's record ends with that. */
+    public void died() {
+        if (episode != null) finish("died");
+    }
+
+    private void finish(String end) {
+        Episode e = episode;
+        episode = null;
+        if (e == null) return;
+        BotPlayer body = bot.body();
+        long now = body.level().getGameTime();
+        boolean died = end.equals("died");
+        int kills = 0;
+        for (Mob m : e.mobs) if (!m.isAlive()) kills++;
+        var o = new com.google.gson.JsonObject();
+        o.addProperty("id", e.id);
+        o.addProperty("bot", bot.name);
+        o.addProperty("how", e.how);
+        o.addProperty("option", e.first.name());
+        o.addProperty("rule", e.rule.name());
+        o.add("possible", net.kasax.challengecraft.bot.learn.Journal.array(e.possible.stream().map(Enum::name).toList()));
+        o.add("path", net.kasax.challengecraft.bot.learn.Journal.array(e.path));
+        o.addProperty("decisions", e.decisions);
+        o.add("x", net.kasax.challengecraft.bot.learn.Journal.array(e.x));
+        if (e.predicted != null) {
+            var pred = new com.google.gson.JsonObject();
+            for (var opt : net.kasax.challengecraft.bot.learn.CoverOption.ALL) {
+                if (e.predicted[opt.ordinal()] != null) pred.add(opt.name(), net.kasax.challengecraft.bot.learn.Journal.array(e.predicted[opt.ordinal()]));
+            }
+            o.add("predicted", pred);
+        }
+        o.addProperty("end", end);
+        o.addProperty("died", died ? 1 : 0);
+        o.addProperty("hp0", e.hp0);
+        o.addProperty("hp_end", died ? 0 : body.getHealth());
+        o.addProperty("hp_lost", died ? e.hp0 : Math.max(0, e.hp0 - e.minHp));
+        int damage = body.getStats().getValue(net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.DAMAGE_TAKEN)) - e.damage0;
+        o.addProperty("damage", damage / 10.0);
+        o.addProperty("secs", (now - e.start) / 20.0);
+        o.addProperty("kills", kills);
+        o.addProperty("mobs", e.mobs.size());
+        o.addProperty("difficulty", body.level().getDifficulty().getSerializedName());
+        o.addProperty("dim", body.level().dimension().identifier().getPath());
+        if (context != null) o.add("ctx", context.deepCopy());
+        net.kasax.challengecraft.bot.learn.Journal.write("cover", o);
+        if (onEpisode != null) onEpisode.accept(o);
     }
 
     private int noneSaidAt = -1000;
@@ -413,6 +633,22 @@ public final class Guardian {
                     Math.round(body.getHealth()), String.format("%.1f", r.ticksLeft() / 20.0), why);
         }
         return null;
+    }
+
+    /** How many of the threats are illagers with a crossbow (pillagers). */
+    private static int crossbows(Reckoning r) {
+        int n = 0;
+        for (Threat t : r.threats()) if (t.ranged && t.mob instanceof net.minecraft.world.entity.monster.illager.Pillager) n++;
+        return n;
+    }
+
+    /** A sword or an axe in the hand or the pack. */
+    public static boolean armed(BotPlayer body) {
+        if (body.getMainHandItem().is(net.minecraft.tags.ItemTags.SWORDS) || body.getMainHandItem().is(net.minecraft.tags.ItemTags.AXES)) return true;
+        for (var st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.SWORDS) || st.is(net.minecraft.tags.ItemTags.AXES)) return true;
+        }
+        return false;
     }
 
     /** Ticks to dig in right here (three blocks down and the lid), or MAX_VALUE when it cannot be done. */

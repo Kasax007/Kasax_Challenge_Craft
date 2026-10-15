@@ -48,8 +48,15 @@ public final class BotNavigator {
     /** Searches one after another that found no step forward at all, before giving up. */
     private static final int MAX_NO_WAY = 3;
 
-    /** Path searches off the server thread (as Baritone plans while the player walks). */
-    private static final java.util.concurrent.ExecutorService SEARCH = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+    /**
+     * Path searches off the server thread (as Baritone plans while the player walks). Two at once
+     * in a normal game; on a training server with several bots (the arena), each bot's search
+     * waits for a thread of its own, so as many as the cores allow there
+     * (CHALLENGECRAFT_BOT_SEARCH_THREADS: the count).
+     */
+    private static final int SEARCH_THREADS = Math.max(1, Integer.parseInt(java.util.Objects.requireNonNullElse(
+            System.getenv("CHALLENGECRAFT_BOT_SEARCH_THREADS"), "2")));
+    private static final java.util.concurrent.ExecutorService SEARCH = java.util.concurrent.Executors.newFixedThreadPool(SEARCH_THREADS, r -> {
         Thread t = new Thread(r, "bot-path-search");
         t.setDaemon(true);
         return t;
@@ -601,7 +608,7 @@ public final class BotNavigator {
             // (Never by a drop: a jump that comes down a little aside goes over the edge - the
             // Nether's ledges over the lava sea.)
             if (far >= index + 3 && flat > 3.5 && bot.sprintNow && bot.onGround() && !up && !careful && !byDrop(feet)
-                    && bot.getFoodData().getFoodLevel() > 6 && runningAlong(dx, dz) && jumpRoom) bot.jump = true;
+                    && bot.getFoodData().getFoodLevel() > 6 && bot.getHealth() > 6 && runningAlong(dx, dz) && jumpRoom) bot.jump = true;
         }
         // Stuck: no progress for a while.
         double d = flat + Math.abs(bot.getY() - to.getY());
@@ -1039,7 +1046,7 @@ public final class BotNavigator {
         BotPathfinder.WorldView view = BotPathfinder.WorldView.capture(level, from, VIEW_CHUNKS);
         BotPathfinder.Abilities abilities = new BotPathfinder.Abilities(mayBreak, mayPillar && actions.hasThrowaway(),
                 tools.snapshot(), bot.getFoodData().getFoodLevel() > 6, BotActions.buildingBlocks(bot),
-                bot.level().dimension() == net.minecraft.world.level.Level.NETHER);
+                bot.level().dimension() == net.minecraft.world.level.Level.NETHER).frail(bot.getHealth());
         // (Searching again from where it stands: the rest of the way it was on is kept to,
         // where it still goes - no swinging between two ways that cost about the same.)
         java.util.Set<Long> favoured = new java.util.HashSet<>();

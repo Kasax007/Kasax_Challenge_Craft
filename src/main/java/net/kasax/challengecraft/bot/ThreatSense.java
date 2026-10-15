@@ -43,6 +43,17 @@ public final class ThreatSense {
         this.bot = bot;
     }
 
+    /** A new body (after a death): the marks kept in the old body's ticks go (see Guardian#newBody). */
+    void newBody() {
+        dodge = null;
+        dodgeUntil = 0;
+        shieldSaidAt = -1000;
+        shieldMineUntil = -1;
+        creeperSaidAt = -1000;
+        stand = null;
+        standCheckAt = 0;
+    }
+
     /** The nearest creeper hissing (its fuse burning) within {@code r} blocks, or null. */
     public static net.minecraft.world.entity.monster.Creeper hissingNear(BotPlayer body, double r) {
         net.minecraft.world.entity.monster.Creeper best = null;

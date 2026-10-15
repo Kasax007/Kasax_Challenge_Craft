@@ -251,6 +251,24 @@ final class BotCommands {
                                             ok(ctx, "versus: " + bots.size() + " bots, " + seconds + " s");
                                             return 1;
                                         })))))
+                        // The arena for the trainer: "arena start 8 explore", "arena start 4 eval candidate-cover.json",
+                        // "arena stop", "arena status" ([ARENA] in the log, the fights in the journal).
+                        .then(Commands.literal("arena")
+                                .then(Commands.literal("start").then(Commands.argument("bots", IntegerArgumentType.integer(1, 32))
+                                        .then(Commands.argument("mode", StringArgumentType.word())
+                                                .suggests((ctx, b) -> SharedSuggestionProvider.suggest(java.util.List.of("explore", "eval", "rule", "model"), b))
+                                                .executes(ctx -> arena(ctx, null))
+                                                .then(Commands.argument("candidate", StringArgumentType.word())
+                                                        .executes(ctx -> arena(ctx, StringArgumentType.getString(ctx, "candidate")))))))
+                                .then(Commands.literal("stop").executes(ctx -> {
+                                    net.kasax.challengecraft.bot.learn.Arena.stop(ctx.getSource().getServer());
+                                    ok(ctx, "arena stopped");
+                                    return 1;
+                                }))
+                                .then(Commands.literal("status").executes(ctx -> {
+                                    ok(ctx, net.kasax.challengecraft.bot.learn.Arena.stats().toString());
+                                    return 1;
+                                })))
                         .then(Commands.literal("fieldtest").then(Commands.argument("name", StringArgumentType.word()).suggests(BOT_NAMES)
                                 .then(Commands.argument("goals", StringArgumentType.string())
                                         .then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))
@@ -373,6 +391,22 @@ final class BotCommands {
         return 1;
     }
 
+
+    private static int arena(CommandContext<CommandSourceStack> ctx, String candidate) {
+        net.kasax.challengecraft.bot.learn.Arena.Mode mode;
+        try {
+            mode = net.kasax.challengecraft.bot.learn.Arena.Mode.valueOf(StringArgumentType.getString(ctx, "mode").toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(Component.literal("Mode: explore, eval, rule or model"));
+            return 0;
+        }
+        if (mode == net.kasax.challengecraft.bot.learn.Arena.Mode.EVAL && candidate == null) candidate = "candidate-cover.json";
+        boolean sprint = !"0".equals(System.getenv("BOB_ARENA_SPRINT"));
+        String said = net.kasax.challengecraft.bot.learn.Arena.start(ctx.getSource().getServer(), IntegerArgumentType.getInteger(ctx, "bots"),
+                mode, candidate, System.nanoTime(), sprint);
+        ok(ctx, said);
+        return 1;
+    }
 
     /** Ids typed without a namespace are Minecraft's. */
     private static String ns(String id) {

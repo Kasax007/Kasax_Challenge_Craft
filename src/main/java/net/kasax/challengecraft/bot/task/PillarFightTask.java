@@ -25,6 +25,8 @@ public final class PillarFightTask implements BotTask {
     private boolean shot, untilClear;
     /** How much higher than the pillar's foot the ground right beside it stands (a slope): that much higher up. */
     private int rise;
+    /** Still building the pillar (an enderman is held frozen by a look meanwhile). */
+    private boolean building = true;
 
     public PillarFightTask(LivingEntity target) {
         this.target = target;
@@ -58,6 +60,16 @@ public final class PillarFightTask implements BotTask {
         // Well armed and armoured, at full health: a fight like any other.
         boolean diamondSword = body.getInventory().countItem(Items.DIAMOND_SWORD) + body.getInventory().countItem(Items.NETHERITE_SWORD) > 0;
         return !(diamondSword && body.getArmorValue() >= 15 && body.getHealth() >= 18);
+    }
+
+    /** The one it is about. */
+    public LivingEntity target() {
+        return target;
+    }
+
+    /** Whether it is still building the pillar (and so holds an enderman frozen with a look). */
+    public boolean building() {
+        return building;
     }
 
     /** Room for two blocks under it and its head, and something to build with. */
@@ -110,7 +122,13 @@ public final class PillarFightTask implements BotTask {
             lastPlaced = placed;
             placedAt = ticks;
         }
-        if (placed < need && height < need && ticks - placedAt < 80) {
+        building = placed < need && height < need && ticks - placedAt < 80;
+        if (building) {
+            // (An enderman looked in the eyes the while: the game holds an angry one frozen where
+            // it stands for as long as its target stares at it - so it is not at the foot before
+            // the pillar is high enough. Not looked at, it walked up during the jumps and struck at
+            // two and a half blocks up in a test brawl.)
+            if (target instanceof net.minecraft.world.entity.monster.Enderman) body.lookAt(target.getEyePosition());
             // Jump, and at the top of the jump a block where the feet were.
             body.jump = true;
             BlockPos below = body.blockPosition().below();
@@ -139,12 +157,16 @@ public final class PillarFightTask implements BotTask {
                 bot.interject(new ShootTask(Items.BOW, e -> e.getUUID().equals(id), 8));
                 return Result.RUNNING;
             }
-            body.lookAt(target.getEyePosition());
+            // (At its feet, not in its eyes: an enderman looked in the eyes stands frozen out of
+            // reach for as long as it is looked at - the game's rule - and so it never came to the
+            // foot of the pillar, a minute long, until he came down to it and died.)
+            body.lookAt(target instanceof net.minecraft.world.entity.monster.Enderman ? target.position() : target.getEyePosition());
             // Gone off out of reach a long while (it lost interest): down and on.
             return ticks > 600 && target.distanceTo(body) > 8 ? Result.DONE : Result.RUNNING;
         }
         if (ticks % 10 == 1) KillTask.equipWeapon(bot);
-        body.lookAt(hitting.getBoundingBox().getCenter());
+        // (An enderman at its legs, not its eyes: stared at that close, it teleports off.)
+        body.lookAt(hitting instanceof net.minecraft.world.entity.monster.Enderman ? hitting.position().add(0, 0.4, 0) : hitting.getBoundingBox().getCenter());
         if (body.getAttackStrengthScale(0.5f) >= 1f) {
             body.attack(hitting);
             body.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, true);

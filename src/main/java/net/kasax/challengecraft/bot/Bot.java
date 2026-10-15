@@ -30,8 +30,16 @@ public final class Bot {
     public final ThreatSense threats = new ThreatSense(this);
     /** How long he has at the rate he is being hurt, and the quickest cover when a fight would not be won in time. */
     public final Guardian guardian = new Guardian(this);
+    /** One of the arena's bots (see learn.Arena): back at once after a death, no dawn awaited. */
+    public boolean arena;
+    /** How the guardian picks its way out: the rules, the learnt model, or (in the arena) at random. */
+    public final net.kasax.challengecraft.bot.learn.CoverPolicy cover = new net.kasax.challengecraft.bot.learn.CoverPolicy();
     /** Knobs of its play (the self-play matches set them per bot). */
-    public BotParams params = BotParams.DEFAULT;
+    /**
+     * The knobs it plays with: the ones the self-play league found best (bob-models/champion.json,
+     * see learn.ModelStore) where there are any, else the defaults; a match sets its own.
+     */
+    public BotParams params = BotParams.champion();
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
     /**
@@ -126,6 +134,8 @@ public final class Bot {
     public final java.util.ArrayList<net.minecraft.core.BlockPos> trail = new java.util.ArrayList<>();
     /** Lava pools where casting a portal failed (no room, no way there): not chosen again. */
     public final java.util.Set<net.minecraft.core.BlockPos> badCastPools = new java.util.HashSet<>();
+    /** Lava sources counted round each pool looked at for casting (counted once, when in view). */
+    public final java.util.Map<net.minecraft.core.BlockPos, Integer> poolSources = new java.util.HashMap<>();
     private net.minecraft.core.BlockPos lastSurface;
     private Object trailDimension;
     /** Set by the brain while an explosion survived would claim a tile: a creeper is then welcome. */
@@ -154,6 +164,10 @@ public final class Bot {
         shooterCheckAt = 0;
         reflexCooldown = 0;
         retreat = null;
+        movedAt = 0;
+        guardian.newBody();
+        threats.newBody();
+        danger.newBody();
     }
 
     public BotPlayer body() {
@@ -298,9 +312,38 @@ public final class Bot {
         threats.react();
         // Last, the keys pressed: where they lead worked out, and not pressed if that is into harm.
         danger.guard();
+        guardian.track();
+        // And the head: never an enderman's eyes in the line of sight by chance.
+        lookPastEndermen();
+    }
+
+    /**
+     * Never an enderman's eyes in the line of sight by chance: one looked in the eyes turns on
+     * him, and one already after him that he looks at stands frozen where it is (the game's own
+     * rule) - out of reach of his sword below his pillar, a minute long, until he came down to
+     * it. Three of nine deaths in a game on the user's laptop went so. The head is tipped down
+     * the few degrees that take the eyes out of line (only the head: the way he walks stays);
+     * the one he means to fight is looked at only to make it come, and once it comes, not.
+     */
+    private void lookPastEndermen() {
+        var near = body.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Enderman.class,
+                body.getBoundingBox().inflate(64, 32, 64), net.minecraft.world.entity.LivingEntity::isAlive);
+        if (near.isEmpty()) return;
+        BotTask in = BotTask.innermost(tasks.peek());
+        net.minecraft.world.entity.LivingEntity hunted = in instanceof net.kasax.challengecraft.bot.task.KillTask k ? k.target() : null;
+        // (The one a pillar is being built against: held frozen by the look until the pillar
+        // is high enough - see PillarFightTask.)
+        var holding = in instanceof net.kasax.challengecraft.bot.task.PillarFightTask p && p.building() ? p.target() : null;
+        for (var e : near) {
+            if (e == hunted && e.getTarget() != body || e == holding) continue;
+            for (int i = 0; i < 10 && e.isLookingAtMe(body, 0.025, true, false, e.getEyeY()); i++) {
+                body.setXRot(Math.min(90f, body.getXRot() + 6f));
+            }
+        }
     }
 
     private void act() {
+        senses.worldSense = params.on("worldsense");
         senses.tick(body);
         memory.tick(body);
         if (body.tickCount % 10 == 0) layTrail();

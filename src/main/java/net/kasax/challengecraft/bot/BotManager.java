@@ -36,6 +36,7 @@ public final class BotManager {
             BOTS.clear();
         });
         BotCommands.register();
+        net.kasax.challengecraft.bot.learn.Learn.register();
     }
 
     public static Bot spawn(MinecraftServer server, String name, ServerLevel level, Vec3 pos) {
@@ -88,6 +89,8 @@ public final class BotManager {
                 if (bot.lastDeath == null || body.level().getGameTime() - bot.lastDeath.time() > 100) {
                     // (The blow that killed it, for the log: the bot is not ticked any more once dead.)
                     bot.logHits();
+                    bot.guardian.died();
+                    net.kasax.challengecraft.bot.learn.Learn.death(bot, body);
                     var src = body.getLastDamageSource();
                     boolean gone = body.isInLava() || src != null && (src.is(net.minecraft.tags.DamageTypeTags.IS_FIRE) && body.isInLava()
                             || src.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD));
@@ -105,8 +108,10 @@ public final class BotManager {
                 long serverNow = server.overworld().getGameTime();
                 if (bot.deadSince < 0) bot.deadSince = serverNow;
                 long clock = server.overworld().getOverworldClockTime() % 24000;
-                boolean night = clock >= 12800 && clock < 23200;
-                if (body.deathTime >= RESPAWN_DELAY && night && serverNow - bot.deadSince < 7200) {
+                // (From sunset on: died at dusk, back at once with nothing, the night came a minute
+                // later - and with it the next death, in a game on the user's laptop.)
+                boolean night = clock >= 12000 && clock < 23200;
+                if (body.deathTime >= RESPAWN_DELAY && night && !bot.arena && serverNow - bot.deadSince < 11400) {
                     if (!bot.waitingForDawn) {
                         bot.waitingForDawn = true;
                         bot.say("dead at night: back at dawn, not into the dark with nothing");

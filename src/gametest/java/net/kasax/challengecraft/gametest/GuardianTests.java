@@ -357,4 +357,74 @@ public class GuardianTests {
             return shut && h.getTick() > 40;
         });
     }
+
+    /**
+     * An enderman ten blocks off, Bob looking it in the eyes at the start (a game on the user's
+     * laptop: three of nine deaths were endermen provoked by a look while he walked or dug): the
+     * eyes turned down past it at once - the enderman never takes him for its target.
+     */
+    @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 400, skyAccess = true, padding = 24)
+    public void endermanNotStaredAt(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "enderman_not_stared_at");
+        hard(h.getLevel());
+        a.spawn(20, FEET, 14, new ItemStack(Items.STONE_SWORD));
+        var body = a.bot().body();
+        var e = EntityTypes.ENDERMAN.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
+        e.setPos(Vec3.atBottomCenterOf(a.abs(20, FEET, 24)));
+        e.setPersistenceRequired();
+        e.setNoAi(false);
+        h.getLevel().addFreshEntity(e);
+        body.lookAt(e.getEyePosition());
+        boolean[] angered = {false};
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 400, () -> {
+            angered[0] |= e.getTarget() == body;
+            h.assertTrue(!angered[0], "enderman_not_stared_at: the enderman was provoked");
+            return h.getTick() > 300;
+        });
+    }
+
+    /**
+     * A spider at him, a stone sword and twelve hearts, on hard (on the user's laptop he ran from
+     * spiders and was bitten six times on the run): no running from what is quicker than he is -
+     * the fight, and alive with the spider dead.
+     */
+    @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 40)
+    public void spiderFoughtNotFled(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "spider_fought_not_fled");
+        hard(h.getLevel());
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 16));
+        var body = a.bot().body();
+        body.setHealth(12);
+        var spider = mob(h, a, EntityTypes.SPIDER, 24, FEET, 20);
+        a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 900, () -> {
+            h.assertTrue(a.bot().body() == body, "spider_fought_not_fled: died");
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] spider_fought_not_fled hp {} spider {} guardian runs {} fights {}", body.getHealth(),
+                    spider.isAlive() ? spider.getHealth() : "dead", a.bot().guardian.runs, a.bot().guardian.fights);
+            h.assertTrue(a.bot().guardian.runs == 0, "spider_fought_not_fled: ran from the spider");
+            return !spider.isAlive();
+        });
+    }
+
+    /**
+     * One and a half hearts left, the way to a spot over a step of four (a hop off it is half a
+     * heart: on the user's laptop twice in a row, the second one the end): the way round down the
+     * stairs, never the drop - and alive there.
+     */
+    @GameTest(environment = "challengecraft:guardian", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void frailTakesTheStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "frail_takes_the_stairs");
+        // A shelf four high over the floor, stairs down at its far end.
+        a.fill(4, FEET, 4, 20, FEET + 3, 36, Blocks.STONE);
+        for (int i = 0; i < 3; i++) a.fill(21 + i, FEET, 32, 21 + i, FEET + 2 - i, 36, Blocks.STONE);
+        a.spawn(18, FEET + 4, 20);
+        var body = a.bot().body();
+        body.setHealth(3);
+        float[] low = {3};
+        net.minecraft.core.BlockPos goal = a.abs(26, FEET, 20);
+        a.run(new net.kasax.challengecraft.bot.task.GoToTask(goal, 0), 900, () -> {
+            low[0] = Math.min(low[0], body.getHealth());
+            h.assertTrue(low[0] >= 3, "frail_takes_the_stairs: hurt by a fall (" + low[0] + " hp)");
+            return body.blockPosition().distManhattan(goal) <= 1;
+        });
+    }
 }

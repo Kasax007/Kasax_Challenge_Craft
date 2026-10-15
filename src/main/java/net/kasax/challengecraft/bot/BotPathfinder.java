@@ -36,7 +36,25 @@ public final class BotPathfinder {
      * and whether it sprints (enough food).
      */
     public record Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint, int blocks,
-                            boolean wary) {
+                            boolean wary, int maxFall, int leapDrop) {
+        public Abilities(boolean mayBreak, boolean mayPillar, java.util.function.ToDoubleFunction<BlockState> breakTicks, boolean sprint, int blocks,
+                         boolean wary) {
+            this(mayBreak, mayPillar, breakTicks, sprint, blocks, wary, MAX_FALL, 12);
+        }
+
+        /**
+         * The falls the search may plan for a body with {@code hp} left: a walk off an edge of
+         * three hurts nobody, but a step taken with a hop is a fall of four and half a heart - at
+         * 1.5 hp, twice, the end (a game on the user's laptop: "hit the ground too hard", down
+         * to the cave for apples with no food left). And a leap fallen short drops the whole
+         * depth under the gap and the jump's height on top: with few hearts, only over a ditch.
+         */
+        public Abilities frail(float hp) {
+            int fall = hp <= 4 ? 2 : MAX_FALL;
+            int leap = hp <= 6 ? 2 : hp <= 10 ? 6 : 12;
+            return new Abilities(mayBreak, mayPillar, breakTicks, sprint, blocks, wary, Math.min(maxFall, fall), Math.min(leapDrop, leap));
+        }
+
         public Abilities(boolean mayBreak, boolean mayPillar, BotTools tools) {
             this(mayBreak, mayPillar, tools::breakTicks, true, 64, false);
         }
@@ -459,7 +477,7 @@ public final class BotPathfinder {
                     }
                     if (!clear(land)) break;
                     if (canStand(land)) {
-                        if (fall <= MAX_FALL) out.add(new Step(land, List.of(), null));
+                        if (fall <= abilities.maxFall()) out.add(new Step(land, List.of(), null));
                         break;
                     }
                 }
@@ -487,7 +505,7 @@ public final class BotPathfinder {
                     if (!waterBelow(over)) worst = Math.max(worst, dropBelow(over));
                     // (Wary - in the Nether, where the ground is crumbling netherrack and the mobs
                     // push: a two-block gap too only over a drop that hurts little.)
-                    if (worst > (gap >= 3 ? MAX_FALL : !abilities.wary() ? 12 : gap == 1 ? 8 : 4)) break;
+                    if (worst > Math.min(abilities.leapDrop(), gap >= 3 ? MAX_FALL : !abilities.wary() ? 12 : gap == 1 ? 8 : 4)) break;
                     BlockPos land = p.offset(dx * (gap + 1), 0, dz * (gap + 1));
                     if (canStand(land) && clear(land.above()) && clear(land.above(2)) && !inWater(land)) {
                         if (!failedLeaps.contains(land.asLong())) out.add(new Step(land, List.of(), null, true));
@@ -527,7 +545,7 @@ public final class BotPathfinder {
         // ... or through the floor into a hollow under it (a cave below): the block dug, and a
         // short fall to the cave floor.
         else if (abilities.mayBreak() && floor && breakable(below) && !liquidAround(below) && clear(below.below())) {
-            for (int fall = 1; fall <= MAX_FALL; fall++) {
+            for (int fall = 1; fall <= abilities.maxFall(); fall++) {
                 BlockPos land = below.below(fall);
                 if (!clear(land) || inWater(land)) break;
                 if (canStand(land)) {

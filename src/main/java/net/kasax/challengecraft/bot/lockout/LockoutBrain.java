@@ -464,6 +464,7 @@ public final class LockoutBrain implements BotBrain {
         goalFirstEstimate = pick.plain();
         goalProxy = pick.option().proxy();
         goalGoal = pick.tile().goal();
+        journalGoalStart(bot, pick, quick);
         extensions = 0;
         stalls = 0;
         String reason = strategist.why(pick.tile().goal().id());
@@ -637,7 +638,7 @@ public final class LockoutBrain implements BotBrain {
 
     /** Dusk: from here on, ready for the night or making ready (monsters come out from about 13000). */
     static final long DUSK = 10000, SHELTER_FROM = 12600, DAWN = 23200;
-    private long bedTriedDay = -1, foodTriedDay = -1, weaponTriedDay = -1, nightFoodTriedDay = -1, shelterRetryAt;
+    private long bedTriedDay = -1, foodTriedDay = -1, weaponTriedDay = -1, nightFoodTriedDay = -1, villageBedTriedDay = -1, shelterRetryAt;
 
     /** What it fights with at night, when it has none: the cheapest sword (a wooden one will do). */
     private static final Set<net.minecraft.world.item.Item> NIGHT_WEAPONS = Set.of(net.minecraft.world.item.Items.WOODEN_SWORD,
@@ -739,6 +740,23 @@ public final class LockoutBrain implements BotBrain {
                 start(bot, nightPrep, 2400);
                 if (!startRefused) return true;
                 startRefused = false;
+            }
+        }
+        // A bed in a village within reach: the night slept away there - the Lockout tile with it
+        // if it is open - set out for in time to be there as the dark comes (the user's game: a
+        // village two hundred blocks off, and four nights dug in or died in instead).
+        if (villageBedTriedDay != day && nightWouldPass(bot)) {
+            net.minecraft.core.BlockPos vb = net.kasax.challengecraft.bot.task.VillageBedTask.nearestVillageBed(bot, Set.of());
+            if (vb != null) {
+                double walk = Math.sqrt(vb.distSqr(bot.body().blockPosition())) / 3.5;
+                if (walk <= 100 && c + walk * 20 + 400 >= SHELTER_FROM) {
+                    villageBedTriedDay = day;
+                    bot.say("dusk soon: the night in a village bed (~" + Math.round(walk) + " s off)");
+                    nightPrep = new net.kasax.challengecraft.bot.task.VillageBedTask();
+                    start(bot, nightPrep, 20 * 360);
+                    if (!startRefused) return true;
+                    startRefused = false;
+                }
             }
         }
         // Before dusk proper: a bed, if it comes cheap (the sheep are in sight, wool in the pack).
@@ -1511,7 +1529,7 @@ public final class LockoutBrain implements BotBrain {
         // was how most deaths began - seed 77: one failed search for apples at minute two, then
         // nothing for seventeen minutes, a night in a hole at nine hp that healed nothing.)
         boolean hard = bot.body().level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
-        double stockCost = bare ? (opened ? (hard ? 300 : 150) : (hard ? 120 : 60)) : 25;
+        double stockCost = (bare ? (opened ? (hard ? 300 : 150) : (hard ? 120 : 60)) : 25) * bot.params.get("foodstock", 1);
         if (!hurt && (level >= 12 && cost > stockCost || cost > (level <= 6 ? 900 : bare ? Math.max(120, stockCost) : 90))) return false;
         if (hurt && cost > 900) return false;
         // (foodcap=<s>: a stock while not starving only if it costs no more - self-play comparisons.)
@@ -1581,8 +1599,20 @@ public final class LockoutBrain implements BotBrain {
             // Harder than it looked last time (it ran over its time): believed less now.
             // What earlier games taught about this tile (it always takes three times as long...).
             if (o != null) {
-                double f = GoalExperience.factor(tile.goal().id());
-                if (f != 1) o = o.costing(o.cost() * f);
+                // The learnt goal model, where there is one (trained on the journal of many games:
+                // how long such a tile really takes, from the plan's own figure and the situation,
+                // and how often it does not come off) - else the per-tile experience factor.
+                var model = bot.params.on("goalmodel") ? net.kasax.challengecraft.bot.learn.ModelStore.goal() : null;
+                String id = tile.goal().id();
+                if (model != null) {
+                    double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, tile.goal(), plain, o.proxy(), minutes(now), deathsSeen,
+                            tries.getOrDefault(id, 0), overruns.getOrDefault(id, 0), GoalExperience.factor(id));
+                    double secs = model.seconds(plain, x) / Math.max(0.3, 1 - model.failChance(x));
+                    o = o.costing(Math.max(0.5 * plain, Math.min(3.5 * Math.max(1, plain), secs)));
+                } else {
+                    double f = GoalExperience.factor(id);
+                    if (f != 1) o = o.costing(o.cost() * f);
+                }
             }
             // Ran over its time before: believed somewhat less - unless things have changed since (a
             // new tool, a village found: the fresh estimate is well below the one that failed).
@@ -2041,6 +2071,7 @@ public final class LockoutBrain implements BotBrain {
                 cortex.ended(bot, runningKey, now, false, false);
                 runningKey = null;
             }
+            journalGoalEnd(bot, "overrun");
             overruns.merge(targetId, 1, Integer::sum);
             overrunEstimate.put(targetId, goalFirstEstimate);
             // (For next games too: at least this long, and it was not even done.)
@@ -2365,6 +2396,7 @@ public final class LockoutBrain implements BotBrain {
         if (task != goalTask) return;
         long now = bot.body().level().getGameTime();
         if (success) {
+            journalGoalEnd(bot, "done");
             // Learnt for next time: how long it really took against the plain estimate.
             if (targetId != null && !goalProxy && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now));
             // The game counts it within a second (it checks inventories once a second): wait for
@@ -2377,6 +2409,7 @@ public final class LockoutBrain implements BotBrain {
             goalTask = null;
             return;
         }
+        journalGoalEnd(bot, "failed");
         fails.merge(targetId, 1, Integer::sum);
         // Failed: try it again later, but not forever.
         if (tries.merge(targetId, 1, Integer::sum) >= MAX_TRIES) {
@@ -2389,8 +2422,60 @@ public final class LockoutBrain implements BotBrain {
         pause = difficulty.pauseTicks / 2;
     }
 
+    // ---- the journal: each tile set out for, the plan's figure and how long it really took ------
+
+    /** The tile under way, as the journal will have it once it is over (null: none, or no journal). */
+    private com.google.gson.JsonObject goalRecord;
+    /** When this brain began (game time), and the deaths since: part of a tile's situation. */
+    private long brainBorn = -1;
+    private int deathsSeen;
+
+    private double minutes(long now) {
+        if (brainBorn < 0) brainBorn = now;
+        return (now - brainBorn) / 1200.0;
+    }
+
+    private void journalGoalStart(Bot bot, Choice pick, boolean quick) {
+        journalGoalEnd(bot, "replaced");
+        if (!net.kasax.challengecraft.bot.learn.Journal.on()) return;
+        var g = pick.tile().goal();
+        long now = bot.body().level().getGameTime();
+        double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, g, pick.plain(), pick.option().proxy(), minutes(now), deathsSeen,
+                tries.getOrDefault(g.id(), 0), overruns.getOrDefault(g.id(), 0), GoalExperience.factor(g.id()));
+        var o = new com.google.gson.JsonObject();
+        o.addProperty("id", net.kasax.challengecraft.bot.learn.Journal.newId());
+        o.addProperty("bot", bot.name);
+        o.addProperty("goal", g.id());
+        o.addProperty("category", g.category().name());
+        o.addProperty("type", g.type().name());
+        o.addProperty("difficulty", g.difficulty().name());
+        o.addProperty("plain", pick.plain());
+        o.addProperty("estimate", pick.option().cost());
+        o.addProperty("quick", quick);
+        o.addProperty("proxy", pick.option().proxy());
+        o.addProperty("learned", bot.params.on("goalmodel") && net.kasax.challengecraft.bot.learn.ModelStore.goal() != null);
+        o.addProperty("minute", Math.round(minutes(now) * 10) / 10.0);
+        o.addProperty("params", bot.params.toString());
+        o.add("x", net.kasax.challengecraft.bot.learn.Journal.array(x));
+        goalRecord = o;
+    }
+
+    private void journalGoalEnd(Bot bot, String outcome) {
+        var o = goalRecord;
+        goalRecord = null;
+        if (o == null) return;
+        long now = bot.body().level().getGameTime();
+        o.addProperty("outcome", outcome);
+        o.addProperty("secs", goalSeconds(now));
+        o.addProperty("wall_secs", (now - goalStarted) / 20.0);
+        o.addProperty("extensions", extensions);
+        net.kasax.challengecraft.bot.learn.Journal.write("goal", o);
+    }
+
     @Override
     public void respawned(Bot bot) {
+        journalGoalEnd(bot, "died");
+        deathsSeen++;
         // Died at it: that intent waits longer before the next try.
         if (runningKey != null) cortex.ended(bot, runningKey, bot.body().level().getGameTime(), false, true);
         runningKey = null;
@@ -2413,6 +2498,7 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private void drop(Bot bot) {
+        journalGoalEnd(bot, "dropped");
         targetIndex = -1;
         goalTask = null;
         sideTask = null;

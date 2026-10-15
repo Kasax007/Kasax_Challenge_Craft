@@ -3238,3 +3238,152 @@ Die drei Brawl-Tests streuen auf dem alten wie dem neuen Stand gleich.
 
   Achtung: Die Spiel-Logs überschreiben sich je Seed mit der nächsten Liga.
 - **Höchstens zwei JVMs gleichzeitig:** Eine Liga belegt beide. Tests erst danach.
+
+## 26. Runde 21: Die Partie auf dem Laptop – und Bob lernt
+
+Auslöser war eine Runde des Spielers auf seinem Laptop: 9 Tode in gut sechs Stunden, dazu Wünsche aus
+dem Spielchat. Der Spieler fand das Dorf mit dem Bett und den Schild-Kessel-Eisen-Weg „leicht“ und
+wünschte sich ausdrücklich, Bob mehr Wissen über seine Umgebung zu geben. Darauf folgten fünf Aufträge:
+
+1. den Laptop einrichten und messen;
+2. eine Datenbrücke;
+3. ein Pilot „Kampf und Deckung lernen“;
+4. gelernte Zielschätzungen im Routenplaner;
+5. Strategie im Spiel gegen sich selbst.
+
+Gewünscht war außerdem ein Prozess, der auf dem Laptop von selbst weitertrainiert, bis man ihn
+stoppt, mit so vielen Instanzen, wie der Rechner gerade trägt.
+
+### 26.1 Die Tode des Laptop-Laufs und was dagegen getan ist
+
+| Tod | Ursache | Korrektur |
+| --- | --- | --- |
+| Zombie (2×), Spinne | Nach dem ersten Tod floh Bob eine Stunde lang vor allem: Die Marken des Wächters (`runAt` usw.) zählten in Ticks des alten Körpers, ein neuer Körper beginnt bei 0. | `newBody()` setzt alle Körper-Marken in Wächter, Bedrohungs- und Gefahrensinn beim Respawn zurück. Vor Spinnen und Endermen wird nicht mehr geflohen; bewaffnet und mit ≥ 8 HP kämpft Bob. |
+| Enderman (3×) | Vom Säulenkampf aus starrte Bob ihn an. Ein wütender Enderman bleibt stehen, solange sein Ziel ihn anstarrt. Nach einer Minute kam Bob herunter und starb unten. | Blickwächter: Bob schaut nie zufällig in Enderman-Augen. Beim Säulenbau starrt er ihn absichtlich an, damit er stehen bleibt. Oben schaut er auf die Füße, der Enderman kommt an den Fuß und wird von oben geschlagen (4 Tests grün, 0 HP Verlust). |
+| Plünderer | Am Außenposten mauerte sich Bob viermal ein und wurde durch die Lücken erschossen. | Ab zwei Armbrust-Plünderern weg aus der Reichweite statt einmauern. |
+| Fall | Zwei Stürze aus 4 Blöcken (½ Herz) bei 1,5 HP. | Der Wegplaner ist HP-abhängig: Fall ≤ 2 bei ≤ 4 HP; Sprünge über Lücken nur über flache Gräben (≤ 6/≤ 2 Tiefe bei ≤ 10/≤ 6 HP); kein Sprint-Springen unter 7 HP. Test `frail_takes_the_stairs`. |
+| Ertrunkener, verbrannt | Hunger mit 0 Essen im Gepäck, dann Kämpfe bei 2–4 HP. | Neuer Knopf `foodstock`, den die Liga tunen kann. |
+
+Weitere Fehlerfunde:
+
+- **Handel:** Ein gescheiterter Handel wurde unter einem anderen Schlüssel gemerkt als dem, unter dem
+  später nachgesehen wurde. Darum fragte Bob den Waffenschmied fünfmal in 50 s.
+- **Lavapools:** Sie werden jetzt schon aus der Ferne auf Quellen gezählt (≥ 10) statt erst nach
+  dem Hinlaufen.
+- **Respawn:** Tot ab Sonnenuntergang heißt jetzt, auf den Morgen zu warten.
+- **Dorfbett:** Neue Aufgabe `VillageBedTask`. Sie verlangt ein Bett in einem Dorf, verscheucht
+  Monster in der Nähe und gilt erst als erledigt, wenn Bob wirklich liegt. Dazu kommt ein
+  Dämmerungsplan, der Bob rechtzeitig dorthin schickt.
+
+### 26.2 Weltsinn
+
+Der Knopf `worldsense` ist standardmäßig an. Bob kennt damit Strukturen bis etwa 500 Blöcke (Dörfer,
+Außenposten, Tempel, Schiffswracks, Ruinenportale, im Nether Festung und Bastion) und Biome bis etwa
+800 Blöcke.
+
+So geht er vor:
+
+- Er nutzt die Ortung des Spiels (`findNearestMapStructure`), eine Art je Blick. Ein Durchlauf dauert
+  zwei Minuten, damit es keine Ruckler gibt.
+- Die Biome holt er alle fünf Minuten aus einem Raster der Biomquelle.
+- Was er so weiß, geht in seinen Atlas wie Gesehenes. Kommt er näher, ersetzt der echte Blick die
+  Schätzung.
+
+### 26.3 Die Lerninfrastruktur
+
+Alle Java-Teile liegen im Paket `bot.learn`:
+
+| Teil | Aufgabe |
+| --- | --- |
+| `Journal` | JSON-Zeilen, eigener Schreib-Thread, Rotation bei 16 MB. Satzarten `cover`, `goal`, `death`, `game` und `arena`. |
+| `Situation` | 42 Zahlen zur Lage einer Deckungsentscheidung |
+| `GoalModel` | 25 Zahlen zur Lage einer Kachel, dazu Ridge- und Logistik-Modell |
+| `CoverOption`, `CoverPolicy` | Wahl nach Regeln, Modell oder Exploration. Der Wächter bleibt bei Modell und Exploration während eines Kampfes bei der einmal gewählten Option. |
+| `Mlp`, `CoverModel`, `ModelStore` | kleines Netz aus JSON. Die Modelle werden alle 10 s nachgeladen, ein Neustart ist nicht nötig. |
+| `Arena` | viele Kämpfe je Server in echter Welt, Modi `explore`, `eval`, `rule` und `model`; Befehl `challengecraft_bot arena start <n> <modus>` |
+| `Learn` | Journal auf/zu, Statusdatei `bob-status.json`, Watchdog: Der Server endet, wenn der Trainer weg ist. |
+
+Der Wächter wurde umgebaut, ohne dass sich sein Verhalten nach Regeln ändert:
+
+1. Er berechnet die Regel-Option.
+2. Er bestimmt die möglichen Optionen.
+3. Die Strategie wählt.
+4. `take()` setzt die Wahl um.
+
+Jeder Kampf, in dem der Wächter eingreift, wird eine Episode. Sie endet, wenn die Monster tot oder
+weg sind, nach 30 s oder mit dem Tod. Am Ende schreibt sie Ergebnis, HP-Verlust, Dauer und Kills
+ins Journal.
+
+Die Knöpfe `cover`, `goalmodel` und `worldsense` steuern die gelernten Teile. `champion.json` setzt
+die Standardknöpfe. Mit `BOB_LEARNED=0` ist alles Gelernte aus.
+
+### 26.4 Der Trainer auf dem Laptop (`scripts/train`)
+
+`train.bat` richtet Python ein und baut Bob (`gradlew bobLaunchSpec` schreibt Java, Klassenpfad und
+JVM-Argumente). Danach kopiert es Bobs Klassen zur Seite, damit ein Neubau in IntelliJ die laufenden
+Server nicht stört. Beim ersten Mal vermisst es den Rechner, dann trainiert es, bis `stop.bat` kommt.
+
+**Hauptschleife (alle 5 s):**
+
+- **Neuer Server:** wenn die CPU unter 72 % liegt, genug Speicher frei ist und die Obergrenze aus
+  der Kalibrierung noch nicht erreicht ist.
+- **Ein Server weniger:** über 92 % CPU oder unter 1,5 GB freiem Speicher.
+- **Aufteilung:** etwa ein Drittel Liga, der Rest Arena. Ein Prüfserver kommt dazu, wenn ein
+  Kandidat wartet.
+- **Wartung:** Arenen bekommen alle 30 Minuten eine frische Welt. Abgestürzte oder hängende Server
+  werden ersetzt.
+
+**Training (alle 10 Minuten):**
+
+- **Deckungsmodell:** Das Netz 42 → 64 → 64 → 7×3 schätzt Todeschance, HP-Verlust und Sekunden je
+  Option. Es lernt nur an der jeweils gewählten Option, mit numpy oder PyTorch/CUDA. Gelernt wird an
+  den älteren vier Fünfteln, geurteilt am neuesten Fünftel. Das Offline-Urteil schätzt per inverser
+  Propensität auf den zufälligen Arena-Wahlen. Ist das Modell um ≥ 3 % billiger als Regeln bzw.
+  aktuelles Modell und zu ≥ 75 % sicher besser, wird es Kandidat.
+- **Online-Prüfung:** Der Kandidat spielt in der Arena gepaarte Kämpfe (gleicher Start, Regeln gegen
+  Modell). Eingesetzt wird er nur, wenn Kosten und Tode besser sind; sonst kommt er nach `history/`.
+- **Zielmodell:** Ridge auf log(Sekunden), dazu ein logistisches Risiko. Es wird eingesetzt, wenn es
+  auf Validierungsdaten ≥ 5 % genauer ist als die Planschätzung (mit mindestens 150 erledigten
+  Zielen).
+
+**Liga (Punkt 5):**
+
+- Champion gegen Herausforderer (ein oder zwei Knöpfe geändert), gleiches Brett und gleiche Welt; die
+  Namen tauschen.
+- Frühestens nach 6 Spielen wird entschieden. Übernommen wird, wenn Mittelwert − 1,64·SE > 0 und mehr
+  Siege als Niederlagen; Tode zählen als −0,5 Felder.
+- Abgelehnt wird spätestens nach 16 Spielen.
+
+**Ausgabe:**
+
+- `report.md`, `status.json` und `calibration.md` auf Deutsch.
+- Was eingesetzt wird, kopiert der Trainer auch nach `run/bob-models`.
+
+Die Anleitung steht in `docs/bob-training.md`.
+
+### 26.5 Erprobt im Container (4 Kerne, 16 GB)
+
+**Kalibrierung (Kurzform, höchstens 2 Server):** Mit 4 Bots kam ein Server auf 1,0- bis 1,9-faches
+Echtzeit-Tempo. Wie schnell die Arena ist, hängt an der Wegsuche: Mit vier Such-Threads pro Server
+statt zwei stiegen die Kämpfe von 3,3 auf etwa 12 pro Minute.
+
+**Dauerbetrieb über 30 Minuten (1 Arena-Server und 1 Liga-Server, Trainingsschwellen für den Test
+gesenkt):**
+
+| Messgröße | Ergebnis |
+| --- | --- |
+| Liga | 7 Spiele zu 5 Minuten Spielzeit, je 1 bis 4 Minuten echte Zeit |
+| Journal | 396 Arena-Kämpfe, 212 davon mit Deckungswahl |
+| Deckungsmodell | nach 15 Minuten offline besser, in der Arena geprüft und eingesetzt: 14 Paare, 1 Tod statt 4, Kosten −15,7 je Kampf |
+| STOP-Datei | beendet alles sauber |
+
+Mit so wenigen Paaren ist das Ergebnis nur ein Funktionsnachweis, keine Messung. Auf dem Laptop gelten
+die vollen Schwellen: 300 Kämpfe und 120 Paare.
+
+**Spieltests:** Volle Suite: 187 grün, 3 rot.
+
+- `dig_into_cave` war rot, weil der Treppenabstieg in Höhlen auf 3 Blöcke begrenzt war. Diese
+  Änderung ist zurückgenommen, der Test ist danach grün.
+- `brawl_zombie_trio` (8,2 statt höchstens 7 HP verloren) und `brawl_enderman_slope` waren nur unter
+  der Last der vollen Suite rot. Einzeln sind beide grün, ebenso alle anderen Enderman-Tests. Sie
+  sollten in der nächsten vollen Suite erneut geprüft werden.

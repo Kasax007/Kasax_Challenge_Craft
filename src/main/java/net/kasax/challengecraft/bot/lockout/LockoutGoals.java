@@ -323,6 +323,15 @@ public final class LockoutGoals {
                 skip.add(p);
                 continue;
             }
+            // (Nor a puddle: the pools were walked to for minutes on the user's laptop and then
+            // had "only 7 lava sources", "only 1" - counted from afar now, as the cast counts them.)
+            if (level.isLoaded(p)) {
+                int n = bot.poolSources.computeIfAbsent(p.immutable(), q -> net.kasax.challengecraft.bot.task.LavaPortalTask.sourcesAround(level, q));
+                if (n < net.kasax.challengecraft.bot.task.LavaPortalTask.MIN_SOURCES) {
+                    skip.add(p);
+                    continue;
+                }
+            }
             if (first == null) first = p;
             if (p.distSqr(bot.body().blockPosition()) > 256 * 256) break;
             if (level.canSeeSky(p.above())) return p;
@@ -622,7 +631,7 @@ public final class LockoutGoals {
             case "enchant_pickaxe" -> enchant(bot, planner, Set.of(Items.WOODEN_PICKAXE, Items.STONE_PICKAXE, Items.IRON_PICKAXE));
             case "ring_bell" -> click(bot, "ring a bell", Blocks.BELL);
             case "use_lectern" -> click(bot, "use a lectern", Blocks.LECTERN);
-            case "sleep_in_village_bed" -> body.level().isDarkOutside() ? clickBed(bot) : null;
+            case "sleep_in_village_bed" -> villageBed(bot);
             default -> null;
         };
     }
@@ -856,12 +865,29 @@ public final class LockoutGoals {
         return new Option(cost, () -> new net.kasax.challengecraft.bot.task.ClickBlockTask(what, s -> s.is(block)));
     }
 
-    private static Option clickBed(Bot bot) {
+    /**
+     * A village bed at night: a bed that stands in a village (the tile's own test), the walk there,
+     * and the wait for the dark if it is near (the game lets one lie down only then). By day, far
+     * from the night, no option: the night plan takes him there at dusk (it ends the night too).
+     */
+    private static Option villageBed(Bot bot) {
+        if (!overworld(bot)) return null;
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-        BlockPos at = bot.memory().nearest(level, bot.body().blockPosition(), s -> s.is(net.minecraft.tags.BlockTags.BEDS), Set.of());
-        if (at == null) return villageTrip(bot);
-        return new Option(5 + Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5,
-                () -> new net.kasax.challengecraft.bot.task.ClickBlockTask("sleep in a village bed", s -> s.is(net.minecraft.tags.BlockTags.BEDS)));
+        long clock = level.getOverworldClockTime() % 24000;
+        // (The dark, or the dusk a minute and a half before it.)
+        boolean night = level.isDarkOutside() || level.isThundering() || clock >= 10700 && clock < 23000;
+        if (!night) return null;
+        BlockPos at = net.kasax.challengecraft.bot.task.VillageBedTask.nearestVillageBed(bot, Set.of());
+        if (at == null) {
+            // A village known, its beds not seen yet: the walk there (the beds show on the way in).
+            Option trip = villageTrip(bot);
+            return trip == null ? null : new Option(trip.cost() + 20, () -> new SequenceTask("sleep in a village bed", List.of(
+                    () -> new VisitStructureTask(level, "village"),
+                    net.kasax.challengecraft.bot.task.VillageBedTask::new)));
+        }
+        double wait = level.isDarkOutside() || level.isThundering() ? 0 : Math.max(0, 12542 - clock) / 20.0;
+        double walk = Math.sqrt(at.distSqr(bot.body().blockPosition())) / 3.5;
+        return new Option(8 + Math.max(walk, wait), net.kasax.challengecraft.bot.task.VillageBedTask::new);
     }
 
     /** Onto a horse (and again, until it stops bucking and is tame). */

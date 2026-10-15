@@ -23,6 +23,16 @@ import java.util.Map;
  *       none (only what the board's iron and the chests bring).</li>
  *   <li>{@code descent} - 1 (the default): what is dug for deep down and not seen yet costs the
  *       staircase down to it in the plan; 0: only the looking about down there (as before).</li>
+ *   <li>{@code cover} - how the guardian picks its way out of a fight going badly: 1 (the
+ *       default) the learnt model where there is one (bob-models/cover.json), else the rules;
+ *       0: the rules always; 2: at random among the possible ways (data for the trainer).</li>
+ *   <li>{@code goalmodel} - 1 (the default): a tile's estimate corrected by the learnt goal
+ *       model where there is one (bob-models/goal.json); 0: by the per-tile experience only.</li>
+ *   <li>{@code worldsense} - 1 (the default): structures out to some five hundred blocks and
+ *       biomes out to some eight hundred are known, as a player has a fair idea of them; 0: only
+ *       what is in view.</li>
+ *   <li>{@code foodstock} - a factor on what a stock of food may cost while not starving yet
+ *       (1, the default; 2: twice as much is worth it - fewer fights begun hungry).</li>
  * </ul>
  */
 public final class BotParams {
@@ -32,6 +42,18 @@ public final class BotParams {
 
     private BotParams(Map<String, Double> values) {
         this.values = values;
+    }
+
+    /** The knobs that won the self-play league (bob-models/champion.json), or the defaults. */
+    public static BotParams champion() {
+        String c = net.kasax.challengecraft.bot.learn.ModelStore.championParams();
+        if (c == null) return DEFAULT;
+        try {
+            return parse(c);
+        } catch (RuntimeException e) {
+            BotManager.LOG.warn("[Models] champion.json has knobs that do not parse ({}): the defaults", e.toString());
+            return DEFAULT;
+        }
     }
 
     /** From {@code key=value,...} (an empty or "-" text: the defaults). */

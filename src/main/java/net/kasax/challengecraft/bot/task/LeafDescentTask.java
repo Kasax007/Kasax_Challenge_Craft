@@ -19,14 +19,18 @@ public final class LeafDescentTask implements BotTask {
     private final java.util.Set<BlockPos> tried = new java.util.HashSet<>();
     /** No way along the crown: straight down through it after all (a fall of a few hearts at most). */
     private boolean takeTheFall;
-    /** When a bot may try again after finding no safe way down (game ticks of its body). */
-    private static final java.util.Map<Bot, Integer> NO_WAY_UNTIL = new java.util.WeakHashMap<>();
+    /**
+     * When a bot may try again after finding no safe way down (the level's game time: a new body
+     * after a death counts its ticks from naught, and a mark in the old body's count kept him out
+     * of every tree for as long as the old one had lived).
+     */
+    private static final java.util.Map<Bot, Long> NO_WAY_UNTIL = new java.util.WeakHashMap<>();
 
     /** Whether it stands on leaves with the ground more than a safe fall below. */
     public static boolean upATree(Bot bot) {
         var level = bot.body().level();
         BlockPos feet = bot.body().blockPosition();
-        if (bot.body().tickCount < NO_WAY_UNTIL.getOrDefault(bot, -1)) return false;
+        if (level.getGameTime() < NO_WAY_UNTIL.getOrDefault(bot, -1L)) return false;
         if (!level.getBlockState(feet.below()).is(BlockTags.LEAVES)) return false;
         var ground = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet);
         return ground.getY() < feet.getY() - 3;
@@ -125,7 +129,7 @@ public final class LeafDescentTask implements BotTask {
 
     private Result giveUp(Bot bot) {
         bot.say("no safe way down out of this tree here");
-        NO_WAY_UNTIL.put(bot, bot.body().tickCount + 600);
+        NO_WAY_UNTIL.put(bot, bot.body().level().getGameTime() + 600);
         return Result.FAILED;
     }
 

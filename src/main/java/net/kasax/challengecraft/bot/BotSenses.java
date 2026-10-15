@@ -168,7 +168,100 @@ public final class BotSenses {
             }
         }
         lootables.sort((a, b) -> Double.compare(a.distSqr(c), b.distSqr(c)));
+        if (worldSense) sense(level, c);
         nearestFrom(c);
+    }
+
+    // ---- the world sense: what a player has a fair idea of without having seen it --------------
+
+    /**
+     * World sense on (the knob {@code worldsense}, set by the bot): structures out to some five
+     * hundred blocks and the biomes out to some eight hundred are known, not only what is in view.
+     * The user's allowance - "give Bob a bit more knowledge about his surrounding world to mimic a
+     * player better": a player has seen the village roofs from the hill, knows the desert is past
+     * the forest, and so does not walk the other way. (A village close by was not known in a game
+     * on the user's laptop: the village-bed tile, "very easy", waited an hour.)
+     */
+    public boolean worldSense = true;
+    private int senseStep;
+    private long biomesSensedAt = Long.MIN_VALUE / 2;
+    private BlockPos biomesSensedFrom;
+
+    private static final List<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>> FAR_OVERWORLD = List.of(
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.VILLAGE_PLAINS, net.minecraft.world.level.levelgen.structure.BuiltinStructures.VILLAGE_DESERT,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.VILLAGE_SAVANNA, net.minecraft.world.level.levelgen.structure.BuiltinStructures.VILLAGE_SNOWY,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.VILLAGE_TAIGA, net.minecraft.world.level.levelgen.structure.BuiltinStructures.PILLAGER_OUTPOST,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.DESERT_PYRAMID, net.minecraft.world.level.levelgen.structure.BuiltinStructures.JUNGLE_TEMPLE,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.SWAMP_HUT, net.minecraft.world.level.levelgen.structure.BuiltinStructures.IGLOO,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.SHIPWRECK, net.minecraft.world.level.levelgen.structure.BuiltinStructures.SHIPWRECK_BEACHED,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.OCEAN_RUIN_COLD, net.minecraft.world.level.levelgen.structure.BuiltinStructures.OCEAN_RUIN_WARM,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_STANDARD, net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_DESERT,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_JUNGLE, net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_SWAMP,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_MOUNTAIN, net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_OCEAN,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.WOODLAND_MANSION, net.minecraft.world.level.levelgen.structure.BuiltinStructures.OCEAN_MONUMENT,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.TRAIL_RUINS);
+    private static final List<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>> FAR_NETHER = List.of(
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.FORTRESS, net.minecraft.world.level.levelgen.structure.BuiltinStructures.BASTION_REMNANT,
+            net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_NETHER);
+
+    private void sense(ServerLevel level, BlockPos c) {
+        boolean overworld = level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
+        boolean nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
+        var kinds = overworld ? FAR_OVERWORLD : nether ? FAR_NETHER : List.<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>>of();
+        if (!kinds.isEmpty()) {
+            // (One kind a look - a look every five seconds - the round in two minutes: a search for
+            // a structure can take a while, and one at a time none is felt.)
+            var key = kinds.get(senseStep++ % kinds.size());
+            var holder = level.registryAccess().lookupOrThrow(Registries.STRUCTURE).get(key);
+            if (holder.isPresent()) {
+                BlockPos at;
+                try {
+                    at = level.findNearestMapStructure(net.minecraft.core.HolderSet.direct(holder.get()), c, overworld ? 32 : 12, false);
+                } catch (RuntimeException e) {
+                    at = null;
+                }
+                if (at != null) {
+                    int y = nether ? c.getY() : surfaceAt(level, at.getX(), at.getZ());
+                    BlockPos spot = new BlockPos(at.getX(), y, at.getZ());
+                    // (Its parts are seen on coming near - the look then puts in the real ones.)
+                    addStructure(new SeenStructure(key.identifier(), spot,
+                            new BoundingBox(spot.getX() - 12, y - 6, spot.getZ() - 12, spot.getX() + 12, y + 12, spot.getZ() + 12)), c);
+                }
+            }
+        }
+        // The biomes round about: a sweep of the land every five minutes, or after a long walk.
+        long now = level.getGameTime();
+        if (!overworld || biomesSensedFrom != null && now - biomesSensedAt < 6000 && biomesSensedFrom.distSqr(c) < 256 * 256) return;
+        biomesSensedAt = now;
+        biomesSensedFrom = c.immutable();
+        Map<Identifier, BlockPos> nearest = new HashMap<>();
+        int range = 768, step = 48;
+        for (int dx = -range; dx <= range; dx += step) {
+            for (int dz = -range; dz <= range; dz += step) {
+                int x = c.getX() + dx, z = c.getZ() + dz;
+                // (The surface by the sea's height and up a mountain; the caves at ten.)
+                for (int y : new int[]{level.getSeaLevel() + 8, 110, 10}) {
+                    var b = level.getUncachedNoiseBiome(net.minecraft.core.QuartPos.fromBlock(x), net.minecraft.core.QuartPos.fromBlock(y),
+                            net.minecraft.core.QuartPos.fromBlock(z));
+                    var key = b.unwrapKey();
+                    if (key.isEmpty()) continue;
+                    BlockPos p = new BlockPos(x, y, z);
+                    nearest.merge(key.get().identifier(), p, (a, q) -> a.distSqr(c) <= q.distSqr(c) ? a : q);
+                }
+            }
+        }
+        for (var e : nearest.entrySet()) {
+            BlockPos p = e.getValue();
+            // (A surface biome's spot on the ground there, as far as the world's shape says.)
+            if (p.getY() > 20) p = new BlockPos(p.getX(), surfaceAt(level, p.getX(), p.getZ()), p.getZ());
+            noteBiome(e.getKey(), p, c);
+        }
+    }
+
+    /** The ground's height at a column: from the world if it is loaded, else from the world's shape. */
+    private static int surfaceAt(ServerLevel level, int x, int z) {
+        if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) != null) return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return level.getChunkSource().getGenerator().getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, level.getChunkSource().randomState());
     }
 
     /** The nearest known of each kind, from {@code c}, out of the atlas of this dimension. */
@@ -229,17 +322,19 @@ public final class BotSenses {
     }
 
     private void note(ServerLevel level, BlockPos p, BlockPos from) {
-        level.getBiome(p).unwrapKey().ifPresent(k -> {
-            List<BlockPos> spots = biomeAtlas.computeIfAbsent(dimension, d -> new HashMap<>()).computeIfAbsent(k.identifier(), d -> new ArrayList<>());
-            for (int i = 0; i < spots.size(); i++) {
-                // Near one it knows: whichever is nearer to here stands for that stretch.
-                if (spots.get(i).distSqr(p) < BIOME_SPACING * BIOME_SPACING) {
-                    if (p.distSqr(from) < spots.get(i).distSqr(from)) spots.set(i, p.immutable());
-                    return;
-                }
+        level.getBiome(p).unwrapKey().ifPresent(k -> noteBiome(k.identifier(), p, from));
+    }
+
+    private void noteBiome(Identifier id, BlockPos p, BlockPos from) {
+        List<BlockPos> spots = biomeAtlas.computeIfAbsent(dimension, d -> new HashMap<>()).computeIfAbsent(id, d -> new ArrayList<>());
+        for (int i = 0; i < spots.size(); i++) {
+            // Near one it knows: whichever is nearer to here stands for that stretch.
+            if (spots.get(i).distSqr(p) < BIOME_SPACING * BIOME_SPACING) {
+                if (p.distSqr(from) < spots.get(i).distSqr(from)) spots.set(i, p.immutable());
+                return;
             }
-            addCapped(spots, p.immutable(), from, x -> x);
-        });
+        }
+        addCapped(spots, p.immutable(), from, x -> x);
     }
 
     private static double distance(BoundingBox box, BlockPos p) {

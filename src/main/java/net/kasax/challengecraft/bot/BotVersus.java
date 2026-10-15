@@ -162,5 +162,10 @@ public final class BotVersus {
         }
         json.append("]}");
         BotManager.LOG.info("[BOTVS] result {}", json);
+        try {
+            net.kasax.challengecraft.bot.learn.Journal.write("game", com.google.gson.JsonParser.parseString(json.toString()).getAsJsonObject());
+        } catch (RuntimeException e) {
+            BotManager.LOG.warn("[Journal] match result not written: {}", e.toString());
+        }
     }
 }

@@ -135,3 +135,27 @@ loom {
 tasks.matching { it.name == 'runFilm' }.configureEach {
 	onlyIf { project.hasProperty('film') }
 }
+
+// The trainer on the laptop (scripts/train/bobtrain.py) starts its dedicated servers itself - as
+// many as the machine carries at the moment - the way runServer starts one, written down for it:
+// the Java, the classpath, the JVM arguments and the main class (./gradlew bobLaunchSpec).
+tasks.register('bobLaunchSpec') {
+	dependsOn 'classes', 'configureLaunch'
+	outputs.upToDateWhen { false }
+	doLast {
+		def run = tasks.getByName('runServer')
+		def spec = [
+			java      : run.javaLauncher.get().executablePath.asFile.absolutePath,
+			classpath : run.internalClasspath.files.collect { it.absolutePath },
+			jvmArgs   : run.internalJvmArgs.get(),
+			mainClass : run.mainClass.get(),
+			args      : run.args,
+			projectDir: projectDir.absolutePath,
+			version   : project.version.toString(),
+		]
+		def f = layout.buildDirectory.file("bob/launch-spec.json").get().asFile
+		f.parentFile.mkdirs()
+		f.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(spec))
+		println "Bob launch spec: ${f}"
+	}
+}

@@ -81,6 +81,14 @@ public final class DangerSense {
         this.bot = bot;
     }
 
+    /** A new body (after a death): the marks kept in the old body's ticks go (see Guardian#newBody). */
+    void newBody() {
+        streak = 0;
+        saidAt = -1000;
+        scannedAt = -1000;
+        columnsAt = -1;
+    }
+
     // ---- the map: lava and fire about him ---------------------------------------------------------
 
     private static final int SCAN_R = 8, SCAN_DOWN = 6, SCAN_UP = 2;

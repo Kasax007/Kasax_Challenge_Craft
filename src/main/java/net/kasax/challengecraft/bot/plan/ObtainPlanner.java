@@ -1269,10 +1269,13 @@ public final class ObtainPlanner {
             if (villageWalk < INF) {
                 for (Item item : accept) {
                     for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).selling(item)) {
-                        String key = "trade:" + t.profession() + ":" + name(item);
-                        if (t.wants() == item || isFailed(key, now) || visiting.contains(t.wants())) continue;
+                        String key = "trade:" + t.profession() + ":" + name(item), way = key + ":" + name(t.wants());
+                        // (A failed step is marked by its way's key, the price in it: looked up by
+                        // the shorter one only, it was never found - "the weaponsmith (level 1) does
+                        // not sell emerald" five times in fifty seconds on the user's laptop.)
+                        if (t.wants() == item || isFailed(key, now) || isFailed(way, now) || visiting.contains(t.wants())) continue;
                         double c = tradeCostOf(bot, t, costs);
-                        if (c < INF) ways.add(new Way(key + ":" + name(t.wants()), c, Kind.TRADE, t));
+                        if (c < INF) ways.add(new Way(way, c, Kind.TRADE, t));
                     }
                 }
             }
