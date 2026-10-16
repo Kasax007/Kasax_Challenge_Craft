@@ -166,3 +166,9 @@ Das Journal lässt sich mit `BOB_JOURNAL=off` abschalten.
 | Gradle-Fehler beim Bauen | einmal in IntelliJ bauen (`runClient` startet), dann `train.bat` erneut |
 | Server stürzen ab | `runs\train\instances\<server>\server.out` ansehen. Nach fünf Abstürzen in zehn Minuten startet der Trainer vorerst keine neuen. |
 | Festplatte füllt sich | Welten werden nach jedem Liga-Spiel und alle 30 Minuten pro Arena-Server gelöscht. Das Journal ist auf 3 GB begrenzt. |
+
+## Schnellere Server (optional)
+
+Lege die Fabric-Versionen für 26.3 von Lithium, C2ME und FerriteCore (von modrinth.com) als `.jar`
+nach `runs\train\mods\`. Jeder Trainingsserver lädt sie beim nächsten Start. Bob läuft damit wie
+bisher. Startet ein Server nicht mehr, nimm den zuletzt hinzugefügten Mod wieder heraus.

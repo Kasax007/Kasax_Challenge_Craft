@@ -295,6 +295,15 @@ class Instance:
             f.write("".join("%s=%s\n" % kv for kv in props.items()))
         with open(os.path.join(self.dir, "eula.txt"), "w", encoding="utf-8") as f:
             f.write("eula=true\n")
+        # (Extra server mods - Lithium, C2ME, FerriteCore - dropped into runs/train/mods: copied
+        # into each server's mods folder, which the Fabric loader reads in the dev launch too.)
+        mods = os.path.join(self.paths.base, "mods")
+        target = os.path.join(self.dir, "mods")
+        shutil.rmtree(target, ignore_errors=True)
+        if os.path.isdir(mods):
+            os.makedirs(target, exist_ok=True)
+            for jar in glob.glob(os.path.join(mods, "*.jar")):
+                shutil.copy2(jar, target)
         for stale in ("bob-status.json",):
             try:
                 os.remove(os.path.join(self.dir, stale))
