@@ -23,11 +23,20 @@ import time
 import numpy as np
 
 OPTIONS = ["FIGHT", "BOX", "PILLAR", "PILLAR_FIGHT", "RUN", "DIG", "SHELTER"]
-COVER_FEATURES = 42
-GOAL_FEATURES = 25
+COVER_FEATURES = 54
+GOAL_FEATURES = 32
+OLD_COVER_FEATURES = (42,)
+OLD_GOAL_FEATURES = (25,)
+
+
+def _padded(x, n, old):
+    """A record of an older, shorter feature list, filled up with zeros (features are only appended)."""
+    if x and len(x) in old:
+        return list(x) + [0.0] * (n - len(x))
+    return x
 HEADS = ["death", "hp", "secs"]
 # What a death costs against a heart and a second (the same weights go into the model file).
-COST = {"death": 60.0, "hp": 1.0, "secs": 0.05}
+COST = {"death": 60.0, "hp": 1.0, "secs": 0.15}  # (time counts: the league showed slow covers cost tiles)
 
 
 # ---- reading the journal ------------------------------------------------------------------------
@@ -77,7 +86,7 @@ class CoverData:
     def __init__(self, records):
         X, opt, mask, died, hp, secs, w, explore, rule = [], [], [], [], [], [], [], [], []
         for r in records:
-            x = r.get("x")
+            x = _padded(r.get("x"), COVER_FEATURES, OLD_COVER_FEATURES)
             if not x or len(x) != COVER_FEATURES or r.get("option") not in OPTIONS:
                 continue
             m = [0.0] * len(OPTIONS)
@@ -384,7 +393,7 @@ FAILED = {"failed", "overrun", "died"}
 def goal_data(records):
     X, y, fail, plain, done = [], [], [], [], []
     for r in records:
-        x = r.get("x")
+        x = _padded(r.get("x"), GOAL_FEATURES, OLD_GOAL_FEATURES)
         if not x or len(x) != GOAL_FEATURES or r.get("proxy"):
             continue
         out = r.get("outcome")

@@ -3,7 +3,9 @@ package net.kasax.challengecraft.bot.learn;
 import com.google.gson.JsonObject;
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotPlayer;
+import net.kasax.challengecraft.challenges.Chal_40_LockoutBingo;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoGoal;
+import net.kasax.challengecraft.challenges.lockout.LockoutBingoTeam;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory;
 import net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalDifficulty;
 import net.minecraft.world.item.Items;
@@ -23,7 +25,8 @@ public final class GoalModel {
     public static final String[] NAMES = {
             "log_estimate", "proxy", "cat_item", "cat_craft", "cat_kill", "cat_exploration", "cat_interaction", "cat_nether",
             "diff_easy", "diff_medium", "diff_hard", "diff_expert", "nether", "night", "minutes", "iron_pickaxe",
-            "bucket", "shield", "armour", "hp", "food", "deaths", "tries", "overruns", "experience"};
+            "bucket", "shield", "armour", "hp", "food", "deaths", "tries", "overruns", "experience",
+            "own_tiles", "other_tiles", "open_tiles", "lead", "y_level", "sky", "iron"};
 
     public final String version;
     private final double[] mean, std, w, risk;
@@ -44,10 +47,11 @@ public final class GoalModel {
     static GoalModel parse(JsonObject o) {
         if (!"goal".equals(o.get("kind").getAsString())) throw new IllegalArgumentException("not a goal model");
         double[] mean = Mlp.vector(o.get("mean")), std = Mlp.vector(o.get("std")), w = Mlp.vector(o.get("w"));
-        if (mean.length != NAMES.length || std.length != NAMES.length || w.length != NAMES.length)
+        // (A model of an older, shorter list still works: it reads the first of today's numbers.)
+        if (w.length > NAMES.length || mean.length != w.length || std.length != w.length)
             throw new IllegalArgumentException("features: " + w.length + ", the situation has " + NAMES.length);
-        double[] risk = o.has("risk_w") ? Mlp.vector(o.get("risk_w")) : new double[NAMES.length];
-        if (risk.length != NAMES.length) throw new IllegalArgumentException("risk features: " + risk.length);
+        double[] risk = o.has("risk_w") ? Mlp.vector(o.get("risk_w")) : new double[w.length];
+        if (risk.length != w.length) throw new IllegalArgumentException("risk features: " + risk.length);
         return new GoalModel(o.has("version") ? o.get("version").getAsString() : "?", mean, std, w, o.get("b").getAsDouble(),
                 risk, o.has("risk_b") ? o.get("risk_b").getAsDouble() : -10,
                 o.has("min_ratio") ? o.get("min_ratio").getAsDouble() : 0.5, o.has("max_ratio") ? o.get("max_ratio").getAsDouble() : 3);
@@ -87,6 +91,27 @@ public final class GoalModel {
         x[22] = Math.min(3, tries) / 3.0;
         x[23] = Math.min(3, overruns) / 3.0;
         x[24] = experience;
+        // (Added later: how the game stands. Older journal lines have these as nought.)
+        var server = level.getServer();
+        var team = server == null ? null : Chal_40_LockoutBingo.teamOf(server, body.getUUID());
+        if (team != null) {
+            int own = 0, other = 0, open = 0;
+            for (var t : Chal_40_LockoutBingo.board(server)) {
+                if (t.claimedBy() == null) open++;
+                else if (t.claimedBy() == team) own++;
+                else other++;
+            }
+            int best = 0;
+            for (LockoutBingoTeam t : LockoutBingoTeam.values()) if (t != team) best = Math.max(best, Chal_40_LockoutBingo.score(server, t));
+            x[25] = own / 25.0;
+            x[26] = other / 25.0;
+            x[27] = open / 25.0;
+            x[28] = Math.max(-1, Math.min(1, (own - best) / 13.0));
+        }
+        x[29] = Math.max(-1, Math.min(1.5, (body.getY() - 64) / 128));
+        x[30] = level.canSeeSky(body.blockPosition().above()) ? 1 : 0;
+        x[31] = Math.min(1.5, net.kasax.challengecraft.bot.plan.ObtainPlanner.countAny(body,
+                java.util.Set.of(Items.IRON_INGOT, Items.RAW_IRON)) / 16.0);
         return x;
     }
 

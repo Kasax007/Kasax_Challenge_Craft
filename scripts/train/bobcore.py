@@ -322,8 +322,12 @@ class Instance:
                     # queue for two threads, and the server waits for each in turn.)
                     "CHALLENGECRAFT_BOT_SEARCH_THREADS": str(self.search_threads)})
         env.pop("CHALLENGECRAFT_TEST_CHALLENGES", None)
+        env.pop("CHALLENGECRAFT_FULL_BOARD", None)
         if self.challenge:
             env["CHALLENGECRAFT_TEST_CHALLENGES"] = str(self.challenge)
+            # (League games run their full time: no early win on a majority, so the endgame of a
+            # close game is played and learnt from too.)
+            env["CHALLENGECRAFT_FULL_BOARD"] = "1"
         self.out = open(os.path.join(self.dir, "server.out"), "w", encoding="utf-8", errors="replace")
         kwargs = {}
         if WINDOWS:

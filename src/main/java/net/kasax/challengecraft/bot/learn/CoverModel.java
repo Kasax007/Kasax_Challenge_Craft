@@ -30,7 +30,8 @@ public final class CoverModel {
     static CoverModel parse(JsonObject o) {
         if (!"cover".equals(o.get("kind").getAsString())) throw new IllegalArgumentException("not a cover model");
         Mlp net = Mlp.parse(o);
-        if (net.inputs != Situation.NAMES.length) throw new IllegalArgumentException(net.inputs + " inputs, the situation has " + Situation.NAMES.length);
+        // (A model of an older, shorter list still works: it reads the first of today's numbers.)
+        if (net.inputs > Situation.NAMES.length) throw new IllegalArgumentException(net.inputs + " inputs, the situation has " + Situation.NAMES.length);
         var opts = o.getAsJsonArray("options");
         CoverOption[] options = new CoverOption[opts.size()];
         for (int i = 0; i < options.length; i++) options[i] = CoverOption.valueOf(opts.get(i).getAsString());
@@ -43,7 +44,7 @@ public final class CoverModel {
 
     /** What it costs, by the model, per option: {death chance, hearts lost, seconds}. */
     public double[][] predict(double[] situation) {
-        double[] out = net.apply(situation);
+        double[] out = net.apply(situation.length == net.inputs ? situation : java.util.Arrays.copyOf(situation, net.inputs));
         double[][] p = new double[CoverOption.ALL.length][];
         for (int i = 0; i < options.length; i++) {
             int o = i * heads;

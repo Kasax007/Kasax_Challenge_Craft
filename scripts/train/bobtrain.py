@@ -38,7 +38,7 @@ CONFIG = {
     "arena_mb": 2048,           # memory per arena server
     "league_mb": 3072,          # memory per league server (a whole Lockout game)
     "league_view": 12,          # view distance of league games (chunks)
-    "league_seconds": 1800,     # length of a league game (game time)
+    "league_seconds": 5400,     # length of a league game (game time, at least 90 min)
     "league_share": 0.34,       # share of the servers playing league games
     "arena_restart_min": 30,    # a fresh world for an arena server this often
     "train_every_min": 10,      # train the models this often
@@ -163,7 +163,7 @@ class Trainer:
             for name, _ in sides:
                 inst.command("challengecraft_bot spawn %s" % name)
             time.sleep(3)
-            secs = self.cfg["league_seconds"]
+            secs = max(5400, int(self.cfg["league_seconds"]))
             inst.command("difficulty hard")
             inst.command("tick sprint %d" % (secs * 20 + 400))
             inst.command("challengecraft_bot versus %d hard %s" % (secs, " ".join("%s:%s" % s for s in sides)))

@@ -3,7 +3,10 @@ package net.kasax.challengecraft.bot.learn;
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotPlayer;
 import net.kasax.challengecraft.bot.Guardian;
+import net.minecraft.core.BlockPos;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Creeper;
@@ -25,7 +28,9 @@ public final class Situation {
             "sky", "light", "hard", "threats", "melee", "ranged", "reachless", "spiders",
             "endermen", "creepers", "cubes", "pillagers", "skeletons", "fireballs", "nearest", "mean_dist",
             "ticks_left", "fight_ticks", "box_possible", "box_taken", "pillar_possible", "dig_ticks", "room_to_run", "threat_dps",
-            "threat_above", "threat_health"};
+            "threat_above", "threat_health",
+            "creeper_swelling", "creeper_nearest", "witches", "drowned", "babies", "phantoms", "on_fire", "lava_near",
+            "y_level", "air", "falling", "day_time"};
 
     private Situation() {
     }
@@ -112,6 +117,40 @@ public final class Situation {
         x[39] = clamp(dpsIn / 10);
         x[40] = clamp(above / 8);
         x[41] = clamp(health / 100);
+        // (Added later: older journal lines have these as nought.)
+        int swelling = 0, witches = 0, drowned = 0, babies = 0, phantoms = 0;
+        double creeperNearest = 16;
+        for (Creeper c : level.getEntitiesOfClass(Creeper.class, body.getBoundingBox().inflate(16), Creeper::isAlive)) {
+            if (c.getSwellDir() > 0) swelling++;
+            creeperNearest = Math.min(creeperNearest, c.distanceTo(body));
+        }
+        for (Guardian.Threat t : r.threats()) {
+            Mob m = t.mob();
+            if (m.getType() == EntityTypes.WITCH) witches++;
+            if (m.getType() == EntityTypes.DROWNED) drowned++;
+            if (m.getType() == EntityTypes.PHANTOM) phantoms++;
+            if (m.isBaby()) babies++;
+        }
+        boolean lava = false;
+        BlockPos at = body.blockPosition();
+        for (BlockPos p : BlockPos.betweenClosed(at.offset(-3, -2, -3), at.offset(3, 1, 3))) {
+            if (level.getFluidState(p).is(FluidTags.LAVA)) {
+                lava = true;
+                break;
+            }
+        }
+        x[42] = clamp(swelling / 2.0);
+        x[43] = creepers == 0 ? 1 : Math.min(16, creeperNearest) / 16;
+        x[44] = clamp(witches / 4.0);
+        x[45] = clamp(drowned / 4.0);
+        x[46] = clamp(babies / 4.0);
+        x[47] = clamp(phantoms / 4.0);
+        x[48] = body.isOnFire() ? 1 : 0;
+        x[49] = lava ? 1 : 0;
+        x[50] = clamp((body.getY() - 64) / 128);
+        x[51] = body.getAirSupply() / (double) Math.max(1, body.getMaxAirSupply());
+        x[52] = clamp(body.fallDistance / 10);
+        x[53] = (level.getOverworldClockTime() % 24000) / 24000.0;
         return x;
     }
 }

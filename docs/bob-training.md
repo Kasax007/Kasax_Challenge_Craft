@@ -119,7 +119,7 @@ nächsten Start:
 | --- | --- | --- |
 | `arena_bots` | 6 | Bots pro Arena-Server |
 | `arena_mb` / `league_mb` | 2048 / 3072 | Arbeitsspeicher je Server |
-| `league_seconds` | 1800 | Länge eines Liga-Spiels (Spielzeit) |
+| `league_seconds` | 5400 | Länge eines Liga-Spiels (Spielzeit, mindestens 90 min; das Brett wird ganz ausgespielt) |
 | `league_share` | 0.34 | Anteil der Liga-Server |
 | `league_view` | 12 | Sichtweite der Liga-Spiele (Chunks) |
 | `train_every_min` | 10 | so oft wird trainiert |
