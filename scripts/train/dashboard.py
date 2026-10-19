@@ -101,6 +101,20 @@ def payload():
     }
 
 
+def trainer_python():
+    """The Python to train with: the training's own environment (runs/train/venv) if there is one,
+    else this one - with numpy and psutil installed first if they are missing (a new machine)."""
+    venv = os.path.join(BASE, "venv", "Scripts" if os.name == "nt" else "bin", "python.exe" if os.name == "nt" else "python")
+    py = venv if os.path.exists(venv) else sys.executable
+    check = subprocess.run([py, "-c", "import numpy, psutil"], capture_output=True)
+    if check.returncode != 0:
+        req = os.path.join(HERE, "requirements.txt")
+        r = subprocess.run([py, "-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", req], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError("pip install fehlgeschlagen: " + (r.stderr or r.stdout).strip()[-300:])
+    return py
+
+
 def start():
     if running():
         return "Das Training laeuft schon."
@@ -117,7 +131,12 @@ def start():
     else:
         kw["start_new_session"] = True
     try:
-        proc = subprocess.Popen([sys.executable, "-u", os.path.join(HERE, "bobtrain.py"), "run"], **kw)
+        py = trainer_python()
+    except Exception as e:
+        out.close()
+        return "Konnte die Python-Pakete nicht installieren (%s). Bitte start-dashboard.bat benutzen." % e
+    try:
+        proc = subprocess.Popen([py, "-u", os.path.join(HERE, "bobtrain.py"), "run"], **kw)
     except OSError as e:
         return "Konnte das Training nicht starten: %s" % e
     finally:
