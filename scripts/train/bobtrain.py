@@ -782,6 +782,13 @@ def main():
         res = train_models(paths, cfg)
         print(json.dumps(res, indent=1, ensure_ascii=False))
         return
+    # (A fresh device: start from the models shipped in the repo, not from nothing.)
+    shipped = os.path.join(bobcore.ROOT, "src", "main", "resources", "bob-models")
+    for name in ("cover.json", "goal.json", "champion.json", "state.json"):
+        src = os.path.join(shipped, name)
+        dst = paths.state if name == "state.json" else os.path.join(paths.models, name)
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy2(src, dst)
     machine = bobcore.Machine()
     java = bobcore.find_java()
     if not java:

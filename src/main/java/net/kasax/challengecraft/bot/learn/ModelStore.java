@@ -95,6 +95,14 @@ public final class ModelStore {
             return (T) e.model();
         }
         Object model = null;
+        if (modified < 0) {
+            // (No file here: the models shipped inside the mod, src/main/resources/bob-models.)
+            try (var in = ModelStore.class.getResourceAsStream("/bob-models/" + name)) {
+                if (in != null) model = parse.apply(JsonParser.parseReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject());
+            } catch (Exception ex) {
+                BotManager.LOG.warn("[Models] bundled {} not usable: {}", name, ex.toString());
+            }
+        }
         if (modified >= 0) {
             try (Reader r = Files.newBufferedReader(f, StandardCharsets.UTF_8)) {
                 model = parse.apply(JsonParser.parseReader(r).getAsJsonObject());
