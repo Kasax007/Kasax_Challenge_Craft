@@ -430,6 +430,11 @@ public final class Guardian {
         } else {
             double[] x = net.kasax.challengecraft.bot.learn.Situation.cover(bot, r, boxPossible, boxTaken, pillarPossible, digTicks, roomToRun);
             var choice = bot.cover.choose(bot, x, possible, rule);
+            // (The model may not stand to fight a fight the reckoning says is lost before it is won,
+            // when the rules know a way out: one bad guess there is a death.)
+            if (choice.how().equals("model") && choice.option() == net.kasax.challengecraft.bot.learn.CoverOption.FIGHT
+                    && rule != net.kasax.challengecraft.bot.learn.CoverOption.FIGHT && r.fightTicks() >= r.ticksLeft())
+                choice = new net.kasax.challengecraft.bot.learn.CoverPolicy.Choice(rule, "rule", choice.predicted());
             pick = choice.option();
             how = choice.how();
             if (episode == null) episode = new Episode(bot, r, x, possible, rule, choice);
