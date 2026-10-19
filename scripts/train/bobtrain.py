@@ -410,11 +410,6 @@ class Trainer:
     # -- the loop -------------------------------------------------------------------------------
 
     def run(self):
-        try:
-            os.remove(self.paths.stop_file)
-        except OSError:
-            pass
-
         def on_signal(*_):
             self.stop.set()
 
@@ -459,6 +454,35 @@ class Trainer:
             pass
         self.event("Training beendet")
         self.save_state()
+
+
+# ---- who is training (for the dashboard) --------------------------------------------------------
+
+def trainer_alive(paths):
+    """The pid of a trainer already running on these files, or None."""
+    info = read_json(os.path.join(paths.base, "trainer.json"))
+    if not info:
+        return None
+    try:
+        import psutil
+        p = psutil.Process(int(info["pid"]))
+        return p.pid if p.is_running() and any("bobtrain" in a for a in p.cmdline()) else None
+    except Exception:
+        return None
+
+
+def set_phase(paths, phase):
+    """Says what the trainer is doing (the dashboard shows it before the first status)."""
+    write_json(os.path.join(paths.base, "trainer.json"), {"pid": os.getpid(), "phase": phase, "since": time.time()})
+
+
+def clear_phase(paths):
+    info = read_json(os.path.join(paths.base, "trainer.json"))
+    if info and info.get("pid") == os.getpid():
+        try:
+            os.remove(os.path.join(paths.base, "trainer.json"))
+        except OSError:
+            pass
 
 
 # ---- training the models ------------------------------------------------------------------------
@@ -782,6 +806,17 @@ def main():
         res = train_models(paths, cfg)
         print(json.dumps(res, indent=1, ensure_ascii=False))
         return
+    other = trainer_alive(paths)
+    if other and other != os.getpid():
+        log.error("Das Training laeuft schon (Prozess %d).", other)
+        raise SystemExit(3)
+    import atexit
+    atexit.register(clear_phase, paths)
+    set_phase(paths, "startet")
+    try:
+        os.remove(paths.stop_file)
+    except OSError:
+        pass
     # (A fresh device: start from the models shipped in the repo, not from nothing.)
     shipped = os.path.join(bobcore.ROOT, "src", "main", "resources", "bob-models")
     for name in ("cover.json", "goal.json", "champion.json", "state.json"):
@@ -796,15 +831,23 @@ def main():
                   "oder BOB_JAVA auf die java.exe setzen.")
         raise SystemExit(2)
     log.info("Java: %s", java)
+    set_phase(paths, "baut Bob (Gradle, ein paar Minuten)")
     spec = bobcore.snapshot(bobcore.launch_spec(java, rebuild=not args.no_build), paths)
     if args.command == "calibrate":
+        set_phase(paths, "vermisst den Rechner (15-30 Minuten)")
         r = calibrate(paths, spec, machine, cfg, quick=args.quick)
         print(open(paths.calibration_md, encoding="utf-8").read())
         return
     if not os.path.exists(paths.calibration):
         log.info("Noch keine Kalibrierung: zuerst wird der Rechner vermessen (etwa 15-30 Minuten) ...")
+        set_phase(paths, "vermisst den Rechner (erster Start, 15-30 Minuten)")
         calibrate(paths, spec, machine, cfg)
         log.info("Kalibrierung fertig: %s", paths.calibration_md)
+    if os.path.exists(paths.stop_file):
+        log.info("STOP-Datei gefunden: Training wird nicht gestartet")
+        os.remove(paths.stop_file)
+        return
+    set_phase(paths, "trainiert")
     Trainer(paths, spec, machine, cfg).run()
 
 

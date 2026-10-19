@@ -20,6 +20,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;p
 .bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;min-width:80px}.bar>span{display:block;height:100%}
 .knobs code{background:var(--bg);padding:1px 6px;border-radius:5px;margin:2px;display:inline-block}
 #msg{min-height:1.5em}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--bg);padding:10px;border-radius:8px;margin:8px 0 0}
+summary{cursor:pointer;margin-top:12px}
 </style>
 </head>
 <body><main>
@@ -37,7 +39,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;p
   <div class="card"><h2>Strategie (Liga)</h2><div class="big" id="leagueBig">–</div><div class="muted" id="leagueTxt"></div></div>
 </div>
 
-<div class="card"><h2>Was gerade läuft</h2><div id="servers" class="muted">keine Server</div></div>
+<div class="card"><h2>Was gerade läuft</h2><div id="servers" class="muted">keine Server</div>
+<details id="logbox"><summary class="muted">Protokoll (letzte Zeilen)</summary><pre id="log"></pre></details></div>
 
 <div class="card"><h2>Prüfungen neuer Kampf-Modelle</h2>
 <p class="muted">Jedes neue Modell kämpft dieselben Situationen wie die alten Regeln. Weniger Tode = besser. Nur Sieger werden eingesetzt.</p>
@@ -58,14 +61,20 @@ const when=t=>new Date(t*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-di
 const NAMES={guardian:'Wächter',quick:'schnelle Felder zuerst (s)',shield:'Schild früh',foodcap:'Essens-Limit',foodstock:'Essensvorrat',nightarmour:'Rüstung nachts',copper:'Kupferrüstung',descent:'Treppe im Plan',worldsense:'Weltsinn',goalmodel:'gelernte Zeiten',cover:'gelerntes Kämpfen'};
 const knobText=p=>Object.fromEntries((p||'').split(',').filter(x=>x.includes('=')).map(x=>x.split('=')));
 function diff(a,b){const A=knobText(a),B=knobText(b);return Object.keys(B).filter(k=>A[k]!==B[k]).map(k=>`${NAMES[k]||k}: ${A[k]}→${B[k]}`).join(', ')||'–'}
-async function act(a){$('msg').textContent='…';const r=await fetch('/api/'+a,{method:'POST'});$('msg').textContent=(await r.json()).message;setTimeout(load,1500)}
+const OFFLINE='Das Dashboard-Programm läuft nicht. Bitte start-dashboard.bat starten und die Seite über http://127.0.0.1:8765 öffnen (nicht die HTML-Datei direkt).';
+async function act(a){
+ $('start').disabled=$('stop').disabled=true;$('msg').textContent=a==='start'?'startet …':'stoppt …';
+ try{const r=await fetch('/api/'+a,{method:'POST'});$('msg').textContent=(await r.json()).message}
+ catch(e){$('msg').textContent=OFFLINE}
+ load()}
 async function load(){
- const d=await (await fetch('/api/data')).json(), st=d.status||{};
- $('state').textContent=d.stopping&&d.running?'stoppt …':d.running?'läuft':'gestoppt';
+ let d;try{d=await (await fetch('/api/data')).json()}catch(e){$('sub').textContent=OFFLINE;$('state').textContent='offline';return}
+ const st=d.status||{};
+ $('state').textContent=d.stopping&&d.running?'stoppt …':d.running?(d.phase&&d.phase!=='trainiert'?d.phase.split(' (')[0]:'läuft'):'gestoppt';
  $('state').className='pill '+(d.running?'on':'off');
  $('start').disabled=d.running;$('stop').disabled=!d.running||d.stopping;
  const m=st.machine||{};
- $('sub').textContent=d.running?`${(st.instances||[]).length} Server · CPU ${m.cpu}% · ${fmt(m.free_mb)} MB frei · läuft seit ${Math.round(st.uptime_min||0)} min`:'Training ist aus. „Training starten“ drücken.';
+ $('sub').textContent=d.running&&d.phase&&d.phase!=='trainiert'?`Vorbereitung: ${d.phase} – seit ${Math.round((Date.now()/1000-d.phase_since)/60)} min. Danach starten die Server.`:d.running?`${(st.instances||[]).length} Server · CPU ${m.cpu}% · ${fmt(m.free_mb)} MB frei · läuft seit ${Math.round(st.uptime_min||0)} min`:'Training ist aus. „Training starten“ drücken.';
  // fight model
  const ok=d.evals.filter(e=>e.promoted), last=ok[ok.length-1];
  if(last){const r=Math.round(100*(1-last.deaths_model/Math.max(1,last.deaths_rule)));
@@ -91,6 +100,7 @@ async function load(){
  // counts
  const c=d.counts;
  $('counts').innerHTML=[['Arena-Kämpfe',c.arena],['Kampf-Entscheidungen',c.cover],['gespielte Felder',c.goal],['Tode (zum Lernen)',c.death],['Liga-Spiele',c.game]].map(([k,v])=>`<div><div class="big">${fmt(v)}</div><div class="muted">${k}</div></div>`).join('');
+ $('log').textContent=(d.log||[]).join('\n')||'–';
  $('events').innerHTML=(d.events||[]).slice().reverse().map(e=>`<div>${esc(e)}</div>`).join('')||'<span class="muted">–</span>';
 }
 load();setInterval(load,10000);

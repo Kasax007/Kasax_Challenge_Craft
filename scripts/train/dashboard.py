@@ -30,12 +30,45 @@ def load(path, default=None):
         return default
 
 
+def trainer():
+    """The running trainer's {pid, phase, since}, or None. It says so in trainer.json from its first
+    second on (building and measuring the laptop take minutes before the first status)."""
+    info = load(os.path.join(BASE, "trainer.json"))
+    if not info:
+        return None
+    try:
+        import psutil
+        p = psutil.Process(int(info["pid"]))
+        if p.is_running() and any("bobtrain" in a for a in p.cmdline()):
+            return info
+    except Exception:
+        pass
+    return None
+
+
 def running():
-    """The trainer counts as running while its status file is fresh (it is written every 15 s)."""
+    if trainer():
+        return True
+    # (A trainer from before trainer.json: its status file is fresh, written every 15 s.)
     try:
         return time.time() - os.path.getmtime(os.path.join(BASE, "status.json")) < 60
     except OSError:
         return False
+
+
+def log_tail(n=12):
+    """The trainer's last lines (its log, and what it printed when started from here)."""
+    lines = []
+    for name in ("bobtrain.log", "dashboard-trainer.log"):
+        try:
+            with open(os.path.join(BASE, name), encoding="utf-8", errors="replace") as f:
+                f.seek(max(0, os.path.getsize(f.name) - 20000))
+                lines = f.read().splitlines()[-n:]
+        except OSError:
+            continue
+        if lines:
+            break
+    return lines
 
 
 def payload():
@@ -44,8 +77,12 @@ def payload():
     models = {n: load(os.path.join(BASE, "models", n)) for n in ("cover.json", "goal.json", "champion.json")}
     league = state.get("league") or {}
     last = (state.get("last_train") or {})
+    t = trainer()
     return {
         "running": running(),
+        "phase": t.get("phase") if t else None,
+        "phase_since": t.get("since") if t else None,
+        "log": log_tail(),
         "stopping": os.path.exists(os.path.join(BASE, "STOP")),
         "status": st,
         "evals": state.get("evals", [])[-20:],
@@ -72,18 +109,44 @@ def start():
     except OSError:
         pass
     os.makedirs(BASE, exist_ok=True)
-    out = open(os.path.join(BASE, "dashboard-trainer.log"), "a", encoding="utf-8")
+    out = open(os.path.join(BASE, "dashboard-trainer.log"), "w", encoding="utf-8")
     kw = {"cwd": ROOT, "stdout": out, "stderr": subprocess.STDOUT, "stdin": subprocess.DEVNULL}
     if os.name == "nt":
-        kw["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+        # (Own hidden console and process group: it keeps running when the dashboard window closes.)
+        kw["creationflags"] = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     else:
         kw["start_new_session"] = True
-    subprocess.Popen([sys.executable, os.path.join(HERE, "bobtrain.py"), "run"], **kw)
-    return "Training startet - nach etwa einer Minute erscheinen die ersten Server."
+    try:
+        proc = subprocess.Popen([sys.executable, "-u", os.path.join(HERE, "bobtrain.py"), "run"], **kw)
+    except OSError as e:
+        return "Konnte das Training nicht starten: %s" % e
+    finally:
+        out.close()
+    # (Gone at once: Java missing, a broken config ... - say why instead of nothing.)
+    for _ in range(8):
+        time.sleep(0.5)
+        if proc.poll() is not None:
+            tail = " | ".join(log_tail(4))
+            return "Das Training hat sich gleich wieder beendet (Code %s). %s" % (proc.returncode, tail)
+        if trainer():
+            break
+    return "Training startet. Erst wird Bob gebaut (und beim ersten Mal der Rechner vermessen), dann kommen die Server."
 
 
 def stop():
     os.makedirs(BASE, exist_ok=True)
+    t = trainer()
+    if t and t.get("phase") != "trainiert":
+        # (Still building or measuring: nothing to save yet. Its servers notice it is gone.)
+        try:
+            import psutil
+            p = psutil.Process(int(t["pid"]))
+            for c in p.children(recursive=True):
+                c.terminate()
+            p.terminate()
+            return "Gestoppt (es lief erst: %s)." % t.get("phase")
+        except Exception as e:
+            return "Konnte nicht stoppen: %s" % e
     open(os.path.join(BASE, "STOP"), "w").close()
     return "Stopp gesetzt - die Server werden sauber beendet (etwa eine Minute)."
 
