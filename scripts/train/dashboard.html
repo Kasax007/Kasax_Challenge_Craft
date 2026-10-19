@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bobs Training</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2430;--muted:#667085;--line:#e3e6eb;--good:#1a7f4b;--bad:#b42318;--warn:#b54708;--accent:#2f6fde}
+@media (prefers-color-scheme:dark){:root{--bg:#11151c;--card:#1a2029;--text:#e7ebf1;--muted:#98a2b3;--line:#2b3340;--good:#4ec27f;--bad:#f97066;--warn:#fdb022;--accent:#6ea0ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}.muted{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:16px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.pill{display:inline-block;padding:4px 12px;border-radius:99px;font-weight:700}
+.on{background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good)}.off{background:color-mix(in srgb,var(--muted) 15%,transparent);color:var(--muted)}
+button{border:0;border-radius:8px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer;color:#fff;background:var(--accent)}button.stop{background:var(--bad)}button:disabled{opacity:.4;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.big{font-size:30px;font-weight:750;line-height:1.1}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;min-width:80px}.bar>span{display:block;height:100%}
+.knobs code{background:var(--bg);padding:1px 6px;border-radius:5px;margin:2px;display:inline-block}
+#msg{min-height:1.5em}
+</style>
+</head>
+<body><main>
+<div class="top">
+  <div><h1>Bobs Training</h1><div class="muted" id="sub">lädt …</div></div>
+  <div><span class="pill off" id="state">–</span>
+    <button id="start" onclick="act('start')">Training starten</button>
+    <button id="stop" class="stop" onclick="act('stop')">Stoppen</button></div>
+</div>
+<div id="msg" class="muted"></div>
+
+<div class="grid">
+  <div class="card"><h2>Kämpfen &amp; Deckung</h2><div class="big" id="coverBig">–</div><div class="muted" id="coverTxt"></div></div>
+  <div class="card"><h2>Zeit-Schätzungen</h2><div class="big" id="goalBig">–</div><div class="muted" id="goalTxt"></div></div>
+  <div class="card"><h2>Strategie (Liga)</h2><div class="big" id="leagueBig">–</div><div class="muted" id="leagueTxt"></div></div>
+</div>
+
+<div class="card"><h2>Was gerade läuft</h2><div id="servers" class="muted">keine Server</div></div>
+
+<div class="card"><h2>Prüfungen neuer Kampf-Modelle</h2>
+<p class="muted">Jedes neue Modell kämpft dieselben Situationen wie die alten Regeln. Weniger Tode = besser. Nur Sieger werden eingesetzt.</p>
+<div id="evals"></div></div>
+
+<div class="card"><h2>Liga: neue Einstellungen gegen den Champion</h2>
+<p class="muted">Bob spielt gegen eine Kopie mit einer geänderten Einstellung. Holt die Kopie klar mehr Felder, wird sie der neue Champion.</p>
+<div class="knobs" id="champ"></div><div id="duels"></div></div>
+
+<div class="card"><h2>Gesammelte Erfahrung</h2><div class="grid" id="counts"></div></div>
+<div class="card"><h2>Letzte Ereignisse</h2><div id="events"></div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fmt=n=>(n??0).toLocaleString('de-DE');
+const when=t=>new Date(t*1000).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const NAMES={guardian:'Wächter',quick:'schnelle Felder zuerst (s)',shield:'Schild früh',foodcap:'Essens-Limit',foodstock:'Essensvorrat',nightarmour:'Rüstung nachts',copper:'Kupferrüstung',descent:'Treppe im Plan',worldsense:'Weltsinn',goalmodel:'gelernte Zeiten',cover:'gelerntes Kämpfen'};
+const knobText=p=>Object.fromEntries((p||'').split(',').filter(x=>x.includes('=')).map(x=>x.split('=')));
+function diff(a,b){const A=knobText(a),B=knobText(b);return Object.keys(B).filter(k=>A[k]!==B[k]).map(k=>`${NAMES[k]||k}: ${A[k]}→${B[k]}`).join(', ')||'–'}
+async function act(a){$('msg').textContent='…';const r=await fetch('/api/'+a,{method:'POST'});$('msg').textContent=(await r.json()).message;setTimeout(load,1500)}
+async function load(){
+ const d=await (await fetch('/api/data')).json(), st=d.status||{};
+ $('state').textContent=d.stopping&&d.running?'stoppt …':d.running?'läuft':'gestoppt';
+ $('state').className='pill '+(d.running?'on':'off');
+ $('start').disabled=d.running;$('stop').disabled=!d.running||d.stopping;
+ const m=st.machine||{};
+ $('sub').textContent=d.running?`${(st.instances||[]).length} Server · CPU ${m.cpu}% · ${fmt(m.free_mb)} MB frei · läuft seit ${Math.round(st.uptime_min||0)} min`:'Training ist aus. „Training starten“ drücken.';
+ // fight model
+ const ok=d.evals.filter(e=>e.promoted), last=ok[ok.length-1];
+ if(last){const r=Math.round(100*(1-last.deaths_model/Math.max(1,last.deaths_rule)));
+  $('coverBig').innerHTML=`<span class="${r>0?'good':'bad'}">${r>0?'−':'+'}${Math.abs(r)}% Tode</span>`;
+  $('coverTxt').textContent=`Letzter Test: ${last.deaths_model} statt ${last.deaths_rule} Tode in ${last.pairs} gleichen Kämpfen gegenüber den alten Regeln. ${ok.length} von ${d.evals.length} Modellen bestanden.`}
+ else{$('coverBig').textContent='noch keins';$('coverTxt').textContent='Bob kämpft nach den Regeln, bis ein Modell die Prüfung besteht.'}
+ // goal model
+ const g=d.goal||{};
+ if(g.gain!=null){$('goalBig').innerHTML=`<span class="${g.gain>0?'good':'warn'}">${Math.round(g.gain*100)}% genauer</span>`;$('goalTxt').textContent=`als die reine Planschätzung, gelernt aus ${fmt(g.n)} Feldern. ${d.goal_version?'Wird benutzt.':'Noch nicht eingesetzt (ab 5 %).'}`}
+ else{$('goalBig').textContent='sammelt';$('goalTxt').textContent=g.note||'Noch zu wenig gespielte Felder.'}
+ // league
+ const prom=d.duels.filter(x=>x.verdict==='promoted').length;
+ $('leagueBig').textContent=`${fmt(d.league_games)} Spiele`;
+ $('leagueTxt').textContent=`${d.duels.length} Duelle entschieden, ${prom} neue Champions. Laufendes Duell: ${d.duel_games} Spiele${d.challenger?' – testet '+diff(d.champion,Object.entries(d.challenger).map(([k,v])=>k+'='+v).join(',')):''}.`;
+ // servers
+ const ins=st.instances||[];
+ $('servers').innerHTML=!d.running||!ins.length?'<span class="muted">keine Server</span>':`<table><tr><th>Server</th><th>Aufgabe</th><th>Tempo</th><th>Kämpfe/min</th><th>RAM</th></tr>${ins.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.kind==='league'?'Liga-Spiel (Bob gegen Bob)':i.kind==='eval'?'prüft neues Kampf-Modell':'Arena: übt Kämpfe'}</td><td>${i.game_speed?i.game_speed+'× Echtzeit':'–'}</td><td>${i.fights_per_min??'–'}</td><td>${fmt(i.mem_mb)} MB</td></tr>`).join('')}</table>`;
+ // evals
+ $('evals').innerHTML=!d.evals.length?'<span class="muted">noch keine</span>':`<table><tr><th>Wann</th><th>Tode Modell</th><th>Tode Regeln</th><th></th><th>Ergebnis</th></tr>${d.evals.slice().reverse().map(e=>{const w=Math.min(100,100*e.deaths_model/Math.max(1,e.deaths_rule));return `<tr><td>${when(e.time)}</td><td>${e.deaths_model}</td><td>${e.deaths_rule}</td><td><div class="bar"><span style="width:${w}%;background:var(--${e.promoted?'good':'bad'})"></span></div></td><td class="${e.promoted?'good':'bad'}">${e.promoted?'eingesetzt':'abgelehnt'}</td></tr>`}).join('')}</table>`;
+ // duels
+ $('champ').innerHTML='Champion: '+Object.entries(knobText(d.champion)).map(([k,v])=>`<code>${esc(NAMES[k]||k)} = ${esc(v)}</code>`).join('');
+ $('duels').innerHTML=!d.duels.length?'':`<table><tr><th>Wann</th><th>Getestete Änderung</th><th>Spiele</th><th>Felder je Spiel</th><th>Ergebnis</th></tr>${d.duels.slice().reverse().map(x=>`<tr><td>${when(x.time)}</td><td>${esc(diff(x.champion,x.challenger))}</td><td>${x.games}</td><td class="${x.mean_diff>0?'good':'bad'}">${x.mean_diff>0?'+':''}${x.mean_diff}</td><td>${x.verdict==='promoted'?'<b class="good">neuer Champion</b>':'abgelehnt'}</td></tr>`).join('')}</table>`;
+ // counts
+ const c=d.counts;
+ $('counts').innerHTML=[['Arena-Kämpfe',c.arena],['Kampf-Entscheidungen',c.cover],['gespielte Felder',c.goal],['Tode (zum Lernen)',c.death],['Liga-Spiele',c.game]].map(([k,v])=>`<div><div class="big">${fmt(v)}</div><div class="muted">${k}</div></div>`).join('');
+ $('events').innerHTML=(d.events||[]).slice().reverse().map(e=>`<div>${esc(e)}</div>`).join('')||'<span class="muted">–</span>';
+}
+load();setInterval(load,10000);
+</script>
+</body></html>

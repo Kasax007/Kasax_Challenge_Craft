@@ -172,3 +172,7 @@ Das Journal lässt sich mit `BOB_JOURNAL=off` abschalten.
 Lege die Fabric-Versionen für 26.3 von Lithium, C2ME und FerriteCore (von modrinth.com) als `.jar`
 nach `runs\train\mods\`. Jeder Trainingsserver lädt sie beim nächsten Start. Bob läuft damit wie
 bisher. Startet ein Server nicht mehr, nimm den zuletzt hinzugefügten Mod wieder heraus.
+
+## Dashboard
+
+`scripts\train\dashboard.bat` (oder `start-dashboard.bat` im Projektordner) öffnet http://127.0.0.1:8765. Dort siehst du, ob das Training läuft, und kannst es starten und stoppen. Die drei Kacheln zeigen, wie gut Bob gerade kämpft, schätzt und plant. Darunter stehen die Prüfungen der Kampf-Modelle und die Liga-Duelle mit der jeweils getesteten Änderung.
