@@ -1,0 +1,277 @@
+{
+ "league": {
+  "champion": {
+   "guardian": 1,
+   "quick": 30,
+   "shield": 0,
+   "foodcap": -1,
+   "foodstock": 1.0,
+   "nightarmour": 0,
+   "copper": 1,
+   "descent": 1,
+   "worldsense": 1,
+   "goalmodel": 1,
+   "cover": 1
+  },
+  "challenger": {
+   "guardian": 1,
+   "quick": 30,
+   "shield": 0,
+   "foodcap": -1,
+   "foodstock": 1.0,
+   "nightarmour": 0,
+   "copper": 1,
+   "descent": 1,
+   "worldsense": 1,
+   "goalmodel": 0,
+   "cover": 1
+  },
+  "games": [
+   {
+    "seed": -6547616082044173406,
+    "tiles": [
+     4,
+     1
+    ],
+    "deaths": [
+     3,
+     2
+    ],
+    "hearts": [
+     181.0,
+     50.5
+    ],
+    "secs": 5400
+   }
+  ],
+  "tried": {
+   "copper=0,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1": "rejected",
+   "copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1": "rejected",
+   "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1": "rejected",
+   "copper=1,cover=0,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1": "rejected"
+  },
+  "history": [
+   {
+    "time": 1792102525.4360442,
+    "challenger": "copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+    "games": 16,
+    "mean_diff": -0.31,
+    "se": 0.7,
+    "wins": 6,
+    "losses": 9,
+    "verdict": "rejected"
+   },
+   {
+    "time": 1792142478.5722754,
+    "challenger": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+    "games": 6,
+    "mean_diff": 2.17,
+    "se": 1.09,
+    "wins": 4,
+    "losses": 2,
+    "verdict": "promoted"
+   },
+   {
+    "time": 1792150479.9754848,
+    "challenger": "copper=0,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "games": 16,
+    "mean_diff": 0.12,
+    "se": 0.92,
+    "wins": 9,
+    "losses": 7,
+    "verdict": "rejected"
+   },
+   {
+    "time": 1792155750.6685658,
+    "challenger": "copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "games": 13,
+    "mean_diff": -1.38,
+    "se": 1.03,
+    "wins": 4,
+    "losses": 8,
+    "verdict": "rejected"
+   },
+   {
+    "time": 1792158815.4189723,
+    "challenger": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "games": 6,
+    "mean_diff": -1.83,
+    "se": 1.6,
+    "wins": 2,
+    "losses": 4,
+    "verdict": "rejected"
+   },
+   {
+    "time": 1792176265.6725698,
+    "challenger": "copper=1,cover=0,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+    "games": 16,
+    "mean_diff": 1.12,
+    "se": 1.08,
+    "wins": 10,
+    "losses": 5,
+    "verdict": "rejected"
+   }
+  ]
+ },
+ "last_train": {
+  "time": "2026-10-17 14:29:14",
+  "counts": {
+   "cover": 54179,
+   "death": 33545,
+   "arena": 100251,
+   "goal": 11228,
+   "game": 73
+  },
+  "journal_mb": 137.5,
+  "cover": {
+   "n": 43343,
+   "n_explore": 43343,
+   "val_loss": 4.2558,
+   "epochs": 48,
+   "seconds": 27.0,
+   "device": "cuda",
+   "value_model": 13.873155118972498,
+   "value_rule": 15.874982650478033,
+   "matched_model": 2596,
+   "matched_rule": 2618,
+   "p_better": 1.0,
+   "choices": {
+    "FIGHT": 1662,
+    "BOX": 7156,
+    "PILLAR": 2,
+    "PILLAR_FIGHT": 369,
+    "RUN": 755,
+    "DIG": 612,
+    "SHELTER": 280
+   },
+   "value_current": 13.679191382872029
+  },
+  "goal": {
+   "n": 684,
+   "n_done": 284,
+   "fail_rate": 0.585,
+   "lambda": 100,
+   "mae_log_model": 0.7779,
+   "mae_log_plan": 0.7823,
+   "gain": 0.006
+  }
+ },
+ "events": [
+  "15.10. 23:54  Neues Deckungsmodell 20261015-235405 ist offline besser - Pruefung in der Arena beginnt",
+  "16.10. 00:02  Deckungsmodell 20261015-235405 eingesetzt: Tode 15 statt 31, Kosten -8.5 je Kampf (123 Paare)",
+  "16.10. 00:14  Neues Deckungsmodell 20261016-001409 ist offline besser - Pruefung in der Arena beginnt",
+  "16.10. 00:15  Liga: Herausforderer copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1 abgelehnt (-0.3 ueber 16 Spiele)",
+  "16.10. 00:21  Deckungsmodell 20261016-001409 abgelehnt: Tode 23 (Regeln 24), Kosten -0.9 (127 Paare)",
+  "16.10. 00:24  STOP-Datei gefunden: Training wird beendet",
+  "16.10. 00:24  Training beendet",
+  "16.10. 10:46  Training gestartet: bis zu 4 Server (32 Kerne, 31 GB RAM)",
+  "16.10. 11:21  Liga: neuer Champion copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1 (+2.2 Felder je Spiel ueber 6 Spiele)",
+  "16.10. 11:26  Neues Deckungsmodell 20261016-112659 ist offline besser - Pruefung in der Arena beginnt",
+  "16.10. 11:33  Deckungsmodell 20261016-112659 abgelehnt: Tode 25 (Regeln 22), Kosten +1.3 (140 Paare)",
+  "16.10. 13:34  Liga: Herausforderer copper=0,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1 abgelehnt (+0.1 ueber 16 Spiele)",
+  "16.10. 15:02  Liga: Herausforderer copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1 abgelehnt (-1.4 ueber 13 Spiele)",
+  "16.10. 15:53  Liga: Herausforderer copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1 abgelehnt (-1.8 ueber 6 Spiele)",
+  "16.10. 15:58  Neues Zielzeit-Modell 20261016-155803 eingesetzt (7% genauer als der Plan)",
+  "16.10. 16:18  Neues Zielzeit-Modell 20261016-161806 eingesetzt (8% genauer als der Plan)",
+  "16.10. 16:19  Training beendet",
+  "16.10. 16:28  Training gestartet: bis zu 12 Server (32 Kerne, 31 GB RAM)",
+  "16.10. 16:33  STOP-Datei gefunden: Training wird beendet",
+  "16.10. 16:33  Training beendet",
+  "16.10. 16:42  Training gestartet: bis zu 12 Server (32 Kerne, 31 GB RAM)",
+  "16.10. 17:07  STOP-Datei gefunden: Training wird beendet",
+  "16.10. 17:07  Training beendet",
+  "16.10. 17:08  Training gestartet: bis zu 12 Server (32 Kerne, 31 GB RAM)",
+  "16.10. 17:08  Neues Zielzeit-Modell 20261016-170827 eingesetzt (5% genauer als der Plan)",
+  "16.10. 17:32  STOP-Datei gefunden: Training wird beendet",
+  "16.10. 17:32  Training beendet",
+  "16.10. 19:03  Training gestartet: bis zu 12 Server (32 Kerne, 31 GB RAM)",
+  "16.10. 19:34  Neues Zielzeit-Modell 20261016-193413 eingesetzt (7% genauer als der Plan)",
+  "16.10. 20:24  Neues Zielzeit-Modell 20261016-202430 eingesetzt (6% genauer als der Plan)",
+  "16.10. 20:34  Neues Zielzeit-Modell 20261016-203432 eingesetzt (5% genauer als der Plan)",
+  "16.10. 20:44  Liga: Herausforderer copper=1,cover=0,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1 abgelehnt (+1.1 ueber 16 Spiele)",
+  "16.10. 20:44  STOP-Datei gefunden: Training wird beendet",
+  "16.10. 20:44  Training beendet",
+  "17.10. 13:59  Training gestartet: bis zu 12 Server (32 Kerne, 31 GB RAM)",
+  "17.10. 14:21  arena-3: Server beendet/abgestuerzt - wird ersetzt",
+  "17.10. 14:21  arena-4: Server beendet/abgestuerzt - wird ersetzt",
+  "17.10. 14:21  arena-7: Server beendet/abgestuerzt - wird ersetzt",
+  "17.10. 14:35  STOP-Datei gefunden: Training wird beendet",
+  "17.10. 14:36  Training beendet"
+ ],
+ "counts": {
+  "cover": 54179,
+  "death": 33545,
+  "arena": 100251,
+  "goal": 11228,
+  "game": 73
+ },
+ "league_games": 74,
+ "evals": [
+  {
+   "pairs": 131,
+   "mean_diff": -4.48,
+   "t": 1.75,
+   "deaths_rule": 21,
+   "deaths_model": 13,
+   "version": "20261015-230353",
+   "promoted": true,
+   "time": 1792098844.216127
+  },
+  {
+   "pairs": 134,
+   "mean_diff": -1.8,
+   "t": 0.74,
+   "deaths_rule": 21,
+   "deaths_model": 16,
+   "version": "20261015-232358",
+   "promoted": false,
+   "time": 1792099928.181226
+  },
+  {
+   "pairs": 129,
+   "mean_diff": -5.01,
+   "t": 1.6,
+   "deaths_rule": 29,
+   "deaths_model": 19,
+   "version": "20261015-234402",
+   "promoted": true,
+   "time": 1792101192.9289997
+  },
+  {
+   "pairs": 123,
+   "mean_diff": -8.47,
+   "t": 2.83,
+   "deaths_rule": 31,
+   "deaths_model": 15,
+   "version": "20261015-235405",
+   "promoted": true,
+   "time": 1792101769.832486
+  },
+  {
+   "pairs": 127,
+   "mean_diff": -0.89,
+   "t": 0.27,
+   "deaths_rule": 24,
+   "deaths_model": 23,
+   "version": "20261016-001409",
+   "promoted": false,
+   "time": 1792102878.619903
+  },
+  {
+   "pairs": 140,
+   "mean_diff": 1.32,
+   "t": -0.51,
+   "deaths_rule": 22,
+   "deaths_model": 25,
+   "version": "20261016-112659",
+   "promoted": false,
+   "time": 1792143187.7176251
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "params": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+ "version": "20261016-112118",
+ "games": 6,
+ "mean_diff": 2.17,
+ "history": [
+  {
+   "time": 1792102525.4360442,
+   "challenger": "copper=1,cover=1,descent=0,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+   "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+   "games": 16,
+   "mean_diff": -0.31,
+   "se": 0.7,
+   "wins": 6,
+   "losses": 9,
+   "verdict": "rejected"
+  },
+  {
+   "time": 1792142478.5722754,
+   "challenger": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=0,worldsense=1",
+   "champion": "copper=1,cover=1,descent=1,foodcap=-1,foodstock=1,goalmodel=1,guardian=1,nightarmour=0,quick=30,shield=1,worldsense=1",
+   "games": 6,
+   "mean_diff": 2.17,
+   "se": 1.09,
+   "wins": 4,
+   "losses": 2,
+   "verdict": "promoted"
+  }
+ ]
+}
