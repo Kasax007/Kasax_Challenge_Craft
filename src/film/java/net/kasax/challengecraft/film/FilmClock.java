@@ -13,6 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class FilmClock {
     private static volatile boolean gated;
     private static final AtomicInteger PERMITS = new AtomicInteger();
+    /** The same for the client's own tick (see {@code ClientLockstepMixin}). */
+    private static final AtomicInteger CLIENT_PERMITS = new AtomicInteger();
     /** Server ticks that ran / were held back while gated (for the log). */
     public static final AtomicInteger RAN = new AtomicInteger(), HELD = new AtomicInteger();
 
@@ -32,6 +34,11 @@ public final class FilmClock {
         return t < 0 ? System.currentTimeMillis() : t;
     }
 
+    /** Whether the film's clock is on (see {@link #setMillis(long)}). */
+    public static boolean isSet() {
+        return filmMillis >= 0;
+    }
+
     /** Sets the film's clock; -1 hands back to the real one. */
     public static void setMillis(long t) {
         filmMillis = t;
@@ -39,6 +46,7 @@ public final class FilmClock {
 
     public static void gate(boolean on) {
         PERMITS.set(0);
+        CLIENT_PERMITS.set(0);
         gated = on;
     }
 
@@ -48,7 +56,21 @@ public final class FilmClock {
 
     /** One more server tick may run. */
     public static void allow() {
-        if (gated) PERMITS.incrementAndGet();
+        if (gated) {
+            PERMITS.incrementAndGet();
+            CLIENT_PERMITS.incrementAndGet();
+        }
+    }
+
+    /**
+     * Client thread, at the start of a client tick: may it run? Every screenshot the game test takes
+     * costs the client a tick or two of its own (it renders a frame, and a frame brings a tick), so
+     * a sprinting player ran four times as fast as the server and the film's clock; gated, only the
+     * ticks the director asks for ({@link #allow()}) are run.
+     */
+    public static boolean mayTickClient() {
+        if (!gated) return true;
+        return CLIENT_PERMITS.getAndUpdate(p -> p > 0 ? p - 1 : 0) > 0;
     }
 
     /** Server thread, at the start of a tick: may it run? */

@@ -8,6 +8,9 @@
     "UiClockMixin",
     "FreeCamPlayerMixin",
     "FreeCamInputMixin",
+    "ClientLockstepMixin",
+    "OwnNameTagMixin",
+    "FilmUserMixin",
     "ScreenEffectFilmMixin"
   ],
   "injectors": {

@@ -39,6 +39,9 @@ final class ChallengeScenes {
         switch (scene) {
             case "clock_test" -> c.clockTest();
             case "red_light" -> c.redLight();
+            case "vis_test" -> c.visTest();
+            case "tick_test" -> c.tickTest();
+            case "red_light_v2" -> c.redLightV2();
             case "dice" -> c.dice();
             case "cushion" -> c.cushion();
             case "chunk_blocks" -> c.chunkBlocks();
@@ -67,6 +70,10 @@ final class ChallengeScenes {
         d.cmd("gamerule advance_time false");
         d.cmd("gamerule spawn_mobs false");
         d.cmd("effect give @p minecraft:saturation infinite 0 true");
+        // No name tag over the film player's head (the free camera would show it).
+        d.cmd("team add film");
+        d.cmd("team modify film nametagVisibility never");
+        d.cmd("team join film @p");
         d.run(10);
     }
 
@@ -155,6 +162,107 @@ final class ChallengeScenes {
         });
         keys(false, false);
         d.hud(false);
+    }
+
+
+
+    /**
+     * Red light, green light with the player in view: he sprints on green, slows on yellow and
+     * stands still on red (the light is set by hand, so the timeline is exactly this one).
+     * Ticks of the shot: green 0-90, yellow 90-150 (keys released at 140), red from 150.
+     */
+    private void redLightV2() {
+        open(48);
+        BlockPos s = spawn();
+        flat(s, -4, -3, 60, 3, "minecraft:dirt_path");
+        d.cmd(String.format("fill %d %d %d %d %d %d minecraft:grass_block", s.getX() - 4, s.getY() - 1, s.getZ() - 3, s.getX() + 60, s.getY() - 1, s.getZ() - 2));
+        d.cmd(String.format("fill %d %d %d %d %d %d minecraft:grass_block", s.getX() - 4, s.getY() - 1, s.getZ() + 2, s.getX() + 60, s.getY() - 1, s.getZ() + 3));
+        Vec3 start = feet(s);
+        d.cam.playerPose(start, -90f, 0f, true);
+        d.run(20);
+        light(Chal_48_RedLight.Phase.GREEN, 100000);
+        d.hud(true);
+        keys(true, true);
+        d.shoot("red_light_v2", 12.0, t -> {
+            if (t == 90) light(Chal_48_RedLight.Phase.YELLOW, 60);
+            if (t == 140) keys(false, false);
+            if (t == 152) light(Chal_48_RedLight.Phase.RED, 200);
+            Vec3 p = playerPos();
+            double f = FilmDirector.ease(t, 0, 240);
+            double ang = Math.toRadians(FilmDirector.lerp(40, 14, f));
+            double r = FilmDirector.lerp(4.5, 3.9, f);
+            Vec3 eye = p.add(Math.cos(ang) * r, FilmDirector.lerp(1.3, 1.5, f), Math.sin(ang) * r);
+            track(t, eye, p.add(0, 1.05, 0));
+            if (t % 20 == 0) {
+                boolean alive = d.ctx.computeOnClient(mc -> mc.player.isAlive());
+                long clientTick = d.ctx.computeOnClient(mc -> (long) mc.player.tickCount);
+                FilmDirector.LOG.info("[Film] red_light_v2 t={} x={} alive={} clientTick={}", t, String.format("%.1f", p.x), alive, clientTick);
+            }
+        });
+        keys(false, false);
+        d.hud(false);
+    }
+
+
+    /** Debug: how far does a sprinting player get per game tick? */
+    private void tickTest() {
+        open();
+        BlockPos s = spawn();
+        flat(s, -4, -3, 120, 3, "minecraft:dirt_path");
+        d.cam.playerPose(feet(s), -90f, 0f, true);
+        d.run(20);
+        for (int phase = 0; phase < 2; phase++) {
+            if (phase == 0) {
+                Vec3 p = playerPos();
+                d.cam.cutTo(p.add(4, 1.5, 2), p.add(0, 1, 0));
+                Cam.freeWalk = true;
+            } else {
+                keys(false, false);
+                Cam.freeWalk = false;
+                d.cam.player();
+                d.cam.playerPose(feet(s), -90f, 0f, true);
+                d.run(20);
+            }
+            keys(true, true);
+            for (int i = 0; i < 12; i++) {
+                d.run(1);
+                final int ph = phase;
+                final int n = i;
+                d.client(mc -> FilmDirector.LOG.info("[TICK] phase {} i {} clientTick {} gameTime {} x {} dx {} sprint {} speedAttr {}", ph, n,
+                        mc.player.tickCount, mc.level.getGameTime(), String.format("%.3f", mc.player.getX()),
+                        String.format("%.3f", mc.player.getDeltaMovement().x), mc.player.isSprinting(),
+                        mc.player.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED)));
+            }
+        }
+        keys(false, false);
+    }
+
+    /** Debug: when is the player drawn under the free camera? */
+    private void visTest() {
+        open();
+        BlockPos s = spawn();
+        flat(s, -4, -3, 60, 3, "minecraft:dirt_path");
+        Vec3 start = feet(s);
+        d.cam.playerPose(start, -90f, 0f, true);
+        d.run(20);
+        d.hud(false);
+        d.shoot("vis_a_stand", 0.5, t -> {
+            Vec3 p = playerPos();
+            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
+        });
+        Cam.freeWalk = true;
+        d.run(2);
+        d.shoot("vis_b_freewalk", 0.5, t -> {
+            Vec3 p = playerPos();
+            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
+        });
+        keys(true, true);
+        d.shoot("vis_c_walk", 1.5, t -> {
+            Vec3 p = playerPos();
+            if (t % 5 == 0) FilmDirector.LOG.info("[VIS] tick {} player at {}", t, p);
+            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
+        });
+        keys(false, false);
     }
 
     /** Sets the traffic light (server statics, as its own timer would) with {@code ticks} of it left. */

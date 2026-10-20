@@ -18,6 +18,8 @@ public final class Cam {
     private ArmorStand stand;
     /** The player walks on held keys while the free camera films it (see {@code FreeCamInputMixin}). */
     public static volatile boolean freeWalk;
+    /** Whether the film player's own name tag shows above his head (it does not, but in the name-tag shot). */
+    public static volatile boolean ownNameTag;
 
     Cam(FilmDirector d) {
         this.d = d;
@@ -171,6 +173,7 @@ public final class Cam {
 
     void reset() {
         freeWalk = false;
+        ownNameTag = false;
         d.client(mc -> {
             mc.options.setCameraType(CameraType.FIRST_PERSON);
             if (mc.player != null) mc.setCameraEntity(mc.player);

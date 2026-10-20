@@ -36,6 +36,11 @@ public class FilmDirector implements FabricClientGameTest {
     public static final Logger LOG = LoggerFactory.getLogger("Film");
     public static final int FPS = 30;
     public static final int WIDTH = 1080, HEIGHT = 1920;
+    /**
+     * Preview run ({@code FILM_PREVIEW=1} in the environment): the scenes play at full game speed but
+     * only two frames a second are rendered, to check a set and its timing in a fraction of the time.
+     */
+    public static final boolean PREVIEW = System.getenv("FILM_PREVIEW") != null;
 
     /** The challenges the next world is created with (read by {@code ChallengeTabFilmMixin}). */
     public static volatile List<Integer> forcedChallenges;
@@ -61,11 +66,17 @@ public class FilmDirector implements FabricClientGameTest {
         if (scenes.isEmpty()) return;
         this.ctx = ctx;
         out = Path.of(System.getProperty("film.out", "film"));
+        FilmCursor.install();
         setupClient();
         for (String scene : scenes.split(",")) {
             LOG.info("[Film] scene {}", scene);
             long t0 = System.currentTimeMillis();
-            boolean known = CasinoScenes.film(this, scene) || ChallengeScenes.film(this, scene) || UiScenes.film(this, scene);
+            // The film's clock runs from the first tick of a scene, so menus animate on game time too.
+            tick = 0;
+            clockBase = t0;
+            FilmClock.setMillis(clockBase);
+            boolean known = CasinoScenes.film(this, scene) || ChallengeScenes.film(this, scene) || UiScenes.film(this, scene)
+                    || MenuScenes.film(this, scene);
             if (!known) LOG.warn("[Film] no scene called {}", scene);
             if (sp != null) closeWorld();
             LOG.info("[Film] scene {} done in {} s ({})", scene, (System.currentTimeMillis() - t0) / 1000, memory());
@@ -163,6 +174,16 @@ public class FilmDirector implements FabricClientGameTest {
         return server.getPlayerList().getPlayers().get(0);
     }
 
+    /** The film player's lifetime XP, which the menus (locks, level) and the name tags read. */
+    public void profileXp(long xp) {
+        client(mc -> {
+            java.util.UUID id = mc.getUser().getProfileId();
+            net.kasax.challengecraft.data.XpManager.setXp(id, xp);
+            net.kasax.challengecraft.ChallengeCraftClient.LOCAL_PLAYER_XP = xp;
+            net.kasax.challengecraft.ChallengeCraftClient.PLAYER_XP_MAP.put(id, xp);
+        });
+    }
+
     /** Shows or hides the whole HUD (F1). */
     public void hud(boolean shown) {
         client(mc -> {
@@ -175,7 +196,8 @@ public class FilmDirector implements FabricClientGameTest {
         FilmClock.allow();
         ctx.waitTick();
         tick++;
-        if (FilmClock.gated()) FilmClock.setMillis(clockBase + tick * 50L);
+        FilmCursor.ticks++;
+        if (FilmClock.gated() || FilmClock.isSet()) FilmClock.setMillis(clockBase + tick * 50L);
     }
 
     /** Lets the game run without filming. */
@@ -205,6 +227,7 @@ public class FilmDirector implements FabricClientGameTest {
      * for a time-lapse (10 fps played at 30 is three times as fast), more for slow motion.
      */
     public void shoot(String name, double seconds, int fps, Every every) {
+        if (PREVIEW && fps > 2) fps = 2;
         Path dir = out.resolve(name);
         try {
             Files.createDirectories(dir);

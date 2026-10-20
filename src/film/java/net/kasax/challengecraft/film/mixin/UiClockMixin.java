@@ -16,6 +16,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
         "net.kasax.challengecraft.client.ui.Anim",
         "net.kasax.challengecraft.client.ui.Anim$Tween",
         "net.kasax.challengecraft.client.ui.HudStack",
+        "net.kasax.challengecraft.client.screen.ChallengeCodeScreen",
+        "net.kasax.challengecraft.client.screen.ChallengeIconProvider",
         "net.kasax.challengecraft.client.screen.ChallengeRewardOverlay",
         "net.kasax.challengecraft.client.screen.ForceItemClientState",
         "net.kasax.challengecraft.client.screen.ForceItemResultsScreen",
@@ -38,6 +40,12 @@ public class UiClockMixin {
 
     @Redirect(method = "*", at = @At(value = "INVOKE", target = "Lnet/minecraft/Util;getMillis()J"), require = 0)
     private static long film$gameMillis() {
+        return FilmClock.millis();
+    }
+
+    /** The same clock under the package the game keeps it in now ({@code net.minecraft.util.Util}). */
+    @Redirect(method = "*", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Util;getMillis()J"), require = 0)
+    private static long film$gameMillis2() {
         return FilmClock.millis();
     }
 }
