@@ -39,8 +39,6 @@ final class ChallengeScenes {
         switch (scene) {
             case "clock_test" -> c.clockTest();
             case "red_light" -> c.redLight();
-            case "vis_test" -> c.visTest();
-            case "tick_test" -> c.tickTest();
             case "red_light_v2" -> c.redLightV2();
             case "dice" -> c.dice();
             case "cushion" -> c.cushion();
@@ -203,67 +201,6 @@ final class ChallengeScenes {
         d.hud(false);
     }
 
-
-    /** Debug: how far does a sprinting player get per game tick? */
-    private void tickTest() {
-        open();
-        BlockPos s = spawn();
-        flat(s, -4, -3, 120, 3, "minecraft:dirt_path");
-        d.cam.playerPose(feet(s), -90f, 0f, true);
-        d.run(20);
-        for (int phase = 0; phase < 2; phase++) {
-            if (phase == 0) {
-                Vec3 p = playerPos();
-                d.cam.cutTo(p.add(4, 1.5, 2), p.add(0, 1, 0));
-                Cam.freeWalk = true;
-            } else {
-                keys(false, false);
-                Cam.freeWalk = false;
-                d.cam.player();
-                d.cam.playerPose(feet(s), -90f, 0f, true);
-                d.run(20);
-            }
-            keys(true, true);
-            for (int i = 0; i < 12; i++) {
-                d.run(1);
-                final int ph = phase;
-                final int n = i;
-                d.client(mc -> FilmDirector.LOG.info("[TICK] phase {} i {} clientTick {} gameTime {} x {} dx {} sprint {} speedAttr {}", ph, n,
-                        mc.player.tickCount, mc.level.getGameTime(), String.format("%.3f", mc.player.getX()),
-                        String.format("%.3f", mc.player.getDeltaMovement().x), mc.player.isSprinting(),
-                        mc.player.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED)));
-            }
-        }
-        keys(false, false);
-    }
-
-    /** Debug: when is the player drawn under the free camera? */
-    private void visTest() {
-        open();
-        BlockPos s = spawn();
-        flat(s, -4, -3, 60, 3, "minecraft:dirt_path");
-        Vec3 start = feet(s);
-        d.cam.playerPose(start, -90f, 0f, true);
-        d.run(20);
-        d.hud(false);
-        d.shoot("vis_a_stand", 0.5, t -> {
-            Vec3 p = playerPos();
-            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
-        });
-        Cam.freeWalk = true;
-        d.run(2);
-        d.shoot("vis_b_freewalk", 0.5, t -> {
-            Vec3 p = playerPos();
-            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
-        });
-        keys(true, true);
-        d.shoot("vis_c_walk", 1.5, t -> {
-            Vec3 p = playerPos();
-            if (t % 5 == 0) FilmDirector.LOG.info("[VIS] tick {} player at {}", t, p);
-            track(t, p.add(4.6, 1.45, 2.1), p.add(0, 1.15, 0));
-        });
-        keys(false, false);
-    }
 
     /** Sets the traffic light (server statics, as its own timer would) with {@code ticks} of it left. */
     private void light(Chal_48_RedLight.Phase phase, int ticks) {

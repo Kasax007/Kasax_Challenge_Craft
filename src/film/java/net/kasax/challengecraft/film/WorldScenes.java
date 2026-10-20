@@ -311,15 +311,15 @@ final class WorldScenes {
         d.cmd(String.format("setblock %d %d %d minecraft:dirt", dirt2.getX(), dirt2.getY(), dirt2.getZ()));
         d.run(20);
         d.hud(true);
-        // From the side: the player on the left, his three blocks in a row to the right of him.
-        preroll(at.add(2.2, 1.7, -7.6), at.add(2.3, 0.9, 0));
+        // From behind and a little above, from the south-west side: the player at the left, his three blocks running away ahead of him.
+        preroll(at.add(-3.8, 3.0, 3.4), at.add(2.0, 0.4, 0));
         d.shoot("progressive_drops", 8.0, t -> {
             if (t == 30) breakBlock(dirt1);
             if (t == 74) breakBlock(log);
             if (t == 118) breakBlock(dirt2);
             double f = FilmDirector.ease(t, 0, 160);
-            Vec3 eye = at.add(FilmDirector.lerp(2.2, 3.0, f), FilmDirector.lerp(1.7, 2.0, f), FilmDirector.lerp(-7.6, -6.6, f));
-            track(t, eye, at.add(2.3, 0.9, 0));
+            Vec3 eye = at.add(FilmDirector.lerp(-3.8, -3.0, f), FilmDirector.lerp(3.0, 2.5, f), FilmDirector.lerp(3.4, 2.8, f));
+            track(t, eye, at.add(2.0, 0.4, 0));
             // The player looks at the block he is about to break.
             BlockPos next = t < 50 ? dirt1 : t < 95 ? log : dirt2;
             d.cam.playerAim(Vec3.atCenterOf(next));
@@ -351,24 +351,50 @@ final class WorldScenes {
         d.cmd(String.format("execute in minecraft:the_end run tp @p 18.5 %d 18.5", groundY));
         d.settle(900);
         d.hud(false);
-        Vec3[] dragonAt = {new Vec3(0, 100, 0)};
         Vec3 ground = new Vec3(18.5, groundY, 18.5);
-        d.cam.playerLook(ground, dragonAt[0], true);
-        preroll(ground.add(Math.cos(Math.toRadians(215)) * 8.5, 1.9, Math.sin(Math.toRadians(215)) * 8.5), ground.add(0, 3, 0));
+        // The player looks towards the island's middle; the dragon circles there, 34 blocks ahead and 11.5 up. The film flies
+        // it round that circle itself (a lap in 9.5 s) so it is in the picture the whole shot.
+        Vec3 fwd = new Vec3(-Math.sqrt(0.5), 0, -Math.sqrt(0.5));
+        Vec3 right = new Vec3(-fwd.z, 0, fwd.x);
+        Vec3 centre = ground.add(fwd.scale(34)).add(0, 11.5, 0);
+        double radius = 13, lap = 9.5, phi0 = 215;
+        java.util.function.DoubleFunction<Vec3[]> flight = frame -> {
+            double phi = Math.toRadians(phi0 + 360.0 * (frame / 20.0) / lap);
+            Vec3 pos = centre.add(right.scale(radius * Math.sin(phi))).add(fwd.scale(-radius * Math.cos(phi))).add(0, 1.4 * Math.sin(phi * 2), 0);
+            Vec3 tan = right.scale(Math.cos(phi)).add(fwd.scale(Math.sin(phi)));
+            return new Vec3[]{pos, tan};
+        };
+        java.util.function.BiConsumer<Vec3, Vec3> place = (pos, tan) -> d.server(server -> {
+            ServerLevel end = server.getLevel(Level.END);
+            List<EnderDragon> found = end.getEntitiesOfClass(EnderDragon.class, new net.minecraft.world.phys.AABB(-300, 0, -300, 300, 300, 300));
+            if (found.isEmpty()) {
+                FilmDirector.LOG.warn("[Film] there is no dragon in the End");
+                return;
+            }
+            // His head points along (sin yaw, -cos yaw): the other way round from every other mob.
+            float yaw = (float) Math.toDegrees(Math.atan2(tan.x, -tan.z));
+            for (EnderDragon e : found) {
+                e.snapTo(pos.x, pos.y, pos.z, yaw, 0f);
+                e.setDeltaMovement(tan.scale(2 * Math.PI * radius / (lap * 20)));
+            }
+        });
+        Vec3[] f0 = flight.apply(0);
+        place.accept(f0[0], f0[1]);
+        d.cam.playerLook(ground, f0[0], true);
+        Vec3 eye0 = ground.add(fwd.scale(-5.0)).add(right.scale(1.3)).add(0, 2.0, 0);
+        preroll(eye0, ground.add(fwd.scale(30)).add(0, 10.0, 0));
         d.cam.nightVision();
         d.run(3);
         d.shoot("dragon", 10.0, t -> {
-            Vec3 dr = d.fromServer(server -> {
-                ServerLevel end = server.getLevel(Level.END);
-                List<EnderDragon> found = end.getEntitiesOfClass(EnderDragon.class, new net.minecraft.world.phys.AABB(-300, 0, -300, 300, 300, 300));
-                return found.isEmpty() ? null : found.get(0).position();
-            });
-            if (dr != null) dragonAt[0] = dragonAt[0].lerp(dr, 0.35);
-            d.cam.playerLook(ground, dragonAt[0].add(0, 4, 0), false);
-            double ang = Math.toRadians(215 + t * 0.22);
-            Vec3 eye = ground.add(Math.cos(ang) * 8.5, 1.9, Math.sin(ang) * 8.5);
-            // Level with his eyes and tilted up about 22 degrees: he stays at the bottom of the frame, the dragon above.
-            track(t, eye, ground.add(0, 5.4, 0));
+            Vec3[] fl = flight.apply(t);
+            place.accept(fl[0], fl[1]);
+            d.cam.playerLook(ground, fl[0], false);
+            // Behind the player and a little to his right, the dragon over his shoulder; the camera drifts round him slowly.
+            double ang = Math.toRadians(FilmDirector.lerp(-7, 7, FilmDirector.ease(t, 0, 200)));
+            Vec3 back = fwd.scale(-5.0);
+            Vec3 off = new Vec3(back.x * Math.cos(ang) - back.z * Math.sin(ang), 0, back.x * Math.sin(ang) + back.z * Math.cos(ang));
+            Vec3 eye = ground.add(off).add(right.scale(1.3)).add(0, FilmDirector.lerp(2.0, 2.4, FilmDirector.ease(t, 0, 200)), 0);
+            track(t, eye, ground.add(fwd.scale(30)).add(0, 10.0, 0));
         });
     }
 
@@ -380,59 +406,105 @@ final class WorldScenes {
     private void chunkHunt() {
         open(38);
         d.cmd("effect give @p minecraft:resistance infinite 4 true");
-        d.cmd("item replace entity @p weapon.mainhand with minecraft:diamond_sword");
+        d.cmd("item replace entity @p weapon.mainhand with minecraft:iron_sword");
         d.run(40);
         // The spawn chunk's own hunt (the challenge starts one as the world opens) is over before the shot.
         d.cmd("kill @e[tag=" + HUNT_TAG + "]");
         d.run(30);
         BlockPos s = spawn();
-        int edge = ((s.getX() >> 4) + 1) << 4;
-        BlockPos c = new BlockPos(edge, s.getY(), s.getZ());
-        flat(c, -24, -20, 24, 20, "minecraft:grass_block");
-        Vec3 start = new Vec3(edge - 3.2, s.getY(), s.getZ() + 0.5);
+        int[] chunk = huntChunk(s);
+        int edge = chunk[0] << 4;                              // the west edge of the chunk the player runs into
+        double zc = chunk[1] * 16 + 8.0;                       // the middle of its row
+        double zl = zc - 0.5;                                  // the line the player and the target run along
+        double y = s.getY();
+        Vec3 start = new Vec3(edge - 13.0, y, zl);
+        Vec3 husk = new Vec3(edge + 7.5, y, zl);
         d.cam.playerPose(start, -90f, 0f, true);
-        d.run(25);
+        d.run(20);
+        // Coming to the start chunk began a hunt of its own (and changed its blocks): it is over, and the chunk levelled
+        // again, before the shot - from then on the next chunk is the new one.
+        for (int i = 0; i < 3; i++) {
+            d.cmd("kill @e[tag=" + HUNT_TAG + "]");
+            d.run(12);
+        }
+        flat(new BlockPos(edge, s.getY(), (int) zc), -24, -20, 24, 20, "minecraft:grass_block");
+        d.cam.playerPose(start, -90f, 0f, true);
+        d.run(15);
         d.hud(false);
-        preroll(start.add(-6.0, 4.8, 5.6), start.add(4, 0.5, 0));
-        keys(true, false, true);
+        Vec3[] look = {new Vec3(edge - 10.5, y + 0.8, zl)};
+        preroll(new Vec3(edge - 11.0, y + 3.8, zc + 6.2), look[0]);
+        keys(true, true, true);
         boolean[] replaced = {false};
         int[] lastHit = {-99};
-        d.shoot("chunk_hunt", 8.0, t -> {
+        d.shoot("chunk_hunt", 10.5, t -> {
             Vec3 p = playerPos();
             Vec3 mob = hunted();
             if (mob != null && !replaced[0]) {
-                // A zombie of the film's choosing takes the place of the random target (same tags, same glow).
-                replaceTarget();
+                // A husk (it does not burn in the sun) takes the place of the random target: same tags, same glow.
+                replaceTarget(husk);
                 replaced[0] = true;
+                mob = husk;
             }
             if (replaced[0] && mob != null) {
                 double dist = Math.hypot(mob.x - p.x, mob.z - p.z);
                 d.cam.playerAim(mob.add(0, 1.0, 0));
-                if (dist > 2.4) keys(true, true, true);
-                else {
-                    keys(false, false, true);
-                    if (t - lastHit[0] >= 11) {
-                        lastHit[0] = t;
-                        d.server(server -> {
-                            ServerPlayer sp = d.player(server);
-                            List<Entity> targets = tagged(server.overworld().getAllEntities());
-                            if (!targets.isEmpty()) {
-                                sp.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
-                                sp.attack(targets.get(0));
-                            }
-                        });
-                    }
+                if (p.x < edge + 1.5 && dist > 2.4) keys(true, true, true);
+                else keys(false, false, true);
+                if (dist <= 2.4 && t - lastHit[0] >= 13) {
+                    lastHit[0] = t;
+                    d.server(server -> {
+                        ServerPlayer sp = d.player(server);
+                        List<Entity> targets = tagged(server.overworld().getAllEntities());
+                        if (!targets.isEmpty()) {
+                            sp.swing(InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, true);
+                            sp.attack(targets.get(0));
+                        }
+                    });
                 }
             } else if (!replaced[0]) {
-                d.cam.playerAim(new Vec3(edge + 12, s.getY() + 1.6, s.getZ() + 0.5));
+                d.cam.playerAim(new Vec3(edge + 12, y + 1.6, zl));
+            } else {
+                keys(false, false, true);   // the target is down
             }
-            // A high 3/4 view from behind the player: the chunk ahead, the wall closing round it.
-            Vec3 ref = mob != null ? p.lerp(mob, 0.45) : p;
-            double f = FilmDirector.ease(t, 0, 160);
-            Vec3 eye = ref.add(FilmDirector.lerp(-6.0, -4.5, f), FilmDirector.lerp(4.8, 4.0, f), FilmDirector.lerp(5.6, 5.0, f));
-            track(t, eye, ref.add(FilmDirector.lerp(4, 2.5, f), 0.6, 0));
+            // From the south side of the chunk, inside the border: the player and the target, the wall closing behind.
+            Vec3 focus = replaced[0] && mob != null ? p.lerp(mob, 0.5) : p.add(2.4, 0, 0);
+            Vec3 want = new Vec3(Math.max(edge - 13.0, Math.min(edge + 8.0, focus.x)), y + 0.8, zl);
+            look[0] = t < 2 ? want : look[0].lerp(want, 0.12);
+            double f = FilmDirector.ease(t, 0, 210);
+            Vec3 eye = new Vec3(look[0].x - 0.5, y + FilmDirector.lerp(3.8, 3.2, f), zc + FilmDirector.lerp(6.2, 5.6, f));
+            track(t, eye, look[0]);
         });
         keys(false, false, true);
+    }
+
+    /**
+     * The chunk the hunt shot runs into: close to the spawn, and one the challenge turns into a plain, bright cube. The hunt
+     * changes the whole chunk into one random block; some of those have holes (a shelf) or are see-through.
+     */
+    private int[] huntChunk(BlockPos s) {
+        return d.fromServer(server -> {
+            ServerLevel w = server.overworld();
+            int sx = s.getX() >> 4, sz = s.getZ() >> 4;
+            java.util.regex.Pattern nice = java.util.regex.Pattern.compile(
+                    "(white|orange|magenta|light_blue|yellow|lime|pink|gray|light_gray|cyan|purple|blue|brown|green|red)_(concrete|wool|terracotta)"
+                            + "|(gold|diamond|emerald|lapis|iron|redstone|copper)_block|(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo)_planks"
+                            + "|purpur_block|quartz_block|bricks|prismarine");
+            for (int r = 1; r <= 5; r++) {
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                        net.minecraft.world.level.block.Block b = net.kasax.challengecraft.challenges.Chal_16_RandomChunkBlocks
+                                .getRandomBlockForChunk(w.getSeed(), new net.minecraft.world.level.ChunkPos(sx + dx, sz + dz));
+                        String id = b.builtInRegistryHolder().key().identifier().getPath();
+                        if (nice.matcher(id).matches()) {
+                            FilmDirector.LOG.info("[Film] the hunt runs into chunk ({}, {}): {}", sx + dx, sz + dz, id);
+                            return new int[]{sx + dx, sz + dz};
+                        }
+                    }
+                }
+            }
+            return new int[]{sx + 1, sz};
+        });
     }
 
     private static List<Entity> tagged(Iterable<Entity> all) {
@@ -453,24 +525,25 @@ final class WorldScenes {
         });
     }
 
-    /** Swaps the random target for a husk (a zombie that does not burn in the sun), with the same tags and glow. */
-    private void replaceTarget() {
-        String summon = d.fromServer(server -> {
-            for (Entity e : server.overworld().getAllEntities()) {
+    /** Swaps the random target for a husk at {@code at}, with the same tags and glow. */
+    private void replaceTarget(Vec3 at) {
+        d.server(server -> {
+            ServerLevel w = server.overworld();
+            for (Entity e : w.getAllEntities()) {
                 if (e.entityTags().contains(HUNT_TAG) && e.isAlive()) {
-                    StringBuilder tags = new StringBuilder();
-                    for (String tag : e.entityTags()) tags.append('"').append(tag).append("\",");
-                    String list = tags.substring(0, tags.length() - 1);
-                    Vec3 at = e.position();
+                    List<String> tags = new ArrayList<>(e.entityTags());
                     e.discard();
-                    return String.format(Locale.ROOT, "summon minecraft:husk %.2f %.2f %.2f {Tags:[%s],PersistenceRequired:1b,Glowing:1b}", at.x, at.y, at.z, list);
+                    Entity husk = net.minecraft.world.entity.EntityTypes.HUSK.create(w, net.minecraft.world.entity.EntitySpawnReason.EVENT);
+                    if (husk == null) return;
+                    husk.snapTo(at.x, at.y, at.z, 90f, 0f);
+                    for (String tag : tags) husk.addTag(tag);
+                    husk.setGlowingTag(true);
+                    if (husk instanceof net.minecraft.world.entity.Mob m) m.setPersistenceRequired();
+                    w.addFreshEntity(husk);
+                    return;
                 }
             }
-            return null;
         });
-        if (summon != null) {
-            d.cmd(summon);
-        }
     }
 
     // ------------------------------------------------------------------ the collections
@@ -754,6 +827,14 @@ final class WorldScenes {
             Vec3 eye = mid.add(FilmDirector.lerp(-0.4, 0.4, f), FilmDirector.lerp(0.0, 0.25, f), FilmDirector.lerp(-6.8, -6.2, f));
             track(t, eye, mid.add(0, 0.1, 0));
         });
+        // Closer: a slow pan along the two of them, one tag at a time, big.
+        Vec3 bob = at.add(2.5, 0, 0);
+        preroll(new Vec3(bob.x, at.y + 1.7, at.z - 3.3), new Vec3(bob.x, at.y + 1.9, at.z));
+        d.shoot("nametags_close", 6.0, t -> {
+            double f = FilmDirector.ease(t, 14, 106);
+            double x = FilmDirector.lerp(bob.x, at.x, f);
+            track(t, new Vec3(x, at.y + 1.7, at.z - FilmDirector.lerp(3.3, 3.0, f)), new Vec3(x, at.y + 1.9, at.z));
+        });
         d.hud(false);
     }
 
@@ -810,7 +891,7 @@ final class WorldScenes {
         sized("zombie", s.offset(5, 0, 0), -0.5);
         d.run(15);
         d.hud(false);
-        preroll(at.add(-2.8, 1.8, 2.4), m.getCenter().add(0, 2.4, 0));
+        preroll(at.add(-2.8, 1.8, 2.4), Vec3.atCenterOf(m).add(0, 2.4, 0));
         d.shoot("size_matters_v2", 8.0, t -> {
             double f = FilmDirector.ease(t, 0, 160);
             Vec3 eye = at.add(FilmDirector.lerp(-2.8, -2.4, f), FilmDirector.lerp(1.8, 1.6, f), FilmDirector.lerp(2.4, 3.4, f));

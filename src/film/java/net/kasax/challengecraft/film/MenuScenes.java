@@ -17,7 +17,6 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Field;
@@ -47,7 +46,6 @@ final class MenuScenes {
     static boolean film(FilmDirector d, String scene) {
         MenuScenes m = new MenuScenes(d);
         switch (scene) {
-            case "ui_probe2" -> m.probe();
             case "ui_stack" -> m.stack();
             case "ui_hub" -> m.hub();
             case "ui_perks" -> m.perks();
@@ -129,28 +127,6 @@ final class MenuScenes {
     }
 
     // ------------------------------------------------------------------ scenes
-
-    /** Stills of the menus at the GUI scales that might fit, to choose how to film them. */
-    private void probe() {
-        window();
-        d.profileXp(XP);
-        for (int gui : new int[]{4, 3}) {
-            scale(gui);
-            openCreateWorld();
-            d.still("create_challenges_g" + gui);
-            show(() -> new LevelingScreen(new TitleScreen()));
-            d.still("journey_g" + gui);
-            show(() -> new PresetScreen(new TitleScreen(), null, Component.empty(), c -> {
-            }));
-            d.still("presets_g" + gui);
-            show(() -> new ChallengeCodeScreen(new TitleScreen(), null, Component.empty(), c -> {
-            }));
-            d.still("code_g" + gui);
-            show(HubTitle::new);
-            d.still("hub_g" + gui);
-        }
-        backToTitle();
-    }
 
     private static final int[] STACK_PICKS = {29, 35, 48, 21};
 

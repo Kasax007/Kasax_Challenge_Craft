@@ -55,7 +55,7 @@ final class FilmMouse {
     /** A left click at a GUI position: handed to the screen as the game would, press and release. */
     private void click(double gx, double gy) {
         d.client(mc -> {
-            MouseButtonEvent ev = new MouseButtonEvent(gx, gy, new MouseButtonInfo(0, 0));
+            MouseButtonEvent ev = new MouseButtonEvent(gx, gy, new MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0));
             Screen sc = mc.gui.screen();
             if (sc != null) {
                 boolean handled = sc.mouseClicked(ev, false);
