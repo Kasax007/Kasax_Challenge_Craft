@@ -76,7 +76,7 @@ public class FilmDirector implements FabricClientGameTest {
             clockBase = t0;
             FilmClock.setMillis(clockBase);
             boolean known = CasinoScenes.film(this, scene) || ChallengeScenes.film(this, scene) || UiScenes.film(this, scene)
-                    || MenuScenes.film(this, scene);
+                    || MenuScenes.film(this, scene) || WorldScenes.film(this, scene);
             if (!known) LOG.warn("[Film] no scene called {}", scene);
             if (sp != null) closeWorld();
             LOG.info("[Film] scene {} done in {} s ({})", scene, (System.currentTimeMillis() - t0) / 1000, memory());
@@ -251,6 +251,26 @@ public class FilmDirector implements FabricClientGameTest {
             if (i % 90 == 0) LOG.info("[Film] {} frame {}: {}", name, i, memory());
         }
         LOG.info("[Film] shot {}: {} frames in {} s", name, frames, (System.currentTimeMillis() - t0) / 1000);
+        pack(dir);
+    }
+
+    /** The PNG frames of a finished shot become JPEGs (a long shot of PNGs is a gigabyte and more). */
+    private void pack(Path dir) {
+        try {
+            Process ff = new ProcessBuilder("ffmpeg", "-v", "error", "-y", "-i", dir.resolve("f%05d.png").toString(),
+                    "-q:v", "2", "-start_number", "0", dir.resolve("f%05d.jpg").toString())
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (ff.waitFor() == 0) {
+                try (var files = Files.list(dir)) {
+                    for (Path f : (Iterable<Path>) files.filter(x -> x.toString().endsWith(".png"))::iterator) Files.deleteIfExists(f);
+                }
+                LOG.info("[Film] packed {}", dir.getFileName());
+            } else {
+                LOG.warn("[Film] ffmpeg failed on {}", dir);
+            }
+        } catch (IOException | InterruptedException e) {
+            LOG.warn("[Film] could not pack {}: {}", dir, e.toString());
+        }
     }
 
     /** One still frame (for checking a set before filming it). */

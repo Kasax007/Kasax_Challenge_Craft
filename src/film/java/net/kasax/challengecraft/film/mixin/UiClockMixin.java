@@ -25,7 +25,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
         "net.kasax.challengecraft.client.screen.LockoutBingoClientState",
         "net.kasax.challengecraft.client.screen.RedLightHUD",
         "net.kasax.challengecraft.client.screen.TimerOverlay",
-        "net.kasax.challengecraft.client.screen.TriviaScreen"
+        "net.kasax.challengecraft.client.screen.TriviaScreen",
+        "net.kasax.challengecraft.client.screen.TriviaScreen$AnswerButton",
+        "net.kasax.challengecraft.client.screen.LevelingScreen$JourneyPanel"
 }, remap = false)
 public class UiClockMixin {
     @Redirect(method = "*", at = @At(value = "INVOKE", target = "Ljava/lang/System;currentTimeMillis()J"), require = 0)

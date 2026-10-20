@@ -10,6 +10,8 @@
     "FreeCamInputMixin",
     "ClientLockstepMixin",
     "OwnNameTagMixin",
+    "NoCrosshairMixin",
+    "NoToastMixin",
     "FilmUserMixin",
     "ScreenEffectFilmMixin"
   ],

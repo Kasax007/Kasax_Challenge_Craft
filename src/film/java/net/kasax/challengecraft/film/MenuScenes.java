@@ -16,6 +16,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.network.chat.Component;
 
 import java.lang.reflect.Field;
@@ -73,8 +75,9 @@ final class MenuScenes {
         d.run(3);
     }
 
-    private void show(Screen screen) {
-        d.client(mc -> mc.setScreenAndShow(screen));
+    /** Opens a screen (built on the client thread: its constructors ask for the game instance). */
+    private void show(Supplier<Screen> screen) {
+        d.client(mc -> mc.setScreenAndShow(screen.get()));
         d.run(8);
     }
 
@@ -125,114 +128,6 @@ final class MenuScenes {
         d.run(5);
     }
 
-    // ------------------------------------------------------------------ the film's mouse
-
-    /** A script of the pointer: glides, waits, clicks, side actions; played by tick inside a shot. */
-    final class Mouse {
-        private final class Step {
-            final int from, to;
-            Supplier<double[]> target;
-            DoubleConsumer during;
-            Runnable once;
-            boolean click;
-            double sx, sy;
-
-            Step(int from, int to) {
-                this.from = from;
-                this.to = to;
-            }
-        }
-
-        private final List<Step> steps = new ArrayList<>();
-        private final double scale;
-        private double x, y;
-        private int at;
-
-        Mouse(double gx, double gy) {
-            this.scale = d.ctx.computeOnClient(mc -> mc.getWindow().getGuiScale());
-            this.x = gx;
-            this.y = gy;
-            FilmCursor.shown = true;
-            apply();
-        }
-
-        int at() {
-            return at;
-        }
-
-        private void apply() {
-            d.ctx.getInput().setCursorPos(x * scale, y * scale);
-        }
-
-        Mouse glide(Supplier<double[]> target, int ticks) {
-            Step s = new Step(at, at + ticks);
-            s.target = target;
-            steps.add(s);
-            at += ticks;
-            return this;
-        }
-
-        Mouse glide(double tx, double ty, int ticks) {
-            return glide(() -> new double[]{tx, ty}, ticks);
-        }
-
-        /** Something that runs along {@code ticks} ticks from tick {@code from} (progress 0..1, eased), without moving the script on. */
-        Mouse alongside(int from, int ticks, DoubleConsumer progress) {
-            Step s = new Step(from, from + ticks);
-            s.during = progress;
-            steps.add(s);
-            return this;
-        }
-
-        Mouse pause(int ticks) {
-            at += ticks;
-            return this;
-        }
-
-        Mouse click() {
-            Step s = new Step(at, at);
-            s.click = true;
-            steps.add(s);
-            at += 1;
-            return this;
-        }
-
-        Mouse run(Runnable r) {
-            Step s = new Step(at, at);
-            s.once = r;
-            steps.add(s);
-            return this;
-        }
-
-        void tick(int t) {
-            for (Step s : steps) {
-                if (t < s.from || t > s.to) continue;
-                if (t == s.from) {
-                    s.sx = x;
-                    s.sy = y;
-                    if (s.once != null) s.once.run();
-                    if (s.click) {
-                        d.ctx.getInput().pressMouse(0);
-                        FilmCursor.click();
-                    }
-                }
-                double f = s.to == s.from ? 1.0 : ease((t - s.from) / (double) (s.to - s.from));
-                if (s.during != null) s.during.accept(f);
-                if (s.target != null) {
-                    double[] tg = s.target.get();
-                    x = s.sx + (tg[0] - s.sx) * f;
-                    y = s.sy + (tg[1] - s.sy) * f;
-                    apply();
-                }
-            }
-        }
-    }
-
-    private static double ease(double x) {
-        x = Math.max(0, Math.min(1, x));
-        return x * x * (3 - 2 * x);
-    }
-
     // ------------------------------------------------------------------ scenes
 
     /** Stills of the menus at the GUI scales that might fit, to choose how to film them. */
@@ -243,15 +138,15 @@ final class MenuScenes {
             scale(gui);
             openCreateWorld();
             d.still("create_challenges_g" + gui);
-            show(new LevelingScreen(new TitleScreen()));
+            show(() -> new LevelingScreen(new TitleScreen()));
             d.still("journey_g" + gui);
-            show(new PresetScreen(new TitleScreen(), null, Component.empty(), c -> {
+            show(() -> new PresetScreen(new TitleScreen(), null, Component.empty(), c -> {
             }));
             d.still("presets_g" + gui);
-            show(new ChallengeCodeScreen(new TitleScreen(), null, Component.empty(), c -> {
+            show(() -> new ChallengeCodeScreen(new TitleScreen(), null, Component.empty(), c -> {
             }));
             d.still("code_g" + gui);
-            show(new HubTitle());
+            show(HubTitle::new);
             d.still("hub_g" + gui);
         }
         backToTitle();
@@ -269,19 +164,19 @@ final class MenuScenes {
         AbstractScrollArea panel = get(tab, "scrollPanel");
         Map<Integer, ChallengeCardWidget> byId = get(tab, "cardById");
         double[] start = {panel.getX() + panel.getWidth() * 0.5, panel.getY() + panel.getHeight() * 0.85};
-        Mouse m = new Mouse(start[0], start[1]);
-        m.pause(24);
+        FilmMouse m = new FilmMouse(d, start[0], start[1]);
+        m.pause(8);
         for (int id : STACK_PICKS) {
             ChallengeCardWidget card = byId.get(id);
-            double from = panel.scrollAmount();
-            double[] scrollFrom = {from};
+            double[] scrollFrom = {0};
             int t0 = m.at();
             m.run(() -> scrollFrom[0] = panel.scrollAmount());
             double target = Math.max(0, Math.min(panel.maxScrollAmount(),
                     card.getY() + card.getHeight() / 2.0 - (panel.getY() + panel.getHeight() * 0.42)));
-            m.alongside(t0 + 1, 34, f -> panel.setScrollAmount(scrollFrom[0] + (target - scrollFrom[0]) * f));
-            m.glide(() -> new double[]{card.getX() + card.getWidth() * 0.5, card.getY() - panel.scrollAmount() + card.getHeight() * 0.5}, 38);
-            m.pause(4).click().pause(34);
+            m.alongside(t0 + 1, 26, f -> panel.setScrollAmount(scrollFrom[0] + (target - scrollFrom[0]) * f));
+            m.glide(() -> new double[]{card.getX() + card.getWidth() * 0.5, card.getY() - panel.scrollAmount() + card.getHeight() * 0.5}, 30);
+            m.pause(2).click();
+            m.pause(1).run(() -> FilmDirector.LOG.info("[Film] card {} is now {}", id, card.isActive() ? "on" : "off")).pause(21);
         }
         FilmDirector.LOG.info("[Film] ui_stack script is {} ticks long", m.at());
         d.shoot("ui_stack", 12.0, m::tick);
@@ -298,18 +193,23 @@ final class MenuScenes {
         d.profileXp(XP);
         seedRuns();
         scale(4);
-        show(new HubTitle());
+        show(HubTitle::new);
         List<AbstractWidget> widgets = hubWidgets();
         FilmDirector.LOG.info("[Film] hub widgets: {}", widgets.size());
         AbstractWidget first = widgets.get(0);
-        Mouse m = new Mouse(first.getX() + first.getWidth() * 0.5, first.getY() + first.getHeight() + 150);
-        m.pause(10);
-        for (int i = 0; i < widgets.size(); i++) {
-            AbstractWidget w = widgets.get(i);
-            // The three code / preset / progress buttons are one row: touch the middle one only.
-            m.glide(w.getX() + w.getWidth() * 0.5, w.getY() + w.getHeight() * 0.5, 22).pause(i == 0 ? 26 : 16);
-        }
-        m.glide(first.getX() + first.getWidth() * 0.55, first.getY() + first.getHeight() * 0.5, 30);
+        List<AbstractWidget> buttons = new ArrayList<>();
+        for (AbstractWidget w : widgets) if (w.getHeight() == 20) buttons.add(w);
+        AbstractWidget daily = widgets.get(1);
+        AbstractWidget recent = widgets.get(widgets.size() - 1);
+        FilmMouse m = new FilmMouse(d, first.getX() + first.getWidth() * 0.85, first.getY() + first.getHeight() + 190);
+        m.glide(first.getX() + first.getWidth() * 0.6, first.getY() + first.getHeight() * 0.5, 22).pause(20);
+        m.glide(daily.getX() + daily.getWidth() * 0.55, daily.getY() + daily.getHeight() * 0.45, 18).pause(26);
+        AbstractWidget presets = buttons.get(Math.min(1, buttons.size() - 1));
+        AbstractWidget progress = buttons.get(buttons.size() - 1);
+        m.glide(presets.getX() + presets.getWidth() * 0.5, presets.getY() + presets.getHeight() * 0.5, 16).pause(10);
+        m.glide(progress.getX() + progress.getWidth() * 0.5, progress.getY() + progress.getHeight() * 0.5, 12).pause(10);
+        m.glide(recent.getX() + recent.getWidth() * 0.5, recent.getY() + recent.getHeight() * 0.5, 16).pause(8);
+        FilmDirector.LOG.info("[Film] ui_hub script is {} ticks long", m.at());
         d.shoot("ui_hub", 8.0, m::tick);
         backToTitle();
     }
@@ -355,32 +255,34 @@ final class MenuScenes {
                 // the corner badge stays: harmless
             }
             int w = Math.min(260, this.width - 8);
-            int top = this.height / 4 + 12;
+            int top = this.height / 3;
             ChallengeHub.build(this, this::addRenderableWidget, (this.width - w) / 2, top, w, this.height - top - 14);
         }
     }
 
-    /** The journey, scrolled slowly down the early levels; the pointer rests on the milestones with perks. */
+    /** The journey: milestones with a perk are pinned by a click, the perk chip hovered for its description. */
     private void perks() {
         window();
-        d.profileXp(9_000);   // level 13: the early perks are earned, the next ones are ahead
+        d.profileXp(9_000);   // level 13: the perk of 11 is earned, the one of 14 is next
         scale(3);
-        show(new LevelingScreen(new TitleScreen()));
+        show(() -> new LevelingScreen(new TitleScreen()));
         Object screen = d.ctx.computeOnClient(mc -> mc.gui.screen());
         AbstractScrollArea panel = get(screen, "journeyPanel");
         List<Object> milestones = get(screen, "milestones");
-        Mouse m = new Mouse(panel.getX() + panel.getWidth() * 0.5, panel.getY() + panel.getHeight() * 0.5);
+        int detailX = num(screen, "detailX"), detailY = num(screen, "detailY");
+        FilmMouse m = new FilmMouse(d, panel.getX() + panel.getWidth() * 0.5, panel.getY() + panel.getHeight() * 0.55);
         m.pause(6);
-        int[] levels = {3, 5, 10, 11};
-        for (int lv : levels) {
+        for (int lv : new int[]{11, 14}) {
             Object ms = milestones.get(lv - 1);
             double[] from = {0};
             int t0 = m.at();
             m.run(() -> from[0] = panel.scrollAmount());
             double target = Math.max(0, Math.min(panel.maxScrollAmount(), num(ms, "anchorY") - panel.getHeight() * 0.42));
-            m.alongside(t0 + 1, 22, f -> panel.setScrollAmount(from[0] + (target - from[0]) * f));
-            m.glide(() -> new double[]{panel.getX() + num(ms, "anchorX"), panel.getY() + num(ms, "anchorY") - panel.scrollAmount()}, 26);
-            m.pause(28);
+            m.alongside(t0 + 1, 20, f -> panel.setScrollAmount(from[0] + (target - from[0]) * f));
+            m.glide(() -> new double[]{panel.getX() + num(ms, "anchorX"), panel.getY() + num(ms, "anchorY") - panel.scrollAmount()}, 22);
+            m.pause(2).click().pause(6);
+            // The perk is the first chip of the milestone's rewards.
+            m.glide(detailX + 12 + 45, detailY + 48 + 13, 14).pause(30);
         }
         FilmDirector.LOG.info("[Film] ui_perks script is {} ticks long", m.at());
         d.shoot("ui_perks", 8.0, m::tick);
@@ -394,7 +296,7 @@ final class MenuScenes {
         return ChallengeCode.of(ids, List.of(), 20, 36, 1, 2, 1, 60, null);
     }
 
-    /** The preset list: saved setups, loaded with one click, and saving the current one under a name. */
+    /** The preset list: saved setups, and the current one saved under a name. */
     private void presets() {
         window();
         d.profileXp(XP);
@@ -402,46 +304,46 @@ final class MenuScenes {
             ChallengePresets.save(PRESET_NAMES[i], setup(PRESETS.get(i)).encode());
         }
         scale(3);
-        show(new PresetScreen(new TitleScreen(), setup(List.of(11, 16, 20)), Component.translatable("challengecraft.code.hint.create_world"), c -> {
+        show(() -> new PresetScreen(new TitleScreen(), setup(List.of(11, 16, 20)), Component.translatable("challengecraft.code.hint.create_world"), c -> {
         }));
         Screen s = d.ctx.computeOnClient(mc -> mc.gui.screen());
         EditBox name = get(s, "nameBox");
-        Mouse m = new Mouse(name.getX() + 20, name.getY() - 60);
-        m.pause(10);
-        m.glide(() -> new double[]{name.getX() + 40, name.getY() + 9}, 24).pause(4).click().pause(4);
+        AbstractWidget save = get(s, "saveButton");
+        FilmMouse m = new FilmMouse(d, name.getX() + 90, name.getY() - 70);
+        m.pause(8);
+        m.glide(() -> new double[]{name.getX() + 40, name.getY() + 9}, 20).pause(3).click().pause(4);
         String typed = "Sky farm";
         for (int i = 0; i < typed.length(); i++) {
             char c = typed.charAt(i);
-            m.run(() -> d.client(mc -> mc.gui.screen().charTyped(new CharacterEvent(c)))).pause(4);
+            m.run(() -> d.client(mc -> mc.gui.screen().charTyped(new CharacterEvent(c)))).pause(3);
         }
-        m.pause(30);
+        m.pause(6);
+        m.glide(() -> new double[]{save.getX() + save.getWidth() * 0.5, save.getY() + save.getHeight() * 0.5}, 16).pause(3).click().pause(40);
         FilmDirector.LOG.info("[Film] ui_presets script is {} ticks long", m.at());
         d.shoot("ui_presets", 6.0, m::tick);
         backToTitle();
     }
 
-    /** The code dialog: the code of what is set up, and a friend's code typed in with its preview. */
+    /** The code dialog: the code of what is set up, and a friend's code pasted in with its preview. */
     private void code() {
         window();
         d.profileXp(XP);
         scale(3);
         ChallengeCode mine = ChallengeCode.of(List.of(29, 35, 48), List.of(), 20, 36, 1, 4, 1, 60, 777L);
         ChallengeCode friends = setup(List.of(33, 34, 21, 46));
-        show(new ChallengeCodeScreen(new TitleScreen(), mine, Component.translatable("challengecraft.code.hint.create_world"), c -> {
+        show(() -> new ChallengeCodeScreen(new TitleScreen(), mine, Component.translatable("challengecraft.code.hint.create_world"), c -> {
         }));
         Screen s = d.ctx.computeOnClient(mc -> mc.gui.screen());
         EditBox input = get(s, "input");
+        AbstractWidget apply = get(s, "applyButton");
         d.client(mc -> input.setValue(""));
-        Mouse m = new Mouse(input.getX() + 60, input.getY() - 70);
-        m.pause(16);
-        m.glide(() -> new double[]{input.getX() + 50, input.getY() + 9}, 22).pause(4).click().pause(6);
-        String typed = friends.encode();
-        FilmDirector.LOG.info("[Film] the friend's code is {}", typed);
-        for (int i = 0; i < typed.length(); i++) {
-            char c = typed.charAt(i);
-            m.run(() -> d.client(mc -> mc.gui.screen().charTyped(new CharacterEvent(c)))).pause(i % 2 == 0 ? 2 : 1);
-        }
-        m.pause(40);
+        FilmMouse m = new FilmMouse(d, input.getX() + 100, input.getY() - 80);
+        m.pause(10);
+        m.glide(() -> new double[]{input.getX() + 50, input.getY() + 9}, 22).pause(3).click().pause(6);
+        String pasted = friends.encode();
+        FilmDirector.LOG.info("[Film] the friend's code is {}", pasted);
+        m.run(() -> d.client(mc -> input.setValue(pasted))).pause(34);
+        m.glide(() -> new double[]{apply.getX() + apply.getWidth() * 0.5, apply.getY() + apply.getHeight() * 0.5}, 18).pause(30);
         FilmDirector.LOG.info("[Film] ui_code script is {} ticks long", m.at());
         d.shoot("ui_code", 6.0, m::tick);
         backToTitle();

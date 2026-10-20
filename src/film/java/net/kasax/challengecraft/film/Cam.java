@@ -109,6 +109,18 @@ public final class Cam {
         return w;
     }
 
+    /**
+     * Night vision for the free camera: the game lights the world for the camera entity's own
+     * effects, and the armor stand has none - in the End (no light at all) the shot stayed black.
+     */
+    public void nightVision() {
+        d.client(mc -> {
+            if (stand != null) {
+                stand.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.NIGHT_VISION, 1_000_000, 0, false, false));
+            }
+        });
+    }
+
     /** Back to the player's own eyes. */
     public void player() {
         d.client(mc -> {
@@ -162,6 +174,23 @@ public final class Cam {
             p.setXRot(pitch);
             p.setYHeadRot(y);
             p.setYBodyRot(y);
+        });
+    }
+
+    /** Turns the player's view (not his place) towards {@code at}; he walks on that way if keys are held. */
+    public void playerAim(Vec3 at) {
+        d.client(mc -> {
+            LocalPlayer p = mc.player;
+            if (p == null) return;
+            Vec3 eye = p.getEyePosition();
+            float yaw = yaw(eye, at);
+            float pitch = pitch(eye, at);
+            p.yRotO = p.getYRot();
+            p.xRotO = p.getXRot();
+            float y = p.getYRot() + wrap(yaw - p.getYRot());
+            p.setYRot(y);
+            p.setXRot(pitch);
+            p.setYHeadRot(y);
         });
     }
 
