@@ -51,6 +51,7 @@ final class MenuScenes {
             case "ui_perks" -> m.perks();
             case "ui_presets" -> m.presets();
             case "ui_code" -> m.code();
+            case "ui_void_trail" -> m.voidTrail();
             default -> {
                 return false;
             }
@@ -156,6 +157,31 @@ final class MenuScenes {
         }
         FilmDirector.LOG.info("[Film] ui_stack script is {} ticks long", m.at());
         d.shoot("ui_stack", 12.0, m::tick);
+        backToTitle();
+    }
+
+    /** The Void Trail card (challenge 51) in world creation: scrolled to, its description read, ticked. */
+    private void voidTrail() {
+        window();
+        d.profileXp(XP);
+        scale(stackScale());
+        openCreateWorld();
+        Object tab = d.ctx.computeOnClient(mc -> get(mc.gui.screen(), "challengeTab"));
+        AbstractScrollArea panel = get(tab, "scrollPanel");
+        Map<Integer, ChallengeCardWidget> byId = get(tab, "cardById");
+        ChallengeCardWidget card = byId.get(51);
+        FilmMouse m = new FilmMouse(d, panel.getX() + panel.getWidth() * 0.5, panel.getY() + panel.getHeight() * 0.85);
+        m.pause(6);
+        double[] scrollFrom = {0};
+        int t0 = m.at();
+        m.run(() -> scrollFrom[0] = panel.scrollAmount());
+        double target = Math.max(0, Math.min(panel.maxScrollAmount(),
+                card.getY() + card.getHeight() / 2.0 - (panel.getY() + panel.getHeight() * 0.42)));
+        m.alongside(t0 + 1, 30, f -> panel.setScrollAmount(scrollFrom[0] + (target - scrollFrom[0]) * f));
+        m.glide(() -> new double[]{card.getX() + card.getWidth() * 0.5, card.getY() - panel.scrollAmount() + card.getHeight() * 0.5}, 34);
+        m.pause(60).click().pause(50);
+        FilmDirector.LOG.info("[Film] ui_void_trail script is {} ticks long", m.at());
+        d.shoot("ui_void_trail", 9.0, m::tick);
         backToTitle();
     }
 

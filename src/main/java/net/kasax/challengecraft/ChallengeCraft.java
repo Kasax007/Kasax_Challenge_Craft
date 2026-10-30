@@ -128,6 +128,7 @@ public class ChallengeCraft implements ModInitializer {
 		net.kasax.challengecraft.challenges.Chal_47_CushionOnly.register();
 		net.kasax.challengecraft.challenges.Chal_48_RedLight.register();
 		net.kasax.challengecraft.challenges.Chal_49_AllBiomes.register();
+		net.kasax.challengecraft.challenges.Chal_51_VoidTrail.register();
 		net.kasax.challengecraft.data.BlockSurvey.register();
 		net.kasax.challengecraft.daily.SeedProbe.register();
 		net.kasax.challengecraft.data.RegistryIdAudit.register();

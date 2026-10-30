@@ -1,6 +1,6 @@
 # Challenge Craft — turn every world into a challenge run
 
-![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-50-9b59ff?style=for-the-badge) ![Mods](https://img.shields.io/badge/Mods-29-ff8c42?style=for-the-badge)
+![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-51-9b59ff?style=for-the-badge) ![Mods](https://img.shields.io/badge/Mods-29-ff8c42?style=for-the-badge)
 
 The **Challenge Craft Modpack** is the complete version of the challenge run: the mod itself, plus everything I use when I play it. Shaders, voice chat, a full ambient soundscape and a hand-built menu — set up, tuned and ready, so you can click **Play** and start a run instead of assembling a modlist first.
 
@@ -22,7 +22,7 @@ Have an idea? Suggest a challenge on [Discord](https://discord.com/invite/zuZVtV
 
 ![Features](https://raw.githubusercontent.com/Kasax007/Kasax_Challenge_Craft/master/art/features.png)
 
-- **50 challenges** — modifiers, randomizers and full game modes like Lockout Bingo, Force Item Battle, The House Always Wins, All Biomes, Trivia, Skyblock, Chunk Hunt or roll a die to walk
+- **51 challenges** — modifiers, randomizers and full game modes like Lockout Bingo, Force Item Battle, The House Always Wins, All Biomes, Trivia, Skyblock, Chunk Hunt or roll a die to walk
 - **Stack challenges** for a higher difficulty rating and bigger XP payouts
 - **Daily Challenge** — one ruleset and one seed per day, the same for everyone. Come back tomorrow and beat your best time.
 - **Challenge Codes & Presets** — save your favorite setups and share any run as a short code, seed included. Your friends paste it and play the exact same world.
@@ -45,7 +45,7 @@ Farm to pay — or gamble to get ahead on four machines you build in your world:
 
 ![Challenges](https://raw.githubusercontent.com/Kasax007/Kasax_Challenge_Craft/master/art/challenges.png)
 
-All **50 challenges**, in the order they unlock. Full descriptions and icons are on the [standalone mod page](https://www.curseforge.com/minecraft/mc-mods/challenge).
+All **51 challenges**, in the order they unlock. Full descriptions and icons are on the [standalone mod page](https://www.curseforge.com/minecraft/mc-mods/challenge).
 
 **Level 1** — Lockout Bingo · Force Item Battle · Level = Item · Random Item every 30s · Random Chunk Blocks · 500 Blocks = Item · Damage = Item  
 **Level 2** — No Chest Loot · No Regeneration · Random Mob Spawn  
@@ -57,7 +57,7 @@ All **50 challenges**, in the order they unlock. Full descriptions and icons are
 **Level 8** — Mob Health Multiplier · Walk = Damage · Heavy Pockets · The House Always Wins 🆕  
 **Level 9** — Damage = Border · Corrosive Tools · Dice Movement  
 **Level 10** — Level = Border · Symbiotic Bond · Cushion Only 🆕  
-**Level 11** — The Floor is Lava  
+**Level 11** — The Floor is Lava · Void Trail 🆕  
 **Level 12** — No Block Drops · Size Matters  
 **Level 13** — No Mob Drops · No Food  
 **Level 14** — Upside Down Drops  

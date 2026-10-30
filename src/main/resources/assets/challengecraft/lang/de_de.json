@@ -869,6 +869,8 @@
   "challengecraft.hub.daily_run": "Tages-Challenge",
   "challengecraft.worldcreate.challenge50": "The House Always Wins",
   "challengecraft.worldcreate.challenge50.desc": "Jedes Item ist Jetons wert (ProjectE-Werte). Alle 10 Minuten kassiert das Haus eine steigende Gebühr vom ganzen Team - wer nicht zahlen kann, hat verloren. Die Spiele behalten 4 % jedes Einsatzes - also farme, um das Haus zu bezahlen, oder zocke an Slots, Plinko, Crash und Roulette; verlorene Wetten rufen Monster, jeder Tod kostet 25 % der Jetons, und eine Hand Blackjack entscheidet, ob du zurückkommst.",
+  "challengecraft.worldcreate.challenge51": "Spur ins Nichts",
+  "challengecraft.worldcreate.challenge51.desc": "Jeder Block, den du verlässt, nimmt seine ganze Säule mit – vom Himmel bis ins Nichts, samt Grundgestein, Wasser und Lava. Nur Endportalrahmen und das Endportal bleiben stehen. Es gibt keinen Weg zurück: Geh immer weiter auf frischen Boden.",
   "block.challengecraft.slot_machine": "Spielautomat",
   "block.challengecraft.slot_machine_top": "Spielautomat",
   "block.challengecraft.crash_pad": "Crash-Startrampe",

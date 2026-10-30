@@ -869,6 +869,8 @@
   "challengecraft.hub.daily_run": "Daily challenge",
   "challengecraft.worldcreate.challenge50": "The House Always Wins",
   "challengecraft.worldcreate.challenge50.desc": "Every item is worth Jetons (ProjectE values). Every 10 minutes the House collects a growing fee from the whole team - can't pay, run over. The games keep 4 % of every stake, so farm to pay the House - or gamble on slots, plinko, crash and roulette to get ahead; lost bets summon monsters, every death costs 25 % of your chips, and a hand of blackjack decides whether you come back.",
+  "challengecraft.worldcreate.challenge51": "Void Trail",
+  "challengecraft.worldcreate.challenge51.desc": "Every block you leave takes its whole column with it - from the sky down to the void, bedrock, water and lava included. Only End portal frames and the End portal survive. There is no way back: keep moving onto fresh ground.",
   "block.challengecraft.slot_machine": "Slot Machine",
   "block.challengecraft.slot_machine_top": "Slot Machine",
   "block.challengecraft.crash_pad": "Crash Launch Pad",

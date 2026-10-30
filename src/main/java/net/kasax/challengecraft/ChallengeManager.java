@@ -26,7 +26,7 @@ import java.util.List;
 public class ChallengeManager {
     public static final Logger LOGGER = LoggerFactory.getLogger(ChallengeCraft.MOD_ID);
     /** Highest challenge id. Screens that walk every challenge loop up to this, so a new one is one edit. */
-    public static final int MAX_CHALLENGE_ID = 50;
+    public static final int MAX_CHALLENGE_ID = 51;
     private static List<Integer> PRE_LOADED_PERKS = new ArrayList<>();
     /** Countdown to the follow-up sync after a join; 0 = idle. */
     private static int resyncDelayTicks = 0;
@@ -174,6 +174,7 @@ public class ChallengeManager {
             case 49 -> 12.0; // All Biomes (every Overworld, Nether and End biome; like All Achievements)
             case 48 -> 3.0;  // Red Light, Green Light (lethal, but warned by yellow and fair to knockback)
             case 50 -> 2.5;  // The House Always Wins (rising fee, loss waves, death tax; bankrupt = run lost)
+            case 51 -> 6.0;  // Void Trail (every column left is gone: no way back, no base, no digging around)
             default -> 0.0;
         };
     }
@@ -237,7 +238,11 @@ public class ChallengeManager {
             new int[]{49, 40}, // All Biomes + Lockout Bingo (minigame)
             new int[]{49, 45}, // All Biomes + Force Item Battle (minigame)
             new int[]{50, 40}, // House Always Wins + Lockout Bingo (minigame)
-            new int[]{50, 45}  // House Always Wins + Force Item Battle (the target item could simply be bought)
+            new int[]{50, 45}, // House Always Wins + Force Item Battle (the target item could simply be bought)
+            new int[]{51, 11}, // Void Trail + Skyblock (the island is gone after a few steps)
+            new int[]{51, 9},  // Void Trail + Level Border (no fresh ground inside a tiny border)
+            new int[]{51, 25}, // Void Trail + Damage Border (same)
+            new int[]{51, 38}  // Void Trail + Chunk Hunt (a locked chunk runs out of ground before the mob dies)
     );
 
     public static boolean hasConflict(List<Integer> ids, List<Integer> perks) {
@@ -687,6 +692,7 @@ public class ChallengeManager {
         if (net.kasax.challengecraft.challenges.Chal_48_RedLight.isActive()) ids.add(48);
         if (net.kasax.challengecraft.challenges.Chal_49_AllBiomes.isActive()) ids.add(49);
         if (net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins.isActive()) ids.add(50);
+        if (net.kasax.challengecraft.challenges.Chal_51_VoidTrail.isActive()) ids.add(51);
         return ids;
     }
 
@@ -741,6 +747,7 @@ public class ChallengeManager {
         net.kasax.challengecraft.challenges.Chal_48_RedLight.setActive(active);
         net.kasax.challengecraft.challenges.Chal_49_AllBiomes.setActive(active);
         net.kasax.challengecraft.challenges.Chal_50_HouseAlwaysWins.setActive(active);
+        net.kasax.challengecraft.challenges.Chal_51_VoidTrail.setActive(active);
     }
 
     public static void applyActiveFlag(int id, ServerLevel world, ChallengeSavedData data) {
@@ -875,6 +882,7 @@ public class ChallengeManager {
                 }
                 LOGGER.info("Challenge 50 ON");
             }
+            case 51 -> { net.kasax.challengecraft.challenges.Chal_51_VoidTrail.setActive(true); LOGGER.info("Challenge 51 ON"); }
             default -> LOGGER.warn("Unknown challenge id {}", id);
         }
     }

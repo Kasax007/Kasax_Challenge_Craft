@@ -68,6 +68,7 @@ final class WorldScenes {
             case "skyblock_v2" -> w.skyblock();
             case "random_block_drops" -> w.randomBlockDrops();
             case "dice_walk" -> w.diceWalk();
+            case "void_trail" -> w.voidTrail();
             default -> {
                 return false;
             }
@@ -157,6 +158,64 @@ final class WorldScenes {
         d.cmd(String.format("fill %d %d %d %d %d %d minecraft:oak_leaves", x - 2, y + logs - 2, z - 2, x + 2, y + logs - 1, z + 2));
         d.cmd(String.format("fill %d %d %d %d %d %d minecraft:oak_leaves", x - 1, y + logs, z - 1, x + 1, y + logs + 1, z + 1));
         d.cmd(String.format("fill %d %d %d %d %d %d minecraft:oak_log", x, y, z, x, y + logs - 1, z));
+    }
+
+    // ------------------------------------------------------------------ Void Trail (51)
+
+    /**
+     * Void Trail: walking across the meadow, every column left behind is gone down to the void
+     * (the camera rises at the end to show the line); then a walk over End portal frames, which
+     * stay floating over the void. Set up in creative (no trail), filmed in survival.
+     */
+    private void voidTrail() {
+        open(51);
+        d.cmd("gamemode creative @p");
+        d.settle(600);
+        BlockPos s = spawn();
+        flat(s, -4, -3, 40, 3, "minecraft:grass_block");
+        flat(s, -4, 7, 40, 13, "minecraft:grass_block");
+        int y = s.getY();
+        for (int k = 3; k <= 8; k++) {
+            d.cmd(String.format("setblock %d %d %d minecraft:end_portal_frame[eye=true,facing=north]", s.getX() + k, y - 1, s.getZ() + 10));
+        }
+        d.run(5);
+        d.hud(false);
+
+        Vec3 start = new Vec3(s.getX() + 0.5, y, s.getZ() + 0.5);
+        d.cam.playerPose(start, -90f, 0f, true);
+        d.run(10);
+        d.cmd("gamemode survival @p");
+        d.run(5);
+        preroll(start.add(-5.0, 4.2, 3.4), start.add(1.0, -1.5, 0));
+        keys(true, false, true);
+        d.shoot("void_trail_walk", 9.0, t -> {
+            Vec3 p = playerPos();
+            // Behind and above him, looking down at the trail; for the last three seconds up and back.
+            double f = FilmDirector.ease(t, 120, 180);
+            Vec3 eye = p.add(FilmDirector.lerp(-5.0, -14.0, f), FilmDirector.lerp(4.2, 17.0, f), FilmDirector.lerp(3.4, 7.0, f));
+            track(t, eye, p.add(FilmDirector.lerp(-1.0, -6.0, f), -1.5, 0));
+        });
+        keys(false, false, true);
+        d.run(10);
+
+        d.cmd("gamemode creative @p");
+        Vec3 frames = new Vec3(s.getX() + 0.5, y, s.getZ() + 10.5);
+        d.cam.playerPose(frames, -90f, 0f, true);
+        d.run(10);
+        d.cmd("gamemode survival @p");
+        d.run(5);
+        Vec3 side = new Vec3(s.getX() + 6.0, y + 3.6, s.getZ() + 16.5);
+        preroll(side, new Vec3(s.getX() + 5.5, y - 2.0, s.getZ() + 10.5));
+        keys(true, false, true);
+        d.shoot("void_trail_frames", 7.0, t -> {
+            Vec3 p = playerPos();
+            if (p.x > s.getX() + 11) keys(false, false, true);
+            // From the side, a little ahead of him: the frames he crossed stay floating over the void.
+            double f = FilmDirector.ease(t, 60, 140);
+            track(t, side.add(FilmDirector.lerp(0, 1.5, f), FilmDirector.lerp(0, 1.0, f), 0),
+                    new Vec3(s.getX() + FilmDirector.lerp(4.5, 6.0, f), y - FilmDirector.lerp(1.0, 3.0, f), s.getZ() + 10.5));
+        });
+        keys(false, false, true);
     }
 
     // ------------------------------------------------------------------ chunk worlds

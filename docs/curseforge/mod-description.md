@@ -1,10 +1,10 @@
 # Challenge Craft — turn every world into a challenge run
 
-![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-50-9b59ff?style=for-the-badge)
+![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-51-9b59ff?style=for-the-badge)
 
-**Challenge Craft** turns normal survival into replayable challenge runs. Pick from **50 challenges** — run one, or stack a brutal combination — and every world you finish earns permanent **Lifetime XP** that unlocks more challenges and perks. Play the runs you know from YouTubers or invent your own.
+**Challenge Craft** turns normal survival into replayable challenge runs. Pick from **51 challenges** — run one, or stack a brutal combination — and every world you finish earns permanent **Lifetime XP** that unlocks more challenges and perks. Play the runs you know from YouTubers or invent your own.
 
-**New:** 🎰 **The House Always Wins** — a full casino challenge · 🚦 **Red Light, Green Light** · 🪑 **Cushion Only** · 🧭 **All Biomes** · 🔗 **Challenge Codes & Presets** · 🤖 **Bob**, an AI rival for Lockout *(Early Development Stage)*
+**New:** 🕳️ **Void Trail** · 🎰 **The House Always Wins** — a full casino challenge · 🚦 **Red Light, Green Light** · 🪑 **Cushion Only** · 🧭 **All Biomes** · 🔗 **Challenge Codes & Presets** · 🤖 **Bob**, an AI rival for Lockout *(Early Development Stage)*
 
 [![Play the full modpack](https://img.shields.io/badge/Play_the-Challenge_Craft_Modpack-ff8c42?style=for-the-badge)](https://www.curseforge.com/minecraft/modpacks/challenge-craft/)
 
@@ -24,7 +24,7 @@ Have an idea? Suggest a challenge on [Discord](https://discord.com/invite/zuZVtV
 
 ![Features](https://raw.githubusercontent.com/Kasax007/Kasax_Challenge_Craft/master/art/features.png)
 
-- **50 challenges** — modifiers, randomizers and full game modes like Lockout Bingo, Force Item Battle, The House Always Wins, All Biomes, Trivia, Skyblock, Chunk Hunt or roll a die to walk
+- **51 challenges** — modifiers, randomizers and full game modes like Lockout Bingo, Force Item Battle, The House Always Wins, All Biomes, Trivia, Skyblock, Chunk Hunt or roll a die to walk
 - **Stack challenges** for a higher difficulty rating and bigger XP payouts
 - **Daily Challenge** — one ruleset and one seed per day, the same for everyone. Come back tomorrow and beat your best time.
 - **Challenge Codes & Presets** — save your favorite setups and share any run as a short code, seed included. Your friends paste it and play the exact same world.
@@ -61,7 +61,7 @@ Farm to pay the House — or gamble to get ahead. Buy the machines from the Crou
 
 ![Challenges](https://raw.githubusercontent.com/Kasax007/Kasax_Challenge_Craft/master/art/challenges.png)
 
-All **50 challenges**, in the order they unlock. 🆕 marks the newest ones.
+All **51 challenges**, in the order they unlock. 🆕 marks the newest ones.
 
 ### Level 1
 
@@ -195,6 +195,9 @@ You cannot walk or jump. Place a cushion and sit on it — that is the only way 
 
 ![Lava Bucket](https://assets.mcasset.cloud/1.21.5/assets/minecraft/textures/item/lava_bucket.png) **The Floor is Lava**  
 Stand still for 3 seconds — or on natural blocks — and you burn.
+
+![Bedrock](https://assets.mcasset.cloud/1.21.5/assets/minecraft/textures/block/bedrock.png) **Void Trail** 🆕  
+Every block you leave takes its whole column with it — from the sky down to the void, bedrock included. Only End portal frames and the End portal survive. Keep moving onto fresh ground.
 
 ### Level 12
 
