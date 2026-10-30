@@ -172,12 +172,19 @@ final class WorldScenes {
         d.cmd("gamemode creative @p");
         d.settle(600);
         BlockPos s = spawn();
-        flat(s, -4, -3, 40, 3, "minecraft:grass_block");
-        flat(s, -4, 7, 40, 13, "minecraft:grass_block");
+        // Wide enough that no tree stands between the camera and him on either set.
+        flat(s, -20, -10, 40, 14, "minecraft:grass_block");
+        flat(s, -20, 15, 40, 42, "minecraft:grass_block");
         int y = s.getY();
-        for (int k = 3; k <= 8; k++) {
-            d.cmd(String.format("setblock %d %d %d minecraft:end_portal_frame[eye=true,facing=north]", s.getX() + k, y - 1, s.getZ() + 10));
+        // An End portal as in a stronghold: twelve frames with their eyes round a 3x3 of portal.
+        int px = s.getX() + 6, pz = s.getZ() + 28;
+        for (int k = -1; k <= 1; k++) {
+            frame(px + k, y - 1, pz - 2, "south");
+            frame(px + k, y - 1, pz + 2, "north");
+            frame(px - 2, y - 1, pz + k, "east");
+            frame(px + 2, y - 1, pz + k, "west");
         }
+        d.cmd(String.format("fill %d %d %d %d %d %d minecraft:end_portal", px - 1, y - 1, pz - 1, px + 1, y - 1, pz + 1));
         d.run(5);
         d.hud(false);
 
@@ -198,24 +205,39 @@ final class WorldScenes {
         keys(false, false, true);
         d.run(10);
 
+        // The portal: he clears the ground round it and under it row by row (three blocks a step,
+        // the columns crossed go too), steps out at the edge and looks back at what is left.
+        Vec3 centre = new Vec3(px + 0.5, y - 1.0, pz + 0.5);
+        List<Vec3> path = new ArrayList<>();
+        int[] xs = {px - 5, px - 2, px + 2, px + 5};
+        for (int row = 0; row <= 10; row++) {
+            for (int i = 0; i < xs.length; i++) {
+                int x = xs[row % 2 == 0 ? i : xs.length - 1 - i];
+                path.add(new Vec3(x + 0.5, y, pz - 5 + row + 0.5));
+            }
+        }
+        path.add(new Vec3(px + 5.5, y, pz + 6.5));
         d.cmd("gamemode creative @p");
-        Vec3 frames = new Vec3(s.getX() + 0.5, y, s.getZ() + 10.5);
-        d.cam.playerPose(frames, -90f, 0f, true);
+        d.cam.playerPose(path.get(0), Cam.yaw(path.get(0), centre), 0f, true);
         d.run(10);
         d.cmd("gamemode survival @p");
         d.run(5);
-        Vec3 side = new Vec3(s.getX() + 6.0, y + 3.6, s.getZ() + 16.5);
-        preroll(side, new Vec3(s.getX() + 5.5, y - 2.0, s.getZ() + 10.5));
-        keys(true, false, true);
-        d.shoot("void_trail_frames", 7.0, t -> {
-            Vec3 p = playerPos();
-            if (p.x > s.getX() + 11) keys(false, false, true);
-            // From the side, a little ahead of him: the frames he crossed stay floating over the void.
-            double f = FilmDirector.ease(t, 60, 140);
-            track(t, side.add(FilmDirector.lerp(0, 1.5, f), FilmDirector.lerp(0, 1.0, f), 0),
-                    new Vec3(s.getX() + FilmDirector.lerp(4.5, 6.0, f), y - FilmDirector.lerp(1.0, 3.0, f), s.getZ() + 10.5));
+        Vec3 high = centre.add(11.0, 13.0, 15.0);
+        preroll(high, centre.add(0, -4.0, 0));
+        d.shoot("void_trail_portal", 9.0, t -> {
+            int step = t / 2;
+            if (t % 2 == 0 && step >= 1 && step < path.size()) {
+                Vec3 p = path.get(step);
+                d.cam.playerPose(p, Cam.yaw(p, centre), 10f, true);
+            }
+            // Over the corner while the ground goes, then up until the camera looks straight down.
+            double f = FilmDirector.ease(t, 110, 175);
+            track(t, lerp(high, centre.add(2.0, 26.0, 3.0), f), centre.add(0, FilmDirector.lerp(-4.0, -8.0, f), 0));
         });
-        keys(false, false, true);
+    }
+
+    private void frame(int x, int y, int z, String facing) {
+        d.cmd(String.format("setblock %d %d %d minecraft:end_portal_frame[eye=true,facing=%s]", x, y, z, facing));
     }
 
     // ------------------------------------------------------------------ chunk worlds
