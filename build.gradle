@@ -1,6 +1,7 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
+	id 'me.modmuss50.mod-publish-plugin' version '2.2.1'
 }
 
 version = project.mod_version
@@ -88,6 +89,41 @@ publishing {
 
 	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
 	repositories {
+	}
+}
+
+// Release: CurseForge, Modrinth and a GitHub release in one go (`./gradlew publishMods`). The
+// workflow .github/workflows/publish.yml runs it when a push changes mod_version. Without the
+// tokens (on a PC) it is only a dry run. The release notes: docs/curseforge/changelog-<version>.md.
+def releaseNotes = project.file("docs/curseforge/changelog-${project.version}.md")
+publishMods {
+	file = jar.archiveFile
+	changelog = releaseNotes.exists() ? releaseNotes.text : "Challenge Craft ${project.version}"
+	type = STABLE
+	displayName = "Challenge Craft ${project.version}"
+	modLoaders.add("fabric")
+	dryRun = ['CURSEFORGE_TOKEN', 'MODRINTH_TOKEN'].any { providers.environmentVariable(it).getOrNull() == null }
+
+	curseforge {
+		projectId = "1508454"
+		projectSlug = "challenge"
+		accessToken = providers.environmentVariable("CURSEFORGE_TOKEN")
+		minecraftVersions.add(project.minecraft_version)
+		client = true
+		server = true
+		requires("fabric-api")
+	}
+	modrinth {
+		projectId = "3qs3GQyx"
+		accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+		minecraftVersions.add(project.minecraft_version)
+		requires("fabric-api")
+	}
+	github {
+		repository = "Kasax007/Kasax_Challenge_Craft"
+		accessToken = providers.environmentVariable("GITHUB_TOKEN")
+		commitish = providers.environmentVariable("GITHUB_SHA").orElse("26.3")
+		tagName = "v${project.version}"
 	}
 }
 

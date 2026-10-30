@@ -1,0 +1,71 @@
+# Publishes a release to CurseForge, Modrinth and GitHub when a push changes mod_version in
+# gradle.properties and that version has no tag v<version> yet. "Run workflow" (manual) publishes
+# the current version. Needs the repository secrets CURSEFORGE_TOKEN and MODRINTH_TOKEN.
+name: publish
+on:
+  push:
+    branches: ['26.3', '26.3-lockout-bot']
+    paths: ['gradle.properties']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: new version?
+        id: check
+        run: |
+          v=$(sed -n 's/^mod_version=[[:space:]]*//p' gradle.properties | tr -d '[:space:]')
+          before="${{ github.event.before }}"
+          old="$v"
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "$before" ] && [ "$before" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$before" 2>/dev/null; then
+            old=$(git show "$before:gradle.properties" | sed -n 's/^mod_version=[[:space:]]*//p' | tr -d '[:space:]')
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" > /dev/null 2>&1; then
+            echo "v$v is already released - nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$old" != "$v" ]; then
+            echo "Releasing $v (before: $old)."
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mod_version unchanged ($v) - nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: tokens present?
+        if: steps.check.outputs.go == 'true'
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          if [ -z "$CURSEFORGE_TOKEN" ] || [ -z "$MODRINTH_TOKEN" ]; then
+            echo "::error::Add the repository secrets CURSEFORGE_TOKEN and MODRINTH_TOKEN (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+      - name: setup jdk
+        if: steps.check.outputs.go == 'true'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'gradle'
+      - name: build and publish
+        if: steps.check.outputs.go == 'true'
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build publishMods
