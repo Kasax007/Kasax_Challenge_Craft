@@ -4,7 +4,7 @@
 
 The **Challenge Craft Modpack** is the complete version of the challenge run: the mod itself, plus everything I use when I play it. Shaders, voice chat, a full ambient soundscape and a hand-built menu — set up, tuned and ready, so you can click **Play** and start a run instead of assembling a modlist first.
 
-**New:** 🎰 **The House Always Wins** — a full casino challenge · 🚦 **Red Light, Green Light** · 🪑 **Cushion Only** · 🧭 **All Biomes** · 🔗 **Challenge Codes & Presets** · 🤖 **Bob**, an AI rival for Lockout *(Early Development Stage)*
+**New:** 🕳️ **Void Trail** · 🎰 **The House Always Wins** — a full casino challenge · 🚦 **Red Light, Green Light** · 🪑 **Cushion Only** · 🧭 **All Biomes** · 🔗 **Challenge Codes & Presets** · 🤖 **Bob**, an AI rival for Lockout *(Early Development Stage)*
 
 [![Get the standalone mod](https://img.shields.io/badge/Get_the-Standalone_Mod-9b59ff?style=for-the-badge)](https://www.curseforge.com/minecraft/mc-mods/challenge)
 
