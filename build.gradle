@@ -93,9 +93,10 @@ publishing {
 }
 
 // Release: CurseForge, Modrinth and a GitHub release in one go (`./gradlew publishMods`). The
-// workflow .github/workflows/publish.yml runs it when a push changes mod_version. Without any token
-// (on a PC) it is only a dry run; with one, that platform alone: CURSEFORGE_TOKEN=... ./gradlew
-// publishCurseforge. The release notes: docs/curseforge/changelog-<version>.md.
+// workflow .github/workflows/publish.yml runs the tasks of the platforms still missing the version
+// when a push changes mod_version. Without any token (on a PC) it is only a dry run; with one, that
+// platform alone: CURSEFORGE_TOKEN=... ./gradlew publishCurseforge. The release notes:
+// docs/curseforge/changelog-<version>.md.
 def releaseNotes = project.file("docs/curseforge/changelog-${project.version}.md")
 publishMods {
 	file = jar.archiveFile
@@ -103,7 +104,7 @@ publishMods {
 	type = STABLE
 	displayName = "Challenge Craft ${project.version}"
 	modLoaders.add("fabric")
-	dryRun = ['CURSEFORGE_TOKEN', 'MODRINTH_TOKEN'].every { providers.environmentVariable(it).getOrNull() == null }
+	dryRun = ['CURSEFORGE_TOKEN', 'MODRINTH_TOKEN', 'GITHUB_TOKEN'].every { providers.environmentVariable(it).getOrNull() == null }
 
 	curseforge {
 		projectId = "1508454"
