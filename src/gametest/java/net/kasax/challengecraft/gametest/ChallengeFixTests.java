@@ -171,6 +171,30 @@ public class ChallengeFixTests {
         h.succeed();
     }
 
+    /**
+     * The crafter makes neither the Infinite Chest nor a casino device: both are gated per player
+     * at the crafting result slot (level 20 and the perk, bought from the croupier), which a crafter
+     * never clicks. Everything else it still crafts.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 20, skyAccess = true, padding = 8)
+    public void crafterMakesNoGatedItems(GameTestHelper h) {
+        var level = h.getLevel();
+        ItemStack d = new ItemStack(Items.DIAMOND_BLOCK), g = new ItemStack(Items.GOLD_INGOT);
+        ItemStack s = new ItemStack(Items.SMOOTH_STONE_SLAB);
+        var chest = net.minecraft.world.item.crafting.CraftingInput.of(3, 3,
+                java.util.List.of(d, d, d, d, new ItemStack(Items.CHEST), d, d, d, d));
+        var crashPad = net.minecraft.world.item.crafting.CraftingInput.of(3, 3,
+                java.util.List.of(g, new ItemStack(Items.FIREWORK_ROCKET), g, g, new ItemStack(Items.TNT), g, s, s, s));
+        var planks = net.minecraft.world.item.crafting.CraftingInput.of(1, 1, java.util.List.of(new ItemStack(Items.OAK_LOG)));
+        h.assertTrue(net.minecraft.world.level.block.CrafterBlock.getPotentialResults(level, chest).isEmpty(),
+                "a crafter can make the Infinite Chest");
+        h.assertTrue(net.minecraft.world.level.block.CrafterBlock.getPotentialResults(level, crashPad).isEmpty(),
+                "a crafter can make the Crash Pad");
+        h.assertTrue(net.minecraft.world.level.block.CrafterBlock.getPotentialResults(level, planks).isPresent(),
+                "a crafter no longer makes oak planks");
+        h.succeed();
+    }
+
     private static void withdraw(ServerPlayer player, BlockPos pos, Item item) {
         PacketHandler.handleInfiniteChestClick(player, new InfiniteChestClickPayload(pos, new ItemStack(item), 0, false));
     }
