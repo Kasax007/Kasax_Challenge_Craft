@@ -228,38 +228,7 @@ public class PacketHandler {
                 (packet, context) -> {
                     var server = context.server();
                     var player = context.player();
-                    server.execute(() -> {
-                        var world = player.level();
-                        if (world.getBlockEntity(packet.pos()) instanceof net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {
-                            var storage = be.getStorage();
-                            if (packet.button() == -1) {
-                                net.minecraft.world.inventory.AbstractContainerMenu handler = player.containerMenu;
-                                if (handler instanceof net.kasax.challengecraft.block.InfiniteChestScreenHandler) {
-                                    net.minecraft.world.item.ItemStack cursorStack = handler.getCarried();
-                                    if (!cursorStack.isEmpty()) {
-                                        storage.addStack(cursorStack.copy());
-                                        cursorStack.setCount(0);
-                                        handler.setCarried(net.minecraft.world.item.ItemStack.EMPTY);
-                                        syncInfiniteChest(player, be);
-                                    }
-                                }
-                                return;
-                            }
-                            net.minecraft.world.item.ItemStack stack = packet.stack();
-                            if (!stack.isEmpty()) {
-                                net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey key = net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey.fromStack(stack);
-                                long amountToRemove = (packet.button() == 1) ? 1 : 64;
-                                long count = storage.removeItems(key, amountToRemove);
-                                if (count > 0) {
-                                    net.minecraft.world.item.ItemStack out = key.toStack((int) count);
-                                    // 26.3: placeItemBackInInventory(ItemStack) removed; now takes a trailing
-                                    // Prediction. Server-driven (infinite chest withdrawal), not client-predicted -> SERVER_ONLY.
-                                    player.getInventory().placeItemBackInInventory(out, net.minecraft.util.Prediction.SERVER_ONLY);
-                                }
-                                syncInfiniteChest(player, be);
-                            }
-                        }
-                    });
+                    server.execute(() -> handleInfiniteChestClick(player, packet));
                 }
         );
 
@@ -281,6 +250,51 @@ public class PacketHandler {
                             .handleTeamAction(player, packet.action(), packet.teamId()));
                 }
         );
+    }
+
+    /**
+     * A click in an open infinite chest: withdraw (button 1 = one item, else one stack) or, with
+     * {@code button == -1}, deposit what the cursor carries.
+     *
+     * <p>The position in the packet is the client's word, so only the chest this player has open
+     * counts, and only while that menu is still valid (chest standing, player in reach) - before,
+     * any loaded chest could be emptied from anywhere, and a far position loaded its chunk. Every
+     * change marks the chest for saving: without that, a withdrawal from a chunk nothing else
+     * touched was undone by the next load (the items came back - a dupe), and a deposit was lost.
+     */
+    public static void handleInfiniteChestClick(net.minecraft.server.level.ServerPlayer player, InfiniteChestClickPayload packet) {
+        if (!(player.containerMenu instanceof net.kasax.challengecraft.block.InfiniteChestScreenHandler handler)
+                || !handler.getPos().equals(packet.pos()) || !handler.stillValid(player)) {
+            return;
+        }
+        if (!(player.level().getBlockEntity(packet.pos()) instanceof net.kasax.challengecraft.block.InfiniteChestBlockEntity be)) {
+            return;
+        }
+        var storage = be.getStorage();
+        if (packet.button() == -1) {
+            net.minecraft.world.item.ItemStack cursorStack = handler.getCarried();
+            if (!cursorStack.isEmpty()) {
+                storage.addStack(cursorStack.copy());
+                handler.setCarried(net.minecraft.world.item.ItemStack.EMPTY);
+                be.setChanged();
+                syncInfiniteChest(player, be);
+            }
+            return;
+        }
+        net.minecraft.world.item.ItemStack stack = packet.stack();
+        if (stack.isEmpty()) return;
+        net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey key = net.kasax.challengecraft.storage.InfiniteChestStorage.ItemStackKey.fromStack(stack);
+        // One stack of this item, not a flat 64: a click on swords or ender pearls took 64 of them.
+        long amountToRemove = packet.button() == 1 ? 1 : key.toStack(1).getMaxStackSize();
+        long count = storage.removeItems(key, amountToRemove);
+        if (count > 0) {
+            be.setChanged();
+            net.minecraft.world.item.ItemStack out = key.toStack((int) count);
+            // 26.3: placeItemBackInInventory(ItemStack) removed; now takes a trailing
+            // Prediction. Server-driven (infinite chest withdrawal), not client-predicted -> SERVER_ONLY.
+            player.getInventory().placeItemBackInInventory(out, net.minecraft.util.Prediction.SERVER_ONLY);
+        }
+        syncInfiniteChest(player, be);
     }
 
     public static void syncInfiniteChest(net.minecraft.server.level.ServerPlayer player, net.kasax.challengecraft.block.InfiniteChestBlockEntity be) {

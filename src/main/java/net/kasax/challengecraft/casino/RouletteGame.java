@@ -80,14 +80,18 @@ public final class RouletteGame {
 
     public static void placeBet(ServerPlayer player, BlockPos pos, int kind, int target, long chips) {
         if (!(player.level() instanceof ServerLevel level)) return;
-        if (CasinoDevices.at(level, pos) != DeviceType.ROULETTE) return;
+        // Reach before the block lookup: the position is the client's word, and a far one would
+        // load its chunk.
         if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 12 * 12) return;
+        if (CasinoDevices.at(level, pos) != DeviceType.ROULETTE) return;
         Table t = table(level, pos);
         if (t.phase != WAITING && t.phase != BETTING) {
             player.sendOverlayMessage(Component.translatable("challengecraft.casino.roulette.closed").withStyle(ChatFormatting.GRAY));
             return;
         }
-        if (!RouletteMath.valid(kind, target) || chips < 1) return;
+        // The chip count comes from the client too: an absurd one overflowed the stake below into
+        // a negative number, and the "bet" paid the player instead of costing them.
+        if (!RouletteMath.valid(kind, target) || chips < 1 || chips > Long.MAX_VALUE / CasinoAccount.CENTI) return;
         long stake = chips * CasinoAccount.CENTI;
         CasinoAccount account = CasinoEconomy.account(player);
         if (account.balance < stake) {

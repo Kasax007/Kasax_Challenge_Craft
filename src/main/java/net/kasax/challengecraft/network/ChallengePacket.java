@@ -69,7 +69,9 @@ public class ChallengePacket implements CustomPacketPayload {
                         @Override
                         public ChallengePacket decode(FriendlyByteBuf buf) {
                             int size = buf.readVarInt();
-                            List<Integer> list = new ArrayList<>(size);
+                            // Any client can send this (the op check comes later), so the sizes are
+                            // not trusted for the allocation: a huge one would reserve gigabytes.
+                            List<Integer> list = new ArrayList<>(Math.min(size, 64));
                             for (int i = 0; i < size; i++) {
                                 list.add(buf.readVarInt());
                             }
@@ -80,7 +82,7 @@ public class ChallengePacket implements CustomPacketPayload {
                             int gameSpeed = buf.readVarInt();
                             int fibMinutes = buf.readVarInt();
                             int perkSize = buf.readVarInt();
-                            List<Integer> perks = new ArrayList<>(perkSize);
+                            List<Integer> perks = new ArrayList<>(Math.min(perkSize, 64));
                             for (int i = 0; i < perkSize; i++) {
                                 perks.add(buf.readVarInt());
                             }

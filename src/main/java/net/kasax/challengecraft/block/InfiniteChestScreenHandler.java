@@ -61,9 +61,15 @@ public class InfiniteChestScreenHandler extends AbstractContainerMenu {
         return itemStack;
     }
 
+    /**
+     * Like a vanilla chest: the menu closes once the player is out of reach or the chest is gone.
+     * It used to stay valid forever, so an open chest could be used from anywhere. Reach first,
+     * so a player far away never loads the chunk just for this check.
+     */
     @Override
     public boolean stillValid(Player player) {
-        return true;
+        return player.isWithinBlockInteractionRange(pos, 4.0)
+                && player.level().getBlockState(pos).is(InfiniteChestRegistry.INFINITE_CHEST_BLOCK);
     }
 
     public BlockPos getPos() {
