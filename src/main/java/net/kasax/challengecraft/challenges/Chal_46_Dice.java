@@ -1,5 +1,6 @@
 package net.kasax.challengecraft.challenges;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -41,6 +42,15 @@ import java.util.UUID;
 public class Chal_46_Dice {
     private static boolean active = false;
     private static int tickCounter = 0;
+    /**
+     * Server ticks the challenge has been off. The state is only dropped once this reaches
+     * {@link #OFF_DEBOUNCE_TICKS}: in singleplayer the client's challenge sync shares the flag and
+     * turns every challenge off and on again in one go (see {@code Chal_48_RedLight}), and clearing
+     * right in {@link #setActive} made every sync - a LAN player joining, the re-sync after a join,
+     * a settings change - take everyone's remaining blocks.
+     */
+    private static int inactiveTicks = 0;
+    private static final int OFF_DEBOUNCE_TICKS = 20;
 
     /** Server-authoritative state. The client keeps its own copy in {@code DiceClientState} — a
      *  shared static would be a data race on an integrated server, where both sides share a JVM. */
@@ -77,6 +87,12 @@ public class Chal_46_Dice {
     private static final int SNAP_COOLDOWN_TICKS = 8;
 
     public static void register() {
+        // A world opened next in the same game starts clean (no budget, no die in flight).
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            clearState();
+            inactiveTicks = 0;
+        });
+
         // Right-click throws the die. Never consumes it.
         UseItemCallback.EVENT.register((player, world, hand) -> {
             if (!active) return InteractionResult.PASS;
@@ -91,7 +107,11 @@ public class Chal_46_Dice {
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            if (!active) return;
+            if (!active) {
+                if (inactiveTicks < OFF_DEBOUNCE_TICKS && ++inactiveTicks == OFF_DEBOUNCE_TICKS) clearState();
+                return;
+            }
+            inactiveTicks = 0;
             tickCounter++;
             // Scanning every inventory every tick would be wasteful; once a second is plenty.
             boolean handOutDice = tickCounter % 20 == 0;
@@ -130,18 +150,20 @@ public class Chal_46_Dice {
 
     public static void setActive(boolean value) {
         active = value;
-        if (!value) {
-            SERVER_BUDGET.clear();
-            LAST_ROLL.clear();
-            IN_FLIGHT.clear();
-            IN_FLIGHT_DEADLINE.clear();
-            LAST_POS.clear();
-            ANCHOR.clear();
-            SNAP_COOLDOWN.clear();
-            clientRemaining = 0.0;
-            tickCounter = 0;
-        }
         ChallengeCraft.LOGGER.info("[Chal46] {}", value ? "activated" : "deactivated");
+    }
+
+    /** Everything a run kept: once the challenge has stayed off, and when the server stops. */
+    private static void clearState() {
+        SERVER_BUDGET.clear();
+        LAST_ROLL.clear();
+        IN_FLIGHT.clear();
+        IN_FLIGHT_DEADLINE.clear();
+        LAST_POS.clear();
+        ANCHOR.clear();
+        SNAP_COOLDOWN.clear();
+        clientRemaining = 0.0;
+        tickCounter = 0;
     }
 
     public static boolean isActive() {

@@ -150,6 +150,27 @@ public class ChallengeFixTests {
         });
     }
 
+    /**
+     * Dice: the client's challenge sync switches every challenge off and the active ones on again,
+     * in singleplayer on the server's own flags - that must not take a player's remaining blocks
+     * (it did, on every sync: a LAN player joining, the re-sync after a join). Only the Dice flag
+     * is touched, and only within this call, so the bot tests running alongside never see it.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 20, skyAccess = true, padding = 8)
+    public void diceBudgetSurvivesSync(GameTestHelper h) {
+        var uuid = java.util.UUID.randomUUID();
+        boolean was = net.kasax.challengecraft.challenges.Chal_46_Dice.isActive();
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(true);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setBudget(uuid, 5);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(false);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(true);
+        double left = net.kasax.challengecraft.challenges.Chal_46_Dice.getBudget(uuid);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setBudget(uuid, 0);
+        net.kasax.challengecraft.challenges.Chal_46_Dice.setActive(was);
+        h.assertTrue(left == 5, "a challenge sync took the dice budget: " + left + " of 5 blocks left");
+        h.succeed();
+    }
+
     private static void withdraw(ServerPlayer player, BlockPos pos, Item item) {
         PacketHandler.handleInfiniteChestClick(player, new InfiniteChestClickPayload(pos, new ItemStack(item), 0, false));
     }
