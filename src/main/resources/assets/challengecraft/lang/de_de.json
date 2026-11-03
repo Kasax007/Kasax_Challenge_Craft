@@ -879,6 +879,7 @@
   "item.challengecraft.chip_wallet": "Jeton-Beutel",
   "item.challengecraft.chip_wallet.balance": "Jeton-Beutel · %s Jetons",
   "entity.challengecraft.croupier": "Croupier",
+  "entity.challengecraft.dice": "Würfel",
   "key.category.challengecraft.casino": "Challenge Craft · Casino",
   "key.challengecraft.casino_bet_up": "Einsatz erhöhen",
   "key.challengecraft.casino_bet_down": "Einsatz senken",

@@ -879,6 +879,7 @@
   "item.challengecraft.chip_wallet": "Chip Wallet",
   "item.challengecraft.chip_wallet.balance": "Chip Wallet · %s Jetons",
   "entity.challengecraft.croupier": "Croupier",
+  "entity.challengecraft.dice": "Die",
   "key.category.challengecraft.casino": "Challenge Craft · Casino",
   "key.challengecraft.casino_bet_up": "Raise stake",
   "key.challengecraft.casino_bet_down": "Lower stake",

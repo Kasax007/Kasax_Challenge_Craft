@@ -113,7 +113,7 @@ final class UiScenes {
                     ChallengeCardWidget c = cards.get(picks[i]);
                     d.client(mc -> {
                         double x = c.getX() + c.getWidth() / 2.0, y = c.getY() + c.getHeight() / 2.0;
-                        c.onClick(new net.minecraft.client.input.MouseButtonEvent(x, y, new net.minecraft.client.input.MouseButtonInfo(0, 0)), false);
+                        c.onClick(new net.minecraft.client.input.MouseButtonEvent(x, y, new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0)), false);
                     });
                 }
             }

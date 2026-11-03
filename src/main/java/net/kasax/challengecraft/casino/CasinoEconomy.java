@@ -316,9 +316,11 @@ public final class CasinoEconomy {
     // ---- withdrawals --------------------------------------------------------------------------
 
     public static void buyItem(ServerPlayer player, String itemId, int count) {
-        Item item = BuiltInRegistries.ITEM.getValue(Identifier.parse(itemId));
         CasinoAccount a = account(player);
-        if (item == null || item == Items.AIR || !a.known.contains(itemId) || !EmcValues.isForSale(item)) {
+        // The id is the client's text: only one the player has deposited before is looked up (an
+        // unparsable one threw out of the server task).
+        Item item = a.known.contains(itemId) ? BuiltInRegistries.ITEM.getValue(Identifier.tryParse(itemId)) : null;
+        if (item == null || item == Items.AIR || !EmcValues.isForSale(item)) {
             player.sendOverlayMessage(Component.translatable("challengecraft.casino.buy.unknown").withStyle(ChatFormatting.RED));
             return;
         }
