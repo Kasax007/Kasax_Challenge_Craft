@@ -172,13 +172,11 @@ public final class ChallengeBrowser {
                 continue;
             }
             List<ChallengeCardWidget> inSection = new ArrayList<>();
-            int active = 0;
-            int total = 0;
+            List<ChallengeCardWidget> sectionCards = new ArrayList<>();
             for (int id : order) {
                 if (categoryOf(id) != category) continue;
                 ChallengeCardWidget card = cards.get(id);
-                total++;
-                if (card.isActive()) active++;
+                sectionCards.add(card);
                 if (visible(card)) inSection.add(card);
             }
             // While filtering, an empty section is noise; without a filter every section shows.
@@ -186,7 +184,8 @@ public final class ChallengeBrowser {
                 continue;
             }
             int index = category.ordinal();
-            panel.addChild(new SectionHeader(x0, y, width, sectionLabel(Component.translatable(category.key), active, total),
+            Component name = Component.translatable(category.key);
+            panel.addChild(new SectionHeader(x0, y, width, () -> sectionLabel(name, sectionCards),
                     expanded[index] || isFiltering(), () -> {
                         expanded[index] = !expanded[index];
                         onChange.run();
@@ -201,14 +200,13 @@ public final class ChallengeBrowser {
 
         if (only == null) {
             List<ChallengeCardWidget> visiblePerks = new ArrayList<>();
-            int active = 0;
+            List<ChallengeCardWidget> allPerks = List.copyOf(perks);
             for (ChallengeCardWidget perk : perks) {
-                if (perk.isActive()) active++;
                 if (visible(perk)) visiblePerks.add(perk);
             }
             if (!visiblePerks.isEmpty() || !isFiltering()) {
-                panel.addChild(new SectionHeader(x0, y, width,
-                        sectionLabel(Component.translatable("challengecraft.challenge_selection.perks_header"), active, perks.size()),
+                Component name = Component.translatable("challengecraft.challenge_selection.perks_header");
+                panel.addChild(new SectionHeader(x0, y, width, () -> sectionLabel(name, allPerks),
                         perksExpanded || isFiltering(), () -> {
                             perksExpanded = !perksExpanded;
                             onChange.run();
@@ -264,8 +262,13 @@ public final class ChallengeBrowser {
         return y;
     }
 
-    private static Component sectionLabel(Component name, int active, int total) {
-        return name.copy().append(Component.literal("  " + active + "/" + total).withColor(CraftUI.TEXT_MUTED));
+    /** "Name  active/total", counted when drawn: a card switched on or off updates it at once. */
+    private static Component sectionLabel(Component name, List<ChallengeCardWidget> section) {
+        int active = 0;
+        for (ChallengeCardWidget card : section) {
+            if (card.isActive()) active++;
+        }
+        return name.copy().append(Component.literal("  " + active + "/" + section.size()).withColor(CraftUI.TEXT_MUTED));
     }
 
     // ---- conflicts -------------------------------------------------------------------------
@@ -301,12 +304,18 @@ public final class ChallengeBrowser {
 
     /** Collapsible section title with a caret, the section's "active/total" count and a gold rule. */
     public static final class SectionHeader extends AbstractWidget {
+        private final java.util.function.Supplier<Component> label;
         private final boolean expanded;
         private final Runnable onToggle;
         private final Anim.Tween hover = new Anim.Tween(0f);
 
-        SectionHeader(int x, int y, int width, Component label, boolean expanded, Runnable onToggle) {
-            super(x, y, width, 16, label);
+        /**
+         * The label is asked for again on every frame: toggling a card does not lay the panel out
+         * again, so a label fixed at layout time kept showing "0/7" with three cards switched on.
+         */
+        SectionHeader(int x, int y, int width, java.util.function.Supplier<Component> label, boolean expanded, Runnable onToggle) {
+            super(x, y, width, 16, label.get());
+            this.label = label;
             this.expanded = expanded;
             this.onToggle = onToggle;
         }
@@ -326,6 +335,7 @@ public final class ChallengeBrowser {
                     context.fill(x + 1 + i, y + i, x + 2 + i, y + 7 - i, caret);
                 }
             }
+            setMessage(label.get());
             context.text(font, getMessage(), x + 12, y, color, false);
             int underlineY = y + font.lineHeight + 1;
             context.fill(x, underlineY, x + getWidth(), underlineY + 1, CraftUI.applyAlpha(CraftUI.GOLD, 0.6f));

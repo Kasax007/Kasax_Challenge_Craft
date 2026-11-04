@@ -136,6 +136,18 @@ final class UiScenes {
             if (c.visible) out.add(c);
             return;
         }
+        // The Challenges tab keeps its cards in a scroll panel, which is a widget, not a container:
+        // without this the scene found no card at all ("0 challenge cards on screen") and clicked none.
+        if (node instanceof net.kasax.challengecraft.client.screen.WidgetScrollPanel panel) {
+            try {
+                Field children = net.kasax.challengecraft.client.screen.WidgetScrollPanel.class.getDeclaredField("children");
+                children.setAccessible(true);
+                for (Object child : (List<?>) children.get(panel)) collect(child, out);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(e);
+            }
+            return;
+        }
         if (node instanceof net.minecraft.client.gui.components.events.ContainerEventHandler h) {
             for (GuiEventListener child : h.children()) collect(child, out);
         }

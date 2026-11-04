@@ -6,8 +6,14 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
 ## Geprüft
 
 - **Build** (`build`, `compileFilmJava`, `compileGametestJava`): ok, keine neuen Warnungen.
-- **Game-Tests** (Dedicated-Server-Umgebung): vorher 194/195 grün; `brawl_enderman_slope` fiel einmal
-  unter Volllast (bekannt wackelig, im nächsten Lauf grün). Nach den Fixes: alle grün, siehe unten.
+- **Game-Tests** (Dedicated-Server-Umgebung, Maschine stark ausgelastet): vorher 194/195 grün
+  (`brawl_enderman_slope` rot, bekannt wackelig). Nach den Fixes 197/197 grün; letzter voller Lauf
+  196/198 – rot nur zwei Bob-Kampfszenen (`sniper_duel`: alle Pfeile verschossen, Skelett lebt;
+  `brawl_enderman`), die mit den Änderungen nichts zu tun haben. Einzeln nachgeprüft: siehe unten.
+- **Client** (Film-Harness unter Xvfb): Hub, Challenge-Auswahl mit echten Karten-Klicks; Client-Log
+  ohne Fehler der Mod.
+- **Dedicated Server** (`runServer`, `CHALLENGECRAFT_VERIFY_IDS=1`): startet ohne Client-Klassen
+  (Done in 3,4 s); das Registry-Audit fand eine ungültige ID (Punkt 9).
 - **Ressourcen per Skript:** jede Sprach-Schlüssel-Familie (51 Challenges, Perks, Lockout-Ziele,
   Casino) in `en_us` und `de_de`, Platzhalter gleich; jedes Modell, jede Textur, jede Blockstate- und
   Item-Definition vorhanden; Loot-Tabellen und Rezepte laden ohne Fehler (Server-Log sauber).
@@ -30,7 +36,8 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
    - Fix: nur die offene Truhe in Reichweite, Menü schließt wie bei einer Kiste, jede Änderung
      markiert die Truhe, Linksklick = ein Stapel des Items.
    - **Im Spiel geprüft:** neuer Game-Test `challenge_fix_tests_infinite_chest_clicks`. Gegen den
-     alten Code laufen lassen: alle acht Prüfungen schlugen fehl. Mit Fix grün.
+     alten Code laufen lassen: 8 der 10 Prüfungen schlugen fehl (genau die oben genannten Fehler;
+     Öffnen und Ablegen selbst gingen). Mit Fix grün.
 2. **Crafter umging Level- und Kauf-Sperre** – neu `mixin/CrafterGateMixin.java`. Infinite Chest
    (Level 20 + Perk) und Casino-Geräte (einmal beim Croupier kaufen) sind nur am Ergebnis-Slot
    gesperrt; der Crafter klickt nie und baute sie für jeden. Jetzt baut er sie nicht (Hand-Crafting
@@ -49,8 +56,18 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
    Client, die OP-Prüfung kommt später) – `network/ChallengePacket.java:74`. Nur gelesen.
 7. **Kleinkram:** Name des Würfel-Entitys fehlte (`entity.challengecraft.dice`, beide Sprachen);
    tote Loot-Tabelle im alten Ordner `loot_tables/` entfernt (die generierte unter `loot_table/`
-   gilt, im Jar geprüft); Film-Harness `film/UiScenes.java:116` klickte mit Taste 0 (in 26.3 keine
-   Taste) – jetzt `MOUSE_BUTTON_LEFT`.
+   gilt, im Jar geprüft).
+8. **Challenge-Auswahl: Abschnittszähler blieb stehen** – `client/screen/ChallengeBrowser.java:266`,
+   `:316`. Die Zahl „aktiv/gesamt“ neben jedem Abschnitt wurde nur beim Layout berechnet; nach einem
+   Klick auf eine Karte stand dort weiter „0/7“, obwohl drei Challenges an waren (im Film-Bild
+   gesehen). Jetzt beim Zeichnen gezählt. Gilt für Welt-Erstellung und `/challenges`.
+9. **Block-Survey: ID aus 1.21** – `data/challengecraft/block_survey.json`: `minecraft:chain` heißt in
+   26.3 `minecraft:iron_chain` (steht schon im Datensatz). Progressive Block Drops hat den Eintrag
+   still übersprungen; das eigene ID-Audit meldete ihn. Entfernt.
+10. **Film-Harness** – `film/UiScenes.java:116`, `:141`: die Szene `ui_select` klickte mit Taste 0
+    (in 26.3 keine Taste) und fand seit dem Umbau auf das Scroll-Panel keine Karte mehr („0 challenge
+    cards on screen“, also auch kein Klick). Jetzt `MOUSE_BUTTON_LEFT` und Suche im Panel: 59 Karten,
+    die Klicks schalten sichtbar um.
 
 ## Offen (nicht geändert)
 
@@ -71,11 +88,12 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
 - **Trivia** – `network/TriviaQuestionPacket.java:12`: die richtige Antwort geht an den Client.
 - **Roulette** – `casino/client/RouletteScreen.java:75`: `ROULETTE_LEAVE` wird gesendet, aber der
   Server behandelt es nicht (`casino/CasinoGames.java:283`). Harmlos.
-- **Bob (Early Development Stage):** keine klaren Fehler gefunden; `brawl_enderman_slope` bleibt
-  unter Last wackelig (1 von 2 Läufen rot).
+- **Bob (Early Development Stage):** nur stichprobenartig gelesen, keine klaren Fehler gefunden;
+  `brawl_enderman_slope` bleibt unter Last wackelig (im ersten vollen Lauf rot, danach grün).
 
 ## Im Spiel geprüft vs. nur gelesen
 
-- Im Spiel (Headless-Server bzw. Client): Punkte 1–3 per Game-Test, voller Testlauf, Client-Start
-  mit Film-Szenen, Dedicated-Server-Start mit ID-Audit (Ergebnis unten).
-- Nur gelesen: Punkte 4–7 und alle offenen Punkte.
+- Im Spiel: Punkte 1–3 per Game-Test (Headless-Server), Punkte 8 und 10 im Client (Film-Bilder
+  angesehen), Punkt 9 per Server-Start mit ID-Audit; dazu volle Testläufe, Client- und Serverstart.
+- Nur gelesen: Punkte 4–7 und alle offenen Punkte. Dass der Dice-Test am alten Code scheitert, folgt
+  aus dem Code (dort leerte `setActive(false)` die Budgets); nicht extra laufen lassen.

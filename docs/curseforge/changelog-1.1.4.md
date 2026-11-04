@@ -10,4 +10,5 @@
 - **Crafter:** no longer crafts the Infinite Chest or the casino devices — they keep their level and purchase requirements, so craft them by hand.
 - **Dice:** you keep your rolled blocks when someone joins a LAN world or the challenge settings change.
 - **The House Always Wins:** the roulette table and the cashier check every request properly.
+- **Challenge selection:** the count next to each section (like "3/7") updates as soon as you switch a challenge on or off.
 - The thrown die shows its name.
