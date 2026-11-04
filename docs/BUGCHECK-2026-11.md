@@ -9,11 +9,12 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
 - **Game-Tests** (Dedicated-Server-Umgebung, Maschine stark ausgelastet): vorher 194/195 grün
   (`brawl_enderman_slope` rot, bekannt wackelig). Nach den Fixes 197/197 grün; letzter voller Lauf
   196/198 – rot nur zwei Bob-Kampfszenen (`sniper_duel`: alle Pfeile verschossen, Skelett lebt;
-  `brawl_enderman`), die mit den Änderungen nichts zu tun haben. Einzeln nachgeprüft: siehe unten.
+  `brawl_enderman`), die mit den Änderungen nichts zu tun haben; einzeln nachgeprüft beide grün.
 - **Client** (Film-Harness unter Xvfb): Hub, Challenge-Auswahl mit echten Karten-Klicks; Client-Log
   ohne Fehler der Mod.
 - **Dedicated Server** (`runServer`, `CHALLENGECRAFT_VERIFY_IDS=1`): startet ohne Client-Klassen
-  (Done in 3,4 s); das Registry-Audit fand eine ungültige ID (Punkt 9).
+  (Done in 3,4 s); das Registry-Audit fand eine ungültige ID (Punkt 9), nach dem Fix „OK — every id
+  resolves“ (1495 IDs).
 - **Ressourcen per Skript:** jede Sprach-Schlüssel-Familie (51 Challenges, Perks, Lockout-Ziele,
   Casino) in `en_us` und `de_de`, Platzhalter gleich; jedes Modell, jede Textur, jede Blockstate- und
   Item-Definition vorhanden; Loot-Tabellen und Rezepte laden ohne Fehler (Server-Log sauber).
@@ -88,8 +89,10 @@ gepusht. Changelog für die nächste Version liegt bereit: `docs/curseforge/chan
 - **Trivia** – `network/TriviaQuestionPacket.java:12`: die richtige Antwort geht an den Client.
 - **Roulette** – `casino/client/RouletteScreen.java:75`: `ROULETTE_LEAVE` wird gesendet, aber der
   Server behandelt es nicht (`casino/CasinoGames.java:283`). Harmlos.
-- **Bob (Early Development Stage):** nur stichprobenartig gelesen, keine klaren Fehler gefunden;
-  `brawl_enderman_slope` bleibt unter Last wackelig (im ersten vollen Lauf rot, danach grün).
+- **Bob (Early Development Stage):** nur stichprobenartig gelesen, keine klaren Fehler gefunden.
+  Unter Volllast wackeln Kampfszenen: `brawl_enderman_slope` (Lauf 1), `sniper_duel` und
+  `brawl_enderman` (Lauf 3) – jeweils im nächsten bzw. Einzel-Lauf grün. Bei `sniper_duel` gingen
+  im roten Lauf alle 48 Pfeile daneben; vielleicht lohnt ein Blick aufs Zielen unter Lag.
 
 ## Im Spiel geprüft vs. nur gelesen
 
