@@ -1,6 +1,6 @@
 # Challenge Craft — turn every world into a challenge run
 
-![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-51-9b59ff?style=for-the-badge) ![Mods](https://img.shields.io/badge/Mods-29-ff8c42?style=for-the-badge)
+![Minecraft](https://img.shields.io/badge/Minecraft-26.3-5fbf4a?style=for-the-badge) ![Loader](https://img.shields.io/badge/Loader-Fabric-3f9bff?style=for-the-badge) ![Java](https://img.shields.io/badge/Java-25-f89820?style=for-the-badge) ![Challenges](https://img.shields.io/badge/Challenges-51-9b59ff?style=for-the-badge) ![Mods](https://img.shields.io/badge/Mods-31-ff8c42?style=for-the-badge)
 
 The **Challenge Craft Modpack** is the complete version of the challenge run: the mod itself, plus everything I use when I play it. Shaders, voice chat, a full ambient soundscape and a hand-built menu — set up, tuned and ready, so you can click **Play** and start a run instead of assembling a modlist first.
 
@@ -78,6 +78,8 @@ Everything below is already configured. Nothing needs to be switched on.
 - **Sound Physics Remastered** then makes it all sound realistic
 - **AppleSkin** — see saturation and what food is actually worth
 - **Mouse Tweaks** — drag, sort and move stacks without twenty clicks
+- **Upgraded Iron Chests** — iron, gold, diamond and netherite chests, safe chests with a passcode, a search field, quick stack and linked chests
+- **Storage Drawers** — bulk storage for huge amounts of one item each, with capacity upgrades and a drawer controller
 - **Just Zoom** — a proper zoom key
 - **Not Enough Animations** · **3D Skin Layers** · **Entity Model / Texture Features** — players and mobs that move and look like they have weight
 - **Mod Menu** — every mod's settings in one place
@@ -112,11 +114,11 @@ The modpack is client-side complete. For a server you only need the gameplay mod
 
 | Minecraft | Java | Loader | Server needs |
 | --- | --- | --- | --- |
-| **26.3** | 25 | Fabric | Challenge Craft + Fabric API (+ Simple Voice Chat for proximity audio) |
+| **26.3** | 25 | Fabric | Challenge Craft + Fabric API + Upgraded Iron Chests + Storage Drawers (+ Simple Voice Chat for proximity audio) |
 
 1. Create a Fabric **26.3** server with BisectHosting.
 2. Start it once so the files generate, then stop it.
-3. Upload **Challenge Craft** and **Fabric API** to `mods`. Add **Simple Voice Chat** if you want voice.
+3. Upload **Challenge Craft**, **Fabric API**, **Upgraded Iron Chests** and **Storage Drawers** to `mods`. Add **Simple Voice Chat** if you want voice.
 4. Start the server and join with this modpack installed.
 
 ⚠️ Server and client must run the same Minecraft version. Challenge Craft must be present on both.
