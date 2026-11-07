@@ -10,7 +10,7 @@ menu art and the pack logo of the modpack are in docs/curseforge/src (copied fro
 Frames are cut with ffmpeg into $CC_FRAMES (default: a temporary folder).
 what: image names without extension (header glance ...), or nothing for everything. Every number on the images is
 counted from this repository (see counts()); the modpack numbers come from $CC_PACK (the modpack zip) when it is set,
-otherwise from the list in PACK_MODS below (the manifest of Challenge Craft 26.3 v5)."""
+otherwise from the list in PACK_MODS below (the manifest of Challenge Craft 26.3 v4)."""
 import io
 import json
 import math
@@ -139,13 +139,14 @@ def counts():
                 keys=keys, lang=lang)
 
 
-# The modpack (manifest of "Challenge Craft 26.3 v5", CurseForge project 1653698). Groups for the pictures.
+# The modpack (manifest of "Challenge Craft 26.3 v4", CurseForge project 1653698). Groups for the pictures. The pack stays
+# vanilla gameplay plus Challenge Craft: everything else is client polish, sound, voice chat, shaders and performance.
 PACK_MODS = {
     'challenge': ['Challenge Craft'],
     'looks': ['Iris Shaders', 'Complementary Reimagined', 'BSL Shaders', 'Bliss Shaders', 'Entity Model Features',
               'Entity Texture Features', '3D Skin Layers', 'Not Enough Animations'],
     'sound': ['Simple Voice Chat', 'AmbientSounds', 'Sound Physics Remastered'],
-    'comfort': ['AppleSkin', 'Mouse Tweaks', 'Just Zoom', 'Upgraded Iron Chests', 'Storage Drawers'],
+    'comfort': ['AppleSkin', 'Mouse Tweaks', 'Just Zoom'],
     'speed': ['Sodium', 'Lithium', 'FerriteCore', 'Entity Culling', 'Packet Fixer', 'spark'],
     'menu': ['FancyMenu', 'Drippy Loading Screen', 'Melody', 'BisectHosting Server Menu'],
     'library': ['Fabric API', 'CreativeCore', 'Konkrete', 'Prickle', 'AttributeFix'],
@@ -1288,8 +1289,8 @@ def pack_cta(c):
     glow_behind(im, t, (x, 40), MAGENTA, 14, 110)
     im.alpha_composite(t, (x, 40))
     d = ImageDraw.Draw(im)
-    lines = wrap(d, 'The Challenge Craft modpack: this mod plus shaders, proximity voice chat, a full soundscape, '
-                    'big storage and a menu made for it. All set up, one click.', semi(22), w - x - 60)
+    lines = wrap(d, 'The Challenge Craft modpack: this mod plus shaders, proximity voice chat, a full soundscape '
+                    'and a menu made for it. Vanilla gameplay, all set up, one click.', semi(22), w - x - 60)
     draw_lines(d, (x + 2, 100), lines, semi(22), WHITE, 29)
     pk = pack_counts()
     chips = ['%d MODS' % pk['mods'], '%d SHADER PACKS' % pk['shaders'], 'SERVER PACK']
@@ -1302,8 +1303,8 @@ def pack_cta(c):
     save(im, 'pack_cta.jpg', quality=90)
 
 
-# the server pack of v5 (Serverpack Challenge Craft 26.3-v5.zip): the gameplay mods, plus configs and server.properties
-SERVER_MODS = ['Challenge Craft', 'Fabric API', 'Simple Voice Chat', 'Upgraded Iron Chests', 'Storage Drawers', 'Lithium',
+# the server pack of v4 (Serverpack Challenge Craft 26.3-v4.zip): the mods a server needs, plus configs and server.properties
+SERVER_MODS = ['Challenge Craft', 'Fabric API', 'Simple Voice Chat', 'Lithium',
                'FerriteCore', 'Sodium', 'Packet Fixer', 'spark', 'Mouse Tweaks', 'CreativeCore', 'AttributeFix', 'Prickle',
                'Konkrete', 'Melody', 'BisectHosting Server Menu']
 VOICE_PORT = 24454
@@ -1331,9 +1332,11 @@ def pack_glance(c):
     tw, th, gap = 552, 176, 24
     h = 34 + 50 + 30 + 3 * (th + gap) + 14 + 104 + 34
     im = panel_bg(w, h, seed=37)
-    y = heading(im, 'WHAT THE PACK ADDS', 34, 30)
+    y = heading(im, 'WHAT IS IN THE PACK', 34, 30)
     pk = pack_counts()
     tiles = [
+        (tex('cc:item/challenge_stick'), 'CHALLENGE CRAFT', 'All %d challenge runs. Everything else stays vanilla Minecraft gameplay.' % c['n'], GOLD,
+         ['Challenge Craft']),
         (cube(tex('block/glowstone'), tex('block/glowstone'), 60), '%d SHADER PACKS' % pk['shaders'],
          'Complementary Reimagined is on from the start. BSL and Bliss are one click away.', CYAN,
          ['Iris'] + SHADERS),
@@ -1341,8 +1344,6 @@ def pack_glance(c):
          ['Simple Voice Chat']),
         (tex('item/music_disc_cat'), 'SOUNDSCAPE', 'Caves, forests, water and weather get their own sound, and it echoes like it should.', MAGENTA,
          ['AmbientSounds', 'Sound Physics Remastered']),
-        (chest_icon(60), 'BIG STORAGE', 'Iron to netherite chests, safe chests with a passcode, and drawers for huge stacks.', GOLD,
-         ['Upgraded Iron Chests', 'Storage Drawers']),
         (tex('item/golden_apple'), 'COMFORT', 'Food values, mouse sorting, a zoom key, and livelier players and mobs.', AMBER,
          ['AppleSkin', 'Mouse Tweaks', 'Just Zoom', 'Not Enough Animations', '3D Skin Layers', 'Entity Model Features', 'Entity Texture Features']),
         (tex('item/painting'), 'CUSTOM MENU', 'A pixel-art title screen and loading screen made for this pack.', ROSE,
