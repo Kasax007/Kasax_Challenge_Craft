@@ -102,8 +102,10 @@ final class LockoutStrategist {
         // Investments: kits that pay for themselves.
         for (Kit kit : KITS) {
             if (holds(bot, kit.items())) continue;
-            double kitCost = 0;
-            for (Item i : kit.items()) kitCost += Math.min(UNREACHABLE, planner.estimate(bot, Set.of(i), 1));
+            // (The kit as one trip: the iron for the pickaxe and the bucket from the same vein.)
+            Map<Item, Integer> want = new HashMap<>();
+            for (Item i : kit.items()) if (ObtainPlanner.countAny(bot.body(), Set.of(i)) == 0) want.put(i, 1);
+            double kitCost = Math.min(UNREACHABLE * kit.items().size(), planner.estimateAll(bot, want));
             Map<String, Double> with = planner.assuming(bot, kit.items(), () -> costs(bot, planner, open));
             double savings = 0;
             int helped = 0;

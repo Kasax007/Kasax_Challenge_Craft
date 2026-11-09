@@ -65,6 +65,14 @@ public final class ObtainPlanner {
     }
 
     private static final double INF = 1e9, MAX_WAY_COST = 1200;
+
+    /**
+     * The way of estimating, for what is learnt against the estimates (the goal model, the goal
+     * experience): 1 - one item's share times the count, flat efforts per mob; 2 - batches along
+     * the plan's ways, the mob search from the spawn rules (round 21 of docs/bob-plan.md). What was
+     * learnt against another way is not used.
+     */
+    public static final int ESTIMATES = 2;
     private static final int SCAN_RADIUS = 32;
     private static final int MAX_DEPTH = 12;
 
@@ -100,12 +108,41 @@ public final class ObtainPlanner {
     /** Seconds until the monsters come out on the surface (0 at night). */
     private double untilNight;
 
-    /** A way to one item: its effort, the searching part of it, and where the work is. */
-    private record Leaf(double cost, double search, BlockPos at) {
-        static final Leaf NONE = new Leaf(1e9, 0, null);
+    /**
+     * A way to one item: its effort, the searching part of it, and where the work is; {@code lot}
+     * says what a whole batch of them costs (see {@link #batch}). The {@code cost} is what the ways
+     * are compared by, one item's share as it always was.
+     */
+    private record Leaf(double cost, double search, BlockPos at, Lot lot) {
+        static final Leaf NONE = new Leaf(1e9, 0, null, new Lot(1e9, 0, 0, 0, null));
 
+        /** Every one as dear as the first (the way one was counted before batches). */
+        Leaf(double cost, double search, BlockPos at) {
+            this(cost, search, at, new Lot(0, cost, 0, search, null));
+        }
+
+        /** Partly held already: that much less to get of one (a batch counts what is held itself). */
         Leaf scaled(double f) {
-            return new Leaf(cost * f, search * f, at);
+            return new Leaf(cost * f, search * f, at, lot);
+        }
+
+        /** {@code n} of the item from each block broken or mob killed: one item's share of it. */
+        Leaf perDrop(double n) {
+            return new Leaf(cost / n, search / n, at, new Lot(lot.once(), lot.each() / n, lot.onceLuck(), lot.eachLuck() / n, lot.tool(), lot.per()));
+        }
+    }
+
+    /**
+     * What a batch of an item costs by a raw way (mined, killed, filled): {@code once} what is
+     * paid however many are wanted - the walk to the tree, the search for the gravel bank, the
+     * herd; {@code each} what every one adds - a log chopped, a tenth of the gravel for a flint,
+     * the next of the pack (a batch of n: once + n * each; for a mob, once is the first kill's
+     * cost less one each, and may be below nought); {@code tool} the tool still to be made for it (made once). The luck in
+     * both, as for {@link #searchPart}.
+     */
+    private record Lot(double once, double each, double onceLuck, double eachLuck, Item tool, Item per) {
+        Lot(double once, double each, double onceLuck, double eachLuck, Item tool) {
+            this(once, each, onceLuck, eachLuck, tool, null);
         }
     }
     private boolean craftOnly;
@@ -215,6 +252,9 @@ public final class ObtainPlanner {
         Map<Block, Double> savedVisible = visibleBlocks, savedHints = biomeHints;
         Map<EntityType<?>, Double> savedMobs = visibleMobs;
         Map<Item, Double> saved = costs;
+        Map<Item, Double> savedSearches = searches;
+        Map<Item, BlockPos> savedAnchors = anchors;
+        Map<Item, Object> savedWays = ways;
         nether = true;
         visibleBlocks = new IdentityHashMap<>();
         biomeHints = new IdentityHashMap<>();
@@ -228,6 +268,10 @@ public final class ObtainPlanner {
             biomeHints = savedHints;
             visibleMobs = savedMobs;
             costs = saved;
+            searches = savedSearches;
+            anchors = savedAnchors;
+            ways = savedWays;
+            batches.clear();
         }
     }
 
@@ -240,6 +284,7 @@ public final class ObtainPlanner {
         Map<Item, Double> saved = costs;
         Map<Item, Double> savedSearches = searches;
         Map<Item, BlockPos> savedAnchors = anchors;
+        Map<Item, Object> savedWays = ways;
         Set<Item> savedHeld = assumeHeld;
         assumeHeld = held;
         costs = computeCosts(bot);
@@ -250,6 +295,8 @@ public final class ObtainPlanner {
             costs = saved;
             searches = savedSearches;
             anchors = savedAnchors;
+            ways = savedWays;
+            batches.clear();
         }
     }
 
@@ -267,14 +314,17 @@ public final class ObtainPlanner {
         return visibleBlocks.get(block);
     }
 
-    /** Rough effort, in seconds of play, to hold {@code count} of these items (0 if it already does). */
+    /**
+     * Rough effort, in seconds of play, to hold {@code count} of these items (0 if it already
+     * does): as a batch along the plan's ways (see {@link #batch}) - a whole craft for one arrow,
+     * the walk to the trees once for sixteen logs.
+     */
     public double estimate(Bot bot, Collection<Item> items, int count) {
         refresh(bot);
         int have = countAny(bot.body(), Set.copyOf(items));
         if (have >= count) return 0;
-        double best = INF;
-        for (Item i : items) best = Math.min(best, cost(i));
-        return best >= INF ? INF : best * (count - have);
+        double s = bestBatch(bot, items, count - have).seconds();
+        return s >= INF ? INF : s;
     }
 
     /**
@@ -287,8 +337,8 @@ public final class ObtainPlanner {
         refresh(bot);
         int have = countAny(bot.body(), Set.copyOf(items));
         if (have >= count) return 0;
-        Item best = cheapestOf(items);
-        return best == null ? 0 : Math.min(cost(best), searches.getOrDefault(best, 0.0)) * (count - have);
+        Batch b = bestBatch(bot, items, count - have);
+        return b.seconds() >= INF ? 0 : b.luck();
     }
 
     /** Where the work for these items mostly is (a seen block, a village, a habitat, a depth), or null: here, anywhere. */
@@ -321,14 +371,23 @@ public final class ObtainPlanner {
         return villagePos;
     }
 
-    /** Rough effort to craft one of these items (from scratch, whatever is held). */
+    /**
+     * Rough effort to craft one of these items (crafting counts, not having): one craft by the
+     * cheapest recipe, its ingredients as batches from what is held.
+     */
     public double estimateCraft(Bot bot, Collection<Item> items) {
         refresh(bot);
         BotKnowledge k = BotKnowledge.get(bot.server());
+        Map<Item, Integer> pack = new IdentityHashMap<>();
+        for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (!s.isEmpty()) pack.merge(s.getItem(), s.getCount(), Integer::sum);
         double best = INF;
         for (Item i : items) {
             for (BotKnowledge.Route r : k.routesTo(i)) {
-                if (r instanceof BotKnowledge.CraftRoute) best = Math.min(best, routeCost(r, costs));
+                if (!(r instanceof BotKnowledge.CraftRoute c) || routeCost(r, costs) >= INF) continue;
+                Set<Item> making = new HashSet<>();
+                making.add(i);
+                paidOnce.clear();
+                best = Math.min(best, craftBatch(bot, k, c, 1, new IdentityHashMap<>(pack), 0, making).seconds());
             }
         }
         return best;
@@ -352,7 +411,9 @@ public final class ObtainPlanner {
         boolean water = cat == net.minecraft.world.entity.MobCategory.WATER_CREATURE || cat == net.minecraft.world.entity.MobCategory.WATER_AMBIENT
                 || cat == net.minecraft.world.entity.MobCategory.UNDERGROUND_WATER_CREATURE;
         if (!water || l.cost() >= INF) return l;
-        return new Leaf(l.cost() * 4 + 30, l.search() * 4 + 30, l.at());
+        Lot lot = l.lot();
+        return new Leaf(l.cost() * 4 + 30, l.search() * 4 + 30, l.at(),
+                new Lot(lot.once() * 4 + 30, lot.each() * 4, lot.onceLuck() * 4 + 30, lot.eachLuck() * 4, null));
     }
 
     private static final Set<EntityType<?>> RISKY_PREY = Set.of(net.minecraft.world.entity.EntityTypes.SKELETON, net.minecraft.world.entity.EntityTypes.STRAY, net.minecraft.world.entity.EntityTypes.BOGGED,
@@ -378,13 +439,24 @@ public final class ObtainPlanner {
     private Leaf landMobLeaf(EntityType<?> type, double effort) {
         Double seen = visibleMobs.get(type);
         if (seen == null && isMissing(type)) return Leaf.NONE;
+        boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
+        // Bob's seconds for the fight itself (the way in under fire): from the knowledge base. The
+        // old flat efforts had it inside them; for one in sight it was left out altogether - "a
+        // skeleton, ~27 s" took four minutes in the leagues.
+        double fight = MobSearch.fight(type, 0);
+        int pack = MobSearch.pack(type);
         // In sight: a walk there and the fight, no luck needed.
         // (One in sight that shoots, or any monster while hurt: as dear as one still to be found
         // - see below.)
         if (seen != null) {
             double risk = habitatBot == null || geared(habitatBot.body()) ? 0 : RISKY_PREY.contains(type) ? 300 : bareRisk(type);
-            if (type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER && habitatBot != null && habitatBot.body().getHealth() <= 8) risk += 600;
-            return new Leaf(seen + risk, 0, mobPos.get(type));
+            if (monster && habitatBot != null && habitatBot.body().getHealth() <= 8) risk += 600;
+            // (The next ones: the rest of its pack, then a search like any other.)
+            double again = habitatBot == null ? effort : searchFor(type, true, effort);
+            if (again < 0 || again >= INF) again = Math.min(effort, 600);
+            // (A batch: the first one as above, each further one its fight and its share of a search.)
+            double each = fight + again / pack;
+            return new Leaf(seen + risk + fight, 0, mobPos.get(type), new Lot(seen + risk + fight - each, each, -again / pack, again / pack, null));
         }
         // Nether mobs only in the Nether, and the Overworld's not there.
         if (BotKnowledge.NETHER_MOBS.contains(type) != nether) return Leaf.NONE;
@@ -392,26 +464,64 @@ public final class ObtainPlanner {
         // then the search there; not knowing any is a long search (horses are not in the snow).
         double walk = 0;
         BlockPos at = null;
+        boolean away = false;
         if (habitatBot != null && !MobHabitats.inHabitat(habitatBot, type)) {
             BlockPos home = MobHabitats.nearestKnown(habitatBot, type);
             if (home != null) {
                 walk = net.kasax.challengecraft.bot.BotTerrain.walkSeconds(habitatBot, habitatBot.body().blockPosition(), home);
                 at = home;
+                away = true;
             } else effort *= 2.5;
         }
-        boolean monster = type.getCategory() == net.minecraft.world.entity.MobCategory.MONSTER;
-        // Monsters come out in the dark: on the surface by day that is a wait for the night (or
-        // a trip down into a cave, about three searches' worth); in the Nether and down in a cave
-        // it is dark at noon.
-        double wait = monster && !dark && !nether && !underground ? Math.min(untilNight, effort * 3) : 0;
+        // How long the search takes where it will be looking (see MobSearch): the spawn rules,
+        // the time of day, the biome's share of that kind. Mobs not found by looking about
+        // (structure ones, slimes, phantoms) keep their old figure.
+        double search = habitatBot == null ? MobSearch.UNKNOWN : searchFor(type, !away, effort);
+        double find = search >= 0 ? search + fight : effort;
+        // Monsters come out in the dark: on the surface by day the burning kinds are gone - a wait
+        // for the night (in the Nether and down in a cave it is dark at noon). The others (spiders,
+        // creepers) are few by day: their day search is in the figure, unless the night is sooner.
+        double wait = 0;
+        if (monster && !dark && !nether && !underground) {
+            if (search < 0) wait = Math.min(untilNight, effort * 3);
+            else if (MobSearch.onlyInTheDark(type)) wait = untilNight;
+            else {
+                double atNight = habitatBot == null ? search : searchFor(type, !away, effort, true);
+                if (untilNight + atNight < search) {
+                    wait = untilNight;
+                    find = atNight + fight;
+                    search = atNight;
+                }
+            }
+        }
         // The ones that hit from afar (or with potions, or from the water) are not hunted bare:
         // without a shield or armour that is how the early deaths went (a skeleton hunted for
         // one arrow at minute four on seed 22, a witch, a drowned). Other ways first.
-        if (habitatBot != null && !geared(habitatBot.body())) wait += RISKY_PREY.contains(type) ? 300 : bareRisk(type);
+        double risk = 0;
+        if (habitatBot != null && !geared(habitatBot.body())) risk += RISKY_PREY.contains(type) ? 300 : bareRisk(type);
         // (Hurt down to eight hearts: no monster hunted for its drops till the hearts are back -
         // the brain puts such a hunt aside, and it should not be the plan either.)
-        if (monster && habitatBot != null && habitatBot.body().getHealth() <= 8) wait += 600;
-        return new Leaf(walk + wait + effort, effort, at);
+        if (monster && habitatBot != null && habitatBot.body().getHealth() <= 8) risk += 600;
+        double luck = search >= 0 ? search : effort;
+        // A batch: the first one as above; each further one its fight and a search shared with
+        // the rest of its pack (the old flat effort, for those not found by looking about).
+        double each = search >= 0 ? fight + luck / pack : effort, eachLuck = search >= 0 ? luck / pack : effort;
+        double first = walk + wait + risk + find;
+        return new Leaf(first, luck, at, new Lot(first - each, each, luck - eachLuck, eachLuck, null));
+    }
+
+    /** {@link MobSearch#seconds} in the light of the last look about ({@code here}: where Bob stands, else in its habitat). */
+    private double searchFor(EntityType<?> type, boolean here, double fallback) {
+        return searchFor(type, here, fallback, false);
+    }
+
+    /** ... {@code night}: as it will be once it is dark. */
+    private double searchFor(EntityType<?> type, boolean here, double fallback, boolean night) {
+        try {
+            return MobSearch.seconds(habitatBot, type, dark || night, underground, nether, !here);
+        } catch (RuntimeException e) {
+            return fallback;
+        }
     }
 
     // ---- looking around -----------------------------------------------------------------------
@@ -554,11 +664,17 @@ public final class ObtainPlanner {
         boolean furnace = countAny(bot.body(), Set.of(Items.FURNACE)) > 0 || BotWorld.nearest((ServerLevel) bot.body().level(),
                 bot.body().blockPosition(), StationTaskRange.RANGE, 8, st -> st.is(Blocks.FURNACE), false, bot.unreachableStations) != null;
         furnaceShare = furnace ? 0 : 12;
+        furnaceAtHand = furnace;
+        tableAtHand = countAny(bot.body(), Set.of(Items.CRAFTING_TABLE)) > 0 || BotWorld.nearest((ServerLevel) bot.body().level(),
+                bot.body().blockPosition(), StationTaskRange.RANGE, 8, st -> st.is(Blocks.CRAFTING_TABLE), false, bot.unreachableStations) != null;
         Map<Item, Double> cost = new IdentityHashMap<>();
         Map<Item, Double> search = new IdentityHashMap<>();
         Map<Item, BlockPos> at = new IdentityHashMap<>();
+        Map<Item, Object> way = new IdentityHashMap<>();
         searches = search;
         anchors = at;
+        ways = way;
+        batches.clear();
         Set<Item> all = new HashSet<>(k.craftableItems());
         for (Item item : BuiltInRegistries.ITEM) {
             if (!k.blocksDropping(item).isEmpty() || !k.mobsDropping(item).isEmpty()) all.add(item);
@@ -566,7 +682,11 @@ public final class ObtainPlanner {
         // Made neither by a recipe nor dropped (see specialCost).
         all.addAll(List.of(Items.WATER_BUCKET, Items.LAVA_BUCKET, Items.OBSIDIAN));
         for (TradeKnowledge.Trade t : TradeKnowledge.get(bot.server()).all()) all.add(t.gives());
-        for (Item item : all) put(item, rawLeaf(bot, k, item, cost), cost, search, at);
+        for (Item item : all) {
+            Leaf raw = rawLeaf(bot, k, item, cost);
+            put(item, raw, cost, search, at);
+            way.put(item, raw);
+        }
         // Relax over the recipes until nothing gets cheaper (a few rounds: recipe chains are short).
         for (int round = 0; round < 10; round++) {
             boolean changed = false;
@@ -574,26 +694,193 @@ public final class ObtainPlanner {
                 double now = cost.get(item);
                 if (now == 0) continue;
                 Leaf best = null;
+                Object bestWay = null;
                 Leaf raw = rawLeaf(bot, k, item, cost);
                 if (raw.cost() < now - 1e-6) {
                     best = raw;
+                    bestWay = raw;
                     now = raw.cost();
                 }
                 for (BotKnowledge.Route r : k.routesTo(item)) {
                     Leaf via = routeLeaf(r, cost, search, at);
                     if (via.cost() < now - 1e-6) {
                         best = via;
+                        bestWay = r;
                         now = via.cost();
                     }
                 }
                 if (best != null) {
                     put(item, best, cost, search, at);
+                    way.put(item, bestWay);
                     changed = true;
                 }
             }
             if (!changed) break;
         }
         return cost;
+    }
+
+    // ---- batches: the estimate for a count ----------------------------------------------------
+    //
+    // The costs above are one item's share: a quarter of a craft for one arrow (four come out),
+    // ten gravel's worth of searching for one flint. That ranks the ways well; as the time for a
+    // tile it was wrong both ways - "an arrow, ~21 s" took a whole craft and a chicken hunt
+    // (100 s in the leagues), "16 logs" counted the walk to a tree sixteen times. A batch follows
+    // the ways the plan takes and counts what a player would: a recipe made as often as its yield
+    // asks, a raw way's finding once and each item on top, a tool or a station made once.
+
+    /** For each item, the way its cost came from (a raw way's Leaf, or the Route), from the last relaxation. */
+    private Map<Item, Object> ways = Map.of();
+    private boolean furnaceAtHand, tableAtHand;
+    /** Batches asked for since the costs were last worked out (the brain asks the same many times a tick). */
+    private final Map<List<Object>, Batch> batches = new HashMap<>();
+
+    /** A batch's seconds and the luck in them (the searching: see {@link #searchPart}). */
+    private record Batch(double seconds, double luck) {
+        static final Batch NOTHING = new Batch(0, 0), NONE = new Batch(INF, 0);
+    }
+
+    /** Seconds to craft once (the grid filled, the result taken). */
+    private static final double CRAFT_SECONDS = 1;
+    /** Fuel's share per item smelted: a coal or some planks now and then (wood is always at hand). */
+    private static final double FUEL_SECONDS = 0.5;
+
+    /**
+     * The cheapest of {@code items} to have {@code n} more of, as a batch, from what the bot holds
+     * now (the items themselves left out: what is held of them was counted by the caller).
+     */
+    private Batch bestBatch(Bot bot, Collection<Item> items, int n) {
+        List<Object> key = List.of(Set.copyOf(items), n, assumeHeld, nether);
+        Batch cached = batches.get(key);
+        if (cached != null) return cached;
+        BotKnowledge k = BotKnowledge.get(bot.server());
+        Batch best = Batch.NONE;
+        Map<Item, Integer> pack = new IdentityHashMap<>();
+        for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (!s.isEmpty()) pack.merge(s.getItem(), s.getCount(), Integer::sum);
+        for (Item i : items) pack.remove(i);
+        for (Item i : items) {
+            if (cost(i) >= INF) continue;
+            paidOnce.clear();
+            Batch b = batch(bot, k, i, n, new IdentityHashMap<>(pack), 0, new HashSet<>());
+            if (b.seconds() < best.seconds()) best = b;
+        }
+        batches.put(key, best);
+        return best;
+    }
+
+    /** The raw ways whose finding is paid already in the batch being worked out (a second lot of iron from the same vein). */
+    private final Set<Item> paidOnce = new HashSet<>();
+
+    /**
+     * Seconds to have all of these (item -> how many more) in one go, the way a player gathers a
+     * kit: what one needs and another has made is shared, and a vein or a herd found once serves
+     * them all (the iron for the pickaxe and the bucket from the one trip down).
+     */
+    public double estimateAll(Bot bot, Map<Item, Integer> wants) {
+        refresh(bot);
+        BotKnowledge k = BotKnowledge.get(bot.server());
+        Map<Item, Integer> held = new IdentityHashMap<>();
+        for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (!s.isEmpty()) held.merge(s.getItem(), s.getCount(), Integer::sum);
+        paidOnce.clear();
+        double total = 0;
+        for (Map.Entry<Item, Integer> e : wants.entrySet()) {
+            Batch b = batch(bot, k, e.getKey(), e.getValue(), held, 0, new HashSet<>());
+            if (b.seconds() >= INF) return INF;
+            total += b.seconds();
+        }
+        return total;
+    }
+
+    /**
+     * The seconds to have {@code n} more of {@code item} along the ways the plan would take, using
+     * up what {@code held} has as it goes (and putting back what is made on the way and left over).
+     * Deeper than a few steps, or round in a circle, the item's plain share counts.
+     */
+    private Batch batch(Bot bot, BotKnowledge k, Item item, int n, Map<Item, Integer> held, int depth, Set<Item> making) {
+        if (n <= 0) return Batch.NOTHING;
+        int have = held.getOrDefault(item, 0);
+        if (have > 0) {
+            int use = Math.min(have, n);
+            held.put(item, have - use);
+            n -= use;
+            if (n <= 0) return Batch.NOTHING;
+        }
+        if (assumeHeld.contains(item)) return Batch.NOTHING;
+        double one = cost(item);
+        if (one >= INF) return Batch.NONE;
+        Object way = ways.get(item);
+        if (way == null || depth > 8 || making.contains(item)) return new Batch(one * n, Math.min(one, searches.getOrDefault(item, 0.0)));
+        making.add(item);
+        try {
+            if (way instanceof Leaf l) {
+                Lot lot = l.lot();
+                // (Found once already in this batch: only each one more.)
+                boolean fresh = paidOnce.add(item);
+                double s = (fresh ? lot.once() : 0) + n * lot.each(), luck = (fresh ? lot.onceLuck() : 0) + n * lot.eachLuck();
+                // (The tool for it made once, and kept.)
+                if (lot.tool() != null && held.getOrDefault(lot.tool(), 0) == 0) {
+                    Batch t = batch(bot, k, lot.tool(), 1, held, depth + 1, making);
+                    s += t.seconds();
+                    luck += t.luck();
+                    held.merge(lot.tool(), 1, Integer::sum);
+                }
+                if (lot.per() != null) {
+                    Batch p = batch(bot, k, lot.per(), n, held, depth + 1, making);
+                    s += p.seconds();
+                    luck += p.luck();
+                }
+                return s >= INF ? Batch.NONE : new Batch(s, Math.min(s, luck));
+            }
+            if (way instanceof BotKnowledge.CraftRoute r) {
+                int crafts = (n + r.yield() - 1) / r.yield();
+                Batch b = craftBatch(bot, k, r, crafts, held, depth, making);
+                if (b.seconds() < INF) held.merge(item, crafts * r.yield() - n, Integer::sum);
+                return b;
+            }
+            BotKnowledge.SmeltRoute r = (BotKnowledge.SmeltRoute) way;
+            double s = n * (SMELT_SECONDS + FUEL_SECONDS), luck = 0;
+            if (!furnaceAtHand && held.getOrDefault(Items.FURNACE, 0) == 0) {
+                Batch f = batch(bot, k, Items.FURNACE, 1, held, depth + 1, making);
+                s += f.seconds();
+                luck += f.luck();
+                held.merge(Items.FURNACE, 1, Integer::sum);
+            }
+            Batch in = batch(bot, k, cheapestHeldFirst(BotKnowledge.items(r.input()), held), n, held, depth + 1, making);
+            return in.seconds() >= INF ? Batch.NONE : new Batch(s + in.seconds(), luck + in.luck());
+        } finally {
+            making.remove(item);
+        }
+    }
+
+    /** {@code crafts} times this recipe: its table (once), its ingredients as batches, the crafting itself. */
+    private Batch craftBatch(Bot bot, BotKnowledge k, BotKnowledge.CraftRoute r, int crafts, Map<Item, Integer> held, int depth, Set<Item> making) {
+        double s = crafts * CRAFT_SECONDS, luck = 0;
+        if (r.table() && !tableAtHand && held.getOrDefault(Items.CRAFTING_TABLE, 0) == 0) {
+            Batch t = batch(bot, k, Items.CRAFTING_TABLE, 1, held, depth + 1, making);
+            s += t.seconds();
+            luck += t.luck();
+            held.merge(Items.CRAFTING_TABLE, 1, Integer::sum);
+        }
+        // The same ingredient in several slots counts together (four planks for a table).
+        Map<List<Item>, Integer> groups = new LinkedHashMap<>();
+        for (Ingredient i : r.ingredients()) groups.merge(BotKnowledge.items(i), crafts, Integer::sum);
+        for (Map.Entry<List<Item>, Integer> g : groups.entrySet()) {
+            Batch b = batch(bot, k, cheapestHeldFirst(g.getKey(), held), g.getValue(), held, depth + 1, making);
+            if (b.seconds() >= INF) return Batch.NONE;
+            s += b.seconds();
+            luck += b.luck();
+        }
+        return new Batch(s, Math.min(s, luck));
+    }
+
+    /** Of the items an ingredient takes: one held (enough of it, best), else the cheapest. */
+    private Item cheapestHeldFirst(List<Item> options, Map<Item, Integer> held) {
+        Item best = null;
+        for (Item i : options) {
+            if (held.getOrDefault(i, 0) > 0) return i;
+            if (best == null || cost(i) < cost(best)) best = i;
+        }
+        return best;
     }
 
     private static void put(Item item, Leaf l, Map<Item, Double> cost, Map<Item, Double> search, Map<Item, BlockPos> at) {
@@ -622,11 +909,11 @@ public final class ObtainPlanner {
     private Leaf acquireLeaf(Bot bot, BotKnowledge k, Item item, Map<Item, Double> cost) {
         Leaf best = Leaf.NONE;
         for (BotKnowledge.Drop d : k.blocksDropping(item)) {
-            Leaf l = blockLeaf(bot, k, d.block(), cost).scaled(1 / Math.max(0.05, d.count()));
+            Leaf l = blockLeaf(bot, k, d.block(), cost).perDrop(Math.max(0.05, d.count()));
             if (l.cost() < best.cost()) best = l;
         }
         for (BotKnowledge.MobDrop d : k.mobsDropping(item)) {
-            Leaf l = mobLeaf(d.type(), d.effort()).scaled(1 / d.count());
+            Leaf l = mobLeaf(d.type(), d.effort()).perDrop(d.count());
             if (l.cost() < best.cost()) best = l;
         }
         for (Leaf l : new Leaf[]{tradeLeaf(bot, item, cost), barterLeaf(bot, item, cost), specialLeaf(bot, k, item, cost)}) {
@@ -749,7 +1036,9 @@ public final class ObtainPlanner {
             }
             if (seen == null) return Leaf.NONE;
             double bucket = countAny(bot.body(), Set.of(Items.BUCKET)) > 0 ? 0 : cost.getOrDefault(Items.BUCKET, INF);
-            return new Leaf(seen + 3 + bucket, search + searches.getOrDefault(Items.BUCKET, 0.0), visiblePos.get(fluid));
+            // (A batch: the walk once; each one a bucket of its own, filled.)
+            return new Leaf(seen + 3 + bucket, search + searches.getOrDefault(Items.BUCKET, 0.0), visiblePos.get(fluid),
+                    new Lot(seen, 3, search, 0, null, Items.BUCKET));
         }
         if (item == Items.OBSIDIAN) {
             Double lava = visibleBlocks.get(Blocks.LAVA);
@@ -757,7 +1046,10 @@ public final class ObtainPlanner {
             double tool = toolCost(bot, k, Blocks.OBSIDIAN, cost);
             double water = cost.getOrDefault(Items.WATER_BUCKET, INF);
             double c = lava + 14 + Math.min(tool, INF) / 10 + water / 10; // tools once for all ten
-            return new Leaf(c, searches.getOrDefault(Items.WATER_BUCKET, 0.0) / 10, visiblePos.get(Blocks.LAVA));
+            // (A batch: to the pool with the water and the pickaxe once, then each block poured and mined.)
+            return new Leaf(c, searches.getOrDefault(Items.WATER_BUCKET, 0.0) / 10, visiblePos.get(Blocks.LAVA),
+                    new Lot(lava + water, 14, searches.getOrDefault(Items.WATER_BUCKET, 0.0), 0,
+                            bot.tools().canHarvest(Blocks.OBSIDIAN.defaultBlockState()) ? null : cheapestTool(k, Blocks.OBSIDIAN, cost)));
         }
         return Leaf.NONE;
     }
@@ -843,7 +1135,20 @@ public final class ObtainPlanner {
         }
         double breakSeconds = Math.min(60, bot.tools().breakTicks(s) / 20.0);
         Leaf tool = toolLeaf(bot, k, block, cost);
-        return new Leaf(find + breakSeconds + tool.cost(), search + tool.search(), at != null ? at : tool.at());
+        // A batch of them: the place found once (the tool made once - see batch), then each block
+        // broken and the step to the next of the patch; a patch used up (a vein of six iron, a
+        // tree of five logs), the search for the next shared out over it.
+        double patch = BotKnowledge.patchSize(block);
+        Lot lot = new Lot(find, breakSeconds + BotKnowledge.hop(block) + search / patch, search, search / patch,
+                bot.tools().canHarvest(s) ? null : cheapestTool(k, block, cost));
+        return new Leaf(find + breakSeconds + tool.cost(), search + tool.search(), at != null ? at : tool.at(), lot);
+    }
+
+    /** The cheapest tool that harvests the block (null: none can be had). */
+    private static Item cheapestTool(BotKnowledge k, Block block, Map<Item, Double> cost) {
+        Item best = null;
+        for (Item t : k.harvestTools(block)) if (best == null || cost.getOrDefault(t, INF) < cost.getOrDefault(best, INF)) best = t;
+        return best == null || cost.getOrDefault(best, INF) >= INF ? null : best;
     }
 
     private double toolCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {

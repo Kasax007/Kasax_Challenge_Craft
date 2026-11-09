@@ -53,9 +53,23 @@ public final class ModelStore {
         return load(file, CoverModel::parse);
     }
 
-    /** The goal-time model (null: none, or switched off). */
+    private static String unfitGoalModel;
+
+    /**
+     * The goal-time model (null: none, switched off, or trained against another way of estimating
+     * than the planner's now - it waits for the trainer's next one, see GoalModel#fitsEstimates).
+     */
     public static GoalModel goal() {
-        return enabled() ? load("goal.json", GoalModel::parse) : null;
+        GoalModel m = enabled() ? load("goal.json", GoalModel::parse) : null;
+        if (m == null || m.fitsEstimates()) return m;
+        synchronized (ModelStore.class) {
+            if (!m.version.equals(unfitGoalModel)) {
+                unfitGoalModel = m.version;
+                BotManager.LOG.info("[Models] goal.json {} was trained on estimates v{}, the planner makes v{}: not used",
+                        m.version, m.estimates, net.kasax.challengecraft.bot.plan.ObtainPlanner.ESTIMATES);
+            }
+        }
+        return null;
     }
 
     /** The knobs that won the league ({@code params}: "k=v,..."), or null. */

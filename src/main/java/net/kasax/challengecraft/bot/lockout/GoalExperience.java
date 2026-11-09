@@ -1,6 +1,7 @@
 package net.kasax.challengecraft.bot.lockout;
 
 import net.kasax.challengecraft.bot.BotManager;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -8,22 +9,56 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Properties;
 
 /**
  * What Bob has learnt over many games: for each goal, how long it really took against what he
- * estimated (a running average of the ratio). Kept in the config folder, so the next game starts
- * with estimates that know "a cauldron always takes four times longer than it looks".
+ * estimated. Kept in the config folder, so the next game starts with estimates that know "a
+ * cauldron always takes four times longer than it looks".
+ *
+ * <p>Learnt as the logarithm of the ratio (a tile twice as quick and one twice as slow weigh the
+ * same), with a little doubt while there are few games behind it: the factor is
+ * {@code exp(mean · n / (n + 1.5))} - one game moves it 40 % of the way, three 67 %. It may go as
+ * far as {@link #MAX} (the leagues measured mob tiles four to nine times their estimate; the old
+ * band of 0.6 to 2 could never take that in). Forgetting lowers how many games it counts (10 % a
+ * game), not what it learnt: a factor that keeps being confirmed stays.
+ *
+ * <p>What was learnt belongs to the estimates it was learnt against: when the planner's way of
+ * estimating changes ({@link ObtainPlanner#ESTIMATES}), it starts afresh.
  */
-final class GoalExperience {
+public final class GoalExperience {
     private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("challengecraft-bob-experience.properties");
-    // (Kept to a narrow band: an estimate already knows what Bob holds and knows about the world;
-    // experience only corrects its habitual bias, it must not drown it.)
-    private static final double MIN = 0.6, MAX = 2.0, WEIGHT = 0.25, FORGET = 0.2;
+    /** The band a factor stays in, and what one game's ratio is clamped to. */
+    static final double MIN = 0.25, MAX = 8.0;
+    /** Games' worth of doubt: with n games behind it, n / (n + PRIOR) of the learnt mean counts. */
+    private static final double PRIOR = 1.5;
+    /** Of the games counted, this share is forgotten each game. */
+    private static final double FORGET = 0.1;
     private static Properties data;
-    private static final String VERSION_KEY = "_version", VERSION = "2";
+    private static final String VERSION_KEY = "_version", ESTIMATES_KEY = "_estimates", VERSION = "3";
 
     private GoalExperience() {
+    }
+
+    /** One goal's record: the mean log ratio and the games (fractional: forgetting, lower bounds) behind it. */
+    private record Entry(double logMean, double games) {
+        double factor() {
+            return clamp(Math.exp(logMean * games / (games + PRIOR)));
+        }
+
+        String text() {
+            return String.format(Locale.ROOT, "%.4f,%.2f", logMean, games);
+        }
+
+        static Entry parse(String s) {
+            String[] parts = s.split(",");
+            return new Entry(Double.parseDouble(parts[0]), parts.length > 1 ? Double.parseDouble(parts[1]) : 1);
+        }
+    }
+
+    private static double clamp(double f) {
+        return Math.max(MIN, Math.min(MAX, f));
     }
 
     private static Properties data() {
@@ -36,21 +71,23 @@ final class GoalExperience {
                     BotManager.LOG.warn("[Bot] could not read {}: {}", FILE, e.toString());
                 }
             }
-            // Forgetting, a little each game: what went wrong long ago (a since mended blunder, a
-            // map that happened to be awkward) should not weigh on him for ever.
-            // (Learnt before one game counted only a quarter: brought down to that once.)
-            boolean old = !VERSION.equals(data.getProperty(VERSION_KEY));
+            String estimates = String.valueOf(ObtainPlanner.ESTIMATES);
+            // (Learnt against another way of estimating, or in the old format: starts afresh -
+            // a factor of 4 on the old "a skeleton, ~27 s" would make the new 250 s a thousand.)
+            if (!VERSION.equals(data.getProperty(VERSION_KEY)) || !estimates.equals(data.getProperty(ESTIMATES_KEY))) {
+                if (!data.isEmpty()) BotManager.LOG.info("[Bot] goal experience learnt against older estimates: starting afresh");
+                data.clear();
+            }
             data.setProperty(VERSION_KEY, VERSION);
+            data.setProperty(ESTIMATES_KEY, estimates);
+            // Forgetting, a little each game: what went wrong long ago (a since mended blunder, a
+            // map that happened to be awkward) weighs less and less - unless it happens again.
             for (String goal : data.stringPropertyNames()) {
-                if (goal.equals(VERSION_KEY)) continue;
-                String[] parts = data.getProperty(goal).split(",");
+                if (goal.startsWith("_")) continue;
                 try {
-                    double f = Math.max(MIN, Math.min(MAX, Double.parseDouble(parts[0])));
-                    int n = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-                    if (old) f = 1 + (f - 1) * Math.min(1, WEIGHT * n);
-                    f = 1 + (f - 1) * (1 - FORGET);
-                    data.setProperty(goal, String.format(java.util.Locale.ROOT, "%.3f,%s", f, parts.length > 1 ? parts[1] : "1"));
-                } catch (NumberFormatException e) {
+                    Entry e = Entry.parse(data.getProperty(goal));
+                    data.setProperty(goal, new Entry(e.logMean(), e.games() * (1 - FORGET)).text());
+                } catch (RuntimeException ex) {
                     data.remove(goal);
                 }
             }
@@ -58,14 +95,29 @@ final class GoalExperience {
         return data;
     }
 
+    /**
+     * The factor after these games' ratios (real / estimate), one game after the other from
+     * nothing, forgetting as between games - the learning rule on its own, without the file (for
+     * the tests: four games of "nine times the estimate" must leave far more than the old cap of 2).
+     */
+    public static double learnt(double... ratios) {
+        Entry e = new Entry(0, 0);
+        for (double r : ratios) {
+            e = new Entry(e.logMean(), e.games() * (1 - FORGET));
+            double games = e.games() + 1;
+            e = new Entry(e.logMean() + (Math.log(clamp(r)) - e.logMean()) / games, games);
+        }
+        return e.factor();
+    }
+
     /** By how much to multiply the estimate for this goal (1 when nothing is known yet). */
     static double factor(String goalId) {
-        if (goalId.equals(VERSION_KEY)) return 1;
+        if (goalId.startsWith("_")) return 1;
         String v = data().getProperty(goalId);
         if (v == null) return 1;
         try {
-            return Math.max(MIN, Math.min(MAX, Double.parseDouble(v.split(",")[0])));
-        } catch (NumberFormatException e) {
+            return Entry.parse(v).factor();
+        } catch (RuntimeException e) {
             return 1;
         }
     }
@@ -77,28 +129,24 @@ final class GoalExperience {
 
     /**
      * {@code certainty} below 1 for a lower bound only (given up on: it would have taken at least
-     * that long). One game never decides it: the first one moves the factor from 1 only a quarter
-     * of the way too.
+     * that long) - it counts as that share of a game, and only ever pushes the factor up.
      */
     static void record(String goalId, double estimate, double actualSeconds, double certainty) {
-        if (estimate <= 0) return;
-        double ratio = Math.max(MIN, Math.min(MAX, actualSeconds / estimate));
-        String old = data().getProperty(goalId);
-        double prev = 1;
-        int n = 1;
-        if (old != null) {
-            String[] parts = old.split(",");
-            try {
-                prev = Math.max(MIN, Math.min(MAX, Double.parseDouble(parts[0])));
-                n = parts.length > 1 ? Integer.parseInt(parts[1]) + 1 : 2;
-            } catch (NumberFormatException ignored) {
-                // start afresh
-            }
+        if (estimate <= 0 || goalId.startsWith("_")) return;
+        double ratio = Math.log(clamp(actualSeconds / estimate));
+        Entry old;
+        try {
+            old = data().containsKey(goalId) ? Entry.parse(data().getProperty(goalId)) : new Entry(0, 0);
+        } catch (RuntimeException e) {
+            old = new Entry(0, 0);
         }
-        double f = prev + WEIGHT * certainty * (ratio - prev);
-        data().setProperty(goalId, String.format(java.util.Locale.ROOT, "%.3f,%d", f, n));
+        // (A lower bound below what is believed already says nothing new.)
+        if (certainty < 1 && ratio <= old.logMean()) return;
+        double games = old.games() + certainty;
+        double mean = old.logMean() + certainty * (ratio - old.logMean()) / games;
+        data().setProperty(goalId, new Entry(mean, games).text());
         try (Writer w = Files.newBufferedWriter(FILE)) {
-            data().store(w, "Bob's experience: per goal, how much longer (or shorter) it takes than estimated, and how often seen");
+            data().store(w, "Bob's experience: per goal, the log of how much longer (or shorter) it takes than estimated, and the games behind it");
         } catch (IOException e) {
             BotManager.LOG.warn("[Bot] could not write {}: {}", FILE, e.toString());
         }

@@ -1117,8 +1117,106 @@ public final class LockoutGoals {
     private static Option obtain(Bot bot, ObtainPlanner planner, Set<Item> items, int count) {
         if (items.isEmpty()) return null;
         double cost = planner.estimate(bot, items, count);
-        if (cost >= INF) return null;
-        return new Option(cost, () -> new ObtainTask(items, count, planner), () -> planner.yields(bot, items, count, false));
+        Option usual = cost >= INF ? null : new Option(cost, () -> new ObtainTask(items, count, planner), () -> planner.yields(bot, items, count, false));
+        return cheapest(usual, loot(bot, planner, items, count, cost));
+    }
+
+    /** A structure's chests are a tile's way only this close (seconds' walk): a detour, not an expedition. */
+    private static final double LOOT_WALK = 300;
+
+    /**
+     * The speedrunner's way to many items: a structure's chests - iron from a shipwreck's treasure
+     * chest, gunpowder and TNT from a desert temple, obsidian and flint and steel from a ruined
+     * portal, an apple from a village house - when one is known (seen, or in the atlas the world
+     * sense gives) and not raided yet. The walk, the looting, and, as the chests may not have it,
+     * the usual way afterwards for what is still missing. The chances are the game's loot tables,
+     * rolled (see SpeedrunKnowledge). The guarded places (an outpost, a fortress, a bastion) only
+     * with a shield or armour and the hearts up.
+     */
+    static Option loot(Bot bot, ObtainPlanner planner, Set<Item> items, int count, double usual) {
+        var body = bot.body();
+        if (!(body.level() instanceof ServerLevel level) || level.dimension() == Level.END) return null;
+        int need = count - ObtainPlanner.countAny(body, items);
+        if (need <= 0) return null;
+        boolean ready = ready(bot);
+        var kb = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get();
+        Option best = null;
+        for (Item item : items) {
+            for (var l : kb.loot(bot.server(), item)) {
+                if (l.dangerous() && !ready) continue;
+                Set<Identifier> ids = VisitStructureTask.resolve(level, l.family());
+                if (ids.isEmpty()) continue;
+                BotSenses.SeenStructure seen = VisitStructureTask.nearest(bot, ids);
+                if (seen == null || bot.raided.contains(Bot.raidKey(l.family(), seen.spot()))) continue;
+                double walk = net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, body.blockPosition(), seen.spot());
+                if (walk > LOOT_WALK) continue;
+                // Enough from it: the chance of any, times the share of the need one find covers.
+                double perFind = l.mean() / Math.max(1e-6, l.chance());
+                double enough = l.chance() * Math.min(1, perFind / need);
+                double cost = walk + l.lootSeconds() + (1 - enough) * (usual >= INF ? 900 : usual);
+                if (best != null && cost >= best.cost()) continue;
+                String family = l.family();
+                BlockPos spot = seen.spot();
+                String what = ObtainPlanner.name(item);
+                best = new Option(cost, () -> new SequenceTask("loot the " + family.replace('_', ' ') + " for " + what, List.of(
+                        () -> {
+                            bot.raided.add(Bot.raidKey(family, spot));
+                            return new net.kasax.challengecraft.bot.task.RaidTask(level, family);
+                        },
+                        () -> ObtainPlanner.countAny(bot.body(), items) >= count ? null : new ObtainTask(items, count, planner))),
+                        () -> Set.copyOf(items));
+            }
+        }
+        return best;
+    }
+
+    /** Fit for a guarded place or a shooter's home: a shield or armour, and the hearts up. */
+    private static boolean ready(Bot bot) {
+        var body = bot.body();
+        return body.getHealth() >= 16 && (body.getArmorValue() >= 6 || body.getOffhandItem().is(Items.SHIELD)
+                || ObtainPlanner.countAny(body, Set.of(Items.SHIELD)) > 0);
+    }
+
+    /**
+     * Where the knowledge base says a mob lives (witches in swamp huts, pillagers at outposts,
+     * drowned in ocean ruins, blazes and wither skeletons in fortresses, piglins in bastions): such
+     * a structure known and near - the walk there, the wait for the night where it only comes out
+     * then, the search there and the fight. Shooters' homes only when {@link #ready}.
+     */
+    static Option huntAt(Bot bot, EntityType<?> type) {
+        var facts = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get().mob(type);
+        if (facts == null || facts.structures().isEmpty()) return null;
+        var body = bot.body();
+        if (!(body.level() instanceof ServerLevel level)) return null;
+        if (facts.ranged() && !ready(bot)) return null;
+        Option best = null;
+        for (var e : facts.structures().entrySet()) {
+            Set<Identifier> ids = VisitStructureTask.resolve(level, e.getKey());
+            if (ids.isEmpty()) continue;
+            BotSenses.SeenStructure seen = VisitStructureTask.nearest(bot, ids);
+            if (seen == null) continue;
+            double walk = net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, body.blockPosition(), seen.spot());
+            if (walk > 2 * LOOT_WALK) continue;
+            long clock = Math.floorMod(level.getOverworldClockTime(), 24000L);
+            double untilDark = level.isDarkOutside() ? 0 : clock < 13000 ? (13000 - clock) / 20.0 : (24000 - clock + 13000) / 20.0;
+            double wait = facts.night() ? Math.max(0, untilDark - walk) : 0;
+            double cost = walk + wait + e.getValue() + facts.fight();
+            if (best != null && cost >= best.cost()) continue;
+            String family = e.getKey();
+            boolean night = facts.night();
+            String name = BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath();
+            best = new Option(cost, () -> new SequenceTask("hunt a " + name + " at the " + family.replace('_', ' '), List.of(
+                    () -> new VisitStructureTask(level, family),
+                    () -> night && !level.isDarkOutside() ? net.kasax.challengecraft.bot.task.WaitTask.pause(
+                            (int) Math.min(6000, 20 * Math.max(20, untilDarkNow(level)))) : null,
+                    () -> new KillTask(Set.of(type), Set.of(), 0, 1))));
+        }
+        return best;
+    }
+
+    private static double untilDarkNow(ServerLevel level) {
+        long clock = Math.floorMod(level.getOverworldClockTime(), 24000L);
+        return level.isDarkOutside() ? 0 : clock < 13000 ? (13000 - clock) / 20.0 : (24000 - clock + 13000) / 20.0;
     }
 
     private static Option craft(Bot bot, ObtainPlanner planner, Set<Item> items) {
@@ -1146,14 +1244,17 @@ public final class LockoutGoals {
                     () -> new KillTask(Set.of(type), Set.of(), 0, 1))));
         }
         double cost = planner.mobEffort(bot, type, INF);
+        Option at = huntAt(bot, type);
         if (cost >= INF) {
-            // No drop worth knowing it by: still findable. Monsters come out at night and in caves;
-            // bosses and the rare ones are not a quick tile.
+            // No drop worth knowing it by, nor found by looking about (see MobSearch): where it
+            // lives, if known; else monsters come out at night and in caves; bosses and the rare
+            // ones are not a quick tile.
+            if (at != null) return at;
             if (BOSSES.contains(type)) return null;
             if (type.getCategory() != net.minecraft.world.entity.MobCategory.MONSTER) return null;
             cost = bot.body().level().isDarkOutside() ? 150 : 420;
         }
-        return new Option(cost, () -> new KillTask(Set.of(type), Set.of(), 0, 1));
+        return cheapest(new Option(cost, () -> new KillTask(Set.of(type), Set.of(), 0, 1)), at);
     }
 
     /**

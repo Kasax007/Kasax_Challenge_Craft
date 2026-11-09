@@ -297,6 +297,17 @@ public final class BotSenses {
         if (at.apply(item).distSqr(from) < at.apply(list.get(far)).distSqr(from)) list.set(far, item);
     }
 
+    /**
+     * A structure known without having seen it - as from a map or a word (a test sets one, an
+     * explorer map would): into the atlas like one seen from afar, a box of some 24 blocks round
+     * the spot until the real pieces are seen on coming near.
+     */
+    public void know(Identifier id, BlockPos spot, BlockPos from) {
+        addStructure(new SeenStructure(id, spot.immutable(), new BoundingBox(spot.getX() - 12, spot.getY() - 6, spot.getZ() - 12,
+                spot.getX() + 12, spot.getY() + 12, spot.getZ() + 12)), from);
+        nearestFrom(from);
+    }
+
     /** Everything known of a structure kind in this dimension, nearest to {@code from} first. */
     public List<SeenStructure> structuresOf(Identifier id, BlockPos from) {
         List<SeenStructure> out = new ArrayList<>(structureAtlas.getOrDefault(dimension, Map.of()).getOrDefault(id, List.of()));

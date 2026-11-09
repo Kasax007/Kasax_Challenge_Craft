@@ -205,8 +205,8 @@ public final class LockoutBrain implements BotBrain {
                 var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
                         net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, kind));
                 if (seen == null || seen.spot().distSqr(bot.body().blockPosition()) > (long) radius * radius) continue;
-                String key = kind + "@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
-                if (!raided.add(key)) continue;
+                String key = Bot.raidKey(kind, seen.spot());
+                if (!bot.raided.add(key)) continue;
                 bot.say("loot from the " + kind.replace('_', ' ') + " at " + seen.spot().toShortString());
                 // What the board wants that may stand about there (the bell, a hay bale).
                 Set<net.minecraft.world.level.block.Block> blocks = new java.util.HashSet<>();
@@ -469,9 +469,13 @@ public final class LockoutBrain implements BotBrain {
         stalls = 0;
         String reason = strategist.why(pick.tile().goal().id());
         Odds po = odds(bot, pick, hazard(bot));
+        // (The plan's own figure and an expert's time beside the believed one, for the logs'
+        // estimate tables: scripts/bot/analysis/goals.py.)
+        double expert = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get().expert(pick.tile().goal().id());
         bot.say("goal: " + pick.tile().goal().title().getString() + " (~" + Math.round(pick.option().cost()) + " s, of that ~"
                 + Math.round(po.luck()) + " s luck, " + Math.round(100 * po.within(goalBudget / 20.0)) + "% within " + goalBudget / 20 + " s, "
-                + doable + " doable" + (reason == null ? "" : ", " + reason) + ")");
+                + doable + " doable, plan ~" + Math.round(pick.plain()) + " s" + (Double.isNaN(expert) ? "" : ", expert ~" + Math.round(expert) + " s")
+                + (reason == null ? "" : ", " + reason) + ") [" + pick.tile().goal().id() + "]");
         start(bot, goalTask, goalBudget);
         if (startRefused) {
             // (A loop on this tile: the cortex set it aside; something else next time round.)
@@ -558,7 +562,6 @@ public final class LockoutBrain implements BotBrain {
     private static final List<String> WORTH_LOOTING = List.of("shipwreck", "ruined_portal", "desert_pyramid", "jungle_pyramid",
             "village", "buried_treasure", "igloo", "pillager_outpost", "bastion", "fortress", "end_city");
     private final Map<String, Integer> lootedIn = new HashMap<>();
-    private final Set<String> raided = new java.util.HashSet<>();
     private boolean replanNow = true;
     private int openingStep;
 
@@ -1079,8 +1082,8 @@ public final class LockoutBrain implements BotBrain {
         var seen = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
                 net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "bastion_remnant"));
         if (seen == null || seen.spot().distSqr(body.blockPosition()) > 128 * 128) return false;
-        String key = "bastion@" + (seen.spot().getX() >> 6) + "," + (seen.spot().getZ() >> 6);
-        if (raided.contains(key)) return false;
+        String key = Bot.raidKey("bastion_remnant", seen.spot());
+        if (bot.raided.contains(key)) return false;
         // Worth it: something on the board wants gold, or what piglins give for it.
         boolean wanted = false;
         for (var item : bot.keepItems) {
@@ -1088,7 +1091,7 @@ public final class LockoutBrain implements BotBrain {
             if (id.contains("gold") || ObtainPlanner.BARTER_GOLD.containsKey(item)) wanted = true;
         }
         if (!wanted) return false;
-        raided.add(key);
+        bot.raided.add(key);
         bot.say("the bastion at " + seen.spot().toShortString() + ": its gold");
         start(bot, new net.kasax.challengecraft.bot.task.BastionLootTask(level), 9600);
         return true;
@@ -2451,6 +2454,9 @@ public final class LockoutBrain implements BotBrain {
         o.addProperty("difficulty", g.difficulty().name());
         o.addProperty("plain", pick.plain());
         o.addProperty("estimate", pick.option().cost());
+        o.addProperty("estimates", net.kasax.challengecraft.bot.plan.ObtainPlanner.ESTIMATES);
+        double expert = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get().expert(g.id());
+        if (!Double.isNaN(expert)) o.addProperty("expert", expert);
         o.addProperty("quick", quick);
         o.addProperty("proxy", pick.option().proxy());
         o.addProperty("learned", bot.params.on("goalmodel") && net.kasax.challengecraft.bot.learn.ModelStore.goal() != null);
