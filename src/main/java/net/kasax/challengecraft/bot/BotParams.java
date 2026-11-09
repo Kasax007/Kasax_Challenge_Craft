@@ -33,6 +33,10 @@ import java.util.Map;
  *       what is in view.</li>
  *   <li>{@code foodstock} - a factor on what a stock of food may cost while not starving yet
  *       (1, the default; 2: twice as much is worth it - fewer fights begun hungry).</li>
+ *   <li>{@code search} - 0 (the default): the tiles are picked by the strategist's route; 1: by the
+ *       look-ahead ({@code lockout.BoardSearch}): the game played out many times in the abstract
+ *       simulator ({@code lockout.sim}), calibrated figures for what tiles really take, no iron kit
+ *       or Nether phase for their own sake.</li>
  * </ul>
  */
 public final class BotParams {

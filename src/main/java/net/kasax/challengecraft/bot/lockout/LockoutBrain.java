@@ -88,6 +88,18 @@ public final class LockoutBrain implements BotBrain {
     private int pause, checkTicks;
     /** The big brain over the deciders below: what each set out to do, failures, loops, the mode. */
     private final Cortex cortex = new Cortex();
+    /** The look-ahead board brain (knob {@code search=1}); the strategist's route otherwise. */
+    private final BoardSearch boardSearch = new BoardSearch();
+
+    /** How often the look-ahead has decided (for the tests). */
+    public int lookAheadDecisions() {
+        return boardSearch.decisions();
+    }
+
+    /** Whether the look-ahead picks the tiles (knob {@code search}, off by default; not on easy). */
+    private boolean searching(Bot bot) {
+        return bot.params.get("search", 0) >= 1 && difficulty != Difficulty.EASY;
+    }
     /** The decider now thinking (its intents are named after it), the intent running, and whether the cortex said no. */
     private String stepKey, runningKey;
     private boolean startRefused;
@@ -244,7 +256,8 @@ public final class LockoutBrain implements BotBrain {
         // rather than one more Overworld tile at a time (each looks a bit cheaper on its own, and
         // the trip never happens). A couple of tries per life.
         stepKey = "nether";
-        if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().level().getGameTime() >= netherRetryAt
+        // (With the look-ahead the Nether is a tile's way in like any other: no phase of its own.)
+        if (!surviving && !searching(bot) && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().level().getGameTime() >= netherRetryAt
                 && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.WATER_BUCKET)) > 0) {
             int netherTiles = 0;
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(bot.server())) {
@@ -273,14 +286,17 @@ public final class LockoutBrain implements BotBrain {
         // (shield=0: not before the plan - for the self-play comparisons.)
         boolean shieldFirst = hard && bot.params.on("shield");
         boolean shieldWanted = shieldFirst && !has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD));
-        if ((strategist.wantsIron() || shieldWanted) && bot.body().level().getGameTime() >= kitRetryAt
+        // (With the look-ahead no iron kit for its own sake: what the iron is worth shows in the tiles
+        // it opens. The shield on hard stays - it is for the night, not for the board.)
+        boolean kitWanted = strategist.wantsIron() && !searching(bot);
+        if ((kitWanted || shieldWanted) && bot.body().level().getGameTime() >= kitRetryAt
                 && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             // (On hard the shield first - one ingot of the same trip down: the first iron went into
             // the pickaxe and the bucket, and the shield came twenty minutes later or never, while
             // most deaths were arrows.)
             List<net.minecraft.world.item.Item> kit = new ArrayList<>();
             if (shieldFirst) kit.add(net.minecraft.world.item.Items.SHIELD);
-            if (strategist.wantsIron()) {
+            if (kitWanted) {
                 kit.add(net.minecraft.world.item.Items.IRON_PICKAXE);
                 kit.add(net.minecraft.world.item.Items.BUCKET);
             }
@@ -292,7 +308,7 @@ public final class LockoutBrain implements BotBrain {
                 // (The shield alone, no iron wanted otherwise: only while it comes cheap - iron
                 // in sight, a cave by - and not by digging a mine for the one ingot with stone
                 // tools: round 18 measured where that leads. Looked at again in a minute.)
-                if (item == net.minecraft.world.item.Items.SHIELD && !strategist.wantsIron()
+                if (item == net.minecraft.world.item.Items.SHIELD && !kitWanted
                         && planner.estimate(bot, Set.of(item), 1) > SHIELD_ALONE_MAX) {
                     kitRetryAt = bot.body().level().getGameTime() + 1200;
                     break;
@@ -394,7 +410,8 @@ public final class LockoutBrain implements BotBrain {
         }
         // By the plan: the effort, less what a tile is worth beyond itself (see LockoutStrategist).
         choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
-        Choice pick = difficulty == Difficulty.EASY ? choices.get(0) : route(bot, choices);
+        Choice pick = searching(bot) ? lookAhead(bot, choices) : null;
+        if (pick == null) pick = difficulty == Difficulty.EASY ? choices.get(0) : route(bot, choices);
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
         }
@@ -1856,6 +1873,26 @@ public final class LockoutBrain implements BotBrain {
                 Math.round(100 * fo.within(horizon)), Math.round(horizon)));
         bot.say(sb.toString());
         return first;
+    }
+
+    /**
+     * The look-ahead's pick among the choices (see {@link BoardSearch}), believed to take what the
+     * simulator's figures say if that is more than Bob's own estimate (it sets the time allowance:
+     * a skeleton hunt planned at half a minute was given up before the skeleton was found). Null
+     * when the look-ahead cannot decide: then the route does.
+     */
+    private Choice lookAhead(Bot bot, List<Choice> choices) {
+        List<Integer> tiles = new ArrayList<>();
+        for (Choice c : choices) tiles.add(c.tile().index());
+        BoardSearch.Pick p = boardSearch.pick(bot, tiles);
+        if (p == null) return null;
+        for (Choice c : choices) {
+            if (c.tile().index() != p.tile()) continue;
+            bot.say(p.why());
+            double believed = Math.max(c.option().cost(), Math.min(1800, p.seconds()));
+            return new Choice(c.tile(), c.option().costing(believed), c.plain());
+        }
+        return null;
     }
 
     /** A place in words for the log: here, the village, down at some height, or how far. */
