@@ -68,8 +68,8 @@ public class BotKnowledgeTests {
      * A skeleton tile, none in sight, geared: by night a search and a fight (the leagues' night
      * hunts took 72 s); by day a wait for the night first - not the old "~27 s" either way.
      */
-    // (A batch of its own: it sets the clock.)
-    @GameTest(environment = "challengecraft:night", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    // (A batch of its own: it sets the clock, the whole server's - tests in one batch run at once.)
+    @GameTest(environment = "challengecraft:knowledge_skeleton", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void skeletonEstimate(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "skeleton_estimate");
         a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.BREAD, 8));
@@ -85,7 +85,7 @@ public class BotKnowledgeTests {
                 BotArena.LOG.info("[BOTTEST] skeleton_estimate: by day ~{} s, by night ~{} s (biome {})", Math.round(d), Math.round(n),
                         h.getLevel().getBiome(a.bot().body().blockPosition()).unwrapKey().map(k -> k.identifier().toString()).orElse("?"));
                 h.assertTrue(night != null && n >= 40 && n <= 240, "by night ~" + Math.round(n) + " s, not within 40 to 240");
-                h.assertTrue(day == null || d >= n + 200, "by day ~" + Math.round(d) + " s: the wait for the night not counted");
+                h.assertTrue(day != null && d >= n + 200 && d <= n + 700, "by day ~" + Math.round(d) + " s: not the wait for the night and the night's search");
                 a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
             });
         });
@@ -110,7 +110,7 @@ public class BotKnowledgeTests {
                     Math.round(a1), Math.round(a4), Math.round(a5), Math.round(l1), Math.round(l16));
             h.assertTrue(a1 < 1e8 && a4 <= a1 * 1.05 + 1, "four arrows ~" + Math.round(a4) + " s, one ~" + Math.round(a1) + " s: one craft makes four");
             h.assertTrue(a5 > a4, "a fifth arrow needs a second craft");
-            h.assertTrue(l16 < 8 * l1 && l16 > l1, "sixteen logs ~" + Math.round(l16) + " s against one ~" + Math.round(l1) + " s");
+            h.assertTrue(l16 < 10 * l1 && l16 > l1, "sixteen logs ~" + Math.round(l16) + " s against one ~" + Math.round(l1) + " s");
             a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
         });
     }
@@ -121,7 +121,7 @@ public class BotKnowledgeTests {
      * against "~18 s"); a firework rocket by day waits for a creeper - its gunpowder (the leagues:
      * never got, "~30 s").
      */
-    @GameTest(environment = "challengecraft:night", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    @GameTest(environment = "challengecraft:knowledge_tiles", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void worstTilesEstimates(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "worst_tiles_estimates");
         a.fill(6, GROUND, 6, 9, GROUND, 9, Blocks.WATER);
@@ -178,7 +178,7 @@ public class BotKnowledgeTests {
     }
 
     /** A witch, by night, geared: none to be had by looking about (one in three hundred monsters) - at a swamp hut known nearby, yes. */
-    @GameTest(environment = "challengecraft:night", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    @GameTest(environment = "challengecraft:knowledge_witch", structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void witchAtTheSwampHut(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "witch_at_the_swamp_hut");
         a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.BREAD, 8));

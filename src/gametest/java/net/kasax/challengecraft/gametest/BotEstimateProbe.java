@@ -34,7 +34,7 @@ public class BotEstimateProbe {
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "time set " + ticks);
     }
 
-    @GameTest(environment = "challengecraft:night", structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
+    @GameTest(environment = "challengecraft:estimate_probe", structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
     public void estimates(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "estimate_probe");
         for (int[] t : new int[][]{{6, 30}, {10, 34}, {30, 6}, {34, 34}}) a.fill(t[0], FEET, t[1], t[0], FEET + 4, t[1], Blocks.OAK_LOG);

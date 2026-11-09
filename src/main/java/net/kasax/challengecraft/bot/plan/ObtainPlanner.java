@@ -484,10 +484,10 @@ public final class ObtainPlanner {
         double wait = 0;
         if (monster && !dark && !nether && !underground) {
             if (search < 0) wait = Math.min(untilNight, effort * 3);
-            else if (MobSearch.onlyInTheDark(type)) wait = untilNight;
             else {
+                // (The night's search, after the wait: for the burning kinds the only one.)
                 double atNight = habitatBot == null ? search : searchFor(type, !away, effort, true);
-                if (untilNight + atNight < search) {
+                if (MobSearch.onlyInTheDark(type) || untilNight + atNight < search) {
                     wait = untilNight;
                     find = atNight + fight;
                     search = atNight;
@@ -845,7 +845,7 @@ public final class ObtainPlanner {
                 luck += f.luck();
                 held.merge(Items.FURNACE, 1, Integer::sum);
             }
-            Batch in = batch(bot, k, cheapestHeldFirst(BotKnowledge.items(r.input()), held), n, held, depth + 1, making);
+            Batch in = batch(bot, k, bestOption(bot, k, BotKnowledge.items(r.input()), n, held, depth, making), n, held, depth + 1, making);
             return in.seconds() >= INF ? Batch.NONE : new Batch(s + in.seconds(), luck + in.luck());
         } finally {
             making.remove(item);
@@ -865,12 +865,43 @@ public final class ObtainPlanner {
         Map<List<Item>, Integer> groups = new LinkedHashMap<>();
         for (Ingredient i : r.ingredients()) groups.merge(BotKnowledge.items(i), crafts, Integer::sum);
         for (Map.Entry<List<Item>, Integer> g : groups.entrySet()) {
-            Batch b = batch(bot, k, cheapestHeldFirst(g.getKey(), held), g.getValue(), held, depth + 1, making);
+            Batch b = batch(bot, k, bestOption(bot, k, g.getKey(), g.getValue(), held, depth, making), g.getValue(), held, depth + 1, making);
             if (b.seconds() >= INF) return Batch.NONE;
             s += b.seconds();
             luck += b.luck();
         }
         return new Batch(s, Math.min(s, luck));
+    }
+
+    /**
+     * Of the items an ingredient takes, the one quickest to have {@code n} of from here, as a
+     * batch: enough of one held, that one; else the few cheapest by their share and any held, each
+     * tried on a copy of the stock. (By the share alone a copper nugget looked as cheap as an iron
+     * one - a ninth of an ingot each - with two iron ingots in the pack: "a name tag, ~104 s".)
+     * Deep down in a chain, the cheapest by share.
+     */
+    private Item bestOption(Bot bot, BotKnowledge k, List<Item> options, int n, Map<Item, Integer> held, int depth, Set<Item> making) {
+        if (options.size() == 1) return options.get(0);
+        for (Item i : options) if (held.getOrDefault(i, 0) >= n) return i;
+        if (depth > 3) return cheapestHeldFirst(options, held);
+        List<Item> tries = new ArrayList<>(options.stream().filter(i -> cost(i) < INF)
+                .sorted(Comparator.comparingDouble(this::cost)).limit(3).toList());
+        for (Item i : options) if (held.getOrDefault(i, 0) > 0 && !tries.contains(i)) tries.add(i);
+        Set<Item> paid = new HashSet<>(paidOnce);
+        Item best = null;
+        double bestSeconds = INF;
+        for (Item i : tries) {
+            paidOnce.clear();
+            paidOnce.addAll(paid);
+            double s = batch(bot, k, i, n, new IdentityHashMap<>(held), depth + 1, new HashSet<>(making)).seconds();
+            if (s < bestSeconds) {
+                bestSeconds = s;
+                best = i;
+            }
+        }
+        paidOnce.clear();
+        paidOnce.addAll(paid);
+        return best != null ? best : cheapestHeldFirst(options, held);
     }
 
     /** Of the items an ingredient takes: one held (enough of it, best), else the cheapest. */
