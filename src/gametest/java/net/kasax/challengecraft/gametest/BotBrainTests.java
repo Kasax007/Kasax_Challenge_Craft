@@ -140,13 +140,14 @@ public class BotBrainTests {
     }
 
     // ---- the look-ahead deciding the chores (search=2) ------------------------------------------
+    // (A batch of its own: a Lockout game of its own, not at once with the search=1 test.)
 
     /**
      * Bob with the look-ahead deciding the chores too ({@code search=2}, quick tiles off): no shield,
      * little food, a board he can do right here - the look-ahead decides (tiles and chores alike) and
      * the first tile comes within two minutes.
      */
-    @GameTest(environment = "challengecraft:lockout_search", structure = STRUCTURE, maxTicks = 2500, skyAccess = true, padding = 8)
+    @GameTest(environment = "challengecraft:lockout_search2", structure = STRUCTURE, maxTicks = 2500, skyAccess = true, padding = 8)
     public void searchChoresFirstTile(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "search_chores_first_tile");
         BotArena.day(h);
