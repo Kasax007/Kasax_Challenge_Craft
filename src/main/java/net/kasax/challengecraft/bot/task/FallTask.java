@@ -29,6 +29,10 @@ public final class FallTask implements BotTask {
     private boolean airborne;
     /** Whether it looked for the open sky to build under yet. */
     private boolean sited;
+    /** Ticks waited for the hearts to come back (see {@link #HEAL_TICKS}). */
+    private int healed;
+    /** At most this long waited, on a full belly, for the hearts the fall wants. */
+    private static final int HEAL_TICKS = 600;
 
     /** {@code hurt}: land without the water bucket (the damage is the point). */
     public FallTask(int height, boolean hurt) {
@@ -41,8 +45,16 @@ public final class FallTask implements BotTask {
         BotPlayer body = bot.body();
         ServerLevel level = (ServerLevel) body.level();
         if (++ticks > 2400) return Result.FAILED;
-        // (A fall of that height would kill: not a block built for it.)
-        if (side == null && !airborne && Math.floor(height - 3 + 1e-6) >= body.getHealth()) return Result.FAILED;
+        // (A fall of that height would kill: not a block built for it - unless the hearts come back
+        // first: a full belly heals a heart in a few seconds. A scratch on the way up - a hunger
+        // tick, a zombie's blow - ended "Fall 20 Blocks" more than once in leagues 9 and 10.)
+        if (side == null && !airborne && Math.floor(height - 3 + 1e-6) >= body.getHealth()) {
+            if (bot.params.on("fallheal") && body.getFoodData().getFoodLevel() >= 18 && healed++ < HEAL_TICKS) {
+                body.stopInputs();
+                return Result.RUNNING;
+            }
+            return Result.FAILED;
+        }
         BlockPos feet = body.blockPosition();
         if (airborne) {
             if (body.onGround() || body.isInWater()) {
