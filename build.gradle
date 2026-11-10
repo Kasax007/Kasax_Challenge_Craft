@@ -71,11 +71,29 @@ java {
 	targetCompatibility = JavaVersion.VERSION_25
 }
 
+// The commit a jar was built from (with "+" when the tree had changes): the Bob-Autopilot writes
+// it beside every result, so a game played on a rented server can be traced to its code.
+def bobCommit = {
+	try {
+		def head = ['git', 'rev-parse', '--short=10', 'HEAD'].execute(null, projectDir)
+		head.waitFor()
+		if (head.exitValue() != 0) return 'unknown'
+		def dirty = ['git', 'status', '--porcelain', '--untracked-files=no'].execute(null, projectDir)
+		dirty.waitFor()
+		return head.text.trim() + (dirty.text.trim() ? '+' : '')
+	} catch (Exception ignored) {
+		return 'unknown'
+	}
+}
+
 jar {
 	inputs.property "archivesName", project.base.archivesName
 
 	from("LICENSE") {
 		rename { "${it}_${inputs.properties.archivesName}"}
+	}
+	manifest {
+		attributes('Bob-Commit': bobCommit())
 	}
 }
 
@@ -193,6 +211,55 @@ tasks.register('bobSimTest', JavaExec) {
 	mainClass = 'net.kasax.challengecraft.bot.lockout.sim.SimSelfTest'
 	workingDir = projectDir
 	maxHeapSize = '1G'
+}
+
+// The Bob-Autopilot (src/autopilot): Bob's self-play league on a rented server with a panel
+// (docs/bob-bisect-server.md). A launcher of its own in plain Java - no Minecraft, no libraries -
+// that the panel starts instead of Fabric's jar; it starts the Fabric servers with this mod itself.
+// Built for Java 17 so that a panel still on an older Java gets a readable message, not a crash.
+//   ./gradlew bobAutopilotJar    -> build/libs/bob-autopilot.jar
+//   ./gradlew bobAutopilotTest   its tests
+sourceSets {
+	autopilot {
+	}
+	autopilotTest {
+		compileClasspath += sourceSets.autopilot.output
+		runtimeClasspath += sourceSets.autopilot.output
+	}
+}
+dependencies {
+	autopilotTestImplementation platform('org.junit:junit-bom:5.13.4')
+	autopilotTestImplementation 'org.junit.jupiter:junit-jupiter'
+	autopilotTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('compileAutopilotJava') {
+	options.release = 17
+}
+tasks.named('compileAutopilotTestJava') {
+	options.release = 17
+}
+tasks.register('bobAutopilotJar', Jar) {
+	group = 'bob'
+	description = 'The Bob-Autopilot launcher for a rented server (build/libs/bob-autopilot.jar).'
+	from sourceSets.autopilot.output
+	archiveFileName = 'bob-autopilot.jar'
+	destinationDirectory = layout.buildDirectory.dir('libs')
+	manifest {
+		attributes('Main-Class': 'net.kasax.challengecraft.autopilot.Autopilot', 'Bob-Commit': bobCommit())
+	}
+}
+tasks.register('bobAutopilotTest', Test) {
+	group = 'bob'
+	description = 'Tests of the Bob-Autopilot launcher.'
+	testClassesDirs = sourceSets.autopilotTest.output.classesDirs
+	classpath = sourceSets.autopilotTest.runtimeClasspath
+	useJUnitPlatform()
+	// (The knob table is compared with the laptop trainer's, scripts/train/bobleague.py.)
+	systemProperty 'bob.repo', projectDir.absolutePath
+	testLogging {
+		events 'failed'
+		exceptionFormat 'full'
+	}
 }
 
 // The trainer on the laptop (scripts/train/bobtrain.py) starts its dedicated servers itself - as

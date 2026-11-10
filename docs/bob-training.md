@@ -4,6 +4,10 @@ Diese Anleitung beschreibt den Trainingsprozess für Bob. Du startest ihn auf de
 Doppelklick. Er läuft, bis du ihn stoppst, und nutzt so viele Minecraft-Server gleichzeitig, wie der
 Rechner gerade stabil trägt.
 
+Bob kann auch auf einem gemieteten Minecraft-Server spielen, ganz ohne Python. Dort laufen die Liga
+und die Arena; die Modelle lernen danach aus den heruntergeladenen Paketen. Die Anleitung dazu steht
+in `docs/bob-bisect-server.md`.
+
 ## Was der Prozess macht
 
 Er deckt die fünf besprochenen Punkte ab:
