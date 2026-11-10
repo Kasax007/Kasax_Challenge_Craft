@@ -1006,11 +1006,11 @@ public final class MineTask implements BotTask {
     private long bowmenSaidAt = -1000;
 
     /**
-     * Without a shield (and without armour to speak of): two bowmen within fourteen blocks of
-     * the block (sixteen up or down: a ravine's floor), skeletons in the dark room the iron is in
-     * - a player hears them rattle - or one and two other monsters: not walked into for it. (League 9, seed -2038...: down into a
-     * ravine for the shield's iron, two skeletons at the bottom, shot dead in a box that did not
-     * help.) With the shield on the arm, the arrows end in it.
+     * Without a shield (and without armour to speak of): two bowmen within fourteen blocks of the
+     * block, sixteen up or down (skeletons in the dark room the iron is in, on a ravine's floor -
+     * a player hears them rattle), or one and two other monsters: not walked into for it. (League
+     * 9, seed -2038...: down into a ravine for the shield's iron, two skeletons at the bottom,
+     * shot dead in a box that did not help.) With the shield on the arm, the arrows end in it.
      */
     private boolean bowmenBy(ServerLevel level, Bot bot, BlockPos p) {
         var body = bot.body();
@@ -1047,7 +1047,7 @@ public final class MineTask implements BotTask {
         return true;
     }
 
-    /** Out of the water onto the nearest dry ground (a minute at most), steered back the way it is facing from. */
+    /** Out of the water onto the nearest dry ground (a minute at most): the search spreads out from where it is. */
     static BotTask ashore(BlockPos from) {
         return new NavGoalTask("ashore before digging", (lv, p) -> dryStand(lv, p), b -> from, 1200);
     }
