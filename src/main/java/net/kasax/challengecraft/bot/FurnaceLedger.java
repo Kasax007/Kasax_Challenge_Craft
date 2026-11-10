@@ -48,12 +48,6 @@ public final class FurnaceLedger {
         left.removeIf(l -> l.pos.equals(pos) && l.dimension == level.dimension());
     }
 
-    /** Whether the bot left this furnace cooking (it is not to be used for something else then). */
-    public boolean isLeft(ServerLevel level, BlockPos pos) {
-        for (Left l : left) if (l.pos.equals(pos) && l.dimension == level.dimension()) return true;
-        return false;
-    }
-
     /**
      * What one of its furnaces has of an item: {@code ready} in the output slot, {@code cooking}
      * the input that becomes it, {@code ticks} until the last of what is wanted is done.
