@@ -3999,9 +3999,9 @@ zuerst als Herausforderer.
 
 | Szene (`BotAlgoTests`, je 3 Läufe) | aus | an |
 | --- | --- | --- |
-| Zwei Skelette hinter einer Mauer, Weg gräbt durch | 12 / 13,5 / 13,5 HP verloren, nicht angekommen (im Loch versteckt) | 0 / 0 / 0 HP, angekommen in 276 Ticks, nie in ihrer Schussweite |
+| Zwei Skelette hinter einer Mauer, Weg gräbt durch | 12 / 13,5 / 13,5 HP verloren (Endstand: 21), nicht angekommen (im Loch versteckt) | 0 / 0 / 0 HP (Endstand: 0), angekommen in 276 Ticks (265), nie in ihrer Schussweite |
 | Damm zwischen Lava (17 lang), Umweg ~50 Blöcke | Damm, 117 Ticks, 0 HP | Umweg, 283 Ticks, 0 HP |
-| Tauchgang über einen Seeboden, 60 Blöcke | 470 Ticks, 0 HP | 471 Ticks, 0 HP (der Luft-Reflex aus Runde 2 rettet auch den alten Weg) |
+| Tauchgang über einen Seeboden, 60 Blöcke | 470 Ticks, 0 HP | 471 Ticks, 0 HP (der Luft-Reflex aus Runde 2 rettet auch den alten Weg; mit dem Endstand und `motionsearch` an: aus 351, an 470 Ticks – kein Gewinn) |
 | 75 Blöcke flach | 216 Ticks | 216 Ticks (+0 %) |
 
 ### 29.2 Weltmodell (`beliefs`, `belief.Beliefs`)
