@@ -441,11 +441,12 @@ public final class LockoutBrain implements BotBrain {
             for (Choice c : choices) {
                 tiles.merge(c.tile().index(), c.option().cost(), Math::min);
                 // The least the look-ahead may believe a tile takes: half of Bob's own estimate -
-                // or (searchfloor) all of it where what was learnt of the tile (the leagues' prior,
-                // this server's experience) says it takes longer than planned: the look-ahead's
-                // recipes do not know that "3 Sapling Types" never came off.
+                // or (searchfloor) all of it where what was learnt of the tile says it takes longer
+                // than planned (the believed figure above the plan's: the learnt goal model, the
+                // leagues' prior, this server's experience, its overruns in this game): the
+                // look-ahead's recipes do not know that "Lava Bucket" got twice in seven starts.
                 double floor = BoardSearch.OWN_FLOOR * c.option().cost();
-                if (bot.params.on("searchfloor") && GoalExperience.factor(c.tile().goal().id(), bot.params.on("goalprior")) > 1) floor = c.option().cost();
+                if (bot.params.on("searchfloor") && c.option().cost() > 1.05 * c.plain()) floor = c.option().cost();
                 floors.merge(c.tile().index(), floor, Math::min);
             }
             long chores = searchingChores(bot) ? choresOpen(bot) : 0;
