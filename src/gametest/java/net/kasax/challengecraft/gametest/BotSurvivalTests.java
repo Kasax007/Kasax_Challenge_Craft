@@ -143,6 +143,34 @@ public class BotSurvivalTests {
         });
     }
 
+    /**
+     * At nightfall in a wide river (four deep, the near bank four blocks north), seven hearts and
+     * nothing in hand, a drowned at him from the west: ashore and away on land, not "away" east
+     * through seventeen blocks of water where the drowned swims faster than he does (a solo opening
+     * bench of the base on seed 2582...: three such runs through the river, struck down by it).
+     */
+    @GameTest(environment = "challengecraft:survival_river", structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 44)
+    public void drownedInTheRiver(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "drowned_in_the_river");
+        command(h, "difficulty hard");
+        command(h, "time set 13000");
+        a.fill(-20, GROUND - 4, 14, BotArena.SIZE + 19, GROUND - 4, BotArena.SIZE + 19, Blocks.STONE);
+        a.fill(-20, GROUND - 3, 14, BotArena.SIZE + 19, GROUND, BotArena.SIZE + 19, Blocks.WATER);
+        Bot bot = a.spawn(20, GROUND - 1, 18);
+        var body = bot.body();
+        body.setHealth(7);
+        var drowned = mob(h, a, EntityTypes.DROWNED, 14, GROUND - 2, 18);
+        a.run(new WaitTask(700), 780, () -> {
+            if (drowned.isAlive() && drowned.getTarget() != body) drowned.setTarget(body);
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drowned_in_the_river: killed");
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] drowned_in_the_river hp {} in water {} at {}", body.getHealth(), body.isInWater(), a.feet().toShortString());
+            if (h.getTick() < 700) return false;
+            BotArena.LOG.info("[BOTTEST] drowned_in_the_river alive with {} health, in the water {}", body.getHealth(), body.isInWater());
+            BotArena.day(h);
+            return true;
+        });
+    }
+
     // ---- no weapon at night -------------------------------------------------------------------------
 
     /**
