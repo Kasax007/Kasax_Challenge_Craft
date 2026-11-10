@@ -117,14 +117,17 @@ Starte den Server. In der Konsole sollte nach wenigen Sekunden etwa das stehen:
 
 ```text
 [Bob-Autopilot] Bob-Autopilot 1.0 (Challenge Craft) im Ordner /home/container
-[Bob-Autopilot] Liga beginnt mit dem Champion vom Laptop-Training: copper=1,cover=1,...
 [Bob-Autopilot] Fabric: fabric-server-launch.jar, Mod: challengecraft-1.1.4.jar (Version 1.1.4, Commit ...)
 [Bob-Autopilot] Rechner: 8 Kerne, 22,0 GB Arbeitsspeicher. Plan: 3 Liga-Spiel(e) zu 4096 MB, 0 Arena(s) zu 3072 MB
-[Bob-Autopilot] Done (0.4s)! For help, type "help"
-[Bob-Autopilot] liga-1: Spiel 1 startet (Seed ...): BobA ... gegen BobB ...
+[Bob-Autopilot] Liga beginnt mit dem Champion vom Laptop-Training: copper=1,cover=1,...
+[Bob-Autopilot] Done (0.152s)! For help, type "help"
+[Bob-Autopilot] Stand: bob-autopilot/STATUS.txt. Befehle: status, export, finish, stop (help erklaert sie)
+[Bob-Autopilot] Autopilot gestartet: 3 Liga-Spiel(e) gleichzeitig, 0 Arena(s), 90 Spielminuten je Spiel
+[Bob-Autopilot] liga-1: Spiel 1 startet (Seed ...): BobA copper=1,... gegen BobB copper=1,...
 ```
 
-Das erste Spiel braucht etwa eine Minute bis zum Start, die weiteren starten nacheinander. Steht
+Jedes Spiel braucht etwa 15 Sekunden bis zum Start; die Spiele starten nacheinander. Beim nächsten
+Start steht statt „Liga beginnt …“ die Zeile „Liga geladen: … Spiele bisher …“: Die Liga geht weiter. Steht
 stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zeile davor, was fehlt
 (siehe „Wenn etwas nicht geht“).
 
@@ -141,7 +144,9 @@ stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zei
     wie Echtzeit),
   - die letzten Spiele und Ereignisse.
 
-Ein 90-Minuten-Spiel dauert je nach Tempo etwa 30 bis 60 echte Minuten. Die Uhrzeiten stehen in
+Ein 90-Minuten-Spiel dauert je nach Tempo etwa eine halbe bis eine Stunde, manchmal länger: Steckt
+ein Bob irgendwo fest (etwa im Wasser), rechnet er an seinem Weg, und das Spiel läuft eine Weile
+langsamer als Echtzeit. Die Uhrzeiten stehen in
 der Zeitzone des Servers. Oft ist das UTC: Dann zeigen sie im Winter eine Stunde weniger als die
 deutsche Uhr, im Sommer zwei.
 
@@ -172,17 +177,18 @@ Geplante Neustarts des Panels schaden nicht. Nur das gerade laufende Spiel geht 
 
 ## Arbeitsspeicher: wie viele Spiele gleichzeitig
 
-Jedes Spiel ist ein eigener Minecraft-Server. Es braucht seinen Speicher aus `game_memory_mb`
-(4096 MB) und dazu etwa 1,3 GB, die Java selbst belegt. Ein Spiel braucht also gut **5,3 GB**, ein
+Jedes Spiel ist ein eigener Minecraft-Server. Er darf höchstens den Speicher aus `game_memory_mb`
+(4096 MB) für die Welt nehmen; dazu kommt, was Java selbst belegt (gemessen gut 0,7 GB, der
+Autopilot rechnet vorsichtig mit 1,3 GB). Ein Spiel braucht also höchstens etwa **5,3 GB**, ein
 Arena-Server (3072 MB) etwa **4,3 GB**. Mit `league_games=auto` rechnet der Autopilot das selbst aus
-und lässt 1,5 GB frei.
+und lässt 1,5 GB frei. Der Autopilot selbst braucht weniger als 0,1 GB.
 
-| Einstellung bei 22 GB | belegt etwa | Empfehlung |
+| Einstellung bei 22 GB | belegt höchstens | Empfehlung |
 | --- | --- | --- |
-| `league_games=auto` (ergibt 3), `arena_servers=0` | 17,5 GB | **Standard**: am meisten Liga-Spiele |
+| `league_games=auto` (ergibt 3), `arena_servers=0` | 16 GB | **Standard**: am meisten Liga-Spiele |
 | `league_games=2`, `arena_servers=1` | 15 GB | Liga und Kampftraining |
 | `league_games=2`, `arena_servers=0` | 11 GB | wenn der Server langsam ist (siehe unten) |
-| `league_games=4` | 23 GB | **zu viel**: der Autopilot startet dann nur 3 |
+| `league_games=4` | 21 GB | **zu viel** (dazu 1,5 GB Reserve): der Autopilot startet dann nur 3 |
 
 Wichtiger als der Speicher ist oft der **Prozessor**. Jedes Spiel nutzt etwa zwei Kerne, wenn es
 schnell läuft. Mit `auto` startet der Autopilot höchstens so viele Spiele, wie Kerne für sie da sind.

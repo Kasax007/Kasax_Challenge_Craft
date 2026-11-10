@@ -149,7 +149,7 @@ final class Report {
         }
         Path latest = latestExport(s);
         b.append("\nHerunterladen: ");
-        if (latest != null) b.append("bob-autopilot/export/").append(latest.getFileName()).append(" (").append(Disk.mb(Disk.sizeOf(latest))).append(")");
+        if (latest != null) b.append("bob-autopilot/export/").append(latest.getFileName()).append(" (").append(Disk.human(Disk.sizeOf(latest))).append(")");
         else b.append("noch kein Paket");
         b.append(" - ein neues legt der Konsolenbefehl export an.\n");
         return b.toString();

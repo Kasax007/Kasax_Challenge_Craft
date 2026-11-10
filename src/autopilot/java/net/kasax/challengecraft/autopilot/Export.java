@@ -137,7 +137,7 @@ final class Export {
         out.putNextEntry(e);
         out.write(data);
         out.closeEntry();
-        in.add(name + " (" + Disk.mb(data.length) + ")");
+        in.add(name + " (" + Disk.human(data.length) + ")");
     }
 
     /** Up to the last line break: a line a server is writing right now is left for the next time. */

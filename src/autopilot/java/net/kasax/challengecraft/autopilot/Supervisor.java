@@ -526,8 +526,10 @@ final class Supervisor {
         GameServer g = s.server;
         s.state = State.STOPPING;
         s.since = System.currentTimeMillis();
+        // (Asked to end - the panel's stop button - the servers get less time: their worlds are thrown away anyway.)
+        long grace = stopRequested ? 8_000 : 20_000;
         s.stopping = workers.submit(() -> {
-            g.stop(20_000);
+            g.stop(grace);
             try {
                 g.cleanUp(keepAs);
             } catch (IOException e) {
@@ -613,7 +615,7 @@ final class Supervisor {
         exporting = workers.submit(() -> {
             try {
                 Path zip = export.write();
-                log.info("Paket zum Herunterladen (" + why + "): bob-autopilot/export/" + zip.getFileName() + " (" + Disk.mb(Files.size(zip)) + ")");
+                log.info("Paket zum Herunterladen (" + why + "): bob-autopilot/export/" + zip.getFileName() + " (" + Disk.human(Files.size(zip)) + ")");
             } catch (IOException | RuntimeException e) {
                 log.warn("Paket nicht angelegt: " + e);
             }

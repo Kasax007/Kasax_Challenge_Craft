@@ -164,7 +164,9 @@ final class Disk {
         }
     }
 
-    static String mb(long bytes) {
+    /** A size for people: "12 KB", "3.4 MB", "250 MB". */
+    static String human(long bytes) {
+        if (bytes < (1L << 20)) return String.format(java.util.Locale.ROOT, "%d KB", (bytes + 1023) >> 10);
         return bytes < (100L << 20) ? String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1048576.0)
                 : String.format(java.util.Locale.ROOT, "%.0f MB", bytes / 1048576.0);
     }
