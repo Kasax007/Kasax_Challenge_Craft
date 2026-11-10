@@ -368,20 +368,23 @@ public final class LockoutBrain implements BotBrain {
                     int ingots = 0;
                     for (int i = 0; i < Math.min(2, missing.size()); i++) ingots += COPPER_SET.get(missing.get(i));
                     int want = Math.max(0, have - Math.max(0, spare)) + ingots;
-                    double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want);
+                    // (smeltgo: the copper of both pieces mined and put in the furnace, the first
+                    // piece's ingots waited for, the second's left cooking while it goes on -
+                    // thirteen ingots stood for were ninety seconds at the furnace on seed 2116....
+                    // What counts for going at all is the part waited for: the second piece's ingots
+                    // fetched from the furnace later cost a walk, the copper for the one after is
+                    // mined only while the vein is right there.)
+                    boolean onePiece = bot.params.on("smeltgo") && missing.size() > 1;
+                    int now = onePiece ? want - COPPER_SET.get(missing.get(1)) : want;
+                    double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now);
                     if (est <= COPPER_ARMOUR_MAX && !investLater(bot, est, "copper armour")) {
                         armourTries++;
                         bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
-                        // (smeltgo: the copper of both pieces mined and put in the furnace, the first
-                        // piece's ingots waited for, the second's left cooking while it goes on -
-                        // thirteen ingots stood for were ninety seconds at the furnace on seed 2116....)
-                        int now = want;
-                        if (bot.params.on("smeltgo") && missing.size() > 1) {
-                            now = want - COPPER_SET.get(missing.get(1));
-                            planner.boardDemand.merge(net.minecraft.world.item.Items.RAW_COPPER, want - now, Integer::sum);
-                        }
-                        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now, planner),
-                                budget(est, 1200, 6000));
+                        // (The second piece's copper with the first: mined in the one trip while the
+                        // vein is there, smelted in the one batch, not waited for - see forLater.)
+                        var copper = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now, planner);
+                        if (onePiece) copper.forLater(Map.of(net.minecraft.world.item.Items.RAW_COPPER, want));
+                        start(bot, copper, budget(est, 1200, 6000));
                         if (!startRefused) return;
                         startRefused = false;
                     }

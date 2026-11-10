@@ -1438,7 +1438,7 @@ public final class ObtainPlanner {
                 // More of it wanted by other tiles on the board (iron for the bucket, the shears and
                 // the compass): taken in the same trip while the vein is right there.
                 int extra = 0;
-                for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) - have - total);
+                for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) + laterDemand.getOrDefault(i, 0) - have - total);
                 MineTask mine = new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
                         have + total + Math.max(0, Math.min(extra, 16)), depth, lead(bot, blocks)).atLeast(have + total);
                 // Not lying about anywhere (a furnace, bricks): taken where seen, never searched
@@ -1523,8 +1523,16 @@ public final class ObtainPlanner {
     /** How many of {@code item} the board will want in all: an ingot counts what is wanted of its raw ore too. */
     public int demandFor(Item item) {
         Item raw = INGOT_RAW.get(item);
-        return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0));
+        return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0))
+                + laterDemand.getOrDefault(item, 0) + (raw == null ? 0 : laterDemand.getOrDefault(raw, 0));
     }
+
+    /**
+     * What the errand being planned wants in all, beyond what it waits for now (set by its
+     * ObtainTask while it plans - see {@link net.kasax.challengecraft.bot.task.ObtainTask#forLater}):
+     * mined and smelted with it like the board's demand, not counted as the board's.
+     */
+    public Map<Item, Integer> laterDemand = Map.of();
 
     /** A far lead only if one was found before (no new biome search for blocks that are in sight). */
     private static BlockPos farLeadStandBy(Bot bot, Set<Block> blocks) {

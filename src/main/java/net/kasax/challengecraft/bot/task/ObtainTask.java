@@ -55,6 +55,25 @@ public final class ObtainTask implements BotTask {
         return count;
     }
 
+    /** What this errand wants beyond {@link #count} (for the next thing, cooking meanwhile): see {@link ObtainPlanner#laterDemand}. */
+    private java.util.Map<Item, Integer> later = java.util.Map.of();
+
+    /** Wanted in all beyond what is waited for: mined in the same trip, smelted in the same batch, not waited for. */
+    public ObtainTask forLater(java.util.Map<Item, Integer> later) {
+        this.later = java.util.Map.copyOf(later);
+        return this;
+    }
+
+    /** The planner's plan with this errand's later demand in force. */
+    private ObtainPlanner.Plan plan(Bot bot) {
+        planner.laterDemand = later;
+        try {
+            return planner.plan(bot, items, count, craftOnly, kept);
+        } finally {
+            planner.laterDemand = java.util.Map.of();
+        }
+    }
+
     /** Items not to use up while getting these, as many as it holds when it begins (see {@link ObtainPlanner#plan(Bot, java.util.Collection, int, boolean, java.util.Map)}). */
     public ObtainTask keeping(Set<Item> keep) {
         this.keep = Set.copyOf(keep);
@@ -71,7 +90,7 @@ public final class ObtainTask implements BotTask {
             for (Item k : keep) kept.put(k, ObtainPlanner.countAny(bot.body(), Set.of(k)));
         }
         if (step == null) {
-            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, kept);
+            ObtainPlanner.Plan p = plan(bot);
             if (p instanceof ObtainPlanner.Have) return Result.DONE;
             if (p instanceof ObtainPlanner.Stuck s) {
                 bot.say("can't get " + ObtainPlanner.names(items) + ": " + s.why());
@@ -93,7 +112,7 @@ public final class ObtainTask implements BotTask {
         // Out searching for one kind (spruce) while another that does as well (oak) comes into
         // sight: the plan again, every few seconds, and the other way if it now comes out first.
         if (step instanceof MineTask m && m.searching() && stepPlan != null && ++recheck % 100 == 0) {
-            ObtainPlanner.Plan p = planner.plan(bot, items, count, craftOnly, kept);
+            ObtainPlanner.Plan p = plan(bot);
             // (Only another source of the same thing: not off to something else the plan now
             // puts first - halfway down a staircase for iron, back up for wood.)
             if (p instanceof ObtainPlanner.Step st && !st.key().equals(stepPlan.key())
