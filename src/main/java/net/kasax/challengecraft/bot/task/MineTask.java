@@ -406,8 +406,15 @@ public final class MineTask implements BotTask {
         found.sort(java.util.Comparator.comparingDouble(p -> p.distSqr(feet)));
         for (BlockPos p : found.subList(0, Math.min(found.size(), 24))) {
             if (!bot.tools().canHarvest(level.getBlockState(p))) continue;
+            // (Dry ground round it as well: rock at a pond's edge is dug standing in the water,
+            // five times slower afloat - a minute for the first stone at a desert pond, seed 2116....)
             boolean wet = false;
-            for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) wet = true;
+            for (BlockPos q : BlockPos.betweenClosed(p.offset(-2, -1, -2), p.offset(2, 1, 2))) {
+                if (!level.getFluidState(q).isEmpty()) {
+                    wet = true;
+                    break;
+                }
+            }
             if (!wet && worthIt(level, bot, p)) return p;
         }
         return null;
