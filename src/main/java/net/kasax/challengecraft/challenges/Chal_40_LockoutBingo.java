@@ -417,6 +417,27 @@ public final class Chal_40_LockoutBingo {
         return data.isStarted() && !data.isEnded();
     }
 
+    /**
+     * Ends a debug run as if no game had been played (board, teams, the started mark cleared), so
+     * that the lobby is open again - for tests that start one (see BotLobbyTests).
+     */
+    public static void endDebugRun(MinecraftServer server) {
+        LockoutBingoSavedData data = getData(server);
+        data.resetForRun(data.getRunId());
+    }
+
+    /** Ticks since the running game began (0 when none is on). */
+    public static long elapsedTicks(MinecraftServer server) {
+        if (!active) {
+            return 0L;
+        }
+        LockoutBingoSavedData data = getData(server);
+        if (!data.isStarted() || data.getStartedAtWorldTicks() < 0L) {
+            return 0L;
+        }
+        return Math.max(0L, server.overworld().getGameTime() - data.getStartedAtWorldTicks());
+    }
+
     /** The board as it stands, or an empty list when no game is on. */
     public static List<BoardTile> board(MinecraftServer server) {
         if (!active) {

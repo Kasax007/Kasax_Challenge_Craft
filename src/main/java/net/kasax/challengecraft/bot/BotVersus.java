@@ -80,6 +80,12 @@ public final class BotVersus {
         BotManager.LOG.info("[BOTVS] start: seed {}, {} s, {}, world {}", seed, ticks / 20, difficulty, server.overworld().getDifficulty().getSerializedName());
     }
 
+    /** Seconds left in the self-play match under way, or -1 when none is (a normal game has no time limit). */
+    public static double secondsLeft() {
+        BotVersus v = running;
+        return v == null ? -1 : (v.length - v.ticks) / 20.0;
+    }
+
     static void tickAll() {
         if (running != null && running.tick()) running = null;
     }

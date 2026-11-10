@@ -177,6 +177,24 @@ tasks.matching { it.name == 'runFilm' }.configureEach {
 	onlyIf { project.hasProperty('film') }
 }
 
+// The abstract Lockout simulator and Bob's look-ahead board brain (src/main/java/.../bot/lockout/sim):
+// thousands of games a minute, no Minecraft run. ./gradlew bobSim --args="match --a greedy --b search --games 500"
+// (modes and brains: see SimBench). Its checks: ./gradlew bobSimTest (about a minute).
+tasks.register('bobSim', JavaExec) {
+	dependsOn 'classes'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'net.kasax.challengecraft.bot.lockout.sim.SimBench'
+	workingDir = projectDir
+	maxHeapSize = '1G'
+}
+tasks.register('bobSimTest', JavaExec) {
+	dependsOn 'classes'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'net.kasax.challengecraft.bot.lockout.sim.SimSelfTest'
+	workingDir = projectDir
+	maxHeapSize = '1G'
+}
+
 // The trainer on the laptop (scripts/train/bobtrain.py) starts its dedicated servers itself - as
 // many as the machine carries at the moment - the way runServer starts one, written down for it:
 // the Java, the classpath, the JVM arguments and the main class (./gradlew bobLaunchSpec).

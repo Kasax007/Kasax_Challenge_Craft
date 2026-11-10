@@ -8,6 +8,11 @@ import net.kasax.challengecraft.challenges.lockout.LockoutBingoTeam;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket;
 import net.kasax.challengecraft.network.LockoutBingoActionPacket.Action;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.kasax.challengecraft.bot.BotParams;
+
+import java.util.List;
 
 import static net.kasax.challengecraft.gametest.BotArena.FEET;
 import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
@@ -59,6 +64,50 @@ public class BotLobbyTests {
                 h.succeed();
             }
         });
+    }
+
+    /**
+     * Bob with the look-ahead ({@code search=1}, quick tiles off so that the look-ahead decides) on a
+     * board whose first tiles he can do right here: his first tile within a minute and a half - the
+     * whole path from the board through the simulator to a goal and its claim.
+     */
+    // (A batch of its own as well: a Lockout game of its own, not to be switched off by the lobby test.)
+    @GameTest(environment = "challengecraft:lockout_search", structure = STRUCTURE, maxTicks = 1900, skyAccess = true, padding = 8)
+    public void searchClaimsFirstTile(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "search_first_tile");
+        BotArena.day(h);
+        var server = h.getLevel().getServer();
+        var bob = a.spawn(20, FEET, 20,
+                new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_AXE), new ItemStack(Items.STONE_SHOVEL),
+                new ItemStack(Items.SHIELD), new ItemStack(Items.BREAD, 16), new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.OAK_PLANKS, 32),
+                new ItemStack(Items.IRON_INGOT, 6), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.BUNDLE));
+        bob.params = BotParams.parse("search=1,quick=0");
+        Chal_40_LockoutBingo.startDebugRun(List.of((net.minecraft.server.level.ServerPlayer) bob.body()),
+                List.of("craft_bucket", "craft_shears", "craft_furnace", "craft_cauldron"));
+        LockoutBrain brain = new LockoutBrain(LockoutBrain.Difficulty.HARD);
+        bob.setBrain(brain);
+        LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bob.id);
+        boolean[] ended = {false};
+        h.succeedWhen(() -> {
+            int tiles = Chal_40_LockoutBingo.score(server, team);
+            if (h.getTick() >= 1880 && tiles < 1 && !ended[0]) {
+                ended[0] = true;
+                BotArena.LOG.info("[BOTTEST] search_first_tile FAILED: no tile, look-ahead decisions {}", brain.lookAheadDecisions());
+                end(server, bob);
+            }
+            h.assertTrue(tiles >= 1, "no tile yet");
+            h.assertTrue(brain.lookAheadDecisions() >= 1, "a tile, but the look-ahead never decided");
+            BotArena.LOG.info("[BOTTEST] search_first_tile passed in {} ticks ({} look-ahead decisions)", h.getTick(), brain.lookAheadDecisions());
+            end(server, bob);
+        });
+    }
+
+    /** The game ended and the lobby open again (the lobby test adds Bob only to a game not started). */
+    private static void end(net.minecraft.server.MinecraftServer server, net.kasax.challengecraft.bot.Bot bob) {
+        bob.setBrain(null);
+        Chal_40_LockoutBingo.endDebugRun(server);
+        Chal_40_LockoutBingo.setActive(false);
+        BotManager.remove(server, bob);
     }
 
     private static void fail(GameTestHelper h, String why) {
