@@ -127,9 +127,9 @@ Starte den Server. In der Konsole sollte nach wenigen Sekunden etwa das stehen:
 ```
 
 Jedes Spiel braucht etwa 15 Sekunden bis zum Start; die Spiele starten nacheinander. Beim nächsten
-Start steht statt „Liga beginnt …“ die Zeile „Liga geladen: … Spiele bisher …“: Die Liga geht weiter. Steht
-stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zeile davor, was fehlt
-(siehe „Wenn etwas nicht geht“).
+Start steht statt „Liga beginnt …“ die Zeile „Liga geladen: … Spiele bisher …“: Die Liga geht
+weiter. Steht stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zeile davor,
+was fehlt (siehe „Wenn etwas nicht geht“).
 
 ## Läuft es?
 
@@ -146,9 +146,10 @@ stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zei
 
 Ein 90-Minuten-Spiel dauert je nach Tempo etwa eine halbe bis eine Stunde, manchmal länger: Steckt
 ein Bob irgendwo fest (etwa im Wasser), rechnet er an seinem Weg, und das Spiel läuft eine Weile
-langsamer als Echtzeit. Die Uhrzeiten stehen in
-der Zeitzone des Servers. Oft ist das UTC: Dann zeigen sie im Winter eine Stunde weniger als die
-deutsche Uhr, im Sommer zwei.
+langsamer als Echtzeit.
+
+Die Uhrzeiten stehen in der Zeitzone des Servers. Oft ist das UTC: Dann zeigen sie im Winter eine
+Stunde weniger als die deutsche Uhr, im Sommer zwei.
 
 ## Die Ergebnisse herunterladen und mir schicken
 
@@ -170,8 +171,9 @@ hineinpasst, kommt ins nächste.
 - **`finish`** in der Konsole: Die laufenden Spiele werden zu Ende gespielt, dann hört der Autopilot
   auf. Das dauert bis zu einer Stunde.
 - **Wieder normal spielen:** Server stoppen, im Reiter **Startup** im Feld **Server Jar File** wieder
-  den Namen der Fabric-Jar eintragen (oder die Jars zurückbenennen), starten. Der Ordner `bob-autopilot` stört dabei nicht; du kannst ihn liegen
-  lassen (dann geht die Liga beim nächsten Mal weiter) oder löschen.
+  den Namen der Fabric-Jar eintragen (oder die Jars zurückbenennen), starten. Der Ordner
+  `bob-autopilot` stört dabei nicht; du kannst ihn liegen lassen (dann geht die Liga beim nächsten
+  Mal weiter) oder löschen.
 
 Geplante Neustarts des Panels schaden nicht. Nur das gerade laufende Spiel geht dabei verloren.
 
@@ -278,7 +280,7 @@ ebenfalls der Standard.
 | `journal/` | Bobs Entscheidungen mit Lage und Ausgang (daraus lernen die Modelle) |
 | `games/` | das Log jedes Spiels (gzip) |
 | `models/` | leer; hier könnten neuere Modelle liegen (sonst nimmt Bob die aus der Mod) |
-| `work/` | die Arbeitsordner der laufenden Spiele (nicht herunterladen) |
+| `work/` | die Arbeitsordner der laufenden Spiele. **Nicht anfassen und nicht herunterladen:** Darin sind Verknüpfungen auf die Mods und Bibliotheken des Servers; was du dort löschst, fehlt dem Server. |
 
 ---
 
