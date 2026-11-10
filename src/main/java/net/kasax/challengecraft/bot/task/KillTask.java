@@ -48,6 +48,11 @@ public final class KillTask implements BotTask {
     private LivingEntity target;
 
     /** What it is fighting now (null between two). */
+    /** Out looking for one (none in sight to go for, nothing lying about to pick up). */
+    public boolean searching() {
+        return target == null && collectTicks <= 0;
+    }
+
     public LivingEntity target() {
         return target;
     }

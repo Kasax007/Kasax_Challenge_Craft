@@ -37,10 +37,13 @@ public final class BotBenchmark {
     private boolean wasAlive = true;
     /** Ticks spent per root task (what it set out to do). */
     private final Map<String, Integer> timeOn = new LinkedHashMap<>();
+    /** The opening's milestones and where its time went (see OpeningClock). */
+    private final OpeningClock clock;
 
     private BotBenchmark(Bot bot, int length) {
         this.bot = bot;
         this.length = length;
+        this.clock = new OpeningClock(bot);
     }
 
     public static void start(Bot bot, int ticks, LockoutBrain.Difficulty difficulty) {
@@ -68,6 +71,7 @@ public final class BotBenchmark {
         if (!body.isAlive() && wasAlive) deaths++;
         var root = bot.root();
         timeOn.merge(root == null ? "(nothing)" : root.describe(), 1, Integer::sum);
+        clock.tick(claimed > 0);
         wasAlive = body.isAlive();
         if (ticks % 10 == 0) {
             for (Milestone m : MILESTONES) {
@@ -142,6 +146,9 @@ public final class BotBenchmark {
         if (bot.brain() instanceof LockoutBrain brain) {
             for (String line : brain.openTileReport(bot)) BotManager.LOG.info("[BOTBENCH] open {}", line);
         }
+        // (The stopwatch over the opening, as one line of JSON for scripts/bot/opening.py.)
+        BotManager.LOG.info("[BOTOPEN] {\"name\":\"{}\",\"seed\":{},\"secs\":{},\"tiles\":{},\"deaths\":{},\"params\":\"{}\",\"opening\":{}}", name,
+                bot.body().level().getServer().overworld().getSeed(), ticks / 20, claimed, deaths, bot.params, clock.json());
         BotManager.LOG.info("[BOTBENCH] idle: {} s, failed tasks: {}, deaths: {}, played {} s", bot.idleTicks / 20, bot.failures, deaths, ticks / 20);
     }
 }

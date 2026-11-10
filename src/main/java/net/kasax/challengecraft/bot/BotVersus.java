@@ -28,10 +28,13 @@ public final class BotVersus {
         final List<String> claims = new ArrayList<>();
         /** Ticks spent per root task (what it set out to do), the counts left out. */
         final java.util.Map<String, Integer> timeOn = new java.util.HashMap<>();
+        /** The opening's milestones and where its time went. */
+        final OpeningClock clock;
 
         Side(Bot bot, LockoutBingoTeam team) {
             this.bot = bot;
             this.team = team;
+            this.clock = new OpeningClock(bot);
             var stats = bot.body().getStats();
             deaths0 = stats.getValue(Stats.CUSTOM.get(Stats.DEATHS));
             damage0 = stats.getValue(Stats.CUSTOM.get(Stats.DAMAGE_TAKEN));
@@ -92,6 +95,7 @@ public final class BotVersus {
             var root = s.bot.root();
             String what = root == null ? "(nothing)" : DIGITS.matcher(root.describe()).replaceAll("#");
             s.timeOn.merge(what.length() > 48 ? what.substring(0, 48) : what, 1, Integer::sum);
+            s.clock.tick(s.tiles > 0);
         }
         if (ticks % 10 == 0) {
             for (Chal_40_LockoutBingo.BoardTile t : Chal_40_LockoutBingo.board(server)) {
@@ -158,7 +162,7 @@ public final class BotVersus {
                 if (c > 0) json.append(',');
                 json.append('"').append(s.claims.get(c).replace("\"", "'")).append('"');
             }
-            json.append("]}");
+            json.append("],\"opening\":").append(s.clock.json()).append('}');
         }
         json.append("]}");
         BotManager.LOG.info("[BOTVS] result {}", json);

@@ -1916,6 +1916,21 @@ public final class LockoutBrain implements BotBrain {
             return Double.MAX_VALUE;
         }
     }
+    /**
+     * The decider behind what the bot is doing now, for the stopwatch (see OpeningClock): "side"
+     * for a chance taken on the way, "quick" for a tile taken before anything else, else the
+     * decider of the errand under way ("food", "opening", "kit", "invest", "goal"...); "other"
+     * for something no decider set going, "-" for nothing at all.
+     */
+    public String doing(Bot bot) {
+        if (sideTask != null && bot.tasks().contains(sideTask)) return "side";
+        if (running != null && runningKey != null && bot.tasks().contains(running)) {
+            String decider = runningKey.substring(0, Math.max(0, runningKey.indexOf(':')));
+            return decider.equals("goal") && goalQuick ? "quick" : decider.isEmpty() ? runningKey : decider;
+        }
+        return bot.tasks().isEmpty() ? "-" : "other";
+    }
+
     /** Whatever the brain set going last (a goal, food, the opening), and its time allowance. */
     private BotTask running;
     private long runningSince, runningBudget;

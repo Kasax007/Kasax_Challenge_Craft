@@ -224,7 +224,14 @@ final class BotCommands {
                                         .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.HARD))
                                         .then(Commands.argument("difficulty", StringArgumentType.word())
                                                 .executes(ctx -> bench(ctx, LockoutBrain.Difficulty.valueOf(
-                                                        StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))))))
+                                                        StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT))))
+                                                // (With knobs, as a self-play side has them: "bench Bob 600 hard fastopen=0".)
+                                                .then(Commands.argument("knobs", StringArgumentType.greedyString()).executes(ctx -> {
+                                                    Bot b = bot(ctx);
+                                                    if (b != null) b.params = BotParams.parse(StringArgumentType.getString(ctx, "knobs").trim());
+                                                    return bench(ctx, LockoutBrain.Difficulty.valueOf(
+                                                            StringArgumentType.getString(ctx, "difficulty").toUpperCase(java.util.Locale.ROOT)));
+                                                }))))))
                         // A self-play match: "versus 1800 hard Bob Alice:guardian=0,quick=0" - each bot a team of its own,
                         // with its own knobs ([BOTVS] in the log).
                         .then(Commands.literal("versus").then(Commands.argument("seconds", com.mojang.brigadier.arguments.IntegerArgumentType.integer(10))

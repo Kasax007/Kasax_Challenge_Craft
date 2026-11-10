@@ -61,6 +61,7 @@ public final class BotActions {
      * One tick of breaking {@code pos}. Returns true once the block is gone (also if it already was).
      */
     public boolean breakTick(BlockPos pos) {
+        brokeAt = bot.tickCount;
         ServerLevel level = (ServerLevel) bot.level();
         BlockState state = level.getBlockState(pos);
         if (state.isAir() || !state.getFluidState().isEmpty() && state.getCollisionShape(level, pos).isEmpty()) {
@@ -89,6 +90,14 @@ public final class BotActions {
             return done || level.getBlockState(pos).isAir();
         }
         return false;
+    }
+
+    /** The body's tick of the last {@link #breakTick} (for the stopwatch, see OpeningClock). */
+    private int brokeAt = -1;
+
+    /** Whether a block was worked on in this tick of the body. */
+    public boolean brokeThisTick() {
+        return brokeAt == bot.tickCount;
     }
 
     /** Whether a block is being broken right now (progress made this or the last tick). */
