@@ -129,7 +129,10 @@ public class BotKitTests {
         Bot bot = a.spawn(22, BotArena.FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD),
                 new ItemStack(Items.STONE_AXE), new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.SHIELD), new ItemStack(Items.COOKED_BEEF, 8),
                 new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.COAL, 4),
-                new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.FURNACE));
+                new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.FURNACE),
+                // (The iron kit in hand: without it the brain's kit - iron pickaxe, bucket - came
+                // first, a staircase to y 14, and the armour never in the budget.)
+                new ItemStack(Items.IRON_PICKAXE), new ItemStack(Items.BUCKET));
         bot.params = BotParams.parse(knobs);
         String unreachable = "trade_with_cleric";
         net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
@@ -189,6 +192,9 @@ public class BotKitTests {
         net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
         bot.setBrain(new net.kasax.challengecraft.bot.lockout.LockoutBrain(net.kasax.challengecraft.bot.lockout.LockoutBrain.Difficulty.HARD)
                 .only(Set.of(unreachable)));
+        // (The senses ticked once first: what they know is kept per dimension, and before their
+        // first tick they know of none - the treasure went under no dimension and was never found.)
+        bot.senses().tick(bot.body());
         bot.senses().know(net.minecraft.resources.Identifier.withDefaultNamespace("buried_treasure"), column.above(), bot.body().blockPosition());
         var body = bot.body();
         h.succeedWhen(() -> {
@@ -233,7 +239,9 @@ public class BotKitTests {
         BotArena a = BotArena.flat(h, name);
         int base = a.abs(0, 0, 0).getY();
         int top = 125 - base; // (relative: the mountain's top block)
-        a.fill(8, BotArena.GROUND, 8, 32, top, 32, Blocks.STONE);
+        // (The whole arena: the veins twelve blocks off sit inside the rock, eight from its face -
+        // a mountain of 25 put them in the cliff, seen and gone for from outside by either way.)
+        a.fill(0, BotArena.GROUND, 0, BotArena.SIZE - 1, top, BotArena.SIZE - 1, Blocks.STONE);
         // The layer at y 14 (or the arena's lowest stone, whichever is higher).
         int layer = Math.max(1, 14 - base);
         a.fill(8, layer, 8, 32, layer, 32, Blocks.IRON_ORE);

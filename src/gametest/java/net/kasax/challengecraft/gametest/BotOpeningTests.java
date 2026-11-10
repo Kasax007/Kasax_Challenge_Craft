@@ -142,7 +142,9 @@ public class BotOpeningTests {
             h.getLevel().addFreshEntity(animal);
         }
         Bot bot = a.spawn(12, FEET, 20);
-        bot.params = BotParams.parse(knobs);
+        // ("-": the run's knobs - the defaults, or what -PbotKnobs forces: one knob's part in the
+        // whole opening measured by running this test with it off.)
+        bot.params = "-".equals(knobs) ? BotParams.champion() : BotParams.parse(knobs);
         // A game of its own, its one tile out of reach here (no village): the opening is all there is to do.
         String unreachable = "trade_with_cleric";
         Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
