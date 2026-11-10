@@ -178,24 +178,27 @@ public class BotKnowledgeTests {
     }
 
     /**
-     * A name tag, geared, a mineshaft known forty blocks off: its chest minecarts hold one nearly
-     * three times in four, but the raid opens chest blocks only - no trip there
-     * (LockoutGoals.NOT_RAIDED); the usual way instead.
+     * A mineshaft known forty blocks off: its chest minecarts hold a name tag nearly three times in
+     * four, but the raid opens chest blocks only - so it is no way to one, not even with no other
+     * way at all (LockoutGoals.NOT_RAIDED). The control: a shipwreck known as well, iron with no
+     * other way - the raid there is the way.
      */
     @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
     public void noRaidOnAMineshaft(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "no_raid_on_a_mineshaft");
-        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
-        var goal = LockoutBingoGoalPool.byId("obtain_name_tag");
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.BREAD, 8));
         h.runAfterDelay(20, () -> {
             var bot = a.bot();
-            var before = LockoutGoals.plan(bot, new ObtainPlanner(), goal);
+            var planner = new ObtainPlanner();
             bot.senses().know(Identifier.withDefaultNamespace("mineshaft"), a.abs(20, FEET, 60), bot.body().blockPosition());
-            var known = LockoutGoals.plan(bot, new ObtainPlanner(), goal);
-            String b = before == null ? "none" : before.task().get().describe(), k = known == null ? "none" : known.task().get().describe();
-            BotArena.LOG.info("[BOTTEST] no_raid_on_a_mineshaft: none known: {} (~{} s); a mineshaft known: {} (~{} s)",
-                    b, before == null ? -1 : Math.round(before.cost()), k, known == null ? -1 : Math.round(known.cost()));
-            h.assertFalse(k.startsWith("loot the mineshaft"), "with a mineshaft known: " + k);
+            var tag = LockoutGoals.loot(bot, planner, java.util.Set.of(Items.NAME_TAG), 1, 1e9);
+            bot.senses().know(Identifier.withDefaultNamespace("shipwreck"), a.abs(60, FEET, 20), bot.body().blockPosition());
+            var iron = LockoutGoals.loot(bot, planner, java.util.Set.of(Items.IRON_INGOT), 1, 1e9);
+            String t = tag == null ? "none" : tag.task().get().describe(), i = iron == null ? "none" : iron.task().get().describe();
+            BotArena.LOG.info("[BOTTEST] no_raid_on_a_mineshaft: a name tag with a mineshaft known: {}; iron with a shipwreck known: {} (~{} s)",
+                    t, i, iron == null ? -1 : Math.round(iron.cost()));
+            h.assertFalse(t.startsWith("loot the mineshaft"), "a name tag: " + t);
+            h.assertTrue(i.startsWith("loot the shipwreck"), "iron: " + i);
             a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
         });
     }

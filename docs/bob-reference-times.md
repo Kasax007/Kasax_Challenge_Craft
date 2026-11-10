@@ -117,10 +117,10 @@ daneben die neue Schätzung aus der Probe (feste Szene, siehe unten) und die Exp
 | Arrow | 21 s | 100 s | 39 s (Kies und Hühner in Sicht) | 60 s |
 | Firework Rocket | 30 s | 158 s | 82 / 338 s | 200 s |
 
-Beim Skelett war die alte Zahl ein Suchanteil ohne Kampf. Die neue ist nachts Suche und Kampf. Am
-Tag ist sie das Warten auf die Nacht: Das Feld ist dann nicht dran, und Bob nimmt es in der Nacht.
-Beim Namensschild und beim Pfeil liegt das Material in der Probe schon da. Dort zählt die neue
-Schätzung nur noch die eine ganze Herstellung statt eines Bruchteils.
+Beim Skelett zählte die alte Zahl den Kampf nicht (für eines in Sicht nur den Weg hin). Die neue ist
+nachts Suche und Kampf. Am Tag ist sie das Warten auf die Nacht: Das Feld ist dann nicht dran, und
+Bob nimmt es in der Nacht. Beim Namensschild und beim Pfeil liegt das Material in der Probe schon
+da. Dort zählt die neue Schätzung die eine ganze Herstellung statt eines Bruchteils.
 
 ### Eine feste Szene: die Probe
 
@@ -205,6 +205,24 @@ Dazu die Werkzeuge: `goals.py` (je Ziel; die letzte Zeile zählt auch die Starts
 `compare.py vorher.jsonl nachher.jsonl` (gepaart, je Bot; bei einer Spiegelliga das Mittel beider
 Bots) und `deaths.py`.
 
+### Offen
+
+1. **Schätzungen außerhalb des Planers** sind jetzt die zu kleinen: Kunststücke (Fall 20 Blocks,
+   Block with Shield, Missing 10 Hearts), Biome unter der Erde (Dripstone Caves) und 3 Sapling
+   Types. Fall 20 Blocks scheitert außerdem in der Ausführung und wird wiederholt.
+2. **Das Zielmodell** (`goal.json`) ruht, bis der Trainer eins für die Schätzweise 2 hat
+   (mindestens 150 erledigte Ziele mit `"estimates": 2` im Journal).
+3. **Die neuen Wege sind im Spiel noch unbewiesen.** Kein Brett der 16 Partien bot sie an. Eine Liga
+   mit Brettern, die Namensschild, Gold, Obsidian, Hexe, Plünderer und Lohenrute enthalten, würde
+   sie zeigen.
+4. **Nicht geplündert:** die Lorenkisten der Minen und Kisten unter Wasser. Ein vergrabener Schatz
+   braucht die Karte aus einem Schiffswrack; der Atlas kennt ihn nicht.
+5. **Der Weg in den Nether:** Ohne einen Lavasee mit genug Quellen zählt die Schätzung Obsidian, mit
+   der Diamantspitzhacke abgebaut (in einer Partie 1558 s). Ein Speedrunner gießt das Portal an
+   jedem Lavasee oder ergänzt ein Ruinenportal.
+6. **Mob-Suche am Tag:** Für Arten, die die Sonne verbrennt, gibt es am Tag nur das Warten auf die
+   Nacht. Ein Spieler sucht sie in einer Höhle, wenn er einen Eingang kennt.
+
 ## Die größten Lücken
 
 Aus der Tabelle unten, den Ligen 1 bis 8 und den beiden Ligen dieses Abschnitts:
@@ -214,7 +232,7 @@ Aus der Tabelle unten, den Ligen 1 bis 8 und den beiden Ligen dieses Abschnitts:
 | Erstes Tile | unter 60 s | 355 s | Die Eröffnung: Essen, Schild, Holz und Eisen kommen vor jedem Feld (Ligen 7/8: 150–220 s Essen, 110–160 s Schild). |
 | Schild (Kit) | 45 s | 179 s | Mittel auf „get shield“ in 136 Bot-Spielen. |
 | Kupferbarren (Kit) | 45 s | 172 s | Mittel in 79 Bot-Spielen. |
-| Skeleton | 45 s | 247 s | Ligen 7/8, alte Schätzung 27 s (ein Suchanteil ohne Kampf). Jetzt plant Bob es nachts (siehe Probe). |
+| Skeleton | 45 s | 247 s | Ligen 7/8, alte Schätzung 27 s (ohne den Kampf). Jetzt plant Bob es nachts (siehe Probe). |
 | Spider | 30 s | 174 s | Die Jagd nach dem schnellen Kletterer (6 Spiele). |
 | Drowned | 120 s | 299 s | Unter Wasser (2 Spiele). |
 | Firework Rocket | 200 s | 161 s darauf, 0 Felder in 21 Spielen | Das Schießpulver: ein Creeper nachts, sonst ein Wüstentempel. |

@@ -1139,9 +1139,9 @@ public final class LockoutGoals {
      * sense gives) and not raided yet. The walk, the looting, and, as the chests may not have it,
      * the usual way afterwards for what is still missing. The chances are the game's loot tables,
      * rolled (see SpeedrunKnowledge). The guarded places (an outpost, a fortress, a bastion) only
-     * with a shield or armour and the hearts up.
+     * with a shield or armour and the hearts up. {@code usual}: the usual way's seconds (INF: none).
      */
-    static Option loot(Bot bot, ObtainPlanner planner, Set<Item> items, int count, double usual) {
+    public static Option loot(Bot bot, ObtainPlanner planner, Set<Item> items, int count, double usual) {
         var body = bot.body();
         if (!(body.level() instanceof ServerLevel level) || level.dimension() == Level.END) return null;
         int need = count - ObtainPlanner.countAny(body, items);
