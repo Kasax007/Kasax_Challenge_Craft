@@ -30,7 +30,13 @@ public final class SimSelfTest {
         fastEnough();
         searchWorkIsAFixedCount();
         ownFigureIsAFloor();
+        goalsFailAsTheJournalsSay();
+        monstersMetByTheWay();
+        shieldAndArmourEachTakeAShare();
+        lookAheadDecidesChores();
+        calibratedToTheLeagues();
         searchBeatsTheGreedyBrain(args.length > 0 ? Integer.parseInt(args[0]) : 150);
+        choresBeatTilesOnly(args.length > 0 ? Integer.parseInt(args[0]) : 150);
         System.out.printf("SimSelfTest: %d checks passed in %.0f s%n", checks, (System.nanoTime() - t0) / 1e9);
     }
 
@@ -244,6 +250,143 @@ public final class SimSelfTest {
         }
         System.out.printf("  search against greedy: %d wins, %d losses, %+.2f tiles per game over %d games%n", wins, losses, diff / (2 * seeds), 2 * seeds);
         check(wins > losses && diff > 0, "the planner does not beat the greedy brain");
+    }
+
+    /**
+     * Each goal's failure chance from the leagues' journals (goal-priors.json "outcomes"): one never
+     * got in five starts fails more often than its kind, one got seven times in seven less often.
+     */
+    static void goalsFailAsTheJournalsSay() {
+        Recipe saplings = GoalBook.get("obtain_3_sapling_types"), bricks = GoalBook.get("craft_bricks");
+        check(saplings.seenStarts >= 5 && saplings.seenDone == 0, "the journals' sapling starts not read: " + saplings.seenStarts);
+        Sim sim = new Sim(World.sample(1), only("obtain_3_sapling_types", "craft_bricks"), Profile.bob(), Profile.bob(),
+                new GreedyPolicy(), new GreedyPolicy(), 1200, 1);
+        Profile p = Profile.bob();
+        double fs = sim.failChance(0, saplings), fb = sim.failChance(0, bricks);
+        check(fs > p.fail[saplings.kind.ordinal()] * 1.4, "3 Sapling Types (0 of 5) fails no more often than its kind: " + fs);
+        check(fb < p.fail[bricks.kind.ordinal()] * 0.7, "Bricks (7 of 7) fails as often as its kind: " + fb);
+        p.goalFails = false;
+        Sim plain = new Sim(World.sample(1), only("obtain_3_sapling_types"), p, p, new GreedyPolicy(), new GreedyPolicy(), 1200, 1);
+        check(plain.failChance(0, saplings) == p.fail[saplings.kind.ordinal()], "goalFails off still per goal");
+    }
+
+    /** A zombie tile, armed, a night out on the surface: met and claimed by the way more often than not; never without chances. */
+    static void monstersMetByTheWay() {
+        int met = 0, metOff = 0;
+        for (int g = 0; g < 40; g++) {
+            for (boolean on : new boolean[]{true, false}) {
+                Profile p = Profile.bob();
+                p.chances = on;
+                Board board = only("kill_zombie", "obtain_16_end_stone");
+                Sim sim = new Sim(World.sample(g), board, p, p, new IdleAfter(), new IdleAfter(), 1200, g);
+                for (PlayerState s : sim.players) {
+                    s.ms = Ms.WOOD.bit | Ms.STONE.bit;
+                    s.res[Res.FOOD.ordinal()] = 9;
+                }
+                sim.now = 660; // (night)
+                sim.runUntil(1100);
+                if (board.owner[0] >= 0) {
+                    if (on) met++;
+                    else metOff++;
+                }
+            }
+        }
+        check(met >= 12, "a zombie met by the way in a night on the surface only " + met + " times in 40");
+        check(metOff == 0, "met by the way with chances off: " + metOff);
+    }
+
+    /** A brain that never goes for a tile (only the chores and the night): for the chances. */
+    private static final class IdleAfter implements Policy {
+        @Override
+        public String name() {
+            return "idle";
+        }
+
+        @Override
+        public Decision choose(Sim sim, int me) {
+            return null;
+        }
+
+        @Override
+        public Policy fresh() {
+            return this;
+        }
+    }
+
+    /** Copper armour on top of the shield takes off more of the danger (before round 2 the one or the other counted). */
+    static void shieldAndArmourEachTakeAShare() {
+        Profile p = Profile.bob();
+        Sim sim = new Sim(World.sample(3), only("kill_zombie"), p, p, new GreedyPolicy(), new GreedyPolicy(), 1200, 3);
+        PlayerState s = sim.players[0];
+        s.ms = Ms.WOOD.bit | Ms.STONE.bit | Ms.SHIELD.bit;
+        double shield = sim.hazard(0, Planner.S_WAIT, 0);
+        s.ms |= Ms.COPPER_ARMOR.bit;
+        double both = sim.hazard(0, Planner.S_WAIT, 0);
+        check(both < 0.85 * shield, "copper armour on top of the shield changes nothing: " + shield + " -> " + both);
+    }
+
+    /**
+     * The look-ahead deciding the chores (search=2): with nothing to eat and the board's tiles far,
+     * a stock of food is among its answers; with chores off it never answers a chore.
+     */
+    static void lookAheadDecidesChores() {
+        int chores = 0, off = 0;
+        for (int g = 0; g < 12; g++) {
+            long seed = SearchPolicy.mix(4242 + g);
+            World w = World.sample(seed);
+            Board board = only("craft_shield", "craft_bucket", "obtain_iron_ingot", "kill_spider");
+            Profile p = Profile.bob();
+            Sim sim = new Sim(w, board, p, p, new GreedyPolicy(), new GreedyPolicy(), 5400, seed);
+            for (PlayerState s : sim.players) {
+                s.ms = Ms.WOOD.bit | Ms.STONE.bit | Ms.FURNACE.bit;
+                s.fedAt = 0;
+            }
+            sim.now = 400;
+            SearchPolicy c = new SearchPolicy();
+            c.chores = true;
+            Decision d = c.choose(sim.fork(w, null, null, g), 0);
+            if (d != null && d.chore()) chores++;
+            Decision e = new SearchPolicy().choose(sim.fork(w, null, null, g), 0);
+            if (e != null && e.chore()) off++;
+        }
+        check(chores >= 1, "the look-ahead never chose a chore, hungry with iron tiles to do");
+        check(off == 0, "a chore chosen with chores off");
+    }
+
+    /**
+     * The calibration (Profile.bob against leagues 9 and 10, Bob against Bob, 20 minutes): tiles
+     * per bot within the leagues' 2.86 +- 0.5, deaths within 0.28 +- 0.15.
+     */
+    static void calibratedToTheLeagues() throws Exception {
+        List<SimBench.Result[]> pairs = SimBench.runPairs("greedy", "greedy", Profile.bob(), Profile.bob(), 1200, 150, 1, 99);
+        double tiles = 0, deaths = 0;
+        int n = 0;
+        for (SimBench.Result[] pr : pairs) {
+            for (SimBench.Result r : pr) {
+                for (int i = 0; i < 2; i++) {
+                    tiles += r.score()[i];
+                    deaths += r.deaths()[i];
+                    n++;
+                }
+            }
+        }
+        System.out.printf("  Bob against Bob, 20 minutes: %.2f tiles and %.2f deaths a bot (leagues 9 and 10: 2.86, 0.28)%n", tiles / n, deaths / n);
+        check(Math.abs(tiles / n - 2.86) < 0.5, "tiles per bot off the leagues' 2.86: " + tiles / n);
+        check(Math.abs(deaths / n - 0.28) < 0.15, "deaths per bot off the leagues' 0.28: " + deaths / n);
+    }
+
+    /** The look-ahead deciding the chores beats the look-ahead on tiles alone (20 minutes). */
+    static void choresBeatTilesOnly(int seeds) throws Exception {
+        List<SimBench.Result[]> pairs = SimBench.runPairs("search", "search-chores", Profile.bob(), Profile.bob(), 1200, seeds, 1, 4711);
+        double diff = 0;
+        for (SimBench.Result[] pr : pairs) {
+            for (int k = 0; k < 2; k++) {
+                int chores = k == 0 ? 1 : 0;
+                diff += pr[k].score()[chores] - pr[k].score()[1 - chores];
+            }
+        }
+        System.out.printf("  search with chores against search on tiles alone: %+.2f tiles per game over %d games%n", diff / (2 * seeds), 2 * seeds);
+        check(diff > 0, "deciding the chores does not help the look-ahead");
     }
 
     /** A board of these goals first, filled up with other goals to 25. */

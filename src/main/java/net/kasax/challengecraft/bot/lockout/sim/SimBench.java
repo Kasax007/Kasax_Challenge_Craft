@@ -146,6 +146,7 @@ public final class SimBench {
             }
             case "speed" -> speed(o);
             case "costs" -> costs(o);
+            case "goaltimes" -> goalTimes(o);
             default -> throw new IllegalArgumentException("mode " + args[0]);
         }
     }
@@ -452,6 +453,89 @@ public final class SimBench {
             double luck = sim.planner.lastLuck();
             double tru = sim.planner.estimate(sim, 0, r, p);
             System.out.printf("%-36s own %7.0f (luck %5.0f)  true %7.0f%n", r.id, own, luck, tru);
+        }
+    }
+
+    // ---- goal times ---------------------------------------------------------------------------------------
+
+    /**
+     * Per goal, what it takes Bob in the simulator to get it alone, from a typical state after the
+     * opening (stone tools, a furnace, some food, five minutes in, by day), trying again after a
+     * failure as the brain does, up to {@code --cap} seconds: the mean seconds per tile got, the
+     * share got within the cap. To set beside the journals' seconds per claim
+     * (scripts/bot/analysis/goal_priors.py: "per_claim"). {@code --goals a,b}: only these.
+     */
+    private static void goalTimes(Map<String, String> o) {
+        Profile p = Profile.named(o.getOrDefault("profile", "bob")).tune(o.get("tune"));
+        int trials = Integer.parseInt(o.getOrDefault("trials", "200"));
+        double cap = Double.parseDouble(o.getOrDefault("cap", "1200"));
+        java.util.Set<String> only = o.containsKey("goals") ? java.util.Set.of(o.get("goals").split(",")) : null;
+        Policy idle = new Policy() {
+            @Override
+            public String name() {
+                return "idle";
+            }
+
+            @Override
+            public Decision choose(Sim sim, int me) {
+                return null;
+            }
+
+            @Override
+            public Policy fresh() {
+                return this;
+            }
+        };
+        Policy first = new Policy() {
+            @Override
+            public String name() {
+                return "first";
+            }
+
+            @Override
+            public Decision choose(Sim sim, int me) {
+                return sim.board.isOpen(0) && sim.usable(me, 0) ? Decision.tile(0, sim.planner.estimate(sim, me, sim.board.goal[0], sim.naive[me]), null) : null;
+            }
+
+            @Override
+            public Policy fresh() {
+                return this;
+            }
+        };
+        System.out.println("goal                                 got    s/claim  mean-start");
+        for (Recipe r : GoalBook.all()) {
+            if (!r.bob || r.impossible || only != null && !only.contains(r.id)) continue;
+            double spent = 0;
+            int got = 0;
+            for (int t = 0; t < trials; t++) {
+                long seed = SearchPolicy.mix(r.index * 100_003L + t);
+                World w = World.sample(seed);
+                List<String> ids = new ArrayList<>(List.of(r.id));
+                for (Recipe x : GoalBook.all()) {
+                    if (ids.size() >= Board.SIZE) break;
+                    if (!ids.contains(x.id)) ids.add(x.id);
+                }
+                Board board = Board.of(ids, null, null);
+                for (int k = 1; k < Board.SIZE; k++) board.close(k);
+                Profile solo = p.copy("solo");
+                solo.shieldFirst = false;
+                solo.copper = false;
+                solo.bundle = false;
+                Sim sim = new Sim(w, board, solo, solo, first, idle, 300 + cap, seed);
+                for (PlayerState s : sim.players) {
+                    s.ms = Ms.WOOD.bit | Ms.STONE.bit | Ms.FURNACE.bit;
+                    s.res[Res.FOOD.ordinal()] = 4;
+                    s.fedAt = 600;
+                }
+                sim.now = 300;
+                sim.run();
+                double at = board.owner[0] == 0 ? board.claimedAt[0] : -1;
+                if (at >= 0) {
+                    got++;
+                    spent += at - 300;
+                } else spent += cap;
+            }
+            System.out.printf("  %-34s %5.2f  %7.0f%n", r.id, got / (double) trials, got == 0 ? Double.POSITIVE_INFINITY : spent / got);
         }
     }
 

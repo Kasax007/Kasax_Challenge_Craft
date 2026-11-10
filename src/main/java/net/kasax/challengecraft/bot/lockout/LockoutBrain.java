@@ -1580,8 +1580,19 @@ public final class LockoutBrain implements BotBrain {
     /** Food points under which the night is not gone into (search=2): a meal and a bit. */
     private static final int FOOD_BEFORE_NIGHT = 8;
 
+    /** A chore the look-ahead chose is not offered again before this game tick (bit as in {@link #choresOpen}). */
+    private final Map<Long, Long> choreRest = new HashMap<>();
+    /** Ticks a chore once begun waits before it is a candidate again (one that failed at once is not chosen in a loop). */
+    private static final long CHORE_REST = 600;
+
     /** The chores open to the look-ahead now (bits of sim.Ms, and SearchPolicy.FOOD_BIT). */
     private long choresOpen(Bot bot) {
+        long m = choresAvailable(bot), now = bot.body().level().getGameTime();
+        for (var e : choreRest.entrySet()) if (now < e.getValue()) m &= ~e.getKey();
+        return m;
+    }
+
+    private long choresAvailable(Bot bot) {
         var body = bot.body();
         boolean overworld = body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
         boolean hard = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
@@ -1616,6 +1627,7 @@ public final class LockoutBrain implements BotBrain {
         bot.say(p.why());
         startRefused = false;
         var body = bot.body();
+        choreRest.put(p.food() ? net.kasax.challengecraft.bot.lockout.sim.SearchPolicy.FOOD_BIT : p.chore().bit, body.level().getGameTime() + CHORE_REST);
         try {
             if (p.food()) {
                 stepKey = "food";
