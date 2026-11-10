@@ -123,6 +123,14 @@ import java.util.Map;
  *       drop, a leap over one, the air of a dive, open ground at night - in ticks of risk times
  *       the cost of a hurt or a death; 0: the old flat extras (lava edge, drop edge, a factor near
  *       monsters).</li>
+ *   <li>{@code beliefs} - 1 (the default): the world model (belief.Beliefs, round 3): iron and coal
+ *       not in sight are dug for at the height believed best from here (the staircase against
+ *       the ore's density from the 26.3 placement data, a cave known there, the pickaxe's pace),
+ *       and the dig there gives up when the posterior that the spot holds ore has dropped low;
+ *       logs not in sight cost the walk to the first chunk with trees the biomes read so far
+ *       promise; an animal's search time is scaled by the herds seen about and the country read
+ *       without one; the herd hunted is the nearest by the way there (water at swimming pace);
+ *       0: the flat figures, y 14, the fixed caps, the nearest by the straight line.</li>
  * </ul>
  */
 public final class BotParams {

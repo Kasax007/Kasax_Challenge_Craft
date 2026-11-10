@@ -162,6 +162,7 @@ public final class KillTask implements BotTask {
                     return Result.RUNNING;
                 }
             }
+            beliefs = bot.params.on("beliefs");
             target = nearest(body, level);
             chaseTicks = 0;
             if (target == null) return explore(bot);
@@ -490,11 +491,21 @@ public final class KillTask implements BotTask {
     }
 
     private LivingEntity nearest(BotPlayer body, ServerLevel level) {
-        return level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(within > 0 ? within : BotWorld.MOB_SIGHT),
+        var found = level.getEntitiesOfClass(LivingEntity.class, new AABB(body.blockPosition()).inflate(within > 0 ? within : BotWorld.MOB_SIGHT),
                         e -> e.isAlive() && types.contains(e.getType()) && e != body && !unreachable.contains(e.getUUID()) && BotWorld.seesMob(body, e)
-                                && (only == null || e.getUUID().equals(only)) && !downInTheDark(body, e))
-                .stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
+                                && (only == null || e.getUUID().equals(only)) && !downInTheDark(body, e));
+        // (With the world model: the nearest by the way there - a herd across a river is further
+        // than it looks; the eight nearest weighed, the rest are further anyway.)
+        if (beliefs && found.size() > 1) {
+            found.sort(Comparator.comparingDouble(e -> e.distanceToSqr(body)));
+            return found.subList(0, Math.min(8, found.size())).stream().min(Comparator.comparingDouble(
+                    e -> net.kasax.challengecraft.bot.belief.Beliefs.travelSeconds(level, body.blockPosition(), e.blockPosition()))).orElse(null);
+        }
+        return found.stream().min(Comparator.comparingDouble(e -> e.distanceToSqr(body))).orElse(null);
     }
+
+    /** The world model's ways (knob beliefs): set each tick from the bot's knobs. */
+    private boolean beliefs;
 
     /**
      * A monster down in a cave, hunted from up on the surface with no armour worth the name and

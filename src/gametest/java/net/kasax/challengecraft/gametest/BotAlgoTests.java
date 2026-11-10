@@ -3,7 +3,11 @@ package net.kasax.challengecraft.gametest;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotParams;
+import net.kasax.challengecraft.bot.belief.Beliefs;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
 import net.kasax.challengecraft.bot.task.GoToTask;
+import net.kasax.challengecraft.bot.task.KillTask;
+import net.kasax.challengecraft.bot.task.ObtainTask;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.EntitySpawnReason;
@@ -30,6 +34,9 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  * <ul>
  *   <li>{@code risk_*} (knob riskpath, BotRisk): a skeleton beside the short way, a causeway
  *   between lava, a dive along a lake's floor, and a plain course (the cost on open ground).</li>
+ *   <li>{@code beliefs_*} (knob beliefs, belief.Beliefs): the estimates by context (unit-style),
+ *   iron in rock laid out as the 26.3 placement spreads it (three layouts), a cow across a river
+ *   and one further off on this side.</li>
  * </ul>
  */
 public class BotAlgoTests {
@@ -230,5 +237,185 @@ public class BotAlgoTests {
     @GameTest(environment = "challengecraft:algo_risk", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 44)
     public void riskPlainOff(GameTestHelper h) {
         riskPlain(h, 0);
+    }
+
+    // ---- beliefs: the world model ---------------------------------------------------------------
+
+    /**
+     * The estimates react to the context (no play, figures only): iron from the plains' surface,
+     * from a mountain's, with a cave known at its height; logs with all the country in view read
+     * and no tree in it - desert, plains - and with nothing read; the planner's estimate for raw
+     * iron with an iron ore in sight and with none.
+     */
+    @GameTest(environment = "challengecraft:algo_beliefs", structure = STRUCTURE, maxTicks = 200, skyAccess = true, padding = 8)
+    public void beliefsEstimates(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "beliefs_estimates");
+        double expose = Beliefs.exposePerSecond(0.56);
+        var plains = Beliefs.ore("iron", new BlockPos(0, 65, 0), 66, 3.0, expose, null);
+        var mountain = Beliefs.ore("iron", new BlockPos(0, 150, 0), 152, 3.0, expose, null);
+        var cave = Beliefs.ore("iron", new BlockPos(0, 65, 0), 66, 3.0, expose, new BlockPos(30, 22, 0));
+        double old = 55 + (65 - 14) * 3.0;
+        int view = 12;
+        Beliefs desert = new Beliefs(), plainsRead = new Beliefs(), unread = new Beliefs();
+        for (int dx = -view; dx <= view; dx++) {
+            for (int dz = -view; dz <= view; dz++) {
+                desert.pretend(dx, dz, "desert", 0);
+                plainsRead.pretend(dx, dz, "plains", 0);
+            }
+        }
+        BlockPos o = new BlockPos(8, 65, 8);
+        double logsDesert = desert.logs(h.getLevel(), o, view).seconds(), logsPlains = plainsRead.logs(h.getLevel(), o, view).seconds(),
+                logsUnread = unread.logs(h.getLevel(), o, view).seconds();
+        Bot bot = knobbed(a.spawn(4, FEET, 4, new ItemStack(Items.STONE_PICKAXE)), "beliefs=1");
+        double none = new ObtainPlanner().estimate(bot, java.util.Set.of(Items.RAW_IRON), 1);
+        var feet = bot.body().blockPosition();
+        BotArena.LOG.info("[BOTTEST] beliefs_estimates context: feet {} surface {} cave {} stone {}", feet.toShortString(),
+                h.getLevel().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()),
+                bot.memory().cave(h.getLevel(), feet, 16, 24, 128, java.util.List.of()), bot.tools().breakTicks(Blocks.STONE.defaultBlockState()));
+        bot.params = BotParams.parse("beliefs=0");
+        double noneOld = new ObtainPlanner().estimate(bot, java.util.Set.of(Items.RAW_IRON), 1);
+        bot.params = BotParams.parse("beliefs=1");
+        a.fill(12, FEET, 12, 12, FEET, 12, Blocks.IRON_ORE);
+        double seen = new ObtainPlanner().estimate(bot, java.util.Set.of(Items.RAW_IRON), 1);
+        BotArena.LOG.info("[BOTTEST] algo beliefs_estimates iron: plains {}s at y{} (old flat {}s at y14), mountain {}s at y{}, cave known {}s at y{}"
+                        + " | logs: all read desert {}s, all read plains {}s, nothing read {}s | planner raw iron: seen {}s, none {}s (old way {}s)",
+                (int) plains.seconds(), plains.y(), (int) old, (int) mountain.seconds(), mountain.y(), (int) cave.seconds(), cave.y(),
+                (int) logsDesert, (int) logsPlains, (int) logsUnread, (int) seen, (int) none, (int) noneOld);
+        h.assertTrue(mountain.seconds() < plains.seconds() / 2, "mountain not shorter: " + mountain + " vs " + plains);
+        h.assertTrue(cave.seconds() < plains.seconds(), "cave not shorter: " + cave + " vs " + plains);
+        h.assertTrue(logsDesert > 2 * logsPlains && logsDesert > 120, "desert logs not long: " + logsDesert + " vs " + logsPlains);
+        h.assertTrue(seen < none / 3, "seen iron not short: " + seen + " vs " + none);
+        a.bot().body().discard();
+        h.succeed();
+    }
+
+    /**
+     * Rock from y 4 to y 64 with iron laid out as the 26.3 placement spreads it (veins of five at
+     * the density of the priors, a seeded layout, none in the outer three blocks), the bot on top
+     * (y 65, a plains start) with stone pickaxes: one raw iron. The world model digs where it
+     * believes best from here; the old way to y 14. Only logged: the finds are mostly luck.
+     */
+    private void beliefsIron(GameTestHelper h, int seed, int knob) {
+        String name = "beliefs_iron_" + seed + "_" + (knob == 1 ? "on" : "off");
+        BotArena a = BotArena.flat(h, name);
+        BotArena.day(h);
+        // (Whatever height the test put the arena at: rock from y 4 to y 64, as under a plains
+        // start, the bot on top at y 65.)
+        int y0 = a.abs(0, 0, 0).getY(), bottom = 4 - y0, top = 64 - y0;
+        java.util.Random rng = new java.util.Random(seed * 7919L);
+        // (A hundred and twenty wide: the staircase down moves a block a level, and the tunnel
+        // at the depth must not run into the block's faces.)
+        int lo = -40, hi = 79;
+        a.fill(lo, bottom, lo, hi, top, hi, Blocks.STONE);
+        a.fill(lo, top + 1, lo, hi, top + 4, hi, Blocks.AIR);
+        int placed = 0;
+        // (Not in the outer three blocks: the block of rock stands in the open, and ore in its
+        // faces would be seen from outside - a cliff the real hills do not have on every side.)
+        for (int ry = bottom + 3; ry < top; ry++) {
+            double perLayer = Beliefs.density("iron", ry + y0) * (hi - lo - 5) * (hi - lo - 5) / 5;
+            int veins = (int) perLayer + (rng.nextDouble() < perLayer % 1 ? 1 : 0);
+            for (int v = 0; v < veins; v++) {
+                int x = lo + 3 + rng.nextInt(hi - lo - 7), z = lo + 3 + rng.nextInt(hi - lo - 7);
+                for (int k = 0; k < 5; k++) {
+                    int oy = Math.min(top - 1, ry + rng.nextInt(2));
+                    a.fill(x + rng.nextInt(2), oy, z + rng.nextInt(2), x + rng.nextInt(2), oy, z + rng.nextInt(2), Blocks.IRON_ORE);
+                    placed++;
+                }
+            }
+        }
+        // (The kit of the kit tests' mountain iron: spare pickaxes, food, blocks - else the plan wants wood first.)
+        Bot bot = knobbed(a.spawn(20, top + 1, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE),
+                new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE),
+                new ItemStack(Items.BREAD, 16), new ItemStack(Items.COBBLESTONE, 32)), "beliefs=" + knob);
+        Record r = new Record("beliefs_iron_" + seed, "beliefs=" + knob);
+        int[] low = {Integer.MAX_VALUE};
+        int ores = placed;
+        a.run(new ObtainTask(java.util.Set.of(Items.RAW_IRON), 1), 9000, () -> {
+            r.tick(bot, null);
+            low[0] = Math.min(low[0], bot.body().getBlockY());
+            boolean found = bot.body().getInventory().countItem(Items.RAW_IRON) >= 1;
+            boolean done = found || h.getTick() >= 8990;
+            if (done) r.log(h, (found ? "found" : "not_found") + " deepest_y=" + low[0] + " ores=" + ores);
+            return done;
+        });
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron1On(GameTestHelper h) {
+        beliefsIron(h, 1, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron1Off(GameTestHelper h) {
+        beliefsIron(h, 1, 0);
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron2On(GameTestHelper h) {
+        beliefsIron(h, 2, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron2Off(GameTestHelper h) {
+        beliefsIron(h, 2, 0);
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron3On(GameTestHelper h) {
+        beliefsIron(h, 3, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_iron", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 64)
+    public void beliefsIron3Off(GameTestHelper h) {
+        beliefsIron(h, 3, 0);
+    }
+
+    /** An animal that stays where it is put. */
+    private static <T extends Mob> T rooted(GameTestHelper h, BotArena a, EntityType<T> type, int x, int y, int z) {
+        T m = type.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
+        m.setPos(Vec3.atBottomCenterOf(a.abs(x, y, z)));
+        m.setPersistenceRequired();
+        m.getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(0);
+        h.getLevel().addFreshEntity(m);
+        return m;
+    }
+
+    /**
+     * A river twenty-four wide (x 4..27) between the bot and a cow twenty-nine blocks east; another
+     * cow thirty blocks south on this side. The nearer by the straight line is across the
+     * water (eleven seconds of swimming and climbing out); the world model's travel time picks
+     * the one on foot.
+     */
+    private void beliefsCows(GameTestHelper h, int knob) {
+        String name = "beliefs_cows_" + (knob == 1 ? "on" : "off");
+        BotArena a = BotArena.wide(h, name);
+        BotArena.day(h);
+        a.fill(4, GROUND - 3, -20, 27, GROUND - 3, 59, Blocks.STONE);
+        a.fill(4, GROUND - 2, -20, 27, GROUND, 59, Blocks.WATER);
+        var across = rooted(h, a, net.minecraft.world.entity.EntityTypes.COW, 30, FEET, 1);
+        var near = rooted(h, a, net.minecraft.world.entity.EntityTypes.COW, 1, FEET, 31);
+        Bot bot = knobbed(a.spawn(1, FEET, 1, new ItemStack(Items.STONE_SWORD)), "beliefs=" + knob);
+        Record r = new Record("beliefs_cows", "beliefs=" + knob);
+        a.run(new KillTask(java.util.Set.of(net.minecraft.world.entity.EntityTypes.COW), java.util.Set.of(), 1, 1), 1200, () -> {
+            r.tick(bot, null);
+            boolean done = !across.isAlive() || !near.isAlive();
+            if (done) {
+                r.log(h, "killed=" + (!near.isAlive() ? "this_side" : "across"));
+                across.discard();
+                near.discard();
+                if (knob == 1) h.assertTrue(!near.isAlive(), name + ": went across the river");
+            }
+            return done;
+        });
+    }
+
+    @GameTest(environment = "challengecraft:algo_beliefs", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
+    public void beliefsCowsOn(GameTestHelper h) {
+        beliefsCows(h, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_beliefs", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
+    public void beliefsCowsOff(GameTestHelper h) {
+        beliefsCows(h, 0);
     }
 }

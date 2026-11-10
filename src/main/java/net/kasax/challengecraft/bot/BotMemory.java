@@ -51,6 +51,9 @@ public final class BotMemory {
     private record Seen(BlockPos pos, long time) {
     }
 
+    /** The world model (knob beliefs, round 3): what was read and seen, as evidence. */
+    public final net.kasax.challengecraft.bot.belief.Beliefs beliefs = new net.kasax.challengecraft.bot.belief.Beliefs();
+
     private final Map<ResourceKey<Level>, Map<Block, List<BlockPos>>> blocks = new HashMap<>();
     private final Map<ResourceKey<Level>, Map<Long, Long>> scanned = new HashMap<>();
     private final Map<ResourceKey<Level>, Map<EntityType<?>, List<Seen>>> animals = new HashMap<>();
@@ -162,6 +165,7 @@ public final class BotMemory {
             done.put(key, now);
             java.util.Set<BlockPos> kept = scan(level, chunk, at);
             scanCaves(level, chunk, at, kept);
+            beliefs.observeChunk(level, chunk, scanLogs, now);
             return;
         }
     }
@@ -174,6 +178,7 @@ public final class BotMemory {
         // stays known, though it is not in sight from up here.
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         java.util.Set<BlockPos> kept = new java.util.HashSet<>();
+        scanLogs = 0;
         for (Map.Entry<Block, List<BlockPos>> e : known.entrySet()) {
             e.getValue().removeIf(p -> {
                 if ((p.getX() >> 4) != (x0 >> 4) || (p.getZ() >> 4) != (z0 >> 4)) return false;
@@ -193,12 +198,16 @@ public final class BotMemory {
                         BlockState s = section.getBlockState(x, y, z);
                         if (!interesting(s)) continue;
                         BlockPos p = new BlockPos(x0 + x, y0 + y, z0 + z);
-                        if (kept.contains(p)) continue;
+                        if (kept.contains(p)) {
+                            if (s.is(BlockTags.LOGS)) scanLogs++;
+                            continue;
+                        }
                         // Only what can be seen: next to air or water (a cave wall, the ground),
                         // not ore buried in the rock - that is what caves and tunnels are for.
                         // And only from where a player would see it: from the open air, or close
                         // by in its line of sight (not the cave forty blocks under its feet).
                         if (!exposed(level, chunk, p) || !BotWorld.seen(level, p, eye)) continue;
+                        if (s.is(BlockTags.LOGS)) scanLogs++;
                         add(known, s.getBlock(), p, at);
                     }
                 }
@@ -206,6 +215,9 @@ public final class BotMemory {
         }
         return kept;
     }
+
+    /** Logs in view in the chunk read last (for the world model). */
+    private int scanLogs;
 
     private static boolean exposed(ServerLevel level, LevelChunk chunk, BlockPos p) {
         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
@@ -396,6 +408,7 @@ public final class BotMemory {
             BlockPos p = e.blockPosition();
             list.removeIf(s -> s.pos().distSqr(p) < 64);
             list.add(new Seen(p, now));
+            if (e.getType().getCategory() == net.minecraft.world.entity.MobCategory.CREATURE) beliefs.observeMob(e.getType(), p);
             if (list.size() > 24) list.remove(0);
         }
     }

@@ -39,7 +39,7 @@ public final class MineTask implements BotTask {
     private final Integer depth;
     private final Set<BlockPos> skip = new HashSet<>();
     private BlockPos target;
-    private int collectTicks, idle, searchTicks, legs, scanCooldown, budget;
+    private int collectTicks, idle, searchTicks, legs, scanCooldown, budget, atDepthTicks;
     private boolean walking, searching, leadSaid;
     private Direction heading;
     private Explorer explorer;
@@ -641,7 +641,24 @@ public final class MineTask implements BotTask {
         if (budget == 0) budget = depth == null ? SEARCH_TICKS : 6000 + 50 * Math.max(0, bot.body().blockPosition().getY() - depth);
         // (Walking to where they are known to be is not searching: only the looking about counts.)
         if (lead == null) searchTicks++;
-        if (searchTicks > budget || legs > (depth == null ? MAX_LEGS : 600)) {
+        // The world model's rule for an ore dug for at its believed height (knob beliefs): the
+        // looking about down there ends once the posterior that this spot holds ore as the prior
+        // says has dropped low - a poor spot - not after a fixed time (the way down is not looking).
+        String ore = depth == null ? null : blocks.test(net.minecraft.world.level.block.Blocks.IRON_ORE.defaultBlockState()) ? "iron"
+                : blocks.test(net.minecraft.world.level.block.Blocks.COAL_ORE.defaultBlockState()) ? "coal" : null;
+        boolean believed = ore != null && bot.params.on("beliefs");
+        if (believed && lead == null && Math.abs(bot.body().getBlockY() - depth) <= 3) {
+            atDepthTicks++;
+            double stone = Math.min(15, bot.tools().breakTicks(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()) / 20.0);
+            double luck = 1 / (net.kasax.challengecraft.bot.belief.Beliefs.exposePerSecond(stone) * Math.max(1e-6,
+                    net.kasax.challengecraft.bot.belief.Beliefs.density(ore, depth)));
+            if (atDepthTicks % 20 == 0 && net.kasax.challengecraft.bot.belief.Beliefs.stillGood(luck, atDepthTicks / 20.0)
+                    < net.kasax.challengecraft.bot.belief.Beliefs.GIVE_UP_BELOW) {
+                bot.say("no " + what + " here after " + atDepthTicks / 20 + " s at y " + depth + ": a poor spot (expected " + (int) luck + " s)");
+                return Result.FAILED;
+            }
+        }
+        if ((believed ? searchTicks > 2 * budget : searchTicks > budget) || legs > (depth == null ? MAX_LEGS : 600)) {
             bot.say("found no " + what);
             return Result.FAILED;
         }

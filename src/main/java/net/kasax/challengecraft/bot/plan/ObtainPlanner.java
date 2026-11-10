@@ -506,6 +506,12 @@ public final class ObtainPlanner {
         // the time of day, the biome's share of that kind. Mobs not found by looking about
         // (structure ones, slimes, phantoms) keep their old figure.
         double search = habitatBot == null ? MobSearch.UNKNOWN : searchFor(type, !away, effort);
+        // (The world model: herds seen about make it shorter, much country read without one longer.)
+        if (search > 0 && habitatBot != null && !away && !nether && type.getCategory() == net.minecraft.world.entity.MobCategory.CREATURE
+                && habitatBot.params.on("beliefs")) {
+            search *= habitatBot.memory().beliefs.animalFactor(type, habitatBot.body().blockPosition(),
+                    net.kasax.challengecraft.bot.BotWorld.viewChunks((net.minecraft.server.level.ServerLevel) habitatBot.body().level()));
+        }
         double find = search >= 0 ? search + fight : effort;
         // Monsters come out in the dark: on the surface by day the burning kinds are gone - a wait
         // for the night (in the Nether and down in a cave it is dark at noon). The others (spiders,
@@ -570,6 +576,7 @@ public final class ObtainPlanner {
         Map<Block, BlockPos> positions = new IdentityHashMap<>();
         BlockPos c = bot.body().blockPosition();
         here = c;
+        oreBeliefs.clear();
         // Seconds to dig one level of a staircase (two blocks of stone) with what it holds.
         double digPerBlock = Math.min(15, 2 * bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0) + 0.4;
         this.digPerBlock = digPerBlock;
@@ -1127,6 +1134,41 @@ public final class ObtainPlanner {
         return Leaf.NONE;
     }
 
+    /** The world model's estimates for ores not in sight, by ore kind (worked out once a look about). */
+    private final Map<String, net.kasax.challengecraft.bot.belief.Beliefs.Estimate> oreBeliefs = new HashMap<>();
+
+    /** Which ore kind of the world model a block is ("iron", "coal"), or null. */
+    static String oreKind(Block b) {
+        if (b == Blocks.IRON_ORE || b == Blocks.DEEPSLATE_IRON_ORE) return "iron";
+        if (b == Blocks.COAL_ORE || b == Blocks.DEEPSLATE_COAL_ORE) return "coal";
+        return null;
+    }
+
+    /**
+     * The world model's way to an ore not in sight (knob beliefs): the best height to dig at from
+     * where Bob stands - the staircase down at the pace of the pickaxe in hand (a stone one's at
+     * worst: the plan makes one first) against the ore's density there, a cave known at about
+     * that height walked instead. Null: not iron or coal, not the Overworld, or the knob off.
+     */
+    private net.kasax.challengecraft.bot.belief.Beliefs.Estimate oreBelief(Bot bot, Block block) {
+        String ore = oreKind(block);
+        if (ore == null || nether || !bot.params.on("beliefs") || bot.body().level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+        return oreBeliefs.computeIfAbsent(ore, o -> {
+            var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+            BlockPos feet = bot.body().blockPosition();
+            int surface = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+            double stone = Math.min(1.15, Math.min(15, bot.tools().breakTicks(Blocks.STONE.defaultBlockState()) / 20.0));
+            BlockPos cave = bot.memory().cave(level, feet, o.equals("iron") ? 16 : 44, 24, 128, List.of());
+            return net.kasax.challengecraft.bot.belief.Beliefs.ore(o, feet, surface, net.kasax.challengecraft.bot.belief.Beliefs.stairSeconds(stone),
+                    net.kasax.challengecraft.bot.belief.Beliefs.exposePerSecond(stone), cave);
+        });
+    }
+
+    /** The common trees' logs (their kinds grow in most wooded biomes). */
+    private static boolean commonLog(Block b) {
+        return b == Blocks.OAK_LOG || b == Blocks.BIRCH_LOG || b == Blocks.SPRUCE_LOG || b == Blocks.DARK_OAK_LOG;
+    }
+
     private double blockCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
         return blockLeaf(bot, k, block, cost).cost();
     }
@@ -1148,6 +1190,14 @@ public final class ObtainPlanner {
             find = seen;
             search = 0;
             at = visiblePos.get(block);
+        }
+        // Logs not in sight (knob beliefs): the walk to the first trees the world model expects -
+        // short in a forest's edge country, long when all the country read is desert.
+        if (seen == null && !nether && commonLog(block) && bot.params.on("beliefs")) {
+            var est = bot.memory().beliefs.logs((net.minecraft.server.level.ServerLevel) bot.body().level(), bot.body().blockPosition(),
+                    net.kasax.challengecraft.bot.BotWorld.viewChunks((net.minecraft.server.level.ServerLevel) bot.body().level()));
+            find = est.seconds();
+            search = est.luck();
         }
         Double hint = biomeHints.get(block);
         if (hint != null && hint + 10 < find) {
@@ -1200,8 +1250,16 @@ public final class ObtainPlanner {
             find += 90;
             search = Math.max(search, 0.7 * find);
         }
+        // Not seen, an ore of the world model (knob beliefs): its estimate - the best height from
+        // here, the way down and the luck there - instead of the flat figure and the fixed depth.
+        var believed = seen == null && at == null && here != null ? oreBelief(bot, block) : null;
+        if (believed != null) {
+            find = believed.seconds();
+            search = believed.luck();
+            at = believed.at();
+        }
         // Not seen, dug for: the work is right below, at the depth where it is common.
-        if (at == null && here != null && search > 0) {
+        if (believed == null && at == null && here != null && search > 0) {
             Integer depth = depth(bot, block, here.getY());
             if (depth != null && depth < here.getY() - 4) {
                 at = new BlockPos(here.getX(), depth, here.getZ());
@@ -1454,7 +1512,9 @@ public final class ObtainPlanner {
     }
 
     /** Where a block is dug for from this height (see {@link BotKnowledge#depth(Block, int, boolean)}: mountain iron with its knob). */
-    private static Integer depth(Bot bot, Block block, int y) {
+    private Integer depth(Bot bot, Block block, int y) {
+        var believed = oreBelief(bot, block);
+        if (believed != null && believed.at() != null) return believed.y();
         return BotKnowledge.depth(block, y, bot.params.on("mountainiron"));
     }
 
