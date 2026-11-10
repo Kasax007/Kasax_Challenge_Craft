@@ -1,4 +1,4 @@
-"""The goal priors shipped with the mod (src/main/resources/bob-knowledge/goal-priors.json): per goal,
+"""The goal priors shipped with the mod (src/main/resources/bob-models/goal-priors.json): per goal,
 what the self-play leagues measured - the seconds a tile took per time it was got, the failed starts'
 seconds counted too, against the plan's estimate - as GoalExperience reads it.
 

@@ -2720,6 +2720,9 @@ public final class LockoutBrain implements BotBrain {
         o.addProperty("plain", pick.plain());
         o.addProperty("estimate", pick.option().cost());
         o.addProperty("estimates", net.kasax.challengecraft.bot.plan.ObtainPlanner.ESTIMATES);
+        // (Whether the planner made it with round 2's estimates: the trainer's goal priors take the
+        // goals those changed only from lines made with them.)
+        o.addProperty("estfix", bot.params.on("estfix"));
         double expert = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get().expert(g.id());
         if (!Double.isNaN(expert)) o.addProperty("expert", expert);
         o.addProperty("quick", quick);

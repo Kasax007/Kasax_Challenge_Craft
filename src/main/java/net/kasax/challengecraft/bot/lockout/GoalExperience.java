@@ -140,25 +140,31 @@ public final class GoalExperience {
 
     // ---- the prior shipped with the mod ----------------------------------------------------------
 
-    /** The prior's resource: per goal, the log ratio measured in the leagues and the games it counts as. */
-    static final String PRIOR_RESOURCE = "/bob-knowledge/goal-priors.json";
-    private static java.util.Map<String, Entry> priors;
+    private static Object priorsFrom;
+    private static java.util.Map<String, Entry> priors = java.util.Map.of();
 
     /**
-     * What the self-play leagues measured per goal (scripts/bot/analysis/goal_priors.py from the
-     * journals): the seconds a tile took per time it was got - the failed starts' seconds counted
-     * too - against the plan's estimate, as a log ratio, and the games it counts as (half a game
-     * per start: the leagues play a dozen worlds). A new installation does not have to lose each
-     * of these tiles a few times itself before it believes them: "3 Sapling Types" never got in
-     * five starts, "Lava Bucket" got twice in seven at eight times its estimate a tile.
-     * Only for the estimates it was measured against ({@code estimates} in the file).
+     * What the self-play leagues measured per goal (bob-models/goal-priors.json, made by
+     * scripts/bot/analysis/goal_priors.py from the journals, or by the laptop trainer from its own):
+     * the seconds a tile took per time it was got - the failed starts' seconds counted too -
+     * against the plan's estimate, as a log ratio, and the games it counts as (half a game per
+     * start: the leagues play a dozen worlds). A new installation does not have to lose each of
+     * these tiles a few times itself before it believes them: "Lava Bucket" got twice in seven at
+     * eight times its estimate a tile. Only for the estimates it was measured against
+     * ({@code estimates} in the file); read again when the trainer puts a new one in place.
      */
     static synchronized java.util.Map<String, Entry> priors() {
-        if (priors != null) return priors;
+        com.google.gson.JsonObject root;
+        try {
+            root = net.kasax.challengecraft.bot.learn.ModelStore.goalPriors();
+        } catch (RuntimeException | LinkageError e) {
+            root = null;
+        }
+        if (root == priorsFrom) return priors;
+        priorsFrom = root;
         java.util.Map<String, Entry> out = new java.util.HashMap<>();
-        try (var in = GoalExperience.class.getResourceAsStream(PRIOR_RESOURCE)) {
-            if (in != null) {
-                var root = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        if (root != null) {
+            try {
                 int estimates = root.has("estimates") ? root.get("estimates").getAsInt() : 0;
                 if (estimates == ObtainPlanner.ESTIMATES) {
                     for (var e : root.getAsJsonObject("goals").entrySet()) {
@@ -169,9 +175,9 @@ public final class GoalExperience {
                 } else {
                     BotManager.LOG.info("[Bot] goal priors are for estimates v{}, the planner's are v{}: not used", estimates, ObtainPlanner.ESTIMATES);
                 }
+            } catch (RuntimeException e) {
+                BotManager.LOG.warn("[Bot] the goal priors do not read: {}", e.toString());
             }
-        } catch (IOException | RuntimeException e) {
-            BotManager.LOG.warn("[Bot] could not read the goal priors: {}", e.toString());
         }
         priors = java.util.Collections.unmodifiableMap(out);
         return priors;

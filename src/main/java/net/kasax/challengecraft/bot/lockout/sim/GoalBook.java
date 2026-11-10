@@ -40,12 +40,12 @@ public final class GoalBook {
     public static double SEEN_FAIL = 0.415;
 
     /**
-     * What the leagues' journals saw of each goal (bob-knowledge/goal-priors.json, "outcomes":
+     * What the leagues' journals saw of each goal (bob-models/goal-priors.json as shipped, "outcomes":
      * attempts counted and got, from scripts/bot/analysis/goal_priors.py) into the recipes, for the
      * simulator's failure chances per goal. Without the file (or Gson), nothing: the kinds' chances.
      */
     private static void measured() {
-        try (var in = GoalBook.class.getResourceAsStream("/bob-knowledge/goal-priors.json")) {
+        try (var in = GoalBook.class.getResourceAsStream("/bob-models/goal-priors.json")) {
             if (in == null) return;
             var root = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
             if (!root.has("outcomes")) return;

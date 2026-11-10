@@ -56,7 +56,7 @@ import java.util.Map;
  *       way down, a pillar's real pace for the falls, a staircase's pace for "Reach Y -50"; 0: as
  *       before.</li>
  *   <li>{@code goalprior} - 1 (the default): a tile's estimate times what the self-play leagues
- *       measured for it (bob-knowledge/goal-priors.json) besides what this server learnt
+ *       measured for it (bob-models/goal-priors.json) besides what this server learnt
  *       (GoalExperience); 0: only what was learnt here.</li>
  *   <li>{@code failexp} - 1 (the default): a failed start is learnt as an overrun is (the tile takes
  *       at least what was spent and another go); 0: only overruns and successes are learnt. (The

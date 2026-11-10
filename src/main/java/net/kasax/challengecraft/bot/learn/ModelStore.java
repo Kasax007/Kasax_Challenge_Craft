@@ -72,6 +72,15 @@ public final class ModelStore {
         return null;
     }
 
+    /**
+     * The goal priors (goal-priors.json: per goal what the leagues measured against the plan, see
+     * GoalExperience): from the models folder when the trainer put one there, else the one shipped
+     * with the mod; null when switched off.
+     */
+    public static JsonObject goalPriors() {
+        return enabled() ? load("goal-priors.json", j -> j) : null;
+    }
+
     /** The knobs that won the league ({@code params}: "k=v,..."), or null. */
     public static String championParams() {
         if (!enabled()) return null;
