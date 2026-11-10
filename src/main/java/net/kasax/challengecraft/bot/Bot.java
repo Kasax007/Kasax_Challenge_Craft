@@ -42,6 +42,8 @@ public final class Bot {
     public BotParams params = BotParams.champion();
     /** The crafting table it last put down itself (taken along when it moves on). */
     public net.minecraft.core.BlockPos ownTable;
+    /** Furnaces it loaded and left cooking (smeltgo), for the planner and to come back to; kept across deaths. */
+    public final FurnaceLedger furnaces = new FurnaceLedger();
     /**
      * Blocks it set out for and found no way to (a tree on top of a mesa, ore behind lava), with
      * when: left alone for a few minutes, whichever task wants them next.
@@ -356,6 +358,9 @@ public final class Bot {
 
     private void act() {
         senses.worldSense = params.on("worldsense");
+        senses.senseTreasure = params.on("treasureiron");
+        // (Eating, the shield up: as slow as a player's client makes him - see BotPlayer#itemSlow.)
+        body.itemSlow = params.get("itemslow", 0) != 0;
         senses.tick(body);
         memory.tick(body);
         if (body.tickCount % 10 == 0) layTrail();

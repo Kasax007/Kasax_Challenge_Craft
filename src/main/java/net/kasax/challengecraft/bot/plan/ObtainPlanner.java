@@ -181,6 +181,14 @@ public final class ObtainPlanner {
         scannedAt = -10_000; // look again
     }
 
+    /**
+     * One of its furnaces left cooking could not be got back to (a side trip to it failed or ran
+     * out of time): no plan fetches from it until {@code until} (game time) either.
+     */
+    public void restFurnace(BlockPos pos, long until) {
+        failed.merge("collect:" + pos.toShortString(), until, Math::max);
+    }
+
     private boolean isMissing(Object source) {
         Long until = missing.get(source);
         return until != null && until > costsAt;
@@ -331,7 +339,8 @@ public final class ObtainPlanner {
      */
     public double estimate(Bot bot, Collection<Item> items, int count) {
         refresh(bot);
-        int have = countAny(bot.body(), Set.copyOf(items));
+        // (What its furnaces left cooking hold of them counts as had - smeltgo: a walk back.)
+        int have = countAny(bot.body(), Set.copyOf(items)) + leftCookingAny(bot, items);
         if (have >= count) return 0;
         double s = bestBatch(bot, items, count - have).seconds();
         return s >= INF ? INF : s;
@@ -345,7 +354,7 @@ public final class ObtainPlanner {
      */
     public double searchPart(Bot bot, Collection<Item> items, int count) {
         refresh(bot);
-        int have = countAny(bot.body(), Set.copyOf(items));
+        int have = countAny(bot.body(), Set.copyOf(items)) + leftCookingAny(bot, items);
         if (have >= count) return 0;
         Batch b = bestBatch(bot, items, count - have);
         return b.seconds() >= INF ? 0 : b.luck();
@@ -589,7 +598,7 @@ public final class ObtainPlanner {
             // (Ore remembered far off: the dig goes down right here instead when the walk is
             // longer than the way down and a minute's search - as the dig itself decides (see
             // MineTask.worthIt); a self-play game planned gold "29 s away" and tunnelled for iron.)
-            Integer depth = BotKnowledge.depth(e.getKey(), c.getY());
+            Integer depth = depth(bot, e.getKey(), c.getY());
             if (depth != null) {
                 double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
                 double walk = Math.sqrt(dx * dx + dz * dz) / 2.5 + Math.abs(p.getY() - c.getY());
@@ -767,6 +776,7 @@ public final class ObtainPlanner {
         Batch best = Batch.NONE;
         Map<Item, Integer> pack = new IdentityHashMap<>();
         for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (!s.isEmpty()) pack.merge(s.getItem(), s.getCount(), Integer::sum);
+        addFurnaceStock(bot, pack);
         for (Item i : items) pack.remove(i);
         for (Item i : items) {
             if (cost(i) >= INF) continue;
@@ -777,6 +787,17 @@ public final class ObtainPlanner {
         batches.put(key, best);
         return best;
     }
+
+    /** The smelted things its furnaces left cooking hold (smeltgo), as if in the pack: a walk back is all they cost. */
+    private void addFurnaceStock(Bot bot, Map<Item, Integer> pack) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0) return;
+        for (Item i : SMELTED) for (var st : furnaceStocks(bot, Set.of(i))) pack.merge(i, st.all(), Integer::sum);
+    }
+
+    /** What a furnace left cooking is likely to hold: the ingots and the cooked food. */
+    private static final Set<Item> SMELTED = Set.of(Items.IRON_INGOT, Items.COPPER_INGOT, Items.GOLD_INGOT, Items.COOKED_BEEF,
+            Items.COOKED_PORKCHOP, Items.COOKED_MUTTON, Items.COOKED_CHICKEN, Items.COOKED_COD, Items.COOKED_SALMON, Items.BAKED_POTATO,
+            Items.COOKED_RABBIT, Items.CHARCOAL, Items.GLASS, Items.STONE, Items.SMOOTH_STONE, Items.BRICK);
 
     /** The raw ways whose finding is paid already in the batch being worked out (a second lot of iron from the same vein). */
     private final Set<Item> paidOnce = new HashSet<>();
@@ -791,6 +812,7 @@ public final class ObtainPlanner {
         BotKnowledge k = BotKnowledge.get(bot.server());
         Map<Item, Integer> held = new IdentityHashMap<>();
         for (ItemStack s : bot.body().getInventory().getNonEquipmentItems()) if (!s.isEmpty()) held.merge(s.getItem(), s.getCount(), Integer::sum);
+        addFurnaceStock(bot, held);
         paidOnce.clear();
         double total = 0;
         for (Map.Entry<Item, Integer> e : wants.entrySet()) {
@@ -1151,7 +1173,7 @@ public final class ObtainPlanner {
         }
         // Not seen, dug for: the work is right below, at the depth where it is common.
         if (at == null && here != null && search > 0) {
-            Integer depth = BotKnowledge.depth(block, here.getY());
+            Integer depth = depth(bot, block, here.getY());
             if (depth != null && depth < here.getY() - 4) {
                 at = new BlockPos(here.getX(), depth, here.getZ());
                 // The way down to that depth is work too, not luck: a staircase, as for what is
@@ -1272,7 +1294,7 @@ public final class ObtainPlanner {
     // only the first step, but sized for the whole plan (all the logs the pickaxe, the sticks and
     // the table will need, in one go instead of one trip per log).
 
-    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST, TRADE, BARTER }
+    private enum Kind { MINE, KILL, ROUTE, CRAFT, SMELT, FILL, CAST, TRADE, BARTER, COLLECT }
 
     private record Way(String key, double cost, Kind kind, Object data) {
     }
@@ -1395,8 +1417,13 @@ public final class ObtainPlanner {
         Set<Block> blocks = (Set<Block>) p.data();
         for (Block b : blocks) if (visibleBlocks.containsKey(b)) return false;
         Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElse(null);
-        Integer depth = common == null ? null : BotKnowledge.depth(common, bot.body().blockPosition().getY());
+        Integer depth = common == null ? null : depth(bot, common, bot.body().blockPosition().getY());
         return depth != null && depth < bot.body().blockPosition().getY() - 8;
+    }
+
+    /** Where a block is dug for from this height (see {@link BotKnowledge#depth(Block, int, boolean)}: mountain iron with its knob). */
+    private static Integer depth(Bot bot, Block block, int y) {
+        return BotKnowledge.depth(block, y, bot.params.on("mountainiron"));
     }
 
     /** A gathering step the bot can do with what it holds now (the right tool, if any is needed). */
@@ -1414,12 +1441,12 @@ public final class ObtainPlanner {
                 Set<Block> blocks = (Set<Block>) p.data();
                 // If it has to dig for them: to the height of the most common of these blocks.
                 Block common = blocks.stream().min(Comparator.comparingDouble(BotKnowledge::rarity)).orElseThrow();
-                Integer depth = BotKnowledge.depth(common, bot.body().blockPosition().getY());
+                Integer depth = depth(bot, common, bot.body().blockPosition().getY());
                 int have = countAny(bot.body(), p.accept());
                 // More of it wanted by other tiles on the board (iron for the bucket, the shears and
                 // the compass): taken in the same trip while the vein is right there.
                 int extra = 0;
-                for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) - have - total);
+                for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) + laterDemand.getOrDefault(i, 0) - have - total);
                 // No weapon yet and stone being dug (the opening's first stone): the sword's two in
                 // the same haul, not a second trip for them - a zombie came between the pickaxe and
                 // the sword on seed -987..., in the second minute, with nothing to fight it with.
@@ -1447,9 +1474,11 @@ public final class ObtainPlanner {
             // pickaxe and the shears): one furnace, one wait, instead of three trips to it.
             case SMELT -> {
                 BotKnowledge.SmeltRoute r = (BotKnowledge.SmeltRoute) p.data();
-                int later = demandFor(r.result()) - countAny(bot.body(), Set.of(r.result()));
-                yield new SmeltTask(r, Math.max(total, Math.min(total + 16, later)));
+                // (What its furnaces already cook of it counts as had: no second batch for that.)
+                int later = demandFor(r.result()) - countAny(bot.body(), Set.of(r.result())) - leftCooking(bot, r.result());
+                yield new SmeltTask(r, Math.max(total, Math.min(total + 16, later)), total);
             }
+            case COLLECT -> new net.kasax.challengecraft.bot.task.FurnaceCollectTask((BlockPos) p.data(), p.accept(), countAny(bot.body(), p.accept()) + total);
             case FILL -> new net.kasax.challengecraft.bot.task.FillBucketTask(p.data() == Items.LAVA_BUCKET
                     ? net.minecraft.tags.FluidTags.LAVA : net.minecraft.tags.FluidTags.WATER);
             case CAST -> new net.kasax.challengecraft.bot.task.MakeObsidianTask(countAny(bot.body(), Set.of(Items.OBSIDIAN)) + total);
@@ -1507,8 +1536,16 @@ public final class ObtainPlanner {
     /** How many of {@code item} the board will want in all: an ingot counts what is wanted of its raw ore too. */
     public int demandFor(Item item) {
         Item raw = INGOT_RAW.get(item);
-        return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0));
+        return boardDemand.getOrDefault(item, 0) + (raw == null ? 0 : boardDemand.getOrDefault(raw, 0))
+                + laterDemand.getOrDefault(item, 0) + (raw == null ? 0 : laterDemand.getOrDefault(raw, 0));
     }
+
+    /**
+     * What the errand being planned wants in all, beyond what it waits for now (set by its
+     * ObtainTask while it plans - see {@link net.kasax.challengecraft.bot.task.ObtainTask#forLater}):
+     * mined and smelted with it like the board's demand, not counted as the board's.
+     */
+    public Map<Item, Integer> laterDemand = Map.of();
 
     /** A far lead only if one was found before (no new biome search for blocks that are in sight). */
     private static BlockPos farLeadStandBy(Bot bot, Set<Block> blocks) {
@@ -1573,6 +1610,7 @@ public final class ObtainPlanner {
     private void startSearch() {
         budget = 4000;
         impossible.clear();
+        claimed.clear();
     }
 
     private String expandWays(Bot bot, Sim sim, Set<Item> accept, int count, int depth, Set<Item> visiting) {
@@ -1643,6 +1681,16 @@ public final class ObtainPlanner {
                 ways.add(new Way("cast:obsidian", specialCost(bot, k, Items.OBSIDIAN, costs), Kind.CAST, null));
             }
         }
+        // In a furnace of its own left cooking (smeltgo): a walk back and the rest of the cooking.
+        if (!onlyCraft) {
+            for (net.kasax.challengecraft.bot.FurnaceLedger.Stock st : furnaceStocks(bot, accept)) {
+                String key = "collect:" + st.pos().toShortString();
+                if (isFailed(key, now) || claimed.getOrDefault(st.pos(), 0) >= st.all()) continue;
+                int need = count - sim.count(accept);
+                double c = st.distance() / 4.0 + st.ticksFor(need) / 20.0 / Math.max(1, Math.min(need, st.all()));
+                ways.add(new Way(key, c, Kind.COLLECT, st));
+            }
+        }
         for (Item item : accept) {
             if (visiting.contains(item)) continue;
             for (BotKnowledge.Route r : k.routesTo(item)) {
@@ -1668,6 +1716,7 @@ public final class ObtainPlanner {
                 case CAST -> cast(bot, k, sim, count - sim.count(accept), depth, visiting, w.key());
                 case TRADE -> trade(bot, sim, (TradeKnowledge.Trade) w.data(), count - sim.count(accept), depth, visiting, w.key());
                 case BARTER -> barter(bot, sim, (Item) w.data(), count - sim.count(accept), depth, visiting, w.key());
+                case COLLECT -> collect(bot, sim, (net.kasax.challengecraft.bot.FurnaceLedger.Stock) w.data(), accept, count, depth, visiting, w.key());
                 default -> route(bot, k, sim, (BotKnowledge.Route) w.data(), accept, count, depth, visiting);
             };
             if (why == null) return null;
@@ -1700,7 +1749,7 @@ public final class ObtainPlanner {
         Double seenAt = cheapest == null ? null : visibleBlocks.get(cheapest);
         int wanted = count - sim.count(accept);
         Integer digTo = cheapest == null || seenAt != null && seenAt < 20 && wanted < 3 ? null
-                : BotKnowledge.depth(cheapest, bot.body().blockPosition().getY());
+                : depth(bot, cheapest, bot.body().blockPosition().getY());
         // (Not for rock itself - the stone is what it is after - nor for a few levels down, nor
         // once down there: those are made up here, before the staircase, from the wood at hand.)
         int levels = bot.body().blockPosition().getY() - (digTo == null ? 0 : digTo);
@@ -1802,6 +1851,48 @@ public final class ObtainPlanner {
         sim.steps.add(new Pending(Kind.KILL, w.key(), accept, need, types));
         sim.add(accept.iterator().next(), need);
         return null;
+    }
+
+    /** Taken out of one of its furnaces left cooking: what it has (the rest of the need by another way). */
+    private String collect(Bot bot, Sim sim, net.kasax.challengecraft.bot.FurnaceLedger.Stock st, Set<Item> accept, int count, int depth,
+                           Set<Item> visiting, String key) {
+        int need = count - sim.count(accept);
+        int n = Math.min(need, st.all() - claimed.getOrDefault(st.pos(), 0));
+        if (n <= 0) return "nothing left in the furnace at " + st.pos().toShortString();
+        claimed.merge(st.pos(), n, Integer::sum);
+        sim.steps.add(new Pending(Kind.COLLECT, key, accept, n, st.pos()));
+        sim.add(st.item(), n);
+        if (n < need) return expand(bot, sim, accept, count, depth, visiting);
+        return null;
+    }
+
+    /** What of a furnace's contents this plan has counted on already (two steps do not take the same ingots). */
+    private final Map<BlockPos, Integer> claimed = new HashMap<>();
+
+    /** Its furnaces left cooking (smeltgo) that hold or cook any of these, nearest first (none with the knob off). */
+    private List<net.kasax.challengecraft.bot.FurnaceLedger.Stock> furnaceStocks(Bot bot, Collection<Item> items) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0) return List.of();
+        return bot.furnaces.stocks((ServerLevel) bot.body().level(), bot.body().blockPosition(), items);
+    }
+
+    /** How many of any of {@code items} (smelted things only) its furnaces left cooking hold or cook. */
+    private int leftCookingAny(Bot bot, Collection<Item> items) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0 || items.stream().noneMatch(SMELTED::contains)) return 0;
+        int n = 0;
+        for (var st : furnaceStocks(bot, items)) n += st.all();
+        return n;
+    }
+
+    /** How many of {@code item} its furnaces left cooking hold or cook (smeltgo; 0 with the knob off). */
+    public int inFurnaces(Bot bot, Item item) {
+        return leftCooking(bot, item);
+    }
+
+    /** How many of {@code item} its furnaces left cooking hold or cook. */
+    private int leftCooking(Bot bot, Item item) {
+        int n = 0;
+        for (var st : furnaceStocks(bot, Set.of(item))) n += st.all();
+        return n;
     }
 
     private String route(Bot bot, BotKnowledge k, Sim sim, BotKnowledge.Route r, Set<Item> accept, int count, int depth, Set<Item> visiting) {

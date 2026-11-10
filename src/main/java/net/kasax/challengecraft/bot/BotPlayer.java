@@ -32,6 +32,13 @@ public class BotPlayer extends ServerPlayer {
     public boolean sprintNow;
     /** Running away: sprint whenever moving forward, whatever the path step. */
     public boolean hurry;
+    /**
+     * While using an item (eating, the shield raised, a bow drawn) it moves at the item's use
+     * speed, a fifth for most, as a player does: the vanilla client scales its own input so
+     * (LocalPlayer#modifyInput) and the server never does, so a bot went at full speed behind its
+     * shield. The knob {@code itemslow}.
+     */
+    public boolean itemSlow;
 
     BotPlayer(MinecraftServer server, ServerLevel level, GameProfile profile, ClientInformation info) {
         super(server, level, profile, info);
@@ -64,8 +71,11 @@ public class BotPlayer extends ServerPlayer {
         // the player as still on the way (and takes it through no further portal).
         if (isChangingDimension()) hasChangedDimension();
         // The inputs drive the vanilla movement code (LivingEntity#travel) during doTick.
-        this.xxa = strafe;
-        this.zza = forward;
+        float use = itemSlow && isUsingItem() && !isPassenger()
+                ? getUseItem().getOrDefault(net.minecraft.core.component.DataComponents.USE_EFFECTS, net.minecraft.world.item.component.UseEffects.DEFAULT).speedMultiplier()
+                : 1f;
+        this.xxa = strafe * use;
+        this.zza = forward * use;
         this.setJumping(jump);
         this.setShiftKeyDown(sneak);
         this.setSprinting((sprintWhenRunning || sprintNow || hurry) && forward > 0.8f && !sneak && getFoodData().getFoodLevel() > 6 && !isUsingItem());

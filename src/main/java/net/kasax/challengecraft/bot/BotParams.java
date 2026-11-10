@@ -69,6 +69,27 @@ import java.util.Map;
  *       walked or broken into, nor a known spot walked to) with two bowmen by it; 0: as before.</li>
  *   <li>{@code drowsafe} - 1 (the default): low on hearts in the water with something at it: ashore,
  *       not away through more water; 0: away whichever way is open.</li>
+ *   <li>{@code veinfirst} - 1 (the default): the next block in reach is broken before the drops of
+ *       the last are picked up, all of them in one go before it walks off; 0: each block's drops
+ *       picked up before the next block.</li>
+ *   <li>{@code smeltgo} - 1 (the default): once what is wanted now is smelted it goes on, the rest
+ *       (for later tiles) left cooking in the furnace; the planner counts what its furnaces hold,
+ *       and it comes back for it (see FurnaceLedger); 0: it waits for the whole batch.</li>
+ *   <li>{@code cookalong} - 1 (the default; with smeltgo): the raw meat in the pack cooks in a
+ *       furnace of its own beside any batch being smelted (left cooking like the batch); 0: only
+ *       when food is what is smelted.</li>
+ *   <li>{@code foodsight} - 1 (the default): with next to nothing to eat in the pack, a food
+ *       animal in sight up to twenty-four blocks off is taken in passing (twelve otherwise); 0:
+ *       twelve always.</li>
+ *   <li>{@code itemslow} - 1: while using an item (eating, the shield up, a bow drawn) it moves
+ *       at the item's use speed (a fifth), as the vanilla client slows a player; 0 (the default
+ *       until measured otherwise): at full speed, as before.</li>
+ *   <li>{@code treasureiron} - 1 (the default): buried treasure is among what the world sense
+ *       knows, and while iron is wanted one on dry land within 160 blocks is dug up by day (a
+ *       few ingots for sure); 0: only from a treasure map.</li>
+ *   <li>{@code mountainiron} - 1 (the default): standing on a mountain (y 110 and up), iron is
+ *       tunnelled for in the mountain itself, a few blocks under the feet; 0: a staircase down to
+ *       y 14 wherever it stands.</li>
  * </ul>
  */
 public final class BotParams {
@@ -80,8 +101,14 @@ public final class BotParams {
         this.values = values;
     }
 
-    /** The knobs that won the self-play league (bob-models/champion.json), or the defaults. */
+    /**
+     * The knobs that won the self-play league (bob-models/champion.json), or the defaults; knobs
+     * forced for a whole run ({@code -Dbob.knobs=k=v,...} or BOB_KNOBS - the game tests with
+     * {@code -PbotKnobs}: a knob's cost measured over the scenarios that do not set their own) first.
+     */
     public static BotParams champion() {
+        String forced = System.getProperty("bob.knobs", System.getenv("BOB_KNOBS"));
+        if (forced != null && !forced.isBlank()) return parse(forced);
         String c = net.kasax.challengecraft.bot.learn.ModelStore.championParams();
         if (c == null) return DEFAULT;
         try {

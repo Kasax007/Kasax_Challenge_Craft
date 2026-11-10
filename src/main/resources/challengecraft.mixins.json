@@ -10,6 +10,7 @@
     "CrafterGateMixin",
     "MerchantScreenHandlerAccessor",
     "FishingHookAccessor",
+    "FurnaceAccessor",
     "DimensionOptionsMixin",
     "NoBlockDropsMixin",
     "NoChestLootMixin",

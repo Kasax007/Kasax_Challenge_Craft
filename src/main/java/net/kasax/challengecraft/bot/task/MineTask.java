@@ -92,13 +92,25 @@ public final class MineTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         ServerLevel level = (ServerLevel) bot.body().level();
+        // Told to stop (the furnace it worked beside is done): what lies about first, then no more.
+        if (bot0Stop) {
+            bot0Stop = false;
+            bot.navigator().stop();
+            bot.actions().reset();
+            walking = false;
+        }
+        if (wrapUp && collectTicks <= 0 && !sweep()) return Result.DONE;
         int have = ObtainPlanner.countAny(bot.body(), items);
         // An ore vein is taken whole, whatever the count: the rest is right there now, and a
         // trip back for it later (the shield, the bucket) costs minutes.
         boolean veinLeft = collectTicks > 0 || veinNear(level, bot);
-        if (have >= count && !veinLeft) return Result.DONE;
-        // Enough for now, more only for later (other tiles want it too): while it is right here.
-        if (have >= needed && collectTicks <= 0 && !veinLeft && (target == null ? !nearbyMore(level, bot) : target.distSqr(bot.body().blockPosition()) > 12 * 12)) return Result.DONE;
+        // (What was broken and still lies about counts: picked up before the end - see sweepDue.)
+        if (sweepDue) have += BotWorld.drops(level, bot.body().blockPosition(), 6, items).stream().mapToInt(e -> e.getItem().getCount()).sum();
+        boolean done = have >= count && !veinLeft
+                // Enough for now, more only for later (other tiles want it too): while it is right here.
+                || have >= needed && collectTicks <= 0 && !veinLeft && (target == null ? !nearbyMore(level, bot) : target.distSqr(bot.body().blockPosition()) > 12 * 12);
+        if (done && sweep()) return Result.RUNNING;
+        if (done) return Result.DONE;
 
         // Pick up what fell.
         if (collectTicks > 0) {
@@ -115,6 +127,10 @@ public final class MineTask implements BotTask {
             }
             collectTicks = 0;
             walking = false;
+        }
+        if (wrapUp) {
+            bot.navigator().stop();
+            return Result.DONE;
         }
 
         if (target == null || !blocks.test(level.getBlockState(target))) {
@@ -147,6 +163,7 @@ public final class MineTask implements BotTask {
                     // seventeen levels down through dirt for the first three cobblestone).
                     if (!rockStairs && target == null && bot.params.on("rocksight")) target = rockInSight(level, bot);
                     if (target == null) {
+                        if (sweep()) return Result.RUNNING;
                         if (!rockStairs) bot.say("no rock at hand for " + what + ": a staircase down");
                         rockStairs = true;
                         return search(bot);
@@ -191,7 +208,7 @@ public final class MineTask implements BotTask {
                 }
                 targetFromMemory = fromMemory && target != null;
             }
-            if (target == null) return search(bot);
+            if (target == null) return sweep() ? Result.RUNNING : search(bot);
             // A trunk (or any column of them) is taken from the bottom: that one is in reach from
             // the ground, the top ones only from a pillar.
             target = endOfColumn(level, target);
@@ -219,6 +236,8 @@ public final class MineTask implements BotTask {
         // In reach only mid-jump does not count: breaking in the air is five times slower.
         boolean footing = bot.body().onGround() || bot.body().isInWater() || bot.body().onClimbable();
         if (!bot.actions().inReach(target) || !footing && walking) {
+            // (Off to the next one: first what the last ones dropped, while it lies right here.)
+            if (!walking && sweep()) return Result.RUNNING;
             // Far above from down in a mine: up to the surface first (a straight climb beats
             // picking a way through the rock bit by bit).
             if (!walking && target.getY() > bot.body().getY() + 12 && SurfaceTask.underground(bot.body())) {
@@ -290,7 +309,12 @@ public final class MineTask implements BotTask {
                 }
             }
             target = null;
-            collectTicks = 60;
+            // (veinfirst: the next one in reach broken first, all the drops picked up in one go
+            // after - not a stop and a wait for each, some 28 s in ten minutes of an opening.)
+            if (bot.params.on("veinfirst")) {
+                sweepDue = true;
+                swept++;
+            } else collectTicks = 60;
             lastFind = searchTicks;
             idle = 0;
         } else if (++idle > 400) {
@@ -299,6 +323,36 @@ public final class MineTask implements BotTask {
             idle = 0;
         }
         return Result.RUNNING;
+    }
+
+    /**
+     * Blocks broken whose drops have not been picked up yet (veinfirst), and how many: the sweep
+     * comes before it walks off to one out of reach, searches on or ends.
+     */
+    private boolean sweepDue;
+    private int swept;
+
+    private boolean wrapUp;
+
+    /** No more blocks: only the drops still lying about picked up (if any are due), then done. */
+    public void wrapUp() {
+        wrapUp = true;
+        target = null;
+        bot0Stop = true;
+    }
+
+    /** (The walk to a block under way when told to wrap up: stopped at the next tick.) */
+    private boolean bot0Stop;
+
+    /** The drops of what was broken picked up now, if any are due: returns whether that began. */
+    private boolean sweep() {
+        if (!sweepDue) return false;
+        sweepDue = false;
+        // (A moment for each block broken: they lie a step or two apart.)
+        collectTicks = Math.min(200, 40 + 20 * swept);
+        swept = 0;
+        walking = false;
+        return true;
     }
 
     private Boolean rock;

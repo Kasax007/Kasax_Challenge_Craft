@@ -15,6 +15,8 @@ public final class MeanwhileTask implements BotTask {
     private final BotTask work;
     private final BooleanSupplier over;
     private int left;
+    /** Wrapping up: the digging told to stop, its drops still being picked up (a few seconds at most). */
+    private int wrapping = -1;
 
     public MeanwhileTask(BotTask work, int ticks, BooleanSupplier over) {
         this.work = work;
@@ -24,7 +26,18 @@ public final class MeanwhileTask implements BotTask {
 
     @Override
     public Result tick(Bot bot) {
-        if (--left < 0 || over.getAsBoolean()) {
+        if (wrapping < 0 && (--left < 0 || over.getAsBoolean())) {
+            // (Digging that leaves the drops for later - veinfirst - picks them up before it stops.)
+            if (work instanceof MineTask mine) {
+                mine.wrapUp();
+                wrapping = 0;
+            } else {
+                bot.navigator().stop();
+                bot.actions().reset();
+                return Result.DONE;
+            }
+        }
+        if (wrapping >= 0 && ++wrapping > 200) {
             bot.navigator().stop();
             bot.actions().reset();
             return Result.DONE;

@@ -201,12 +201,29 @@ public final class LockoutBrain implements BotBrain {
         if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
                 && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-            boolean ironWanted = (strategist.wantsIron() || !openingIron) && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
+            // (The ingots its furnaces still cook count - smeltgo: no raid for iron that is in the furnace.)
+            boolean ironWanted = (strategist.wantsIron() || !openingIron) && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT))
+                    + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT) < 3;
             // Only for what is wanted: iron (the kit, the board), food running low; a ruined
             // portal for its obsidian and gold when the board or the way to the Nether wants them.
             boolean foodLow = bot.body().getFoodData().getFoodLevel() < 12 && net.kasax.challengecraft.bot.task.EatTask.bestFood(bot.body()) < 0;
             boolean portalWanted = planner.demandFor(net.minecraft.world.item.Items.OBSIDIAN) > 0 || planner.demandFor(net.minecraft.world.item.Items.GOLD_INGOT) > 0
                     || planner.demandFor(net.minecraft.world.item.Items.FLINT_AND_STEEL) > 0 || netherTilesOpen(bot);
+            // A buried treasure the world sense knows of (where a treasure map would point): iron
+            // for sure, a few ingots, a dig of a few blocks under a beach - as runners take it
+            // (treasureiron). Only on dry land: a chest under the sea is a dive and a dig with the
+            // breath running out.
+            if (ironWanted && bot.params.on("treasureiron")) {
+                var treasure = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
+                        net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "buried_treasure"));
+                if (treasure != null && treasure.spot().distSqr(bot.body().blockPosition()) <= 160L * 160L && dryTreasure(level, treasure.spot())
+                        && bot.raided.add(Bot.raidKey("buried_treasure", treasure.spot()))) {
+                    bot.say("iron from the buried treasure at " + treasure.spot().toShortString());
+                    start(bot, net.kasax.challengecraft.bot.task.TreasureTask.at(treasure.spot()), 4800);
+                    if (!startRefused) return;
+                    startRefused = false;
+                }
+            }
             for (String kind : List.of("shipwreck", "ruined_portal", "village")) {
                 int radius = switch (kind) {
                     case "shipwreck" -> ironWanted ? 160 : foodLow ? 80 : 0;
@@ -334,7 +351,8 @@ public final class LockoutBrain implements BotBrain {
         // hand, and only while it comes cheap.
         stepKey = "armour";
         // (copper=0: none of it - self-play comparisons; it cost three minutes a game in league 3.)
-        if (hard && bot.params.on("copper") && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4
+        // (smeltgo: a piece at a time, the next one's ingots fetched from the furnace - two more rounds.)
+        if (hard && bot.params.on("copper") && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < (bot.params.on("smeltgo") ? 6 : 4)
                 && bot.body().level().getGameTime() >= armourRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             List<net.minecraft.world.item.Item> missing = new ArrayList<>();
             for (var piece : COPPER_SET.keySet()) if (armourSlotFree(bot.body(), piece)) missing.add(piece);
@@ -352,12 +370,23 @@ public final class LockoutBrain implements BotBrain {
                     int ingots = 0;
                     for (int i = 0; i < Math.min(2, missing.size()); i++) ingots += COPPER_SET.get(missing.get(i));
                     int want = Math.max(0, have - Math.max(0, spare)) + ingots;
-                    double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want);
+                    // (smeltgo: the copper of both pieces mined and put in the furnace, the first
+                    // piece's ingots waited for, the second's left cooking while it goes on -
+                    // thirteen ingots stood for were ninety seconds at the furnace on seed 2116....
+                    // What counts for going at all is the part waited for: the second piece's ingots
+                    // fetched from the furnace later cost a walk, the copper for the one after is
+                    // mined only while the vein is right there.)
+                    boolean onePiece = bot.params.on("smeltgo") && missing.size() > 1;
+                    int now = onePiece ? want - COPPER_SET.get(missing.get(1)) : want;
+                    double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now);
                     if (est <= COPPER_ARMOUR_MAX && !investLater(bot, est, "copper armour")) {
                         armourTries++;
                         bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
-                        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want, planner),
-                                budget(est, 1200, 6000));
+                        // (The second piece's copper with the first: mined in the one trip while the
+                        // vein is there, smelted in the one batch, not waited for - see forLater.)
+                        var copper = new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now, planner);
+                        if (onePiece) copper.forLater(Map.of(net.minecraft.world.item.Items.RAW_COPPER, want));
+                        start(bot, copper, budget(est, 1200, 6000));
                         if (!startRefused) return;
                         startRefused = false;
                     }
@@ -1311,8 +1340,10 @@ public final class LockoutBrain implements BotBrain {
         var body = bot.body();
         long now = body.level().getGameTime();
         if (now < upgradeRetryAt) return false;
-        // Ingots and raw ore alike: the ore is smelted on the way to whatever it becomes.
-        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+        // Ingots and raw ore alike: the ore is smelted on the way to whatever it becomes. (And what
+        // its furnaces left cooking hold - smeltgo: the chestplate's eight come from there as well.)
+        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON))
+                + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT);
         // The shield whenever there is an ingot about: the arrows and the creepers' blasts end in it.
         if (iron >= 1 && !has(body, Set.of(net.minecraft.world.item.Items.SHIELD))) return make(bot, net.minecraft.world.item.Items.SHIELD, "a shield");
         // On hard, the chestplate next, iron for the board or not: most deaths are arrows,
@@ -1418,7 +1449,9 @@ public final class LockoutBrain implements BotBrain {
                 && bot.body().getHealth() >= 12 && bot.body().level().getGameTime() >= shallowIronAt) {
             shallowIronAt = bot.body().level().getGameTime() + 600;
             var body = bot.body();
-            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+            // (With what its furnaces still cook - smeltgo.)
+            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON))
+                    + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT);
             int need = 1 + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
                     net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
             var ore = shallowIron(bot, shallowTried);
@@ -2108,6 +2141,7 @@ public final class LockoutBrain implements BotBrain {
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
             if (sideWant != null) wantRest.put(sideWant, now + 6000);
             if (sideChest != null) lootedIn.put("chest@" + sideChest.toShortString(), 99);
+            furnaceTripFailed(now);
             // (Only the side trip ends: the goal underneath goes on, its clock having stood still.)
             if (goalTask != null) goalPaused += now - sideStarted;
             BotTask side = sideTask;
@@ -2358,6 +2392,9 @@ public final class LockoutBrain implements BotBrain {
             bot.interject(sideTask);
             return;
         }
+        // Its furnace left cooking (smeltgo), something done in it, a few steps off: taken out in
+        // passing (and the furnace back along once it is empty) - not left behind for good.
+        if (furnaceReady(bot)) return;
         // A treasure map from a shipwreck: the X is worth a detour when it is not too far.
         net.kasax.challengecraft.bot.task.TreasureTask treasure = net.kasax.challengecraft.bot.task.TreasureTask.of(bot.body());
         if (treasure != null && !treasureTried.contains(treasure.column())
@@ -2444,6 +2481,61 @@ public final class LockoutBrain implements BotBrain {
         }
     }
 
+    private long furnaceChanceAt;
+    /**
+     * Its furnaces left alone until a game time: one a side trip just went to (a minute), one it
+     * could not get back to in time (three) - not the same twenty seconds' walk every ten
+     * seconds to a furnace it cannot reach (seed 4416..., three in a row underground).
+     */
+    private final Map<net.minecraft.core.BlockPos, Long> furnaceRest = new java.util.HashMap<>();
+    /** The furnace the side trip under way goes to (null: none). */
+    private net.minecraft.core.BlockPos sideFurnace;
+
+    /** The side trip to its furnace did not get there: that furnace left alone a while (also by the plans). */
+    private void furnaceTripFailed(long now) {
+        if (sideFurnace == null) return;
+        furnaceRest.put(sideFurnace, now + 3600);
+        planner.restFurnace(sideFurnace, now + 3600);
+        sideFurnace = null;
+    }
+
+    /** A buried treasure's column on dry land (sand or soil on top, no water over it); unknown while its chunk is not loaded. */
+    private static boolean dryTreasure(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos spot) {
+        var column = new net.minecraft.core.BlockPos((spot.getX() & ~15) + 9, 0, (spot.getZ() & ~15) + 9);
+        if (!level.isLoaded(column)) return false;
+        int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, column.getX(), column.getZ());
+        var surface = new net.minecraft.core.BlockPos(column.getX(), top - 1, column.getZ());
+        return level.getFluidState(surface).isEmpty() && level.getFluidState(surface.above()).isEmpty();
+    }
+
+    /** One of its furnaces left cooking within a dozen blocks has something done in it: picked up as a side errand. */
+    private boolean furnaceReady(Bot bot) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0) return false;
+        long now = bot.body().level().getGameTime();
+        if (now < furnaceChanceAt) return false;
+        furnaceChanceAt = now + 200;
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        for (net.minecraft.core.BlockPos p : bot.furnaces.readyNear(level, bot.body().blockPosition(), 12)) {
+            if (!(level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity f)) continue;
+            if (furnaceRest.getOrDefault(p, 0L) > now) continue;
+            var out = f.getItem(2);
+            // (Only when the cooking is done, or a good lot is: not a walk over for every ingot.)
+            if (!f.getItem(0).isEmpty() && out.getCount() < 4) continue;
+            sideTask = new net.kasax.challengecraft.bot.task.FurnaceCollectTask(p, Set.of(out.getItem()),
+                    ObtainPlanner.countAny(bot.body(), Set.of(out.getItem())) + out.getCount());
+            furnaceRest.put(p.immutable(), now + 1200);
+            sideFurnace = p.immutable();
+            sideId = null;
+            sideWant = null;
+            sideStarted = now;
+            sideBudget = 400;
+            bot.say("on the way: the " + ObtainPlanner.name(out.getItem()) + " from my furnace at " + p.toShortString());
+            bot.interject(sideTask);
+            return true;
+        }
+        return false;
+    }
+
     private static final Set<net.minecraft.world.entity.EntityType<?>> FOOD_ANIMALS = Set.of(net.minecraft.world.entity.EntityTypes.COW,
             net.minecraft.world.entity.EntityTypes.PIG, net.minecraft.world.entity.EntityTypes.SHEEP, net.minecraft.world.entity.EntityTypes.CHICKEN,
             net.minecraft.world.entity.EntityTypes.MOOSHROOM);
@@ -2460,15 +2552,19 @@ public final class LockoutBrain implements BotBrain {
         if (points >= 16) return false;
         if (!me.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me.getBoundingBox().inflate(16),
                 m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && m.getTarget() == me).isEmpty()) return false;
+        // (Next to nothing to eat in the pack: as far as a player would run for it - a cow in the
+        // open twenty blocks off is a few seconds' sprint, and saves the hunt across the country
+        // the stock of food would be later; foodsight.)
+        int reach = bot.params.on("foodsight") && points < 8 ? 24 : 12;
         net.minecraft.world.entity.animal.Animal prey = null;
-        for (var a : me.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, me.getBoundingBox().inflate(12, 3, 12),
+        for (var a : me.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, me.getBoundingBox().inflate(reach, 3, reach),
                 a -> a.isAlive() && !a.isBaby() && FOOD_ANIMALS.contains(a.getType()) && me.hasLineOfSight(a))) {
             if (prey == null || a.distanceToSqr(me) < prey.distanceToSqr(me)) prey = a;
         }
         if (prey == null) return false;
         foodChanceAt = now + 600;
         sideTask = new net.kasax.challengecraft.bot.task.KillTask(Set.of(prey.getType()), RAW_MEAT,
-                ObtainPlanner.countAny(me, RAW_MEAT) + 1, 1).nearby(14);
+                ObtainPlanner.countAny(me, RAW_MEAT) + 1, 1).nearby(reach + 2);
         sideId = null;
         sideWant = null;
         sideStarted = now;
@@ -2511,6 +2607,8 @@ public final class LockoutBrain implements BotBrain {
             if (goalTask != null) goalPaused += bot.body().level().getGameTime() - sideStarted;
             if (!success && sideId != null) restUntil.put(sideId, bot.body().level().getGameTime() + REST_TICKS);
             if (!success && sideWant != null) wantRest.put(sideWant, bot.body().level().getGameTime() + 6000);
+            if (!success) furnaceTripFailed(bot.body().level().getGameTime());
+            sideFurnace = null;
             sideTask = null;
             sideWant = null;
             sideId = null;
@@ -2630,6 +2728,7 @@ public final class LockoutBrain implements BotBrain {
         sideTask = null;
         sideId = null;
         sideWant = null;
+        sideFurnace = null;
         bot.clearTasks();
     }
 

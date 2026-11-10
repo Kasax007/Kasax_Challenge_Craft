@@ -121,7 +121,7 @@ public class BotOpeningTests {
      * showing in its face, cows and pigs about. Done when the four stone tools, a stock of food
      * and the shield are in the pack; the stopwatch's milestones go to the log.
      */
-    private static void openingKit(GameTestHelper h, String name, String knobs, int budget) {
+    static void openingKit(GameTestHelper h, String name, String knobs, int budget) {
         BotArena a = BotArena.wide(h, name);
         BotArena.day(h);
         var server = h.getLevel().getServer();
@@ -142,7 +142,9 @@ public class BotOpeningTests {
             h.getLevel().addFreshEntity(animal);
         }
         Bot bot = a.spawn(12, FEET, 20);
-        bot.params = BotParams.parse(knobs);
+        // ("-": the run's knobs - the defaults, or what -PbotKnobs forces: one knob's part in the
+        // whole opening measured by running this test with it off.)
+        bot.params = "-".equals(knobs) ? BotParams.champion() : BotParams.parse(knobs);
         // A game of its own, its one tile out of reach here (no village): the opening is all there is to do.
         String unreachable = "trade_with_cleric";
         Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
