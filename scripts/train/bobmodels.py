@@ -452,17 +452,23 @@ def goal_priors(records, per_start=0.5, min_starts=2, min_ratio=0.5):
     nothing of the newest estimates."""
     records = [r for r in records if r.get("t", "goal") == "goal"]
     version = max((estimates_version(r) for r in records), default=0)
-    rows = [r for r in records if estimates_version(r) == version and not r.get("proxy") and r.get("outcome") in PRIOR_COUNTED
-            and (r.get("goal") not in ESTFIX_GOALS or r.get("estfix") is True)]
+    counted = [r for r in records if estimates_version(r) == version and not r.get("proxy") and r.get("outcome") in PRIOR_COUNTED]
+    # (The failures per goal from every counted line - a fact of the game, whatever the estimate; the
+    # priors only from lines planned the way the mod plans now, and never from a negative plan, a bug
+    # before 36f80f1.)
+    every = collections.defaultdict(list)
+    for r in counted:
+        every[r["goal"]].append(r)
+    outcomes = {g: [len(xs), sum(1 for x in xs if x["outcome"] == "done")] for g, xs in sorted(every.items())}
+    rows = [r for r in counted if (r.get("goal") not in ESTFIX_GOALS or r.get("estfix") is True) and float(r.get("plain", 1)) >= 0]
     if not rows:
         return None
     by = collections.defaultdict(list)
     for r in rows:
         by[r["goal"]].append(r)
-    goals, outcomes = {}, {}
+    goals = {}
     for g, xs in sorted(by.items()):
         done = sum(1 for x in xs if x["outcome"] == "done")
-        outcomes[g] = [len(xs), done]
         if len(xs) < min_starts:
             continue
         spent = sum(max(0.0, float(x.get("secs", 0))) for x in xs)

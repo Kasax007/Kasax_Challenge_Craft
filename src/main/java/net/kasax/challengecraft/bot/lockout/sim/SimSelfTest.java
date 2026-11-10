@@ -253,18 +253,19 @@ public final class SimSelfTest {
     }
 
     /**
-     * Each goal's failure chance from the leagues' journals (goal-priors.json "outcomes"): one never
-     * got in five starts fails more often than its kind, one got seven times in seven less often.
+     * Each goal's failure chance from the leagues' journals (goal-priors.json "outcomes"): one got
+     * once in six starts fails more often than its kind, one got nine times in eleven less often.
      */
     static void goalsFailAsTheJournalsSay() {
         Recipe saplings = GoalBook.get("obtain_3_sapling_types"), bricks = GoalBook.get("craft_bricks");
-        check(saplings.seenStarts >= 5 && saplings.seenDone == 0, "the journals' sapling starts not read: " + saplings.seenStarts);
+        check(saplings.seenStarts >= 5 && saplings.seenDone * 3 <= saplings.seenStarts, "the journals' sapling starts not read: "
+                + saplings.seenDone + " of " + saplings.seenStarts);
         Sim sim = new Sim(World.sample(1), only("obtain_3_sapling_types", "craft_bricks"), Profile.bob(), Profile.bob(),
                 new GreedyPolicy(), new GreedyPolicy(), 1200, 1);
         Profile p = Profile.bob();
         double fs = sim.failChance(0, saplings), fb = sim.failChance(0, bricks);
-        check(fs > p.fail[saplings.kind.ordinal()] * 1.4, "3 Sapling Types (0 of 5) fails no more often than its kind: " + fs);
-        check(fb < p.fail[bricks.kind.ordinal()] * 0.7, "Bricks (7 of 7) fails as often as its kind: " + fb);
+        check(fs > p.fail[saplings.kind.ordinal()] * 1.4, "3 Sapling Types (1 of 6) fails no more often than its kind: " + fs);
+        check(fb < p.fail[bricks.kind.ordinal()] * 0.7, "Bricks (9 of 11) fails as often as its kind: " + fb);
         p.goalFails = false;
         Sim plain = new Sim(World.sample(1), only("obtain_3_sapling_types"), p, p, new GreedyPolicy(), new GreedyPolicy(), 1200, 1);
         check(plain.failChance(0, saplings) == p.fail[saplings.kind.ordinal()], "goalFails off still per goal");

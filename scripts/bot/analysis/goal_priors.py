@@ -8,7 +8,9 @@ Per goal from the journal's goal lines of the newest estimates version (ObtainPl
 starts that ended done, failed, overrun or died count (dropped and replaced ones were cut short by
 something else: the other player claimed it, the night, food). log = log((seconds of the counted
 starts / max(done, 0.5)) / mean plan estimate), clamped to [log --min-ratio, log 8]; games =
---per-start x counted starts. --exclude: goals whose estimates changed since the journals were written.
+--per-start x counted starts. --exclude: goals whose estimates changed since the journals were written -
+their lines count only when made with the change (journal "estfix": true, round 2), as the trainer's
+(scripts/train/bobmodels.py, ESTFIX_GOALS). A negative plan figure (a bug before 36f80f1) is no measurement.
 "outcomes": every goal's counted starts and how many got it (the simulator's failure chances per goal).
 """
 import argparse
@@ -46,12 +48,19 @@ def main():
             rows.append(d)
     version = max((int(r.get("estimates", 1)) for r in rows), default=1)
     rows = [r for r in rows if int(r.get("estimates", 1)) == version and not r.get("proxy") and r.get("outcome") in COUNTED]
+    # (Every goal's counted starts and how many got it, the excluded lines too - what failed is a
+    # fact of the game, whatever the estimate: the simulator's failure chances, GoalBook.measured.)
+    every = collections.defaultdict(list)
+    for r in rows:
+        every[r["goal"]].append(r)
+    outcomes = {g: [len(xs), sum(1 for x in xs if x["outcome"] == "done")] for g, xs in sorted(every.items())}
+    rows = [r for r in rows if float(r.get("plain", 1)) >= 0 and (r.get("goal") not in exclude or r.get("estfix") is True)]
     by = collections.defaultdict(list)
     for r in rows:
         by[r["goal"]].append(r)
     goals = {}
     for g, xs in sorted(by.items()):
-        if g in exclude or len(xs) < a.min_starts:
+        if len(xs) < a.min_starts:
             continue
         done = sum(1 for x in xs if x["outcome"] == "done")
         spent = sum(max(0.0, float(x.get("secs", 0))) for x in xs)
@@ -60,9 +69,6 @@ def main():
         log = max(math.log(max(0.25, a.min_ratio)), min(math.log(8), math.log(max(1e-6, ratio))))
         goals[g] = {"log": round(log, 4), "games": round(a.per_start * len(xs), 2), "starts": len(xs), "done": done,
                     "plan": round(plan, 1), "per_claim": round(spent / max(done, 0.5), 1)}
-    # Every goal's counted starts and how many got it, excluded ones too: the simulator's failure
-    # chances per goal (GoalBook.measured) - what failed is a fact of the game, whatever the estimate.
-    outcomes = {g: [len(xs), sum(1 for x in xs if x["outcome"] == "done")] for g, xs in sorted(by.items())}
     json.dump({"estimates": version, "journal_goals": len(rows), "per_start": a.per_start, "excluded": sorted(exclude), "goals": goals,
                "outcomes": outcomes}, sys.stdout, indent=1, sort_keys=True)
     print()

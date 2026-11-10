@@ -125,12 +125,15 @@ public class BotBrainTests {
     public void goalPriors(GameTestHelper h) {
         double lava = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("craft_lava_bucket");
         double tag = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("obtain_name_tag");
-        double bricks = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("craft_bricks");
+        double pot = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("craft_flower_pot");
+        double painting = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("craft_painting");
         double none = net.kasax.challengecraft.bot.lockout.GoalExperience.priorFactor("visit_end_city");
-        BotArena.LOG.info("[BOTTEST] goal_priors: lava bucket x{}, name tag x{}, bricks x{}, end city x{}", round(lava), round(tag), round(bricks), round(none));
+        BotArena.LOG.info("[BOTTEST] goal_priors: lava bucket x{}, name tag x{}, flower pot x{}, painting x{}, end city x{}", round(lava), round(tag),
+                round(pot), round(painting), round(none));
         h.assertTrue(lava > 2, "lava bucket (2 got in 7 at eight times its estimate a tile): x" + round(lava));
         h.assertTrue(tag > 1.5, "name tag: x" + round(tag));
-        h.assertTrue(bricks > 0.8 && bricks < 1.6, "bricks (7 of 7, near the plan): x" + round(bricks));
+        h.assertTrue(pot > 0.7 && pot < 1.4, "flower pot (5 of 5, near the plan): x" + round(pot));
+        h.assertTrue(painting < 0.9, "painting (5 of 5, ten seconds where the plan says 27): x" + round(painting));
         h.assertTrue(none == 1, "a goal never started: x" + round(none));
         h.succeed();
     }
