@@ -207,6 +207,21 @@ public final class LockoutBrain implements BotBrain {
             boolean foodLow = bot.body().getFoodData().getFoodLevel() < 12 && net.kasax.challengecraft.bot.task.EatTask.bestFood(bot.body()) < 0;
             boolean portalWanted = planner.demandFor(net.minecraft.world.item.Items.OBSIDIAN) > 0 || planner.demandFor(net.minecraft.world.item.Items.GOLD_INGOT) > 0
                     || planner.demandFor(net.minecraft.world.item.Items.FLINT_AND_STEEL) > 0 || netherTilesOpen(bot);
+            // A buried treasure the world sense knows of (where a treasure map would point): iron
+            // for sure, a few ingots, a dig of a few blocks under a beach - as runners take it
+            // (treasureiron). Only on dry land: a chest under the sea is a dive and a dig with the
+            // breath running out.
+            if (ironWanted && bot.params.on("treasureiron")) {
+                var treasure = net.kasax.challengecraft.bot.task.VisitStructureTask.nearest(bot,
+                        net.kasax.challengecraft.bot.task.VisitStructureTask.resolve(level, "buried_treasure"));
+                if (treasure != null && treasure.spot().distSqr(bot.body().blockPosition()) <= 160L * 160L && dryTreasure(level, treasure.spot())
+                        && bot.raided.add(Bot.raidKey("buried_treasure", treasure.spot()))) {
+                    bot.say("iron from the buried treasure at " + treasure.spot().toShortString());
+                    start(bot, net.kasax.challengecraft.bot.task.TreasureTask.at(treasure.spot()), 4800);
+                    if (!startRefused) return;
+                    startRefused = false;
+                }
+            }
             for (String kind : List.of("shipwreck", "ruined_portal", "village")) {
                 int radius = switch (kind) {
                     case "shipwreck" -> ironWanted ? 160 : foodLow ? 80 : 0;
@@ -2457,6 +2472,15 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long furnaceChanceAt;
+
+    /** A buried treasure's column on dry land (sand or soil on top, no water over it); unknown while its chunk is not loaded. */
+    private static boolean dryTreasure(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos spot) {
+        var column = new net.minecraft.core.BlockPos((spot.getX() & ~15) + 9, 0, (spot.getZ() & ~15) + 9);
+        if (!level.isLoaded(column)) return false;
+        int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, column.getX(), column.getZ());
+        var surface = new net.minecraft.core.BlockPos(column.getX(), top - 1, column.getZ());
+        return level.getFluidState(surface).isEmpty() && level.getFluidState(surface.above()).isEmpty();
+    }
 
     /** One of its furnaces left cooking within a dozen blocks has something done in it: picked up as a side errand. */
     private boolean furnaceReady(Bot bot) {

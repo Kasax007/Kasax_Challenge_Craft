@@ -61,6 +61,9 @@ import java.util.Map;
  *   <li>{@code itemslow} - 1: while using an item (eating, the shield up, a bow drawn) it moves
  *       at the item's use speed (a fifth), as the vanilla client slows a player; 0 (the default
  *       until measured otherwise): at full speed, as before.</li>
+ *   <li>{@code treasureiron} - 1 (the default): buried treasure is among what the world sense
+ *       knows, and while iron is wanted one on dry land within 160 blocks is dug up by day (a
+ *       few ingots for sure); 0: only from a treasure map.</li>
  *   <li>{@code mountainiron} - 1 (the default): standing on a mountain (y 110 and up), iron is
  *       tunnelled for in the mountain itself, a few blocks under the feet; 0: a staircase down to
  *       y 14 wherever it stands.</li>

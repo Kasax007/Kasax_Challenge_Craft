@@ -358,6 +358,7 @@ public final class Bot {
 
     private void act() {
         senses.worldSense = params.on("worldsense");
+        senses.senseTreasure = params.on("treasureiron");
         // (Eating, the shield up: as slow as a player's client makes him - see BotPlayer#itemSlow.)
         body.itemSlow = params.get("itemslow", 0) != 0;
         senses.tick(body);

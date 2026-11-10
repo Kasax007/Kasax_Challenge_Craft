@@ -121,7 +121,7 @@ public class BotOpeningTests {
      * showing in its face, cows and pigs about. Done when the four stone tools, a stock of food
      * and the shield are in the pack; the stopwatch's milestones go to the log.
      */
-    private static void openingKit(GameTestHelper h, String name, String knobs, int budget) {
+    static void openingKit(GameTestHelper h, String name, String knobs, int budget) {
         BotArena a = BotArena.wide(h, name);
         BotArena.day(h);
         var server = h.getLevel().getServer();

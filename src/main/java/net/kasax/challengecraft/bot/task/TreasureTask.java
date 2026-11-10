@@ -49,6 +49,14 @@ public final class TreasureTask implements BotTask {
         return p == null ? null : new TreasureTask(p);
     }
 
+    /** The treasure of the chunk this spot is in (where the world sense put a buried treasure). */
+    public static TreasureTask at(BlockPos spot) {
+        return new TreasureTask(new BlockPos((spot.getX() & ~15) + 9, 0, (spot.getZ() & ~15) + 9));
+    }
+
+    /** Far off: over the land in legs (one path search for a hundred blocks and more fails). */
+    private final FarWalk far = new FarWalk();
+
     public BlockPos column() {
         return column;
     }
@@ -73,6 +81,10 @@ public final class TreasureTask implements BotTask {
         }
         BlockPos top = new BlockPos(column.getX(), surface, column.getZ());
         double flat = Math.hypot(body.getX() - (column.getX() + 0.5), body.getZ() - (column.getZ() + 0.5));
+        if (flat > 40) {
+            FarWalk.Status fs = far.tick(bot, top, 6);
+            return fs == FarWalk.Status.FAILED ? Result.FAILED : Result.RUNNING;
+        }
         if (flat > 2.5) {
             if (!walking) {
                 bot.navigator().goNear(top, 2);

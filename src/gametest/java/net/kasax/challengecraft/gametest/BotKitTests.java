@@ -31,9 +31,18 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   thirty-two cobblestone and an iron pickaxe - the one ingot for the shield waited for, the rest
  *   left cooking while the stone is mined, the pickaxe's three fetched from the furnace after
  *   ({@code smeltgo}).</li>
+ *   <li>{@code opening_kit_before_kit}: the opening scene of {@code BotOpeningTests#openingKit}
+ *   (the four stone tools, a stock of food and the shield on hard, the Lockout brain playing) with
+ *   this round's knobs off - against {@code opening_kit}, which has them on.</li>
+ *   <li>{@code copper_armour}: on hard with the shield in hand, the Lockout brain's copper armour
+ *   - a copper vein in the rock face beside the start: the chestplate's eight ingots waited for,
+ *   the helmet's five left cooking while the chestplate is made, then fetched ({@code smeltgo}).</li>
  * </ul>
  */
 public class BotKitTests {
+    /** This round's knobs off: the kit trip and the food as before. */
+    static final String BEFORE_KIT = "veinfirst=0,smeltgo=0,cookalong=0,foodsight=0,mountainiron=0";
+
     private static void veinSweep(GameTestHelper h, String name, String knobs, int budget) {
         BotArena a = BotArena.flat(h, name);
         // A rock face beside the start, a vein of eight iron showing in it (two by two by two).
@@ -90,5 +99,72 @@ public class BotKitTests {
     @GameTest(structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
     public void smeltAndGoOldWay(GameTestHelper h) {
         smeltAndGo(h, "smelt_and_go_old_way", "smeltgo=0", 3000);
+    }
+
+    /**
+     * The Lockout brain on hard, the opening done and the shield in hand (its one tile out of
+     * reach): copper armour from a vein in the face beside the start. Done when a chestplate and
+     * a helmet are worn.
+     */
+    private static void copperArmour(GameTestHelper h, String name, String knobs, int budget) {
+        BotArena a = BotArena.wide(h, name);
+        BotArena.day(h);
+        var server = h.getLevel().getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        a.fill(28, BotArena.FEET, 10, 33, BotArena.FEET + 3, 30, Blocks.STONE);
+        a.fill(28, BotArena.FEET, 18, 28, BotArena.FEET + 1, 21, Blocks.COPPER_ORE);
+        a.fill(29, BotArena.FEET, 19, 29, BotArena.FEET + 1, 20, Blocks.COPPER_ORE);
+        Bot bot = a.spawn(22, BotArena.FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD),
+                new ItemStack(Items.STONE_AXE), new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.SHIELD), new ItemStack(Items.COOKED_BEEF, 8),
+                new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.COAL, 4),
+                new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.FURNACE));
+        bot.params = BotParams.parse(knobs);
+        String unreachable = "trade_with_cleric";
+        net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
+        bot.setBrain(new net.kasax.challengecraft.bot.lockout.LockoutBrain(net.kasax.challengecraft.bot.lockout.LockoutBrain.Difficulty.HARD)
+                .only(Set.of(unreachable)));
+        var body = bot.body();
+        h.succeedWhen(() -> {
+            boolean ok = body.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.COPPER_CHESTPLATE)
+                    && body.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(Items.COPPER_HELMET);
+            if (h.getTick() % 400 == 0) BotArena.LOG.info("[BOTTEST] {} t={} | {}", name, h.getTick(), bot.status());
+            if (!ok && h.getTick() >= budget - 2) {
+                BotArena.LOG.info("[BOTTEST] {} FAILED after {} ticks ({})", name, h.getTick(), bot.status());
+                endGame(h, bot);
+            }
+            h.assertTrue(ok, name + ": not yet");
+            BotArena.LOG.info("[BOTTEST] {} passed in {} ticks", name, h.getTick());
+            endGame(h, bot);
+        });
+    }
+
+    /** The game over and gone (see BotOpeningTests#end). */
+    private static void endGame(GameTestHelper h, Bot bot) {
+        if (!net.kasax.challengecraft.bot.BotManager.all().contains(bot)) return;
+        bot.setBrain(null);
+        var server = h.getLevel().getServer();
+        var data = net.kasax.challengecraft.data.LockoutBingoSavedData.get(server.overworld());
+        data.resetForRun(data.getRunId());
+        net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.setActive(false);
+        net.kasax.challengecraft.bot.BotManager.remove(server, bot);
+    }
+
+    /** Copper armour, a piece at a time from one batch: the second piece's ingots cook while the first is made. */
+    @GameTest(environment = "challengecraft:kit_copper", structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 24)
+    public void copperArmour(GameTestHelper h) {
+        copperArmour(h, "copper_armour", "-", 3000);
+    }
+
+    /** The same the old way (all thirteen ingots waited for), for the comparison. */
+    @GameTest(environment = "challengecraft:kit_copper_before", structure = STRUCTURE, maxTicks = 4000, skyAccess = true, padding = 24)
+    public void copperArmourOldWay(GameTestHelper h) {
+        copperArmour(h, "copper_armour_old_way", "smeltgo=0", 4000);
+    }
+
+    /** The whole opening on hard (BotOpeningTests' scene) with this round's knobs off, for the comparison with opening_kit. */
+    // (A batch of its own: a Lockout game is on for the whole server while it runs.)
+    @GameTest(environment = "challengecraft:kit_opening_before", structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 24)
+    public void openingKitBeforeKit(GameTestHelper h) {
+        BotOpeningTests.openingKit(h, "opening_kit_before_kit", BEFORE_KIT, 6000);
     }
 }

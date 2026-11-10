@@ -200,14 +200,27 @@ public final class BotSenses {
             net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_MOUNTAIN, net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_OCEAN,
             net.minecraft.world.level.levelgen.structure.BuiltinStructures.WOODLAND_MANSION, net.minecraft.world.level.levelgen.structure.BuiltinStructures.OCEAN_MONUMENT,
             net.minecraft.world.level.levelgen.structure.BuiltinStructures.TRAIL_RUINS);
+    private static final List<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>> FAR_OVERWORLD_TREASURE;
+    static {
+        var l = new java.util.ArrayList<>(FAR_OVERWORLD);
+        l.add(net.minecraft.world.level.levelgen.structure.BuiltinStructures.BURIED_TREASURE);
+        FAR_OVERWORLD_TREASURE = List.copyOf(l);
+    }
     private static final List<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>> FAR_NETHER = List.of(
             net.minecraft.world.level.levelgen.structure.BuiltinStructures.FORTRESS, net.minecraft.world.level.levelgen.structure.BuiltinStructures.BASTION_REMNANT,
             net.minecraft.world.level.levelgen.structure.BuiltinStructures.RUINED_PORTAL_NETHER);
 
+    /**
+     * Buried treasure among what the world sense knows of (the knob {@code treasureiron}): where a
+     * treasure map would point - the chest of a sure few iron ingots, a few blocks under a beach.
+     */
+    public boolean senseTreasure = true;
+
     private void sense(ServerLevel level, BlockPos c) {
         boolean overworld = level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
         boolean nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
-        var kinds = overworld ? FAR_OVERWORLD : nether ? FAR_NETHER : List.<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>>of();
+        var kinds = overworld ? (senseTreasure ? FAR_OVERWORLD_TREASURE : FAR_OVERWORLD)
+                : nether ? FAR_NETHER : List.<net.minecraft.resources.ResourceKey<net.minecraft.world.level.levelgen.structure.Structure>>of();
         if (!kinds.isEmpty()) {
             // (One kind a look - a look every five seconds - the round in two minutes: a search for
             // a structure can take a while, and one at a time none is felt.)

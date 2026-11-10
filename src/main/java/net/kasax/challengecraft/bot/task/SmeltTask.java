@@ -413,10 +413,12 @@ public final class SmeltTask extends StationTask {
         }
         int pieces = per <= 0 ? 0 : (int) (smelts / per);
         // (Going on once what is wanted now is out - smeltgo: furnaces for that part only; the
-        // rest cooks while it is away.)
-        int batch = leaveEarly(bot) ? needNow : count;
-        int want = Math.min(Math.min(2, batch / 6), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
-        if (extras.size() >= want || waiting < 6 || extraTries > 3) return null;
+        // rest cooks while it is away. And a second furnace from four items on, not six: four
+        // steaks are forty seconds in one, twenty in two - the furnace is made in three.)
+        boolean go = bot.params.on("smeltgo");
+        int batch = leaveEarly(bot) ? needNow : count, per_ = go ? 4 : 6;
+        int want = Math.min(Math.min(2, batch / per_), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
+        if (extras.size() >= want || waiting < per_ || extraTries > 3) return null;
         if (body.getInventory().countItem(Items.FURNACE) == 0) {
             // (Eight cobblestone and a table: a few seconds. Without the stone, one furnace it is.)
             int stone = ObtainPlanner.countAny(body, java.util.Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.BLACKSTONE));
