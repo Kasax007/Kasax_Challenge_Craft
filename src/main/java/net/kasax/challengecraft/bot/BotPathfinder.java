@@ -311,6 +311,10 @@ public final class BotPathfinder {
         Node first = new Node(start);
         first.f = heuristic(start, target);
         if (risk != null) first.air = risk.airUsed;
+        // (The air of a dive is weighed when one is begun with breath to spare - not on the way
+        // out of one with the air nearly gone (the search for air, or a start already short of
+        // it): then every way is as short of breath, and the shortest out is the safe one.)
+        drownTerm = risk != null && !anyWater && !(underwaterStart && risk.airUsed >= BotRisk.AIR - BotRisk.AIR_MARGIN);
         nodes.put(start.asLong(), first);
         open.add(first);
         Node[] best = new Node[COEFFICIENTS.length];
@@ -354,7 +358,7 @@ public final class BotPathfinder {
                 if (risk != null) {
                     // (Danger is not halved for staying on the old way: the price of the step itself.)
                     air = BotRisk.airAfter(n.air, lastMove, inWater(s.to().above()));
-                    cost += riskTicks(n.pos, s, lastMove) + risk.drownTicks(n.air, air);
+                    cost += riskTicks(n.pos, s, lastMove) + (drownTerm ? risk.drownTicks(n.air, air) : 0);
                 }
                 long key = s.to().asLong();
                 Node m = nodes.get(key);
@@ -462,6 +466,8 @@ public final class BotPathfinder {
 
     /** The movement's own ticks of the step last priced by {@link #cost} (the risk model's exposure time). */
     private double lastMove;
+    /** Whether this search weighs the air of a dive (see search). */
+    private boolean drownTerm;
 
     /**
      * What a step risks, in ticks (the risk model, knob riskpath): the monsters' rate of damage
