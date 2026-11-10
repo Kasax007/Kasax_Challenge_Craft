@@ -26,6 +26,24 @@ KNOBS = {
     "worldsense": ("choice", [0, 1], 1),
     "goalmodel": ("choice", [0, 1], 1),
     "cover": ("choice", [0, 1], 1),
+    # Round 2 of 10.11.2026 (BotParams): off in normal play until the league finds them better.
+    "pillarblocks": ("choice", [0, 1], 0),
+    "unarmedrun": ("choice", [0, 1], 0),
+    "coverveto": ("choice", [0, 1], 0),
+    "swordstone": ("choice", [0, 1], 0),
+    "bowmanwary": ("choice", [0, 1], 0),
+    "veinfirst": ("choice", [0, 1], 0),
+    "smeltgo": ("choice", [0, 1], 0),
+    "cookalong": ("choice", [0, 1], 0),
+    "foodsight": ("choice", [0, 1], 0),
+    "treasureiron": ("choice", [0, 1], 0),
+    "mountainiron": ("choice", [0, 1], 0),
+    "itemslow": ("choice", [0, 1], 0),
+    "estfix": ("choice", [0, 1], 0),
+    "goalprior": ("choice", [0, 1], 0),
+    "failexp": ("choice", [0, 1], 0),
+    "fallheal": ("choice", [0, 1], 0),
+    "search": ("choice", [0, 2], 0),
 }
 
 

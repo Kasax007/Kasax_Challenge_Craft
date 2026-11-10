@@ -40,6 +40,11 @@ final class Knobs {
         choice(m, "worldsense", 1, 0, 1);
         choice(m, "goalmodel", 1, 0, 1);
         choice(m, "cover", 1, 0, 1);
+        // Round 2 of 10.11.2026 (BotParams): off in normal play until the league finds them better.
+        for (String k : new String[] {"pillarblocks", "unarmedrun", "coverveto", "swordstone", "bowmanwary",
+                "veinfirst", "smeltgo", "cookalong", "foodsight", "treasureiron", "mountainiron", "itemslow",
+                "estfix", "goalprior", "failexp", "fallheal"}) choice(m, k, 0, 0, 1);
+        choice(m, "search", 0, 0, 2);
         ALL = Collections.unmodifiableMap(m);
     }
 
