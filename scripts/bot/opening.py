@@ -177,7 +177,7 @@ def main():
     r.add_argument("--seeds", required=True)
     r.add_argument("--seconds", type=int, default=600)
     r.add_argument("--difficulty", default="hard")
-    r.add_argument("--knobs", default="")
+    r.add_argument("--knobs", default="-", help="the bot's knobs ('-': the defaults, as a league side has them; not the champion's)")
     r.add_argument("--parallel", type=int, default=2)
     r.add_argument("--out", default="opening.jsonl")
     s = sub.add_parser("show")
