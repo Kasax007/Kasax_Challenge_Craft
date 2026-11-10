@@ -1848,13 +1848,9 @@ public final class ObtainPlanner {
         if (n <= 0) return "nothing left in the furnace at " + st.pos().toShortString();
         claimed.merge(st.pos(), n, Integer::sum);
         sim.steps.add(new Pending(Kind.COLLECT, key, accept, n, st.pos()));
-        sim.add(representativeIn(accept), n);
+        sim.add(st.item(), n);
         if (n < need) return expand(bot, sim, accept, count, depth, visiting);
         return null;
-    }
-
-    private static Item representativeIn(Set<Item> accept) {
-        return accept.iterator().next();
     }
 
     /** What of a furnace's contents this plan has counted on already (two steps do not take the same ingots). */

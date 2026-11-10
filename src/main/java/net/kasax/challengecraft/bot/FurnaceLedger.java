@@ -52,7 +52,7 @@ public final class FurnaceLedger {
      * What one of its furnaces has of an item: {@code ready} in the output slot, {@code cooking}
      * the input that becomes it, {@code ticks} until the last of what is wanted is done.
      */
-    public record Stock(BlockPos pos, int ready, int cooking, double distance) {
+    public record Stock(BlockPos pos, Item item, int ready, int cooking, double distance) {
         public int all() {
             return ready + cooking;
         }
@@ -85,16 +85,18 @@ public final class FurnaceLedger {
             if (d > FAR) continue;
             ItemStack o = f.getItem(OUT), in = f.getItem(IN);
             int ready = !o.isEmpty() && items.contains(o.getItem()) ? o.getCount() : 0;
+            Item what = ready > 0 ? o.getItem() : null;
             int cooking = 0;
             if (!in.isEmpty() && (isLit(f) || !f.getItem(FUEL).isEmpty())) {
                 for (Item i : items) {
                     if (makes(k, in, i) && (o.isEmpty() || o.is(i))) {
                         cooking = in.getCount();
+                        what = i;
                         break;
                     }
                 }
             }
-            if (ready + cooking > 0) out.add(new Stock(l.pos, ready, cooking, d));
+            if (ready + cooking > 0) out.add(new Stock(l.pos, what, ready, cooking, d));
         }
         out.sort(java.util.Comparator.comparingDouble(Stock::distance));
         return out;
