@@ -127,6 +127,14 @@ public final class SmeltTask extends StationTask {
         // (a player puts the meat in and mines the wall beside it), back for what is done.
         int left = 0;
         for (var f : all) left = Math.max(left, f.getItem(IN).getCount() * COOK_TICKS - COOK_TICKS / 2);
+        // (Going on once what is wanted now is out - smeltgo: the wait is for that part only, the
+        // furnaces sharing it out; the work in between ends when it is there, not the whole batch.)
+        boolean early = leaveEarly(bot);
+        if (early) {
+            int still = targetNow - ObtainPlanner.countAny(body, java.util.Set.of(route.result()));
+            for (var f : all) if (f.getItem(OUT).is(route.result())) still -= f.getItem(OUT).getCount();
+            left = still <= 0 ? 0 : Math.min(left, (still + all.size() - 1) / all.size() * COOK_TICKS - COOK_TICKS / 4);
+        }
         // And a bite while waiting, if the stomach has room for a whole one: the eating reflex
         // would stop a walk for it a little later (only with nothing after it close by).
         if (!ateWaiting && left >= 40 && bot.params.on("meanwhile") && !bot.targeted(8)) {
@@ -148,8 +156,10 @@ public final class SmeltTask extends StationTask {
                     furnaces.add(station);
                     furnaces.addAll(extras);
                     var home = station;
+                    var body0 = body;
                     bot.say("while it cooks (~" + left / 20 + " s): " + work.describe());
                     bot.interject(new MeanwhileTask(work, left, () -> cooked(level, furnaces)
+                            || early && ready(level, furnaces, body0) >= targetNow
                             || bot.body().blockPosition().distSqr(home) > MEANWHILE_REACH * MEANWHILE_REACH));
                     return Result.RUNNING;
                 }
@@ -267,6 +277,13 @@ public final class SmeltTask extends StationTask {
             java.util.Map.entry(Blocks.REDSTONE_ORE, Items.REDSTONE), java.util.Map.entry(Blocks.DEEPSLATE_REDSTONE_ORE, Items.REDSTONE),
             java.util.Map.entry(Blocks.LAPIS_ORE, Items.LAPIS_LAZULI), java.util.Map.entry(Blocks.DEEPSLATE_LAPIS_ORE, Items.LAPIS_LAZULI),
             java.util.Map.entry(Blocks.DIAMOND_ORE, Items.DIAMOND), java.util.Map.entry(Blocks.DEEPSLATE_DIAMOND_ORE, Items.DIAMOND));
+
+    /** What of the result is out: in the pack and in these furnaces' output slots. */
+    private int ready(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces, BotPlayer body) {
+        int n = ObtainPlanner.countAny(body, java.util.Set.of(route.result()));
+        for (var p : furnaces) if (level.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity f && f.getItem(OUT).is(route.result())) n += f.getItem(OUT).getCount();
+        return n;
+    }
 
     /** Nothing left to cook in any of these furnaces (or they are gone). */
     private static boolean cooked(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces) {
