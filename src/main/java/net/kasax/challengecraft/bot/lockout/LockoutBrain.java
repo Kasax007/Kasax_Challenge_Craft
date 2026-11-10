@@ -440,13 +440,16 @@ public final class LockoutBrain implements BotBrain {
             Map<Integer, Double> tiles = new HashMap<>(), floors = new HashMap<>();
             for (Choice c : choices) {
                 tiles.merge(c.tile().index(), c.option().cost(), Math::min);
-                // The least the look-ahead may believe a tile takes: half of Bob's own estimate -
-                // or (searchfloor) all of it where what was learnt of the tile says it takes longer
-                // than planned (the believed figure above the plan's: the learnt goal model, the
-                // leagues' prior, this server's experience, its overruns in this game): the
-                // look-ahead's recipes do not know that "Lava Bucket" got twice in seven starts.
-                double floor = BoardSearch.OWN_FLOOR * c.option().cost();
-                if (bot.params.on("searchfloor") && c.option().cost() > 1.05 * c.plain()) floor = c.option().cost();
+                // The least the look-ahead may believe a tile takes: Bob's own estimate (ownfloor:
+                // the share of it; round 1 half) - or (searchfloor) all of it where what was learnt
+                // of the tile says it takes longer than planned (the believed figure above the
+                // plan's: the learnt goal model, the leagues' prior, this server's experience, its
+                // overruns in this game): the look-ahead's recipes do not know that "Lava Bucket"
+                // got twice in seven starts. (Round 1's picks the simulator thought cheaper than
+                // Bob did got 1 tile in 9 to 11 starts in league 10, the others 5 in 9 to 12: the
+                // least of many figures is the one most likely too low.)
+                double floor = bot.params.get("ownfloor", OWN_FLOOR) * c.option().cost();
+                if (bot.params.on("searchfloor") && c.option().cost() > 1.05 * c.plain()) floor = Math.max(floor, c.option().cost());
                 floors.merge(c.tile().index(), floor, Math::min);
             }
             long chores = searchingChores(bot) ? choresOpen(bot) : 0;
@@ -468,6 +471,12 @@ public final class LockoutBrain implements BotBrain {
         if (netherBound(bot, pick) && packForNether(bot)) return;
         startGoal(bot, pick, choices.size());
     }
+
+    /**
+     * With the look-ahead: the share of Bob's own (believed) estimate it believes a tile takes at
+     * least, whatever its simulator says (knob {@code ownfloor}; round 1: 0.5).
+     */
+    static final double OWN_FLOOR = 1.0;
 
     /** Seconds from where things stand at most for a tile to be taken before everything else. */
     static final double QUICK_SECONDS = 30;

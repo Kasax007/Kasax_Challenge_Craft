@@ -73,7 +73,8 @@ final class BoardSearch {
     static final long HANG_NANOS = 30_000_000_000L;
 
     /**
-     * The share of Bob's own estimate a tile is believed to take at least ({@link SearchPolicy#floor}):
+     * The share of Bob's own estimate a tile is believed to take at least ({@link SearchPolicy#floor})
+     * when the brain gives no floors (it does: knob {@code ownfloor}, see LockoutBrain#OWN_FLOOR):
      * the learnt goal model (988 goals) never has a tile take less than half of his estimate, and
      * where his planner sees the world against a tile (no stone to be had, nothing known) his
      * estimate is the one that knows it.

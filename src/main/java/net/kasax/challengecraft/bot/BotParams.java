@@ -41,7 +41,11 @@ import java.util.Map;
  *       the bucket, the way into the Nether are candidates beside the tiles (round 2).</li>
  *   <li>{@code searchfloor} - 1 (the default): with the look-ahead, a tile that what was learnt of
  *       it (the leagues' prior, the server's experience) says takes longer than planned is believed
- *       to take at least Bob's whole estimate; 0: at least half of it, as in round 1.</li>
+ *       to take at least Bob's whole estimate; 0: at least the {@code ownfloor} share of it.</li>
+ *   <li>{@code ownfloor} - with the look-ahead, the share of Bob's own estimate a tile is believed
+ *       to take at least whatever the simulator says: 1 (the default) all of it, the simulator's
+ *       figure only where it is more; 0.5 half of it, as in round 1 (whose picks the simulator
+ *       thought cheaper than Bob did were mostly not got).</li>
  *   <li>{@code fastopen} - 1 (the default): the stone tools before the stock of food (unless
  *       hungry or hurt), the food on the way; 0: the stock first, as before.</li>
  *   <li>{@code interleave} - 1 (the default): a dear investment (the shield's iron, the iron kit,
