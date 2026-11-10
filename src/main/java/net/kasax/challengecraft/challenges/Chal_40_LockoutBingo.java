@@ -417,6 +417,15 @@ public final class Chal_40_LockoutBingo {
         return data.isStarted() && !data.isEnded();
     }
 
+    /**
+     * Ends a debug run as if no game had been played (board, teams, the started mark cleared), so
+     * that the lobby is open again - for tests that start one (see BotLobbyTests).
+     */
+    public static void endDebugRun(MinecraftServer server) {
+        LockoutBingoSavedData data = getData(server);
+        data.resetForRun(data.getRunId());
+    }
+
     /** Ticks since the running game began (0 when none is on). */
     public static long elapsedTicks(MinecraftServer server) {
         if (!active) {

@@ -71,7 +71,8 @@ public class BotLobbyTests {
      * board whose first tiles he can do right here: his first tile within a minute and a half - the
      * whole path from the board through the simulator to a goal and its claim.
      */
-    @GameTest(environment = "challengecraft:lockout_lobby", structure = STRUCTURE, maxTicks = 1900, skyAccess = true, padding = 8)
+    // (A batch of its own as well: a Lockout game of its own, not to be switched off by the lobby test.)
+    @GameTest(environment = "challengecraft:lockout_search", structure = STRUCTURE, maxTicks = 1900, skyAccess = true, padding = 8)
     public void searchClaimsFirstTile(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "search_first_tile");
         BotArena.day(h);
@@ -86,9 +87,11 @@ public class BotLobbyTests {
         LockoutBrain brain = new LockoutBrain(LockoutBrain.Difficulty.HARD);
         bob.setBrain(brain);
         LockoutBingoTeam team = Chal_40_LockoutBingo.teamOf(server, bob.id);
+        boolean[] ended = {false};
         h.succeedWhen(() -> {
             int tiles = Chal_40_LockoutBingo.score(server, team);
-            if (h.getTick() >= 1880 && tiles < 1) {
+            if (h.getTick() >= 1880 && tiles < 1 && !ended[0]) {
+                ended[0] = true;
                 BotArena.LOG.info("[BOTTEST] search_first_tile FAILED: no tile, look-ahead decisions {}", brain.lookAheadDecisions());
                 end(server, bob);
             }
@@ -99,8 +102,10 @@ public class BotLobbyTests {
         });
     }
 
+    /** The game ended and the lobby open again (the lobby test adds Bob only to a game not started). */
     private static void end(net.minecraft.server.MinecraftServer server, net.kasax.challengecraft.bot.Bot bob) {
         bob.setBrain(null);
+        Chal_40_LockoutBingo.endDebugRun(server);
         Chal_40_LockoutBingo.setActive(false);
         BotManager.remove(server, bob);
     }
