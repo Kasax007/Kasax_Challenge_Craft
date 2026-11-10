@@ -107,6 +107,16 @@ class SupervisorTest {
         List<String> again = entries(sup.export.write());
         assertTrue(again.stream().noneMatch(n -> n.startsWith("games/")), again.toString());
         assertTrue(again.contains("league/results.jsonl"));
+
+        // Started again (the panel's restart): the league goes on where it was - champion, duel, history, counts.
+        Supervisor next = supervisor(root);
+        assertEquals(Knobs.text(sup.league.champion), Knobs.text(next.league.champion));
+        assertEquals(Knobs.text(sup.league.challenger), Knobs.text(next.league.challenger));
+        assertEquals(sup.league.games.size(), next.league.games.size());
+        assertEquals(sup.league.history.size(), next.league.history.size());
+        assertFalse(next.league.history.isEmpty(), "the laptop's duels are kept");
+        assertEquals(sup.gamesDone, next.gamesDone);
+        assertTrue(next.gameCounter >= sup.gamesDone);
     }
 
     @Test

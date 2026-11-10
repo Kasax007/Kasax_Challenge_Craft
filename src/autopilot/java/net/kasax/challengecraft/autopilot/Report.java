@@ -182,9 +182,8 @@ final class Report {
             default -> b.append(state);
         }
         if (o.get("speed") != null && !state.equals("idle")) b.append(String.format(Locale.GERMANY, ", Tempo %.1fx", Json.num(o.get("speed"), 0)));
-        if (o.get("rss_mb") != null && Json.num(o.get("rss_mb"), -1) > 0) {
-            b.append(String.format(Locale.GERMANY, ", %.1f GB", Json.num(o.get("rss_mb"), 0) / 1024.0));
-        }
+        // (The memory the server's Java holds, once it is up.)
+        if (Json.num(o.get("rss_mb"), -1) >= 512) b.append(String.format(Locale.GERMANY, ", %.1f GB", Json.num(o.get("rss_mb"), 0) / 1024.0));
         return b.toString();
     }
 

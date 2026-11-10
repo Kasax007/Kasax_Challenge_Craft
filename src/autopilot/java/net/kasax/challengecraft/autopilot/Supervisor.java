@@ -118,6 +118,8 @@ final class Supervisor {
         }
         export = new Export(this);
         lastExport = System.currentTimeMillis();
+        // (The first short status on the console ten minutes in: at the start there is nothing to say yet.)
+        lastSummary = lastExport;
     }
 
     // ---- the league's state -------------------------------------------------------------------------
@@ -127,11 +129,24 @@ final class Supervisor {
         Path own = leagueDir.resolve("state.json");
         try {
             if (Files.exists(own)) {
-                League l = League.fromJson(Json.map(Json.parse(Files.readString(own, StandardCharsets.UTF_8))), true, rng);
-                log.info("Liga geladen: Champion " + Knobs.text(l.champion) + ", " + l.history.size() + " Duelle bisher");
+                // (The trainer's layout: the league under "league", the counts beside it.)
+                Map<String, Object> st = Json.map(Json.parse(Files.readString(own, StandardCharsets.UTF_8)));
+                if (!(st.get("league") instanceof Map)) throw new IllegalArgumentException("no \"league\" in it");
+                League l = League.fromJson(Json.map(st.get("league")), true, rng);
+                gamesDone = (long) Json.num(st.get("league_games"), 0);
+                gamesFailed = (long) Json.num(st.get("league_failed"), 0);
+                gameCounter = (long) Json.num(st.get("game_counter"), gamesDone + gamesFailed);
+                log.info("Liga geladen: " + gamesDone + " Spiele bisher, Champion " + Knobs.text(l.champion)
+                        + (l.challenger == null ? "" : ", Herausforderer " + Knobs.text(l.challenger) + " nach " + l.games.size() + " Spiel(en)"));
                 return l;
             }
         } catch (IOException | RuntimeException e) {
+            // (Kept aside, not overwritten: it may be put right by hand.)
+            try {
+                Files.move(own, own.resolveSibling("state-unreadable-" + System.currentTimeMillis() + ".json"));
+            } catch (IOException ignored) {
+                // (Then it is overwritten.)
+            }
             log.warn("Liga-Stand " + own + " nicht lesbar (" + e.getMessage() + "): beginne mit dem Stand aus der Mod");
         }
         String shipped = Layout.entry(layout.modJar, "bob-models/state.json");
@@ -156,6 +171,8 @@ final class Supervisor {
             Map<String, Object> st = new LinkedHashMap<>();
             st.put("league", league.toJson());
             st.put("league_games", gamesDone);
+            st.put("league_failed", gamesFailed);
+            st.put("game_counter", gameCounter);
             writeAtomically(leagueDir.resolve("state.json"), Json.pretty(st));
         } catch (IOException e) {
             log.warn("Liga-Stand nicht gespeichert: " + e.getMessage());
@@ -426,14 +443,20 @@ final class Supervisor {
         if (champ != null && chall != null) {
             o.put("champion", List.of(champ.get("tiles"), champ.get("deaths"), champ.get("first")));
             o.put("challenger", List.of(chall.get("tiles"), chall.get("deaths"), chall.get("first")));
-            text = String.format(Locale.ROOT, "Champion %s Felder/%s Tode, Herausforderer %s Felder/%s Tode (%.0f echte Minuten)",
-                    Knobs.format(Json.num(champ.get("tiles"), 0)), Knobs.format(Json.num(champ.get("deaths"), 0)),
-                    Knobs.format(Json.num(chall.get("tiles"), 0)), Knobs.format(Json.num(chall.get("deaths"), 0)), (now - s.since) / 60000.0);
+            text = String.format(Locale.ROOT, "Champion %s, %s; Herausforderer %s, %s (%.0f echte Minuten)",
+                    count(champ.get("tiles"), "Feld", "Felder"), count(champ.get("deaths"), "Tod", "Tode"),
+                    count(chall.get("tiles"), "Feld", "Felder"), count(chall.get("deaths"), "Tod", "Tode"), (now - s.since) / 60000.0);
         } else {
             text = "Ergebnis ohne passende Knoepfe";
         }
         o.put("text", text);
         return o;
+    }
+
+    /** "1 Feld", "3 Felder". */
+    private static String count(Object n, String one, String many) {
+        double v = Json.num(n, 0);
+        return Knobs.format(v) + " " + (v == 1 ? one : many);
     }
 
     private void onVerdict(Map<String, Object> v) {
@@ -496,7 +519,9 @@ final class Supervisor {
     private void beginStop(Slot s) {
         if (s.state == State.STOPPING) return;
         boolean keepLog = s.server.kind == GameServer.Kind.LEAGUE || s.server.hint() != null;
-        String base = LocalDateTime.now().format(STAMP) + "_" + s.name() + (s.game != null ? "_spiel" + s.gameNo + "_" + s.game.seed() : "");
+        // (A game that ended without its result - a stop, a crash - says so in its log's name.)
+        String base = LocalDateTime.now().format(STAMP) + "_" + s.name() + (s.game != null ? "_spiel" + s.gameNo + "_" + s.game.seed() : "")
+                + (s.game != null && s.server.result() == null ? "_abgebrochen" : "");
         Path keepAs = keepLog ? games.resolve(base + ".log.gz") : null;
         GameServer g = s.server;
         s.state = State.STOPPING;

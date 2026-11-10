@@ -118,6 +118,14 @@ def status(root):
         return None
 
 
+def league_state(root):
+    try:
+        with open(os.path.join(root, "bob-autopilot", "league", "state.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def results(root):
     try:
         with open(os.path.join(root, "bob-autopilot", "league", "results.jsonl"), encoding="utf-8") as f:
@@ -216,11 +224,16 @@ def main():
     check("league state written", os.path.exists(os.path.join(home, "league", "state.json")))
     logs = sorted(glob.glob(os.path.join(home, "games", "*.log.gz")))
     check("game logs kept", len(logs) >= len(rs), f"{len(logs)} logs")
-    if logs:
-        with gzip.open(logs[-1], "rt", encoding="utf-8", errors="replace") as f:
-            text = f.read()
-        check("a game log has the game", "[BOTVS] result" in text and "[BOTVS] start" in text,
-              f"{len(text) / 2**20:.1f} MB unpacked, {os.path.getsize(logs[-1]) / 2**20:.2f} MB gzipped")
+    for r in rs:
+        # (The log of each finished game: named by its number and seed.)
+        mine = [p for p in logs if f"_spiel{r['game']}_{r['result']['seed']}" in os.path.basename(p) and "abgebrochen" not in p]
+        text = ""
+        if mine:
+            with gzip.open(mine[0], "rt", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        check(f"game {r['game']}'s log has the game", "[BOTVS] result" in text and "[BOTVS] start" in text,
+              f"{text.count(chr(10))} lines, {len(text) / 2**10:.0f} KB unpacked, "
+              f"{os.path.getsize(mine[0]) / 2**10 if mine else 0:.0f} KB gzipped")
     journal = glob.glob(os.path.join(home, "journal", "*.jsonl"))
     kinds = {}
     for j in journal:
@@ -242,6 +255,22 @@ def main():
               and any(n.startswith("games/") for n in names), f"{os.path.getsize(zips[-1]) / 2**20:.1f} MB, {len(names)} files")
     check("autopilot ended on stop", proc.p.returncode == 0, f"exit {proc.p.returncode}")
     check("the server's own world untouched", os.path.exists(os.path.join(root, "world", "level.dat")))
+    # Started again (a panel's restart): the league must go on where it was.
+    state_a = league_state(root)
+    n = len(results(root))
+    proc, _ = run_autopilot(root, args.java, config, lambda st: len(results(root)) >= n + 1, args.minutes * 60 * 2 + 600, samples,
+                            "league again")
+    state_b = league_state(root)
+    la, lb = state_a.get("league", {}), state_b.get("league", {})
+    decided = len(lb.get("history", [])) > len(la.get("history", []))
+    check("the league goes on after a restart",
+          state_b.get("league_games") == state_a.get("league_games", 0) + 1
+          and lb.get("history", [])[:len(la.get("history", []))] == la.get("history", [])
+          and (decided or (lb.get("champion") == la.get("champion") and lb.get("challenger") == la.get("challenger")
+                           and len(lb.get("games", [])) == len(la.get("games", [])) + 1)),
+          f"games {state_a.get('league_games')} -> {state_b.get('league_games')}, duel {len(la.get('games', []))} -> "
+          f"{len(lb.get('games', []))}, history {len(la.get('history', []))} -> {len(lb.get('history', []))}")
+    check("it said so", any("Liga geladen" in l for l in proc.lines))
     if args.arena_minutes:
         n0 = len(samples)
         config = (f"league_games=0\narena_servers=1\narena_restart_minutes=5\nexport_hours=0\nmachine=container\n")

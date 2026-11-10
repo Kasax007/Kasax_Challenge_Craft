@@ -131,7 +131,7 @@ stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zei
 ## Läuft es?
 
 - In der **Konsole** steht alle zehn Minuten ein kurzer Stand, und nach jedem Spiel eine Zeile wie
-  `liga-1: Spiel 3 fertig - Champion 6 Felder/0 Tode, Herausforderer 4 Felder/1 Tode (37 echte Minuten)`.
+  `liga-1: Spiel 3 fertig - Champion 6 Felder, 0 Tode; Herausforderer 4 Felder, 1 Tod (37 echte Minuten)`.
 - Der Befehl **`status`** in der Konsole zeigt den ganzen Stand.
 - Die Datei **`bob-autopilot/STATUS.txt`** zeigt ihn auch (jede Minute neu). Darin steht unter
   anderem:
