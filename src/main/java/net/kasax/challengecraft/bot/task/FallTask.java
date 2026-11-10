@@ -33,6 +33,8 @@ public final class FallTask implements BotTask {
     private int healed;
     /** At most this long waited, on a full belly, for the hearts the fall wants. */
     private static final int HEAL_TICKS = 600;
+    /** Ticks a heart's half takes to come back on a full belly without saturation (vanilla: 80). */
+    private static final int TICKS_PER_HALF_HEART = 80;
 
     /** {@code hurt}: land without the water bucket (the damage is the point). */
     public FallTask(int height, boolean hurt) {
@@ -49,7 +51,12 @@ public final class FallTask implements BotTask {
         // first: a full belly heals a heart in a few seconds. A scratch on the way up - a hunger
         // tick, a zombie's blow - ended "Fall 20 Blocks" more than once in leagues 9 and 10.)
         if (side == null && !airborne && Math.floor(height - 3 + 1e-6) >= body.getHealth()) {
-            if (bot.params.on("fallheal") && body.getFoodData().getFoodLevel() >= 18 && healed++ < HEAL_TICKS) {
+            // (Only a scratch is waited for: the hearts still missing must be able to come back in
+            // the time left at the slow rate, a heart's half each four seconds - ten halves short
+            // of a fall of twenty-one is given up at once, as before.)
+            double missing = Math.floor(height - 3 + 1e-6) + 1 - body.getHealth();
+            if (bot.params.on("fallheal") && body.getFoodData().getFoodLevel() >= 18 && missing * TICKS_PER_HALF_HEART <= HEAL_TICKS - healed) {
+                healed++;
                 body.stopInputs();
                 return Result.RUNNING;
             }

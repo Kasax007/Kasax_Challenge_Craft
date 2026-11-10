@@ -120,6 +120,21 @@ public class BotBrainTests {
         });
     }
 
+    /**
+     * "Fall 20 Blocks" two halves of a heart short (16 of the 18 the fall wants) on a full belly:
+     * the fall waits for them (fallheal) and is then made - landed alive, the damage taken. (Ten
+     * halves short it is still given up at once: BotStuntTests' no_deadly_fall.)
+     */
+    @GameTest(environment = "challengecraft:brain_tests", structure = STRUCTURE, maxTicks = 1500, skyAccess = true, padding = 8)
+    public void fallWaitsForHearts(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "fall_waits_for_hearts");
+        a.spawn(20, FEET, 20, new ItemStack(Items.DIRT, 30));
+        var body = a.bot().body();
+        body.setHealth(16);
+        a.run(new net.kasax.challengecraft.bot.task.FallTask(20, true), 1500, () -> a.bot().current() == null && body.isAlive() && body.onGround()
+                && body.getHealth() <= 3.5 && body.getY() > a.abs(0, FEET, 0).getY() - 0.5);
+    }
+
     /** The leagues' goal priors are read: tiles that ran far over their estimates there start believed dearer, the knob turns it off. */
     @GameTest(environment = "challengecraft:brain_tests", structure = STRUCTURE, maxTicks = 20, padding = 8)
     public void goalPriors(GameTestHelper h) {

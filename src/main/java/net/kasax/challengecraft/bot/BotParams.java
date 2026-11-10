@@ -71,7 +71,7 @@ import java.util.Map;
  *       experience file is the server's: in a league both sides learn from either's failures.)</li>
  *   <li>{@code fallheal} - 1 (the default): a deliberate fall that the hearts would not survive any
  *       more (a scratch on the way up) waits up to half a minute on a full belly for them to come
- *       back; 0: given up at once.</li>
+ *       back, if the missing ones can in that time (a half each four seconds); 0: given up at once.</li>
  * </ul>
  */
 public final class BotParams {
