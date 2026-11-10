@@ -314,6 +314,51 @@ public class BotKitTests {
         shieldWalk(h, "shield_walk_fast", "itemslow=0", 300, 0);
     }
 
+    /**
+     * Four raw iron to smelt and four raw beef in the pack (bread besides), one coal (the iron's),
+     * {@code planks} oak planks, two furnaces: the ingots, then the beef cooked - with
+     * {@code cookalong} the beef cooks in the second furnace beside the iron (on the planks),
+     * without it after the iron in a batch of its own.
+     */
+    private static void cookAlong(GameTestHelper h, String name, String knobs, int budget, int planks) {
+        BotArena a = BotArena.flat(h, name);
+        List<ItemStack> pack = new java.util.ArrayList<>(List.of(new ItemStack(Items.RAW_IRON, 4), new ItemStack(Items.BEEF, 4), new ItemStack(Items.BREAD, 6),
+                new ItemStack(Items.COAL, 1), new ItemStack(Items.FURNACE, 2), new ItemStack(Items.STONE_PICKAXE)));
+        if (planks > 0) pack.add(new ItemStack(Items.OAK_PLANKS, planks));
+        Bot bot = a.spawn(14, FEET, 20, pack.toArray(ItemStack[]::new));
+        bot.params = BotParams.parse(knobs);
+        var body = bot.body();
+        boolean thenBeef = planks > 0;
+        a.run(new SequenceTask("iron, then the beef", thenBeef
+                        ? List.of(() -> new ObtainTask(Set.of(Items.IRON_INGOT), 4), () -> new ObtainTask(Set.of(Items.COOKED_BEEF), 4))
+                        : List.of(() -> new ObtainTask(Set.of(Items.IRON_INGOT), 4))), budget,
+                () -> ObtainPlanner.countAny(body, Set.of(Items.IRON_INGOT)) >= 4 && bot.current() == null
+                        && (thenBeef ? ObtainPlanner.countAny(body, Set.of(Items.COOKED_BEEF)) >= 4
+                        // (No fuel left for it: the beef stays in the pack, raw - not put into a cold furnace and lost.)
+                        : ObtainPlanner.countAny(body, Set.of(Items.BEEF, Items.COOKED_BEEF)) >= 4));
+    }
+
+    /** The beef cooked beside the iron (cookalong): both done in the time of one batch. */
+    @GameTest(structure = STRUCTURE, maxTicks = 1400, skyAccess = true, padding = 8)
+    public void cookAlong(GameTestHelper h) {
+        cookAlong(h, "cook_along", "-", 1400, 4);
+    }
+
+    /** The same the old way (the beef smelted after the iron), for the comparison. */
+    @GameTest(structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void cookAlongOldWay(GameTestHelper h) {
+        cookAlong(h, "cook_along_old_way", "cookalong=0", 2400, 4);
+    }
+
+    /**
+     * The one coal all the iron's and nothing else to burn: none of the beef goes into a furnace
+     * beside it (before the fix it went in cold and stayed there, raw, for good).
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 1400, skyAccess = true, padding = 8)
+    public void cookAlongNoFuel(GameTestHelper h) {
+        cookAlong(h, "cook_along_no_fuel", "-", 1400, 0);
+    }
+
     /** The whole opening on hard (BotOpeningTests' scene) with this round's knobs off, for the comparison with opening_kit. */
     // (A batch of its own: a Lockout game is on for the whole server while it runs.)
     @GameTest(environment = "challengecraft:kit_opening_before", structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 24)

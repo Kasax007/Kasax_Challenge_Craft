@@ -195,6 +195,8 @@ public final class SmeltTask extends StationTask {
         if (foodFurnace != null) {
             if (level.getBlockEntity(foodFurnace) instanceof AbstractFurnaceBlockEntity ff) {
                 takeOutput(bot.body(), ff);
+                // (Gone cold with meat still in it - its fuel burnt out: the meat back into the pack.)
+                coldBack(bot.body(), ff);
                 if (ff.getItem(IN).isEmpty()) {
                     bot.furnaces.remove(level, foodFurnace);
                     extras.add(foodFurnace);
@@ -380,7 +382,10 @@ public final class SmeltTask extends StationTask {
         int rawPoints = food == null ? 0 : food.nutrition() * raw.getCount();
         int batchTicks = Math.min(needNow, count) * COOK_TICKS / (1 + extras.size());
         boolean spare = EatTask.foodPoints(body) - rawPoints >= 8 || batchTicks >= raw.getCount() * COOK_TICKS / 2;
-        if (!spare) {
+        // (Only as much of it as the fuel left in the pack cooks: the batch's fuel all went into
+        // the batch's furnaces, and meat put into a furnace with nothing to burn lay there raw for
+        // good - left on the list of its furnaces, never counted, never fetched.)
+        if (!spare || cookable(raw, cookFuel(body)) <= 0) {
             cookTried = true;
             return null;
         }
@@ -395,27 +400,38 @@ public final class SmeltTask extends StationTask {
             return Result.RUNNING;
         }
         cookTried = true;
+        // (The fuel again: making the furnace may have used some of it.)
+        ItemStack best = cookFuel(body);
+        int n = cookable(raw, best);
+        if (n <= 0) return null;
         net.minecraft.core.BlockPos at = bot.actions().placeNearby(Items.FURNACE);
         if (at == null || !(level.getBlockEntity(at) instanceof AbstractFurnaceBlockEntity f)) return null;
-        int n = raw.getCount();
         f.setItem(IN, raw.copyWithCount(n));
         raw.shrink(n);
-        // (Fuel: what is least use otherwise, never the meat nor what the batch smelts.)
-        ItemStack best = null;
-        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
-            if (st.isEmpty() || RAW_FOOD.contains(st.getItem()) || route.input().test(st) || st.is(route.result()) || BotKnowledge.fuelValue(st) <= 0) continue;
-            if (best == null || rank(st) < rank(best)) best = st;
-        }
-        if (best != null) {
-            int units = (int) Math.min(best.getCount(), Math.ceil(n / BotKnowledge.fuelValue(best)));
-            f.setItem(FUEL, best.copyWithCount(units));
-            best.shrink(units);
-        }
+        int units = (int) Math.min(best.getCount(), Math.ceil(n / BotKnowledge.fuelValue(best)));
+        f.setItem(FUEL, best.copyWithCount(units));
+        best.shrink(units);
         f.setChanged();
         foodFurnace = at;
         bot.furnaces.add(level, at);
         bot.say("cooking " + n + " " + ObtainPlanner.name(f.getItem(IN).getItem()) + " beside it");
         return Result.RUNNING;
+    }
+
+    /** The fuel for the food cooked beside the batch: what is least use otherwise, never the meat nor what the batch smelts (null: none). */
+    private ItemStack cookFuel(BotPlayer body) {
+        ItemStack best = null;
+        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
+            if (st.isEmpty() || RAW_FOOD.contains(st.getItem()) || route.input().test(st) || st.is(route.result()) || BotKnowledge.fuelValue(st) <= 0) continue;
+            if (best == null || rank(st) < rank(best)) best = st;
+        }
+        return best;
+    }
+
+    /** How many of the raw food this fuel cooks through (all of it at most). */
+    private static int cookable(ItemStack raw, ItemStack fuel) {
+        if (fuel == null || fuel.isEmpty()) return 0;
+        return (int) Math.min(raw.getCount(), Math.floor(fuel.getCount() * BotKnowledge.fuelValue(fuel)));
     }
 
     private final java.util.List<net.minecraft.core.BlockPos> extras = new java.util.ArrayList<>();
