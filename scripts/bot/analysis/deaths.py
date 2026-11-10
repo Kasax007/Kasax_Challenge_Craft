@@ -10,7 +10,8 @@ for path in sys.argv[1:]:
         m = re.search(r"\[BOTVS\] (\w+) plays \w+ with (\S+)", l)
         if m: params[m.group(1)] = m.group(2)
     for i, l in enumerate(lines):
-        m = re.search(r"System chat: (?:\[Lvl \d+\] )?(\w+) (was slain|was shot|died|fell|drowned|burned|blew up|hit the ground|tried to swim|went up in flames|was blown up|walked into|suffocated|starved|was killed|was fireballed)(.*)", l)
+        # (Any "was ..." counts - impaled by a drowned's trident, pricked, stung, squashed - besides the other death messages.)
+        m = re.search(r"System chat: (?:\[Lvl \d+\] )?(\w+) (was \w+|died|fell|drowned|burned|blew up|hit the ground|tried to swim|went up in flames|walked into|suffocated|starved|withered|froze|experienced kinetic energy)(.*)", l)
         if not m or m.group(1) not in params: continue
         name = m.group(1)
         print(f"=== {path.split('/')[-1]} {name} ({params[name]}): {m.group(1)} {m.group(2)}{m.group(3)}")
