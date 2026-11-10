@@ -40,6 +40,9 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   <li>{@code shield_walk_slow}: twenty blocks behind the raised shield - with {@code itemslow} at
  *   the item's use speed (a fifth), as a player's client has it; {@code shield_walk_fast} the
  *   same without (the server never slowed a bot so).</li>
+ *   <li>{@code treasure_iron}: on hard, the shield wanted and no iron about, a buried treasure the
+ *   world sense knows of thirty blocks off: dug up (a chest under the sand, block nine-nine of its
+ *   chunk), its iron made into the shield ({@code treasureiron}).</li>
  * </ul>
  */
 public class BotKitTests {
@@ -150,6 +153,49 @@ public class BotKitTests {
         data.resetForRun(data.getRunId());
         net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.setActive(false);
         net.kasax.challengecraft.bot.BotManager.remove(server, bot);
+    }
+
+    /**
+     * The Lockout brain on hard with its stone tools, no shield and no iron in sight; a buried
+     * treasure (three iron ingots in its chest) known to the world sense: dug up for the shield.
+     */
+    @GameTest(environment = "challengecraft:kit_treasure", structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 24)
+    public void treasureIron(GameTestHelper h) {
+        String name = "treasure_iron";
+        BotArena a = BotArena.wide(h, name);
+        BotArena.day(h);
+        var server = h.getLevel().getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        // The chest at block nine-nine of its chunk, three under a patch of sand (a beach's).
+        var near = a.abs(32, BotArena.GROUND, 20);
+        var column = new net.minecraft.core.BlockPos((near.getX() & ~15) + 9, near.getY(), (near.getZ() & ~15) + 9);
+        for (var p : net.minecraft.core.BlockPos.betweenClosed(column.offset(-3, -4, -3), column.offset(3, 0, 3))) h.getLevel().setBlock(p, Blocks.SAND.defaultBlockState(), 2);
+        var chestAt = column.below(3);
+        h.getLevel().setBlock(chestAt, Blocks.CHEST.defaultBlockState(), 2);
+        if (h.getLevel().getBlockEntity(chestAt) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chest) {
+            chest.setItem(0, new ItemStack(Items.IRON_INGOT, 3));
+            chest.setItem(1, new ItemStack(Items.HEART_OF_THE_SEA));
+        }
+        Bot bot = a.spawn(8, BotArena.FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_AXE),
+                new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.COOKED_BEEF, 8), new ItemStack(Items.COBBLESTONE, 40),
+                new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.CRAFTING_TABLE));
+        String unreachable = "trade_with_cleric";
+        net.kasax.challengecraft.challenges.Chal_40_LockoutBingo.startSoloDebugRun(bot.body(), List.of(unreachable));
+        bot.setBrain(new net.kasax.challengecraft.bot.lockout.LockoutBrain(net.kasax.challengecraft.bot.lockout.LockoutBrain.Difficulty.HARD)
+                .only(Set.of(unreachable)));
+        bot.senses().know(net.minecraft.resources.Identifier.withDefaultNamespace("buried_treasure"), column.above(), bot.body().blockPosition());
+        var body = bot.body();
+        h.succeedWhen(() -> {
+            boolean ok = ObtainPlanner.countAny(body, Set.of(Items.SHIELD)) > 0 || body.getOffhandItem().is(Items.SHIELD);
+            if (h.getTick() % 400 == 0) BotArena.LOG.info("[BOTTEST] {} t={} | {}", name, h.getTick(), bot.status());
+            if (!ok && h.getTick() >= 2398) {
+                BotArena.LOG.info("[BOTTEST] {} FAILED after {} ticks ({})", name, h.getTick(), bot.status());
+                endGame(h, bot);
+            }
+            h.assertTrue(ok, name + ": not yet");
+            BotArena.LOG.info("[BOTTEST] {} passed in {} ticks", name, h.getTick());
+            endGame(h, bot);
+        });
     }
 
     /** Copper armour, a piece at a time from one batch: the second piece's ingots cook while the first is made. */
