@@ -134,9 +134,11 @@ public final class OpeningClock {
         lastNavWait = navWait;
         if (bot.inReflex()) return "reflex";
         if (top == null) return "idle";
-        if (bot.actions().brokeThisTick()) return "dig";
+        // (What the bot's last turn did: the stopwatch may be read after it in the same server
+        // tick - the benches - or before its next one - the game tests.)
+        if (bot.actions().brokeAt() == bot.actTick) return "dig";
         if (planning) return "path";
-        boolean moving = bot.navigator().status() == BotNavigator.Status.MOVING && bot.navigator().tickedAt == body.tickCount;
+        boolean moving = bot.navigator().status() == BotNavigator.Status.MOVING && bot.navigator().tickedAt == bot.actTick;
         if (moving && searching(top)) return "search";
         if (in instanceof net.kasax.challengecraft.bot.task.KillTask || in instanceof net.kasax.challengecraft.bot.task.HuntRoundTask) return "hunt";
         if (moving) return "walk";

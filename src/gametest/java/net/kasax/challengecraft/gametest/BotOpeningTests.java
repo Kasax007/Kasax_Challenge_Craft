@@ -73,7 +73,7 @@ public class BotOpeningTests {
                 () -> ObtainPlanner.countAny(bot.body(), Set.of(Items.STONE_PICKAXE)) > 0);
     }
 
-    /** From nothing to a stone pickaxe, the stone from the knoll in sight: under 40 s. */
+    /** From nothing to a stone pickaxe, the stone from the knoll in sight: under 40 s (measured 25 s; the old way 49 s). */
     @GameTest(structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 8)
     public void hillsideStone(GameTestHelper h) {
         hillsideStone(h, "hillside_stone", "-", 800);
@@ -100,7 +100,10 @@ public class BotOpeningTests {
                         && bot.current() == null);
     }
 
-    /** Four beef in the furnace and sixteen cobblestone wanted: mined while it cooks, done in about the cooking time. */
+    /**
+     * Four beef in the furnace and sixteen cobblestone wanted: mined while it cooks, done in about
+     * the cooking time (measured 43 s; the old way 63 s).
+     */
     @GameTest(structure = STRUCTURE, maxTicks = 1050, skyAccess = true, padding = 8)
     public void cookAndMine(GameTestHelper h) {
         cookAndMine(h, "cook_and_mine", "-", 1050);
@@ -171,11 +174,14 @@ public class BotOpeningTests {
         BotManager.remove(h.getLevel().getServer(), bot);
     }
 
-    /** The whole opening on hard, the new way: within five minutes. */
+    /**
+     * The whole opening on hard, the new way: within 200 s (measured 146 s; the old way took 353 s,
+     * the stone pickaxe at 320 s against 77 s).
+     */
     // (A batch of its own: a Lockout game is on for the whole server while it runs.)
-    @GameTest(environment = "challengecraft:opening", structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 24)
+    @GameTest(environment = "challengecraft:opening", structure = STRUCTURE, maxTicks = 4000, skyAccess = true, padding = 24)
     public void openingKit(GameTestHelper h) {
-        openingKit(h, "opening_kit", "-", 6000);
+        openingKit(h, "opening_kit", "-", 4000);
     }
 
     /** The same the old way, for the comparison. */

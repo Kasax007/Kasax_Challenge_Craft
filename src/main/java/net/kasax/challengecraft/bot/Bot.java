@@ -303,9 +303,13 @@ public final class Bot {
         return tasks.peek();
     }
 
+    /** The body's tick of the bot's last turn (what its hands and feet did then is stamped with it). */
+    public int actTick = -1;
+
     void tick() {
         logHits();
         if (!body.isAlive()) return;
+        actTick = body.tickCount;
         danger.restore();
         act();
         // Something flying at it that would hit: a step aside first.

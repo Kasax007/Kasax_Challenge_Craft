@@ -95,9 +95,9 @@ public final class BotActions {
     /** The body's tick of the last {@link #breakTick} (for the stopwatch, see OpeningClock). */
     private int brokeAt = -1;
 
-    /** Whether a block was worked on in this tick of the body. */
-    public boolean brokeThisTick() {
-        return brokeAt == bot.tickCount;
+    /** The body's tick in which a block was last worked on (see {@link Bot#actTick}). */
+    public int brokeAt() {
+        return brokeAt;
     }
 
     /** Whether a block is being broken right now (progress made this or the last tick). */
