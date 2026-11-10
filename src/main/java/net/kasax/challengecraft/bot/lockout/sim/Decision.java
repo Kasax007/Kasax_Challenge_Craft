@@ -32,6 +32,9 @@ public final class Decision {
     /** Whether this is the food chore. */
     public boolean food;
 
+    /** Seconds a floor put on the estimate beyond the simulator's own figure (see SearchPolicy#choreFloor). */
+    public double extra;
+
     /** A chore rather than a tile (an investment or the food). */
     public boolean chore() {
         return invest != null || food;

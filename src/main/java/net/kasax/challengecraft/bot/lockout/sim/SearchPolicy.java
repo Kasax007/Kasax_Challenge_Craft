@@ -67,6 +67,12 @@ public final class SearchPolicy implements Policy {
      */
     public double[] floor;
     /**
+     * Per chore (its bit, as in {@link #choresAllowed}), the least it is believed to take (seconds;
+     * absent: no floor) - as {@link #floor} for the tiles, from Bob's own estimate of the chore in
+     * the real game, so that tiles and chores are weighed alike.
+     */
+    public java.util.Map<Long, Double> choreFloor;
+    /**
      * Varies the luck of the games played ahead from one decision to the next where a fresh
      * instance makes each decision (the real game: the decision's number).
      */
@@ -138,6 +144,7 @@ public final class SearchPolicy implements Policy {
         s.solo = solo;
         s.allowed = allowed;
         s.floor = floor;
+        s.choreFloor = choreFloor;
         s.chores = chores;
         s.choresAllowed = choresAllowed;
         s.deathCost = deathCost;
@@ -160,7 +167,7 @@ public final class SearchPolicy implements Policy {
         Profile prof = sim.profiles[me];
         if ((choresAllowed & FOOD_BIT) != 0 && p.res[Res.FOOD.ordinal()] < prof.foodLow + prof.foodBatch) {
             double c = sim.planner.estimate(sim, me, Res.FOOD, prof.foodBatch, own);
-            if (c < Planner.INF / 2) out.add(Decision.food(c, "chore"));
+            if (c < Planner.INF / 2) out.add(floored(Decision.food(c, "chore"), FOOD_BIT, c));
         }
         int netherTiles = 0;
         for (int t = 0; t < Board.SIZE; t++) if (sim.board.isOpen(t) && sim.board.nether(t) && sim.usable(me, t)) netherTiles++;
@@ -171,8 +178,17 @@ public final class SearchPolicy implements Policy {
             if (m == Ms.COPPER_ARMOR && (!prof.copper || !p.has(Ms.SHIELD) || p.dim != 0)) continue;
             if (m == Ms.NETHER_VISITED && (p.dim != 0 || netherTiles == 0)) continue;
             double c = sim.planner.estimate(sim, me, m, own);
-            if (c < Planner.INF / 2) out.add(Decision.invest(m, c, "chore"));
+            if (c < Planner.INF / 2) out.add(floored(Decision.invest(m, c, "chore"), m.bit, c));
         }
+        return out;
+    }
+
+    /** The chore believed to take at least its floor (see {@link #choreFloor}): the estimate raised, the rest as {@code extra}. */
+    private Decision floored(Decision d, long bit, double c) {
+        Double f = choreFloor == null ? null : choreFloor.get(bit);
+        if (f == null || f <= c) return d;
+        Decision out = d.food ? Decision.food(f, d.why) : Decision.invest(d.invest, f, d.why);
+        out.extra = f - c;
         return out;
     }
 
@@ -278,7 +294,7 @@ public final class SearchPolicy implements Policy {
                         progress++;
                         continue;
                     }
-                    if (tiles[i] >= 0) f.lengthen(me, extra[tiles[i]]);
+                    f.lengthen(me, tiles[i] >= 0 ? extra[tiles[i]] : choreList.get(-1 - tiles[i]).extra);
                     int died = f.players[me].deaths;
                     f.runUntil(until);
                     sum[i] += value(f, me) - deathCost * (f.players[me].deaths - died);

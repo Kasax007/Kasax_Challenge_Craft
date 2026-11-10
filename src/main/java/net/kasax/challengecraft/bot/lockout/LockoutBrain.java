@@ -453,7 +453,20 @@ public final class LockoutBrain implements BotBrain {
                 floors.merge(c.tile().index(), floor, Math::min);
             }
             long chores = searchingChores(bot) ? choresOpen(bot) : 0;
-            BoardSearch.Pick p = boardSearch.pick(bot, tiles, floors, chores);
+            Map<Long, Double> choreFloors = null;
+            if (chores != 0 && bot.params.get("chorefloor", 0) != 0) {
+                // (The chores weighed as the tiles are: at least the ownfloor share of Bob's own
+                // estimate of each; one his planner sees no way to is not offered. Off by default:
+                // league B played search=2 without it.)
+                choreFloors = new HashMap<>();
+                double share = bot.params.get("ownfloor", OWN_FLOOR);
+                for (long bit : choreBits(chores)) {
+                    double own = choreEstimate(bot, bit);
+                    if (own >= 1e8) chores &= ~bit;
+                    else choreFloors.put(bit, share * own);
+                }
+            }
+            BoardSearch.Pick p = boardSearch.pick(bot, tiles, floors, chores, choreFloors);
             // (The look-ahead works on a thread of its own: Bob stands a tick or two for its answer.)
             if (p == BoardSearch.THINKING) return;
             if (p != null && p.isChore()) {
@@ -1627,6 +1640,41 @@ public final class LockoutBrain implements BotBrain {
         }
         if (netherTilesOpen(bot) && body.level().getGameTime() >= netherRetryAt) m |= net.kasax.challengecraft.bot.lockout.sim.Ms.NETHER_VISITED.bit;
         return m;
+    }
+
+    /** The single bits set in a chore mask. */
+    private static List<Long> choreBits(long mask) {
+        List<Long> out = new ArrayList<>();
+        for (long m = mask; m != 0; m &= m - 1) out.add(Long.lowestOneBit(m));
+        return out;
+    }
+
+    /** Bob's own estimate (seconds) of a chore, as {@link #startChore} would plan it; 1e9: no way. */
+    private double choreEstimate(Bot bot, long bit) {
+        var body = bot.body();
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.SearchPolicy.FOOD_BIT) {
+            return planner.estimate(bot, FOODS, ObtainPlanner.countAny(body, FOODS) + 4);
+        }
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.Ms.NETHER_VISITED.bit) {
+            LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
+            return trip == null ? 1e9 : trip.cost();
+        }
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.Ms.COPPER_ARMOR.bit) {
+            int ingots = 0, n = 0;
+            for (var piece : COPPER_SET.keySet()) {
+                if (n < 2 && armourSlotFree(body, piece)) {
+                    ingots += COPPER_SET.get(piece);
+                    n++;
+                }
+            }
+            if (n == 0) return 1e9;
+            int have = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.COPPER_INGOT));
+            return planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), have + ingots);
+        }
+        var item = bit == net.kasax.challengecraft.bot.lockout.sim.Ms.SHIELD.bit ? net.minecraft.world.item.Items.SHIELD
+                : bit == net.kasax.challengecraft.bot.lockout.sim.Ms.IRON_PICK.bit ? net.minecraft.world.item.Items.IRON_PICKAXE
+                : bit == net.kasax.challengecraft.bot.lockout.sim.Ms.BUCKET.bit ? net.minecraft.world.item.Items.BUCKET : null;
+        return item == null ? 1e9 : planner.estimate(bot, Set.of(item), 1);
     }
 
     /**

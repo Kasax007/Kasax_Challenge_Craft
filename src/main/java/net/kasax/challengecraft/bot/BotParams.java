@@ -46,6 +46,10 @@ import java.util.Map;
  *       to take at least whatever the simulator says: 1 (the default) all of it, the simulator's
  *       figure only where it is more; 0.5 half of it, as in round 1 (whose picks the simulator
  *       thought cheaper than Bob did were mostly not got).</li>
+ *   <li>{@code chorefloor} - 0 (the default, as league B played {@code search=2}): the simulator's
+ *       figure for the chores; 1: with {@code search=2} the chores are believed to take at least the
+ *       {@code ownfloor} share of Bob's own estimate of them too (tiles and chores weighed alike),
+ *       and one his planner sees no way to is not offered (not played in a league yet).</li>
  *   <li>{@code fastopen} - 1 (the default): the stone tools before the stock of food (unless
  *       hungry or hurt), the food on the way; 0: the stock first, as before.</li>
  *   <li>{@code interleave} - 1 (the default): a dear investment (the shield's iron, the iron kit,

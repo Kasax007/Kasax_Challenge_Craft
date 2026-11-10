@@ -149,14 +149,27 @@ public class BotBrainTests {
      */
     @GameTest(environment = "challengecraft:lockout_search2", structure = STRUCTURE, maxTicks = 2500, skyAccess = true, padding = 8)
     public void searchChoresFirstTile(GameTestHelper h) {
-        BotArena a = BotArena.flat(h, "search_chores_first_tile");
+        searchFirstTile(h, "search_chores_first_tile", "search=2,quick=0");
+    }
+
+    /**
+     * The same with the chores weighed as the tiles ({@code chorefloor=1}: at least Bob's own
+     * estimate of each, BoardSearch's chore floors): the look-ahead still decides and a tile comes.
+     */
+    @GameTest(environment = "challengecraft:lockout_search2_floor", structure = STRUCTURE, maxTicks = 2500, skyAccess = true, padding = 8)
+    public void searchChoreFloorsFirstTile(GameTestHelper h) {
+        searchFirstTile(h, "search_chore_floors_first_tile", "search=2,quick=0,chorefloor=1");
+    }
+
+    private static void searchFirstTile(GameTestHelper h, String name, String knobs) {
+        BotArena a = BotArena.flat(h, name);
         BotArena.day(h);
         var server = h.getLevel().getServer();
         var bob = a.spawn(20, FEET, 20,
                 new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_AXE), new ItemStack(Items.STONE_SHOVEL),
                 new ItemStack(Items.BREAD, 3), new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.OAK_PLANKS, 32),
                 new ItemStack(Items.IRON_INGOT, 6), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.BUNDLE));
-        bob.params = BotParams.parse("search=2,quick=0");
+        bob.params = BotParams.parse(knobs);
         Chal_40_LockoutBingo.startDebugRun(List.of((net.minecraft.server.level.ServerPlayer) bob.body()),
                 List.of("craft_bucket", "craft_shears", "craft_furnace", "craft_cauldron"));
         LockoutBrain brain = new LockoutBrain(LockoutBrain.Difficulty.HARD);
@@ -167,13 +180,13 @@ public class BotBrainTests {
             int tiles = Chal_40_LockoutBingo.score(server, team);
             if (h.getTick() >= 2480 && tiles < 1 && !ended[0]) {
                 ended[0] = true;
-                BotArena.LOG.info("[BOTTEST] search_chores_first_tile FAILED: no tile, look-ahead decisions {} (chores {})",
+                BotArena.LOG.info("[BOTTEST] {} FAILED: no tile, look-ahead decisions {} (chores {})", name,
                         brain.lookAheadDecisions(), brain.lookAheadChores());
                 end(server, bob);
             }
             h.assertTrue(tiles >= 1, "no tile yet");
             h.assertTrue(brain.lookAheadDecisions() >= 1, "a tile, but the look-ahead never decided");
-            BotArena.LOG.info("[BOTTEST] search_chores_first_tile passed in {} ticks ({} look-ahead decisions, {} of them chores)", h.getTick(),
+            BotArena.LOG.info("[BOTTEST] {} passed in {} ticks ({} look-ahead decisions, {} of them chores)", name, h.getTick(),
                     brain.lookAheadDecisions(), brain.lookAheadChores());
             end(server, bob);
         });

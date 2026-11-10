@@ -135,20 +135,21 @@ final class BoardSearch {
      * to the old route.
      */
     Pick pick(Bot bot, Map<Integer, Double> choices) {
-        return pick(bot, choices, null, 0);
+        return pick(bot, choices, null, 0, null);
     }
 
     /**
      * As {@link #pick(Bot, Map)}, with the least each tile is believed to take ({@code floors}, by
      * board index; null: half of its own estimate) and the chores it may choose instead of a tile
-     * ({@code chores}: bits of {@link Ms} and {@link SearchPolicy#FOOD_BIT}; 0: tiles only).
+     * ({@code chores}: bits of {@link Ms} and {@link SearchPolicy#FOOD_BIT}; 0: tiles only), with the
+     * least each chore is believed to take ({@code choreFloors} by bit; null: none).
      */
-    Pick pick(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores) {
+    Pick pick(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores, Map<Long, Double> choreFloors) {
         if (workerHung) return null;
         try {
             long now = bot.server().overworld().getGameTime();
             if (job != null && now - job.askedAt() >= STALE_TICKS) drop();
-            if (job == null) return ask(bot, choices, floors, chores, now);
+            if (job == null) return ask(bot, choices, floors, chores, choreFloors, now);
             Job j = job;
             long ticks = now - j.askedAt();
             if (BotNavigator.SIM) {
@@ -174,9 +175,12 @@ final class BoardSearch {
             decisions++;
             if (d != null && d.chore()) {
                 choreDecisions++;
-                return new Pick(-1, d.estimate, String.format("look-ahead: %s (~%d s; %s; %d games, %d ticks)",
-                        d.food ? "a stock of food" : d.invest.name().toLowerCase(java.util.Locale.ROOT), Math.round(d.estimate), d.why,
-                        j.policy().progress, ticks), d.invest, d.food);
+                // (With the floor from Bob's own estimate of the chore, if there was one: SearchPolicy#choreFloor.)
+                var choreFloor = j.policy().choreFloor;
+                Double floor = choreFloor == null ? null : choreFloor.get(d.food ? SearchPolicy.FOOD_BIT : (long) d.invest.bit);
+                return new Pick(-1, d.estimate, String.format("look-ahead: %s (~%d s; %s%s; %d games, %d ticks)",
+                        d.food ? "a stock of food" : d.invest.name().toLowerCase(java.util.Locale.ROOT), Math.round(d.estimate),
+                        floor == null ? "" : "floor ~" + Math.round(floor) + " s; ", d.why, j.policy().progress, ticks), d.invest, d.food);
             }
             if (d == null || d.tile < 0 || !choices.containsKey(d.tile)) return null;
             return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s, own ~%d s; %s; %d games, %d ticks)",
@@ -193,7 +197,7 @@ final class BoardSearch {
     }
 
     /** Puts the question: the picture of the game now, handed to the worker. */
-    private Pick ask(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores, long now) {
+    private Pick ask(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores, Map<Long, Double> choreFloors, long now) {
         Sim sim = snapshot(bot);
         if (sim == null) return null;
         SearchPolicy policy = template.fresh();
@@ -209,6 +213,7 @@ final class BoardSearch {
         }
         policy.allowed = allowed;
         policy.floor = floor;
+        policy.choreFloor = choreFloors;
         policy.salt = asked++;
         job = new Job(WORKER.submit(() -> policy.choose(sim, 0)), policy, sim, now);
         return THINKING;

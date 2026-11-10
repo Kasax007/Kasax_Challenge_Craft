@@ -330,7 +330,7 @@ public final class SimSelfTest {
      * a stock of food is among its answers; with chores off it never answers a chore.
      */
     static void lookAheadDecidesChores() {
-        int chores = 0, off = 0;
+        int chores = 0, off = 0, floored = 0;
         for (int g = 0; g < 12; g++) {
             long seed = SearchPolicy.mix(4242 + g);
             World w = World.sample(seed);
@@ -348,9 +348,18 @@ public final class SimSelfTest {
             if (d != null && d.chore()) chores++;
             Decision e = new SearchPolicy().choose(sim.fork(w, null, null, g), 0);
             if (e != null && e.chore()) off++;
+            // (Every chore floored far off by Bob's own figure, SearchPolicy#choreFloor: a tile instead.)
+            SearchPolicy f = new SearchPolicy();
+            f.chores = true;
+            f.choreFloor = new java.util.HashMap<>();
+            f.choreFloor.put(SearchPolicy.FOOD_BIT, 5000.0);
+            for (Ms m : SearchPolicy.CHORES) f.choreFloor.put((long) m.bit, 5000.0);
+            Decision x = f.choose(sim.fork(w, null, null, g), 0);
+            if (x != null && x.chore()) floored++;
         }
         check(chores >= 1, "the look-ahead never chose a chore, hungry with iron tiles to do");
         check(off == 0, "a chore chosen with chores off");
+        check(floored == 0, "a chore Bob's own figure puts at 5000 s still chosen (" + floored + " of 12)");
     }
 
     /**
