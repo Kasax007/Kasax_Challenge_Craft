@@ -217,12 +217,16 @@ public class BotBrainTests {
         }
     }
 
-    /** The iron tile with a structure known (as the world sense knows one): the route is to loot it, and it is run till the iron is in hand. */
-    private static void lootRoute(GameTestHelper h, BotArena a, String name, String family, BlockPos spot, int maxTicks) {
+    /**
+     * The iron tile with a structure known (as the world sense knows one): the route is to loot it,
+     * and it is run till the iron is in hand. {@code structure}: the structure's own id (a family
+     * like "village" is a tag of several: village_plains, village_desert...).
+     */
+    private static void lootRoute(GameTestHelper h, BotArena a, String name, String family, String structure, BlockPos spot, int maxTicks) {
         var goal = LockoutBingoGoalPool.byId("obtain_iron_ingot");
         h.runAfterDelay(20, () -> {
             var bot = a.bot();
-            bot.senses().know(Identifier.withDefaultNamespace(family), spot, bot.body().blockPosition());
+            bot.senses().know(Identifier.withDefaultNamespace(structure), spot, bot.body().blockPosition());
             var o = LockoutGoals.plan(bot, new ObtainPlanner(), goal);
             String route = o == null ? "none" : o.task().get().describe();
             BotArena.LOG.info("[BOTTEST] {}: the route {} (~{} s)", name, route, Math.round(cost(o)));
@@ -239,7 +243,7 @@ public class BotBrainTests {
         chests(a, BuiltInLootTables.SHIPWRECK_TREASURE, new int[]{30, FEET + 1, 30});
         chests(a, BuiltInLootTables.SHIPWRECK_SUPPLY, new int[]{33, FEET + 1, 31});
         a.spawn(5, FEET, 5, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
-        lootRoute(h, a, "loot_shipwreck_route", "shipwreck", a.abs(31, FEET + 1, 30), 1500);
+        lootRoute(h, a, "loot_shipwreck_route", "shipwreck", "shipwreck", a.abs(31, FEET + 1, 30), 1500);
     }
 
     /**
@@ -253,7 +257,7 @@ public class BotBrainTests {
         a.fill(27, GROUND - 3, 27, 33, GROUND, 33, Blocks.SAND);
         chests(a, BuiltInLootTables.BURIED_TREASURE, new int[]{30, GROUND - 2, 30});
         a.spawn(5, FEET, 5, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SHOVEL), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.CRAFTING_TABLE));
-        lootRoute(h, a, "loot_buried_treasure_route", "buried_treasure", a.abs(30, FEET, 30), 1500);
+        lootRoute(h, a, "loot_buried_treasure_route", "buried_treasure", "buried_treasure", a.abs(30, FEET, 30), 1500);
     }
 
     /** A village's smiths' chests, known: the raid there for iron (the weaponsmith's and the toolsmith's chests). */
@@ -262,10 +266,11 @@ public class BotBrainTests {
         BotArena a = BotArena.flat(h, "loot_village_route");
         chests(a, BuiltInLootTables.VILLAGE_WEAPONSMITH, new int[]{30, FEET, 30}, new int[]{33, FEET, 27});
         chests(a, BuiltInLootTables.VILLAGE_TOOLSMITH, new int[]{27, FEET, 33});
-        // (No pickaxe: the iron the usual way is a pickaxe first and a staircase - the smiths'
-        // chests are the quicker way; with a stone pickaxe in hand mining was, ~143 s against ~150.)
+        // (No pickaxe: the iron the usual way is a pickaxe first and a staircase, ~317 s - the
+        // smiths' chests are the quicker way. The village known as a plains village: "village" is
+        // the family, a tag of the five kinds, and no structure of its own.)
         a.spawn(5, FEET, 5, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
-        lootRoute(h, a, "loot_village_route", "village", a.abs(30, FEET, 30), 1500);
+        lootRoute(h, a, "loot_village_route", "village", "village_plains", a.abs(30, FEET, 30), 1500);
     }
 
     // ---- routes: a mob at its home -----------------------------------------------------------------
