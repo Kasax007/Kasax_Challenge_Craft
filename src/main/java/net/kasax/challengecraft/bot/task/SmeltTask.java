@@ -92,9 +92,21 @@ public final class SmeltTask extends StationTask {
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
         // Not stood beside it while it cooks: the kit's stone or wood from within a few blocks
         // (a player puts the meat in and mines the wall beside it), back for what is done.
+        int left = 0;
+        for (var f : all) left = Math.max(left, f.getItem(IN).getCount() * COOK_TICKS - COOK_TICKS / 2);
+        // And a bite while waiting, if the stomach has room for a whole one: the eating reflex
+        // would stop a walk for it a little later (only with nothing after it close by).
+        if (!ateWaiting && left >= 40 && bot.params.on("meanwhile") && !bot.targeted(8)) {
+            int slot = EatTask.bestFood(body);
+            var food = slot < 0 ? null : body.getInventory().getNonEquipmentItems().get(slot).get(net.minecraft.core.component.DataComponents.FOOD);
+            // (Proper food only: not the raw meat that is about to be cooked.)
+            if (food != null && food.nutrition() >= 5 && body.getFoodData().getFoodLevel() <= 20 - food.nutrition()) {
+                ateWaiting = true;
+                bot.interject(new EatTask());
+                return Result.RUNNING;
+            }
+        }
         if (meanwhileTries < 2 && bot.params.on("meanwhile")) {
-            int left = 0;
-            for (var f : all) left = Math.max(left, f.getItem(IN).getCount() * COOK_TICKS - COOK_TICKS / 2);
             if (left >= MEANWHILE_MIN) {
                 meanwhileTries++;
                 BotTask work = meanwhileWork(bot, level);
@@ -171,6 +183,7 @@ public final class SmeltTask extends StationTask {
     /** Cobblestone the kit keeps (spare stone and blocks to build with): mined while the furnace cooks, up to this. */
     private static final int MEANWHILE_COBBLE = 32;
     private int meanwhileTries;
+    private boolean ateWaiting;
 
     /** Nothing left to cook in any of these furnaces (or they are gone). */
     private static boolean cooked(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces) {

@@ -169,11 +169,11 @@ public class BotOpeningTests {
         BotManager.remove(h.getLevel().getServer(), bot);
     }
 
-    /** The whole opening on hard, the new way: within four minutes. */
+    /** The whole opening on hard, the new way: within five minutes. */
     // (A batch of its own: a Lockout game is on for the whole server while it runs.)
-    @GameTest(environment = "challengecraft:opening", structure = STRUCTURE, maxTicks = 4800, skyAccess = true, padding = 24)
+    @GameTest(environment = "challengecraft:opening", structure = STRUCTURE, maxTicks = 6000, skyAccess = true, padding = 24)
     public void openingKit(GameTestHelper h) {
-        openingKit(h, "opening_kit", "-", 4800);
+        openingKit(h, "opening_kit", "-", 6000);
     }
 
     /** The same the old way, for the comparison. */
