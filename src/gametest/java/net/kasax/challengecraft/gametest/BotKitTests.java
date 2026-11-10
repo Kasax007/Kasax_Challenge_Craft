@@ -53,7 +53,7 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  */
 public class BotKitTests {
     /** This round's knobs off: the kit trip and the food as before. */
-    static final String BEFORE_KIT = "veinfirst=0,smeltgo=0,cookalong=0,foodsight=0,mountainiron=0";
+    static final String BEFORE_KIT = "veinfirst=0,smeltgo=0,cookalong=0,foodsight=0,mountainiron=0,treasureiron=0";
 
     private static void veinSweep(GameTestHelper h, String name, String knobs, int budget) {
         BotArena a = BotArena.flat(h, name);
