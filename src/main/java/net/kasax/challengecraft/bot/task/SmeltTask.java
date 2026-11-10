@@ -185,6 +185,16 @@ public final class SmeltTask extends StationTask {
     private int meanwhileTries;
     private boolean ateWaiting;
 
+    /** Ores worth taking beside a furnace, with what each drops. */
+    private static final java.util.Map<net.minecraft.world.level.block.Block, net.minecraft.world.item.Item> ORE_DROPS = java.util.Map.ofEntries(
+            java.util.Map.entry(Blocks.COAL_ORE, Items.COAL), java.util.Map.entry(Blocks.DEEPSLATE_COAL_ORE, Items.COAL),
+            java.util.Map.entry(Blocks.IRON_ORE, Items.RAW_IRON), java.util.Map.entry(Blocks.DEEPSLATE_IRON_ORE, Items.RAW_IRON),
+            java.util.Map.entry(Blocks.COPPER_ORE, Items.RAW_COPPER), java.util.Map.entry(Blocks.DEEPSLATE_COPPER_ORE, Items.RAW_COPPER),
+            java.util.Map.entry(Blocks.GOLD_ORE, Items.RAW_GOLD), java.util.Map.entry(Blocks.DEEPSLATE_GOLD_ORE, Items.RAW_GOLD),
+            java.util.Map.entry(Blocks.REDSTONE_ORE, Items.REDSTONE), java.util.Map.entry(Blocks.DEEPSLATE_REDSTONE_ORE, Items.REDSTONE),
+            java.util.Map.entry(Blocks.LAPIS_ORE, Items.LAPIS_LAZULI), java.util.Map.entry(Blocks.DEEPSLATE_LAPIS_ORE, Items.LAPIS_LAZULI),
+            java.util.Map.entry(Blocks.DIAMOND_ORE, Items.DIAMOND), java.util.Map.entry(Blocks.DEEPSLATE_DIAMOND_ORE, Items.DIAMOND));
+
     /** Nothing left to cook in any of these furnaces (or they are gone). */
     private static boolean cooked(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces) {
         for (var p : furnaces) if (level.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity f && !f.getItem(IN).isEmpty()) return false;
@@ -192,12 +202,27 @@ public final class SmeltTask extends StationTask {
     }
 
     /**
-     * Work worth doing within a few blocks while a furnace cooks, or null: rock showing at body
-     * height or in the ground beside (the kit's cobblestone), else a trunk right there (the spare
-     * wood) - only what is in sight, never a search or a staircase away from the furnace.
+     * Work worth doing within a few blocks while a furnace cooks, or null: ore showing in a wall
+     * beside it (the whole vein), else rock at body height or in the ground beside (the kit's
+     * cobblestone), else a trunk right there (the spare wood) - only what is in sight, never a
+     * search or a staircase away from the furnace.
      */
     static BotTask meanwhileWork(Bot bot, ServerLevel level) {
         BotPlayer body = bot.body();
+        // Ore showing within a few blocks (the furnace stands in a cave or a tunnel often enough):
+        // the whole vein, as a player takes what the wall beside him shows.
+        net.minecraft.core.BlockPos ore = net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 8, 4,
+                st -> ORE_DROPS.containsKey(st.getBlock()) && bot.tools().canHarvest(st), true, bot.unreachable());
+        if (ore != null) {
+            var item = ORE_DROPS.get(level.getBlockState(ore).getBlock());
+            java.util.Set<net.minecraft.world.level.block.Block> family = new java.util.HashSet<>();
+            ORE_DROPS.forEach((b, i) -> {
+                if (i == item) family.add(b);
+            });
+            int have = ObtainPlanner.countAny(body, java.util.Set.of(item));
+            return new MineTask(ObtainPlanner.name(item), st -> family.contains(st.getBlock()), java.util.Set.of(item), have + 8)
+                    .atLeast(have + 1).knownOnly();
+        }
         var stone = java.util.Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
         int cobble = ObtainPlanner.countAny(body, stone);
         java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> rock = st -> (st.is(Blocks.STONE) || st.is(Blocks.DEEPSLATE)
