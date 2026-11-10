@@ -2,6 +2,7 @@
 
     python3 scripts/bot/analysis/goals.py run-*/versus_*.log            # the table
     python3 scripts/bot/analysis/goals.py --md run-*/versus_*.log       # the same as a markdown table
+    python3 scripts/bot/analysis/goals.py --params search=2 logs/*.log  # one side of a two-variant league
 
 Columns: n starts; est = the believed estimate when it was started (the "goal: X (~N s" line);
 plan = the planner's own figure (logged since ObtainPlanner.ESTIMATES 2 as "plan ~N s"); expert = the knowledge
@@ -105,8 +106,15 @@ def fmt(x, w=5):
 
 def main(argv):
     md = "--md" in argv
+    want = None
+    if "--params" in argv:
+        i = argv.index("--params")
+        want = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
     paths = [a for a in argv if not a.startswith("--")]
     rows = parse(paths)
+    if want is not None:
+        rows = [r for r in rows if r[0] == want]
     by = collections.defaultdict(list)
     for v, title, est, real, how, kind, plan, expert in rows:
         by[title].append((est, real, how, kind, v, plan, expert))
