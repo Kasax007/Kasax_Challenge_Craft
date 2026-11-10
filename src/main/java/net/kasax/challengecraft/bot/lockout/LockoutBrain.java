@@ -1693,11 +1693,11 @@ public final class LockoutBrain implements BotBrain {
                 String id = tile.goal().id();
                 if (model != null) {
                     double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, tile.goal(), plain, o.proxy(), minutes(now), deathsSeen,
-                            tries.getOrDefault(id, 0), overruns.getOrDefault(id, 0), GoalExperience.factor(id));
+                            tries.getOrDefault(id, 0), overruns.getOrDefault(id, 0), GoalExperience.factor(id, bot.params.on("goalprior")));
                     double secs = model.seconds(plain, x) / Math.max(0.3, 1 - model.failChance(x));
                     o = o.costing(Math.max(0.5 * plain, Math.min(3.5 * Math.max(1, plain), secs)));
                 } else {
-                    double f = GoalExperience.factor(id);
+                    double f = GoalExperience.factor(id, bot.params.on("goalprior"));
                     if (f != 1) o = o.costing(o.cost() * f);
                 }
             }
@@ -1891,7 +1891,7 @@ public final class LockoutBrain implements BotBrain {
                 for (Choice o : cand) {
                     if (o == f) continue;
                     LockoutGoals.Option again = LockoutGoals.plan(bot, planner, o.tile().goal());
-                    if (again != null) m.put(o.tile().goal().id(), again.cost() * GoalExperience.factor(o.tile().goal().id()));
+                    if (again != null) m.put(o.tile().goal().id(), again.cost() * GoalExperience.factor(o.tile().goal().id(), bot.params.on("goalprior")));
                 }
                 return m;
             }));
@@ -2533,6 +2533,11 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         journalGoalEnd(bot, "failed");
+        // (Knob failexp: a failed start teaches as an overrun does - the tile takes at least what
+        // was spent and another go; "Fall 20 Blocks" failed four times in eight in leagues 9 and
+        // 10, quickly, and was believed as cheap as ever. A lower bound: it only ever raises.)
+        if (bot.params.on("failexp") && !goalProxy && goalFirstEstimate > 0)
+            GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now) + goalFirstEstimate, 0.5);
         fails.merge(targetId, 1, Integer::sum);
         // Failed: try it again later, but not forever.
         if (tries.merge(targetId, 1, Integer::sum) >= MAX_TRIES) {
@@ -2564,7 +2569,7 @@ public final class LockoutBrain implements BotBrain {
         var g = pick.tile().goal();
         long now = bot.body().level().getGameTime();
         double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, g, pick.plain(), pick.option().proxy(), minutes(now), deathsSeen,
-                tries.getOrDefault(g.id(), 0), overruns.getOrDefault(g.id(), 0), GoalExperience.factor(g.id()));
+                tries.getOrDefault(g.id(), 0), overruns.getOrDefault(g.id(), 0), GoalExperience.factor(g.id(), bot.params.on("goalprior")));
         var o = new com.google.gson.JsonObject();
         o.addProperty("id", net.kasax.challengecraft.bot.learn.Journal.newId());
         o.addProperty("bot", bot.name);

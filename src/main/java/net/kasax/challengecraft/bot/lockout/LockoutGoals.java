@@ -210,9 +210,9 @@ public final class LockoutGoals {
             case INVENTORY_SET -> collectDistinct(bot, planner, items(goal.targets()), goal.amount());
             case INTERACT -> interact(bot, planner, goal.id());
             case DIMENSION -> "minecraft:the_nether".equals(goal.primaryTarget()) ? nether(bot, planner) : null;
-            case BIOME -> biome(bot, goal);
+            case BIOME -> biome(bot, planner, goal);
             case STRUCTURE -> structure(bot, planner, goal);
-            case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, -50) : null;
+            case LOCATION -> "reach_y_minus_50".equals(goal.id()) ? descend(bot, planner, -50) : null;
             case ADVANCEMENT -> advancement(bot, planner, goal.id());
             case BREW -> brewGoal(bot, planner, goal.id());
             case TRADE -> trade(bot, planner, goal.id());
@@ -358,6 +358,8 @@ public final class LockoutGoals {
     // ---- stunts: things to do rather than to have --------------------------------------------
 
     private static final Set<Item> BLOCKS = Set.of(Items.DIRT, Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.NETHERRACK);
+    /** Seconds a pillar takes per block (a jump and a block put down, with the stops of a real climb), and to find the spot and fall. */
+    private static final double PILLAR_STEP = 1.2, FALL_SETUP = 15;
     private static final Set<Item> BEDS = beds();
 
     private static Set<Item> beds() {
@@ -907,7 +909,11 @@ public final class LockoutGoals {
     private static Option fall(Bot bot, ObtainPlanner planner, int height, boolean hurt) {
         double blocks = planner.estimate(bot, BLOCKS, height + 2);
         if (blocks >= INF) return null;
-        return new Option(blocks + height * 0.7 + 5, () -> new SequenceTask("fall " + height + " blocks", List.of(
+        // (Knob estfix: a pillar a block a second or so, and the spot under the open sky found
+        // first - "Fall 20 Blocks" was ~20 s, ran 24 s on average and was got 2 times in 8 in
+        // leagues 9 and 10, mostly given up when its allowance of three times ~20 s ran out.)
+        double climb = bot.params.on("estfix") ? height * PILLAR_STEP + FALL_SETUP : height * 0.7 + 5;
+        return new Option(blocks + climb, () -> new SequenceTask("fall " + height + " blocks", List.of(
                 () -> new ObtainTask(BLOCKS, height + 2, planner),
                 () -> new net.kasax.challengecraft.bot.task.FallTask(height, hurt))));
     }
@@ -1015,14 +1021,33 @@ public final class LockoutGoals {
     }
 
     /** Biomes: a walk if one is in view; otherwise exploring, longer the rarer the biome. */
-    private static Option biome(Bot bot, LockoutBingoGoal goal) {
+    private static Option biome(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
         Identifier id = Identifier.parse(goal.primaryTarget());
         boolean nether = goal.category() == net.kasax.challengecraft.challenges.lockout.LockoutBingoGoalCategory.NETHER;
         if (nether != (bot.body().level().dimension() == Level.NETHER)) return null;
         BlockPos seen = bot.senses().biome(id);
         double cost = seen != null ? 3 + net.kasax.challengecraft.bot.BotTerrain.walkSeconds(bot, bot.body().blockPosition(), seen) : unseenEffort(goal);
+        // A cave biome (knob estfix): under the ground where it was sensed - the way down into it
+        // is a staircase from the surface there (or from where it stands below), and some looking
+        // for the way in; the walk over the land alone made "Dripstone Caves" ~12 to 120 s, and
+        // leagues 9 and 10 got it once in four starts at some 260 s each (the expert: 240 s).
+        if (seen != null && CAVE_BIOMES.contains(id.getPath()) && bot.params.on("estfix") && !nether) {
+            var level = bot.body().level();
+            int surface = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, seen.getX(), seen.getZ());
+            if (level.getChunkSource().getChunkNow(seen.getX() >> 4, seen.getZ() >> 4) == null) surface = level.getSeaLevel() + 4;
+            int from = Math.min(bot.body().getBlockY(), surface);
+            // (The biome reaches up from where it was sensed: on the way down it is entered a
+            // quarter of the way short of that, on the whole.)
+            int levels = (int) Math.round(0.75 * Math.max(0, from - seen.getY()));
+            cost += CAVE_WAY_IN + planner.staircase(bot, levels);
+        }
         return new Option(cost, () -> new GoToBiomeTask(id));
     }
+
+    /** The biomes under the ground: reached by a way down, not a walk. */
+    private static final Set<String> CAVE_BIOMES = Set.of("dripstone_caves", "lush_caves", "deep_dark");
+    /** Seconds to find the way into a cave biome once above it (a cave mouth, or the start of a staircase). */
+    private static final double CAVE_WAY_IN = 20;
 
     /** Structures: those it has seen are a walk away; surface ones are worth exploring for. */
     private static Option structure(Bot bot, ObtainPlanner planner, LockoutBingoGoal goal) {
@@ -1073,11 +1098,14 @@ public final class LockoutGoals {
     }
 
     /** Down to a height: the digging, about a block every second or two. */
-    private static Option descend(Bot bot, int y) {
+    private static Option descend(Bot bot, ObtainPlanner planner, int y) {
         if (!overworld(bot)) return null;
         int down = bot.body().getBlockY() - y;
         if (down <= 0) return null; // already there: the game counts it by itself
-        return new Option(20 + down * 0.8, () -> new BotTask() {
+        // (Knob estfix: a staircase at the pace the planner counts for ore deep down - "Reach Y
+        // -50" was ~205 s and took 484 s in league 10; 0.8 s a level before round 2.)
+        double cost = bot.params.on("estfix") ? 20 + planner.staircase(bot, down) : 20 + down * 0.8;
+        return new Option(cost, () -> new BotTask() {
             // Digging for nothing in particular, down to y (and done the moment it is there).
             private final MineTask dig = new MineTask("the depth", s -> false, Set.of(), 1, y - 2);
 

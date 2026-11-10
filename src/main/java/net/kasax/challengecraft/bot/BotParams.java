@@ -46,6 +46,16 @@ import java.util.Map;
  *       mined beside it; 0: it waits at the furnace.</li>
  *   <li>{@code rocksight} - 1 (the default): rock showing in the open up to forty blocks off is
  *       walked to before a staircase is dug for stone; 0: the staircase at once.</li>
+ *   <li>{@code estfix} - 1 (the default): the estimates of round 2 - leaves found where their tree
+ *       is (as dear as its logs, in its biome only) and a step up the crown each, a cave biome's
+ *       way down, a pillar's real pace for the falls, a staircase's pace for "Reach Y -50"; 0: as
+ *       before.</li>
+ *   <li>{@code goalprior} - 1 (the default): a tile's estimate times what the self-play leagues
+ *       measured for it (bob-knowledge/goal-priors.json) besides what this server learnt
+ *       (GoalExperience); 0: only what was learnt here.</li>
+ *   <li>{@code failexp} - 1 (the default): a failed start is learnt as an overrun is (the tile takes
+ *       at least what was spent and another go); 0: only overruns and successes are learnt. (The
+ *       experience file is the server's: in a league both sides learn from either's failures.)</li>
  * </ul>
  */
 public final class BotParams {

@@ -110,16 +110,77 @@ public final class GoalExperience {
         return e.factor();
     }
 
-    /** By how much to multiply the estimate for this goal (1 when nothing is known yet). */
+    /** By how much to multiply the estimate for this goal (1 when nothing is known yet), the shipped prior included. */
     static double factor(String goalId) {
+        return factor(goalId, true);
+    }
+
+    /**
+     * By how much to multiply the estimate for this goal: what this installation learnt, and with
+     * {@code prior} (the knob {@code goalprior}) what the self-play leagues measured before it
+     * (see {@link #prior}) as that many games more - 1 when nothing is known at all.
+     */
+    static double factor(String goalId, boolean prior) {
         if (goalId.startsWith("_")) return 1;
+        Entry local = null;
         String v = data().getProperty(goalId);
-        if (v == null) return 1;
-        try {
-            return Entry.parse(v).factor();
-        } catch (RuntimeException e) {
-            return 1;
+        if (v != null) {
+            try {
+                local = Entry.parse(v);
+            } catch (RuntimeException e) {
+                local = null;
+            }
         }
+        Entry shipped = prior ? priors().get(goalId) : null;
+        if (shipped == null) return local == null ? 1 : local.factor();
+        if (local == null) return shipped.factor();
+        double games = local.games() + shipped.games();
+        return new Entry((local.logMean() * local.games() + shipped.logMean() * shipped.games()) / Math.max(1e-9, games), games).factor();
+    }
+
+    // ---- the prior shipped with the mod ----------------------------------------------------------
+
+    /** The prior's resource: per goal, the log ratio measured in the leagues and the games it counts as. */
+    static final String PRIOR_RESOURCE = "/bob-knowledge/goal-priors.json";
+    private static java.util.Map<String, Entry> priors;
+
+    /**
+     * What the self-play leagues measured per goal (scripts/bot/analysis/goal_priors.py from the
+     * journals): the seconds a tile took per time it was got - the failed starts' seconds counted
+     * too - against the plan's estimate, as a log ratio, and the games it counts as (half a game
+     * per start: the leagues play a dozen worlds). A new installation does not have to lose each
+     * of these tiles a few times itself before it believes them: "3 Sapling Types" never got in
+     * five starts, "Lava Bucket" got twice in seven at eight times its estimate a tile.
+     * Only for the estimates it was measured against ({@code estimates} in the file).
+     */
+    static synchronized java.util.Map<String, Entry> priors() {
+        if (priors != null) return priors;
+        java.util.Map<String, Entry> out = new java.util.HashMap<>();
+        try (var in = GoalExperience.class.getResourceAsStream(PRIOR_RESOURCE)) {
+            if (in != null) {
+                var root = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                int estimates = root.has("estimates") ? root.get("estimates").getAsInt() : 0;
+                if (estimates == ObtainPlanner.ESTIMATES) {
+                    for (var e : root.getAsJsonObject("goals").entrySet()) {
+                        var o = e.getValue().getAsJsonObject();
+                        double log = Math.max(Math.log(MIN), Math.min(Math.log(MAX), o.get("log").getAsDouble()));
+                        out.put(e.getKey(), new Entry(log, o.get("games").getAsDouble()));
+                    }
+                } else {
+                    BotManager.LOG.info("[Bot] goal priors are for estimates v{}, the planner's are v{}: not used", estimates, ObtainPlanner.ESTIMATES);
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            BotManager.LOG.warn("[Bot] could not read the goal priors: {}", e.toString());
+        }
+        priors = java.util.Collections.unmodifiableMap(out);
+        return priors;
+    }
+
+    /** The shipped prior's factor for a goal alone (1: none) - for the tests and the log. */
+    public static double priorFactor(String goalId) {
+        Entry e = priors().get(goalId);
+        return e == null ? 1 : e.factor();
     }
 
     /** Records one game's outcome: {@code actualSeconds} for what was estimated at {@code estimate}. */

@@ -305,6 +305,27 @@ public final class BotKnowledge {
         };
     }
 
+    /**
+     * The log of the tree a kind of leaves grows on (oak leaves: oak logs; mangrove leaves: mangrove
+     * logs); null for azalea leaves (an azalea tree, over lush caves, has oak logs like any oak).
+     */
+    public static Block treeLog(Block leaves) {
+        String id = BuiltInRegistries.BLOCK.getKey(leaves).getPath();
+        if (!id.endsWith("_leaves") || id.contains("azalea")) return null;
+        Block log = BuiltInRegistries.BLOCK.getValue(net.minecraft.resources.Identifier.withDefaultNamespace(id.substring(0, id.length() - "_leaves".length()) + "_log"));
+        return log == Blocks.AIR ? null : log;
+    }
+
+    /** Seconds to come across an azalea tree (its leaves; over lush caves, in a few forests): as a rare plant. */
+    public static final double AZALEA_FIND = 300;
+
+    /**
+     * Seconds per leaf broken for what drops from leaves (saplings, apples, sticks), beyond the
+     * break itself: the crown is overhead - the lower leaves from the ground, then a step or a
+     * block up for the next (0.6 s, a step along a wall of rock, before round 2).
+     */
+    public static final double LEAF_REACH = 1.2;
+
     /** Seconds from one block of a patch to the next (the next tree, the next flower of the meadow). */
     public static double hop(Block block) {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();

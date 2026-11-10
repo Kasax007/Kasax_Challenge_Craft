@@ -1,0 +1,237 @@
+{
+ "estimates": 2,
+ "excluded": [
+  "craft_golden_apple",
+  "eat_apple",
+  "eat_golden_apple",
+  "fall_20_blocks_and_survive",
+  "have_10_hearts_missing",
+  "obtain_3_sapling_types",
+  "obtain_5_dye_colors",
+  "reach_y_minus_50",
+  "take_fall_damage",
+  "visit_deep_dark",
+  "visit_dripstone_caves",
+  "visit_lush_caves"
+ ],
+ "goals": {
+  "advancement_stone_age": {
+   "done": 4,
+   "games": 2.0,
+   "log": -0.3155,
+   "per_claim": 16.5,
+   "plan": 22.6,
+   "starts": 4
+  },
+  "advancement_tactical_fishing": {
+   "done": 2,
+   "games": 1.0,
+   "log": 0.7222,
+   "per_claim": 55.4,
+   "plan": 26.9,
+   "starts": 2
+  },
+  "block_damage_with_shield": {
+   "done": 2,
+   "games": 2.0,
+   "log": 1.141,
+   "per_claim": 396.7,
+   "plan": 126.8,
+   "starts": 4
+  },
+  "craft_bricks": {
+   "done": 7,
+   "games": 3.5,
+   "log": 0.2984,
+   "per_claim": 99.5,
+   "plan": 73.9,
+   "starts": 7
+  },
+  "craft_flower_pot": {
+   "done": 3,
+   "games": 1.5,
+   "log": 0.2541,
+   "per_claim": 57.0,
+   "plan": 44.2,
+   "starts": 3
+  },
+  "craft_item_frame": {
+   "done": 3,
+   "games": 1.5,
+   "log": -0.544,
+   "per_claim": 8.3,
+   "plan": 14.3,
+   "starts": 3
+  },
+  "craft_jukebox": {
+   "done": 2,
+   "games": 1.0,
+   "log": 0.0005,
+   "per_claim": 18.2,
+   "plan": 18.2,
+   "starts": 2
+  },
+  "craft_lava_bucket": {
+   "done": 2,
+   "games": 3.5,
+   "log": 2.0794,
+   "per_claim": 289.6,
+   "plan": 36.1,
+   "starts": 7
+  },
+  "craft_note_block": {
+   "done": 2,
+   "games": 1.5,
+   "log": 1.1122,
+   "per_claim": 81.3,
+   "plan": 26.7,
+   "starts": 3
+  },
+  "craft_painting": {
+   "done": 3,
+   "games": 1.5,
+   "log": -0.6931,
+   "per_claim": 8.6,
+   "plan": 21.3,
+   "starts": 3
+  },
+  "craft_water_bucket": {
+   "done": 3,
+   "games": 2.0,
+   "log": -0.6931,
+   "per_claim": 23.0,
+   "plan": 74.2,
+   "starts": 4
+  },
+  "freeze_in_powder_snow": {
+   "done": 1,
+   "games": 1.0,
+   "log": 1.4758,
+   "per_claim": 258.6,
+   "plan": 59.1,
+   "starts": 2
+  },
+  "kill_creeper": {
+   "done": 2,
+   "games": 1.5,
+   "log": 0.612,
+   "per_claim": 46.3,
+   "plan": 25.1,
+   "starts": 3
+  },
+  "light_campfire": {
+   "done": 2,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 3.3,
+   "plan": 11.0,
+   "starts": 2
+  },
+  "obtain_16_sandstone": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0699,
+   "per_claim": 293.2,
+   "plan": 37.0,
+   "starts": 2
+  },
+  "obtain_3_flower_types": {
+   "done": 2,
+   "games": 1.5,
+   "log": 1.0334,
+   "per_claim": 38.5,
+   "plan": 13.7,
+   "starts": 3
+  },
+  "obtain_calcite": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0794,
+   "per_claim": 1117.9,
+   "plan": 93.2,
+   "starts": 2
+  },
+  "obtain_coal_block": {
+   "done": 3,
+   "games": 2.0,
+   "log": 1.4162,
+   "per_claim": 91.3,
+   "plan": 22.2,
+   "starts": 4
+  },
+  "obtain_emerald": {
+   "done": 2,
+   "games": 1.5,
+   "log": 0.3384,
+   "per_claim": 39.4,
+   "plan": 28.1,
+   "starts": 3
+  },
+  "obtain_honeycomb": {
+   "done": 2,
+   "games": 1.0,
+   "log": 0.0578,
+   "per_claim": 26.5,
+   "plan": 25.0,
+   "starts": 2
+  },
+  "obtain_name_tag": {
+   "done": 3,
+   "games": 3.0,
+   "log": 1.97,
+   "per_claim": 221.7,
+   "plan": 30.9,
+   "starts": 6
+  },
+  "obtain_shield": {
+   "done": 1,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 18.9,
+   "plan": 98.2,
+   "starts": 2
+  },
+  "sleep_in_bed": {
+   "done": 1,
+   "games": 1.0,
+   "log": 1.5972,
+   "per_claim": 371.6,
+   "plan": 75.2,
+   "starts": 2
+  },
+  "trade_with_villager": {
+   "done": 2,
+   "games": 1.5,
+   "log": 0.6312,
+   "per_claim": 50.9,
+   "plan": 27.1,
+   "starts": 3
+  },
+  "use_cartography_table": {
+   "done": 3,
+   "games": 1.5,
+   "log": -0.6456,
+   "per_claim": 17.8,
+   "plan": 34.0,
+   "starts": 3
+  },
+  "visit_abandoned_camp": {
+   "done": 2,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 6.2,
+   "plan": 15.6,
+   "starts": 2
+  },
+  "visit_savanna": {
+   "done": 1,
+   "games": 1.0,
+   "log": 0.7898,
+   "per_claim": 319.4,
+   "plan": 145.0,
+   "starts": 2
+  }
+ },
+ "journal_goals": 130,
+ "per_start": 0.5
+}
