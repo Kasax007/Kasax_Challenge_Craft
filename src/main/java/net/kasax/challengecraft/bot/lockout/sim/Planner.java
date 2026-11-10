@@ -18,7 +18,7 @@ public final class Planner {
             S_SEARCH = 7;
     /** A walk to the river or the lake: about this far. */
     static final double WATER_WALK = 40;
-    private static final double DAY = 1200, NIGHT_FROM = 650, NIGHT_TO = 1150;
+    static final double DAY = 1200, NIGHT_FROM = 650, NIGHT_TO = 1150;
 
     // ---- the scratch copy of the player ----
     private Sim sim;

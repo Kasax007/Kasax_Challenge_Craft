@@ -72,6 +72,29 @@ public final class ModelStore {
         return null;
     }
 
+    /**
+     * The goal priors (goal-priors.json: per goal what the leagues measured against the plan, see
+     * GoalExperience): from the models folder when the trainer put one there, else the one shipped
+     * with the mod (that one also with the learnt models switched off).
+     */
+    public static JsonObject goalPriors() {
+        if (enabled()) return load("goal-priors.json", j -> j);
+        // (The learnt models off - BOB_LEARNED=0, the game tests: the priors shipped with the mod
+        // still, as knowledge; the knob goalprior is what turns them off.)
+        synchronized (ModelStore.class) {
+            if (shippedPriors == null) {
+                try (var in = ModelStore.class.getResourceAsStream("/bob-models/goal-priors.json")) {
+                    shippedPriors = in == null ? new JsonObject() : JsonParser.parseReader(new java.io.InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
+                } catch (Exception ex) {
+                    shippedPriors = new JsonObject();
+                }
+            }
+            return shippedPriors.size() == 0 ? null : shippedPriors;
+        }
+    }
+
+    private static JsonObject shippedPriors;
+
     /** The knobs that won the league ({@code params}: "k=v,..."), or null. */
     public static String championParams() {
         if (!enabled()) return null;

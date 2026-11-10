@@ -73,7 +73,8 @@ final class BoardSearch {
     static final long HANG_NANOS = 30_000_000_000L;
 
     /**
-     * The share of Bob's own estimate a tile is believed to take at least ({@link SearchPolicy#floor}):
+     * The share of Bob's own estimate a tile is believed to take at least ({@link SearchPolicy#floor})
+     * when the brain gives no floors (it does: knob {@code ownfloor}, see LockoutBrain#OWN_FLOOR):
      * the learnt goal model (988 goals) never has a tile take less than half of his estimate, and
      * where his planner sees the world against a tile (no stone to be had, nothing known) his
      * estimate is the one that knows it.
@@ -113,8 +114,19 @@ final class BoardSearch {
         });
     }
 
-    /** What the search decided: the tile (board index), the seconds it believes it takes, a line for the log. */
-    record Pick(int tile, double seconds, String why) {
+    /**
+     * What the search decided: the tile (board index; -1 for a chore), the seconds it believes it
+     * takes, a line for the log; a chore instead of a tile ({@code search=2}): the milestone to
+     * invest in, or the food.
+     */
+    record Pick(int tile, double seconds, String why, Ms chore, boolean food) {
+        Pick(int tile, double seconds, String why) {
+            this(tile, seconds, why, null, false);
+        }
+
+        boolean isChore() {
+            return chore != null || food;
+        }
     }
 
     /**
@@ -123,11 +135,21 @@ final class BoardSearch {
      * to the old route.
      */
     Pick pick(Bot bot, Map<Integer, Double> choices) {
+        return pick(bot, choices, null, 0, null);
+    }
+
+    /**
+     * As {@link #pick(Bot, Map)}, with the least each tile is believed to take ({@code floors}, by
+     * board index; null: half of its own estimate) and the chores it may choose instead of a tile
+     * ({@code chores}: bits of {@link Ms} and {@link SearchPolicy#FOOD_BIT}; 0: tiles only), with the
+     * least each chore is believed to take ({@code choreFloors} by bit; null: none).
+     */
+    Pick pick(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores, Map<Long, Double> choreFloors) {
         if (workerHung) return null;
         try {
             long now = bot.server().overworld().getGameTime();
             if (job != null && now - job.askedAt() >= STALE_TICKS) drop();
-            if (job == null) return ask(bot, choices, now);
+            if (job == null) return ask(bot, choices, floors, chores, choreFloors, now);
             Job j = job;
             long ticks = now - j.askedAt();
             if (BotNavigator.SIM) {
@@ -151,6 +173,15 @@ final class BoardSearch {
             job = null;
             Decision d = j.answer().get();
             decisions++;
+            if (d != null && d.chore()) {
+                choreDecisions++;
+                // (With the floor from Bob's own estimate of the chore, if there was one: SearchPolicy#choreFloor.)
+                var choreFloor = j.policy().choreFloor;
+                Double floor = choreFloor == null ? null : choreFloor.get(d.food ? SearchPolicy.FOOD_BIT : (long) d.invest.bit);
+                return new Pick(-1, d.estimate, String.format("look-ahead: %s (~%d s; %s%s; %d games, %d ticks)",
+                        d.food ? "a stock of food" : d.invest.name().toLowerCase(java.util.Locale.ROOT), Math.round(d.estimate),
+                        floor == null ? "" : "floor ~" + Math.round(floor) + " s; ", d.why, j.policy().progress, ticks), d.invest, d.food);
+            }
             if (d == null || d.tile < 0 || !choices.containsKey(d.tile)) return null;
             return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s, own ~%d s; %s; %d games, %d ticks)",
                     j.sim().board.goal[d.tile].id, Math.round(d.estimate), Math.round(choices.get(d.tile)), d.why, j.policy().progress, ticks));
@@ -166,19 +197,23 @@ final class BoardSearch {
     }
 
     /** Puts the question: the picture of the game now, handed to the worker. */
-    private Pick ask(Bot bot, Map<Integer, Double> choices, long now) {
+    private Pick ask(Bot bot, Map<Integer, Double> choices, Map<Integer, Double> floors, long chores, Map<Long, Double> choreFloors, long now) {
         Sim sim = snapshot(bot);
         if (sim == null) return null;
         SearchPolicy policy = template.fresh();
         policy.solo = soloGame(bot);
+        policy.chores = chores != 0;
+        policy.choresAllowed = chores;
         long allowed = 0;
         double[] floor = new double[Board.SIZE];
         for (var c : choices.entrySet()) {
             allowed |= 1L << c.getKey();
-            floor[c.getKey()] = OWN_FLOOR * c.getValue();
+            Double f = floors == null ? null : floors.get(c.getKey());
+            floor[c.getKey()] = f != null ? f : OWN_FLOOR * c.getValue();
         }
         policy.allowed = allowed;
         policy.floor = floor;
+        policy.choreFloor = choreFloors;
         policy.salt = asked++;
         job = new Job(WORKER.submit(() -> policy.choose(sim, 0)), policy, sim, now);
         return THINKING;
@@ -435,4 +470,11 @@ final class BoardSearch {
     int decisions() {
         return decisions;
     }
+
+    /** Of the decisions, how many chose a chore rather than a tile. */
+    int choreDecisions() {
+        return choreDecisions;
+    }
+
+    private int choreDecisions;
 }

@@ -540,6 +540,14 @@ def train_models(paths, cfg, candidate_ok=True):
             shutil.copy2(os.path.join(paths.models, "goal.json"), os.path.join(paths.history, "goal-%s.json" % cur.get("version", "alt")))
         write_json(os.path.join(paths.models, "goal.json"), model)
         out["goal_promoted"] = model["version"]
+    # The goal priors (GoalExperience): what each tile took against the plan in this machine's games -
+    # once there are enough starts of the newest estimates; the mod's own until then.
+    priors = bobmodels.goal_priors(goal_recs)
+    if priors is not None:
+        out["goal_priors"] = {"goals": len(priors["goals"]), "journal_goals": priors["journal_goals"], "estimates": priors["estimates"]}
+        if priors["journal_goals"] >= cfg.get("goal_priors_min", 200):
+            write_json(os.path.join(paths.models, "goal-priors.json"), priors)
+            out["goal_priors_written"] = priors["version"]
     return out
 
 

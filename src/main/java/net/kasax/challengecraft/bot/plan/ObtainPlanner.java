@@ -326,6 +326,16 @@ public final class ObtainPlanner {
         return dy < 0 ? -dy * (digPerBlock + 0.6) : dy * 0.8;
     }
 
+    /**
+     * Seconds for a staircase {@code levels} down with what is in hand (a wooden pickaxe's pace
+     * at worst), as {@link #vertical} counts it for what is dug for deep down: for the tiles
+     * that are a depth (a cave biome under the ground, "Reach Y -50").
+     */
+    public double staircase(Bot bot, int levels) {
+        refresh(bot);
+        return levels <= 0 ? 0 : vertical(-levels, Math.min(digPerBlock, WOODEN_DIG));
+    }
+
     /** Seconds to walk to the nearest block of this kind in sight around the bot, or null if none is. */
     public Double seen(Bot bot, Block block) {
         refresh(bot);
@@ -1165,6 +1175,25 @@ public final class ObtainPlanner {
                 search = 0.8 * find;
             }
         }
+        // Leaves grow on their trees (knob estfix): not seen, they are found where a tree of their
+        // kind is - as dear to find as its logs, and only in its biome (jungle, savanna, dark
+        // forest, cherry grove, mangroves); azalea leaves only over lush caves. Costed as leaves
+        // anywhere a few seconds off, "3 Sapling Types" was ~49 s with two of its three trees in
+        // other biomes: 0 got of 5 started in leagues 9 and 10 (~195 s spent on each).
+        boolean leaves = s.is(net.minecraft.tags.BlockTags.LEAVES) && bot.params.on("estfix");
+        if (leaves && seen == null) {
+            Block log = BotKnowledge.treeLog(block);
+            if (log != null) {
+                Leaf tree = blockLeaf(bot, k, log, cost);
+                if (tree.cost() >= INF) return Leaf.NONE;
+                find = tree.lot().once();
+                search = tree.lot().onceLuck();
+                at = tree.at();
+            } else {
+                find = Math.max(find, BotKnowledge.AZALEA_FIND);
+                search = 0.8 * find;
+            }
+        }
         // A cave biome's block not seen yet: after the walk to the biome, the way down into it
         // and the looking about there (minutes, and luck).
         if (seen == null && BotKnowledge.caveBiome(block)) {
@@ -1202,7 +1231,10 @@ public final class ObtainPlanner {
         // broken and the step to the next of the patch; a patch used up (a vein of six iron, a
         // tree of five logs), the search for the next shared out over it.
         double patch = BotKnowledge.patchSize(block);
-        Lot lot = new Lot(find, breakSeconds + BotKnowledge.hop(block) + search / patch, search, search / patch,
+        // (Leaves for what drops from them - a sapling, an apple - are up in the crown: each one
+        // a climb or a pillar step away, not the step along a wall of rock; knob estfix.)
+        double hop = leaves ? BotKnowledge.LEAF_REACH : BotKnowledge.hop(block);
+        Lot lot = new Lot(find, breakSeconds + hop + search / patch, search, search / patch,
                 bot.tools().canHarvest(s) ? null : cheapestTool(k, block, cost));
         return new Leaf(find + breakSeconds + tool.cost(), search + tool.search(), at != null ? at : tool.at(), lot);
     }

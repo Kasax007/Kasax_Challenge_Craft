@@ -32,16 +32,26 @@ public final class RaidTask implements BotTask {
     public RaidTask(ServerLevel level, String kind, Set<net.minecraft.world.level.block.Block> wanted) {
         this.kind = kind;
         this.visit = new VisitStructureTask(level, kind);
+        this.ids = VisitStructureTask.resolve(level, kind);
         this.wanted = Set.copyOf(wanted);
     }
+
+    /** The structure ids of the kind. */
+    private final Set<Identifier> ids;
+    /** Blocks from the spot it knows of the structure at which it is there. */
+    private static final double ARRIVED = 8;
 
     @Override
     public Result tick(Bot bot) {
         if (!arrived) {
-            Result r = visit.tick(bot);
+            // (There once close to the spot it knows: its chests are what it came for, not a
+            // part to stand in - a buried treasure's one part is the chest itself, and the visit
+            // never counted it as reached; the route to its iron failed every time.)
+            Result r = VisitStructureTask.near(bot, ids, ARRIVED) ? Result.DONE : visit.tick(bot);
             if (r == Result.RUNNING) return r;
             if (r == Result.FAILED) return Result.FAILED;
             arrived = true;
+            bot.navigator().stop();
             bot.senses().refresh();
             bot.senses().tick(bot.body());
         }

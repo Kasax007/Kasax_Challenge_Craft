@@ -149,8 +149,14 @@ public final class GreedyPolicy implements Policy {
         if (wantsIron && sim.now >= p.kitRetryAt && p.dim == 0 && p.kitTries < 4) {
             for (Ms m : new Ms[]{Ms.IRON_PICK, Ms.BUCKET}) {
                 if (p.has(m) || m == Ms.BUCKET && p.has(Ms.WATER_BUCKET)) continue;
+                double est = sim.planner.estimate(sim, me, m, f);
+                // (Dear, and quick tiles open early in the day: later - the real brain's investLater.)
+                if (sim.investLater(me, est)) {
+                    p.kitRetryAt = sim.now + 30;
+                    return null;
+                }
                 p.kitRetryAt = sim.now + (60L << Math.min(3, p.kitTries++));
-                return Decision.invest(m, sim.planner.estimate(sim, me, m, f), "the plan wants the iron kit");
+                return Decision.invest(m, est, "the plan wants the iron kit");
             }
         }
         return null;

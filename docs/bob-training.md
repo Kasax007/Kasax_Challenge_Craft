@@ -52,6 +52,17 @@ Er deckt die fünf besprochenen Punkte ab:
    v1“). Das mitgelieferte `goal.json` (Fassung 1) ruht also, bis der Trainer genug neue Ziele hat
    (150 erledigte, `goal_min_done`). Bis dahin gilt die Erfahrung je Ziel (`GoalExperience`, jetzt
    bis zum Faktor 8).
+   **Zielvorwissen (Runde 2):** Neben dem Modell schreibt der Trainer `goal-priors.json`: je Ziel die
+   Sekunden je geholtem Feld (die Starts ohne Erfolg mitgezählt) gegen die Planzahl, aus den Journalen
+   der neuesten Schätzfassung, sobald es 200 gezählte Starts sind (`goal_priors_min`). Bob liest es
+   als Vorwissen neben seiner eigenen Erfahrung (`GoalExperience`, Knopf `goalprior`); der Simulator
+   nimmt daraus je Ziel die Erfolgsquote. Bis dahin gilt die mit dem Mod gelieferte Datei
+   (`src/main/resources/bob-models/goal-priors.json`, aus den Ligen 9 und 10 und der Liga B der
+   Runde 2, gemacht mit `scripts/bot/analysis/goal_priors.py`). Ziele, deren Schätzung Runde 2
+   geändert hat (`estfix`), zählen nur aus Journalzeilen mit `"estfix": true`; ihre Erfolgsquote für
+   den Simulator zählt alle Zeilen. Das gelernte Zielmodell (`goal.json`) schlug die Planzahl auf
+   diesen Journalen nicht: 189 Starts, 115 erledigt, über 20 Aufteilungen im Mittel -15 % (Spanne
+   -111 % bis +25 %).
 5. **Strategie im Spiel gegen sich selbst.** Auf Liga-Servern spielt der Champion gegen einen
    Herausforderer:
    - Der **Champion** spielt mit Bobs aktuellen Knöpfen.

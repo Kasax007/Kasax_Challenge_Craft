@@ -1,0 +1,579 @@
+{
+ "estimates": 2,
+ "excluded": [
+  "craft_golden_apple",
+  "eat_apple",
+  "eat_golden_apple",
+  "fall_20_blocks_and_survive",
+  "have_10_hearts_missing",
+  "obtain_3_sapling_types",
+  "obtain_5_dye_colors",
+  "reach_y_minus_50",
+  "take_fall_damage",
+  "visit_deep_dark",
+  "visit_dripstone_caves",
+  "visit_lush_caves"
+ ],
+ "goals": {
+  "advancement_stone_age": {
+   "done": 6,
+   "games": 3.0,
+   "log": -0.3708,
+   "per_claim": 15.5,
+   "plan": 22.5,
+   "starts": 6
+  },
+  "advancement_tactical_fishing": {
+   "done": 3,
+   "games": 2.0,
+   "log": 0.9592,
+   "per_claim": 55.3,
+   "plan": 21.2,
+   "starts": 4
+  },
+  "block_damage_with_shield": {
+   "done": 2,
+   "games": 2.0,
+   "log": 1.141,
+   "per_claim": 396.7,
+   "plan": 126.8,
+   "starts": 4
+  },
+  "craft_bricks": {
+   "done": 9,
+   "games": 5.5,
+   "log": 1.0675,
+   "per_claim": 202.3,
+   "plan": 69.6,
+   "starts": 11
+  },
+  "craft_campfire": {
+   "done": 1,
+   "games": 1.0,
+   "log": 2.0306,
+   "per_claim": 113.9,
+   "plan": 14.9,
+   "starts": 2
+  },
+  "craft_flower_pot": {
+   "done": 5,
+   "games": 2.5,
+   "log": -0.024,
+   "per_claim": 53.4,
+   "plan": 54.7,
+   "starts": 5
+  },
+  "craft_iron_armor_piece": {
+   "done": 1,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 32.0,
+   "plan": 135.6,
+   "starts": 2
+  },
+  "craft_item_frame": {
+   "done": 5,
+   "games": 3.0,
+   "log": 0.1138,
+   "per_claim": 46.0,
+   "plan": 41.1,
+   "starts": 6
+  },
+  "craft_jukebox": {
+   "done": 2,
+   "games": 1.0,
+   "log": 0.0005,
+   "per_claim": 18.2,
+   "plan": 18.2,
+   "starts": 2
+  },
+  "craft_lava_bucket": {
+   "done": 2,
+   "games": 3.5,
+   "log": 2.0794,
+   "per_claim": 289.6,
+   "plan": 36.1,
+   "starts": 7
+  },
+  "craft_note_block": {
+   "done": 3,
+   "games": 2.0,
+   "log": 0.8026,
+   "per_claim": 61.5,
+   "plan": 27.6,
+   "starts": 4
+  },
+  "craft_painting": {
+   "done": 5,
+   "games": 2.5,
+   "log": -0.6931,
+   "per_claim": 10.3,
+   "plan": 27.4,
+   "starts": 5
+  },
+  "craft_shield": {
+   "done": 1,
+   "games": 1.0,
+   "log": 1.1387,
+   "per_claim": 66.9,
+   "plan": 21.4,
+   "starts": 2
+  },
+  "craft_water_bucket": {
+   "done": 4,
+   "games": 3.0,
+   "log": 0.0436,
+   "per_claim": 59.1,
+   "plan": 56.6,
+   "starts": 6
+  },
+  "eat_suspicious_stew": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0794,
+   "per_claim": 1122.4,
+   "plan": 71.9,
+   "starts": 2
+  },
+  "fall_20_blocks_and_survive": {
+   "done": 0,
+   "games": 1.0,
+   "log": 1.9211,
+   "per_claim": 274.5,
+   "plan": 40.2,
+   "starts": 2
+  },
+  "freeze_in_powder_snow": {
+   "done": 2,
+   "games": 1.5,
+   "log": 1.0348,
+   "per_claim": 156.2,
+   "plan": 55.5,
+   "starts": 3
+  },
+  "kill_creeper": {
+   "done": 2,
+   "games": 1.5,
+   "log": 0.612,
+   "per_claim": 46.3,
+   "plan": 25.1,
+   "starts": 3
+  },
+  "kill_husk": {
+   "done": 1,
+   "games": 1.0,
+   "log": 1.3005,
+   "per_claim": 263.6,
+   "plan": 71.8,
+   "starts": 2
+  },
+  "kill_skeleton": {
+   "done": 5,
+   "games": 3.0,
+   "log": -0.6931,
+   "per_claim": 50.1,
+   "plan": 130.6,
+   "starts": 6
+  },
+  "light_campfire": {
+   "done": 4,
+   "games": 2.5,
+   "log": 0.4934,
+   "per_claim": 28.7,
+   "plan": 17.5,
+   "starts": 5
+  },
+  "obtain_16_sandstone": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0699,
+   "per_claim": 293.2,
+   "plan": 37.0,
+   "starts": 2
+  },
+  "obtain_3_flower_types": {
+   "done": 3,
+   "games": 2.0,
+   "log": 0.7639,
+   "per_claim": 27.6,
+   "plan": 12.8,
+   "starts": 4
+  },
+  "obtain_arrow": {
+   "done": 1,
+   "games": 1.0,
+   "log": 1.3006,
+   "per_claim": 193.5,
+   "plan": 52.7,
+   "starts": 2
+  },
+  "obtain_calcite": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0794,
+   "per_claim": 1117.9,
+   "plan": 93.2,
+   "starts": 2
+  },
+  "obtain_coal_block": {
+   "done": 3,
+   "games": 2.0,
+   "log": 1.4162,
+   "per_claim": 91.3,
+   "plan": 22.2,
+   "starts": 4
+  },
+  "obtain_deepslate": {
+   "done": 2,
+   "games": 1.0,
+   "log": -0.0936,
+   "per_claim": 21.8,
+   "plan": 23.9,
+   "starts": 2
+  },
+  "obtain_dripstone_block": {
+   "done": 0,
+   "games": 1.0,
+   "log": 2.0794,
+   "per_claim": 1331.5,
+   "plan": 154.0,
+   "starts": 2
+  },
+  "obtain_emerald": {
+   "done": 3,
+   "games": 2.5,
+   "log": 0.077,
+   "per_claim": 35.2,
+   "plan": 32.6,
+   "starts": 5
+  },
+  "obtain_honeycomb": {
+   "done": 2,
+   "games": 1.0,
+   "log": 0.0578,
+   "per_claim": 26.5,
+   "plan": 25.0,
+   "starts": 2
+  },
+  "obtain_name_tag": {
+   "done": 5,
+   "games": 4.0,
+   "log": 1.8944,
+   "per_claim": 190.2,
+   "plan": 28.6,
+   "starts": 8
+  },
+  "obtain_shield": {
+   "done": 1,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 18.9,
+   "plan": 98.2,
+   "starts": 2
+  },
+  "sleep_in_bed": {
+   "done": 2,
+   "games": 1.5,
+   "log": 1.4328,
+   "per_claim": 321.4,
+   "plan": 76.7,
+   "starts": 3
+  },
+  "sleep_in_village_bed": {
+   "done": 2,
+   "games": 1.5,
+   "log": 1.8137,
+   "per_claim": 177.9,
+   "plan": 29.0,
+   "starts": 3
+  },
+  "trade_with_villager": {
+   "done": 3,
+   "games": 2.0,
+   "log": 0.8836,
+   "per_claim": 130.1,
+   "plan": 53.8,
+   "starts": 4
+  },
+  "use_cartography_table": {
+   "done": 4,
+   "games": 2.0,
+   "log": -0.6931,
+   "per_claim": 15.7,
+   "plan": 33.3,
+   "starts": 4
+  },
+  "visit_abandoned_camp": {
+   "done": 2,
+   "games": 1.0,
+   "log": -0.6931,
+   "per_claim": 6.2,
+   "plan": 15.6,
+   "starts": 2
+  },
+  "visit_savanna": {
+   "done": 1,
+   "games": 1.0,
+   "log": 0.7898,
+   "per_claim": 319.4,
+   "plan": 145.0,
+   "starts": 2
+  }
+ },
+ "journal_goals": 164,
+ "outcomes": {
+  "advancement_stone_age": [
+   6,
+   6
+  ],
+  "advancement_tactical_fishing": [
+   4,
+   3
+  ],
+  "advancement_we_need_to_go_deeper": [
+   1,
+   1
+  ],
+  "block_damage_with_shield": [
+   4,
+   2
+  ],
+  "breed_cows": [
+   1,
+   1
+  ],
+  "craft_anvil": [
+   1,
+   0
+  ],
+  "craft_blast_furnace": [
+   1,
+   1
+  ],
+  "craft_bricks": [
+   11,
+   9
+  ],
+  "craft_campfire": [
+   2,
+   1
+  ],
+  "craft_diamond_pickaxe": [
+   1,
+   0
+  ],
+  "craft_flower_pot": [
+   5,
+   5
+  ],
+  "craft_iron_armor_piece": [
+   2,
+   1
+  ],
+  "craft_item_frame": [
+   6,
+   5
+  ],
+  "craft_jukebox": [
+   2,
+   2
+  ],
+  "craft_lava_bucket": [
+   7,
+   2
+  ],
+  "craft_note_block": [
+   4,
+   3
+  ],
+  "craft_painting": [
+   5,
+   5
+  ],
+  "craft_shield": [
+   2,
+   1
+  ],
+  "craft_water_bucket": [
+   6,
+   4
+  ],
+  "drink_potion": [
+   1,
+   1
+  ],
+  "eat_suspicious_stew": [
+   2,
+   0
+  ],
+  "fall_20_blocks_and_survive": [
+   10,
+   2
+  ],
+  "freeze_in_powder_snow": [
+   3,
+   2
+  ],
+  "have_10_hearts_missing": [
+   2,
+   1
+  ],
+  "kill_cave_spider": [
+   1,
+   0
+  ],
+  "kill_creeper": [
+   3,
+   2
+  ],
+  "kill_drowned": [
+   1,
+   0
+  ],
+  "kill_enderman": [
+   1,
+   0
+  ],
+  "kill_husk": [
+   2,
+   1
+  ],
+  "kill_skeleton": [
+   6,
+   5
+  ],
+  "kill_spider": [
+   1,
+   1
+  ],
+  "kill_zombie": [
+   1,
+   1
+  ],
+  "light_campfire": [
+   5,
+   4
+  ],
+  "obtain_16_sandstone": [
+   2,
+   0
+  ],
+  "obtain_32_cobblestone": [
+   1,
+   0
+  ],
+  "obtain_3_flower_types": [
+   4,
+   3
+  ],
+  "obtain_3_sapling_types": [
+   6,
+   1
+  ],
+  "obtain_5_dye_colors": [
+   3,
+   0
+  ],
+  "obtain_arrow": [
+   2,
+   1
+  ],
+  "obtain_calcite": [
+   2,
+   0
+  ],
+  "obtain_coal_block": [
+   4,
+   3
+  ],
+  "obtain_crossbow": [
+   1,
+   1
+  ],
+  "obtain_deepslate": [
+   2,
+   2
+  ],
+  "obtain_dripstone_block": [
+   2,
+   0
+  ],
+  "obtain_emerald": [
+   5,
+   3
+  ],
+  "obtain_honeycomb": [
+   2,
+   2
+  ],
+  "obtain_name_tag": [
+   8,
+   5
+  ],
+  "obtain_pointed_dripstone": [
+   1,
+   1
+  ],
+  "obtain_shield": [
+   2,
+   1
+  ],
+  "obtain_snowball": [
+   1,
+   0
+  ],
+  "obtain_tuff": [
+   1,
+   1
+  ],
+  "reach_y_minus_50": [
+   2,
+   1
+  ],
+  "sleep_in_bed": [
+   3,
+   2
+  ],
+  "sleep_in_village_bed": [
+   3,
+   2
+  ],
+  "trade_with_farmer": [
+   1,
+   0
+  ],
+  "trade_with_villager": [
+   4,
+   3
+  ],
+  "use_cartography_table": [
+   4,
+   4
+  ],
+  "visit_abandoned_camp": [
+   2,
+   2
+  ],
+  "visit_dripstone_caves": [
+   5,
+   1
+  ],
+  "visit_lush_caves": [
+   2,
+   1
+  ],
+  "visit_ocean_ruin": [
+   1,
+   1
+  ],
+  "visit_savanna": [
+   2,
+   1
+  ],
+  "visit_swamp": [
+   1,
+   1
+  ]
+ },
+ "per_start": 0.5
+}

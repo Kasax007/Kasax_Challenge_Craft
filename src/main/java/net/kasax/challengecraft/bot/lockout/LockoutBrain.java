@@ -100,6 +100,21 @@ public final class LockoutBrain implements BotBrain {
     private boolean searching(Bot bot) {
         return bot.params.get("search", 0) >= 1 && difficulty != Difficulty.EASY;
     }
+
+    /**
+     * Whether the look-ahead decides the chores too ({@code search=2}): the stock of food while not
+     * starving, the shield until the evening, copper armour, the iron pickaxe and the bucket, the
+     * way into the Nether - each a candidate beside the tiles (see BoardSearch). In league 10 the
+     * look-ahead decided 21 times in 12 games: the chores, decided by rules, took the rest.
+     */
+    private boolean searchingChores(Bot bot) {
+        return bot.params.get("search", 0) >= 2 && difficulty != Difficulty.EASY;
+    }
+
+    /** How often the look-ahead chose a chore (for the tests). */
+    public int lookAheadChores() {
+        return boardSearch.choreDecisions();
+    }
     /** The decider now thinking (its intents are named after it), the intent running, and whether the cortex said no. */
     private String stepKey, runningKey;
     private boolean startRefused;
@@ -303,6 +318,8 @@ public final class LockoutBrain implements BotBrain {
         // (shield=0: not before the plan - for the self-play comparisons.)
         boolean shieldFirst = hard && bot.params.on("shield");
         boolean shieldWanted = shieldFirst && !has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD));
+        // (search=2: the shield is the look-ahead's to time - but no night without it on hard.)
+        if (shieldWanted && searchingChores(bot) && !nightComing(bot, SHIELD_BY)) shieldWanted = false;
         // (With the look-ahead no iron kit for its own sake: what the iron is worth shows in the tiles
         // it opens. The shield on hard stays - it is for the night, not for the board.)
         boolean kitWanted = strategist.wantsIron() && !searching(bot);
@@ -379,7 +396,9 @@ public final class LockoutBrain implements BotBrain {
                     boolean onePiece = bot.params.on("smeltgo") && missing.size() > 1;
                     int now = onePiece ? want - COPPER_SET.get(missing.get(1)) : want;
                     double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now);
-                    if (est <= COPPER_ARMOUR_MAX && !investLater(bot, est, "copper armour")) {
+                    // (search=2: the trip for the ingots is the look-ahead's chore; a piece from
+                    // ingots in hand is still made at once, above.)
+                    if (est <= COPPER_ARMOUR_MAX && !searchingChores(bot) && !investLater(bot, est, "copper armour")) {
                         armourTries++;
                         bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
                         // (The second piece's copper with the first: mined in the one trip while the
@@ -447,11 +466,42 @@ public final class LockoutBrain implements BotBrain {
         choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
         Choice pick = null;
         if (searching(bot)) {
-            Map<Integer, Double> tiles = new HashMap<>();
-            for (Choice c : choices) tiles.merge(c.tile().index(), c.option().cost(), Math::min);
-            BoardSearch.Pick p = boardSearch.pick(bot, tiles);
+            Map<Integer, Double> tiles = new HashMap<>(), floors = new HashMap<>();
+            for (Choice c : choices) {
+                tiles.merge(c.tile().index(), c.option().cost(), Math::min);
+                // The least the look-ahead may believe a tile takes: Bob's own estimate (ownfloor:
+                // the share of it; round 1 half) - or (searchfloor) all of it where what was learnt
+                // of the tile says it takes longer than planned (the believed figure above the
+                // plan's: the learnt goal model, the leagues' prior, this server's experience, its
+                // overruns in this game): the look-ahead's recipes do not know that "Lava Bucket"
+                // got twice in seven starts. (Round 1's picks the simulator thought cheaper than
+                // Bob did got 1 tile in 9 to 11 starts in league 10, the others 5 in 9 to 12: the
+                // least of many figures is the one most likely too low.)
+                double floor = bot.params.get("ownfloor", OWN_FLOOR) * c.option().cost();
+                if (bot.params.on("searchfloor") && c.option().cost() > 1.05 * c.plain()) floor = Math.max(floor, c.option().cost());
+                floors.merge(c.tile().index(), floor, Math::min);
+            }
+            long chores = searchingChores(bot) ? choresOpen(bot) : 0;
+            Map<Long, Double> choreFloors = null;
+            if (chores != 0 && bot.params.get("chorefloor", 0) != 0) {
+                // (The chores weighed as the tiles are: at least the ownfloor share of Bob's own
+                // estimate of each; one his planner sees no way to is not offered. Off by default:
+                // league B played search=2 without it.)
+                choreFloors = new HashMap<>();
+                double share = bot.params.get("ownfloor", OWN_FLOOR);
+                for (long bit : choreBits(chores)) {
+                    double own = choreEstimate(bot, bit);
+                    if (own >= 1e8) chores &= ~bit;
+                    else choreFloors.put(bit, share * own);
+                }
+            }
+            BoardSearch.Pick p = boardSearch.pick(bot, tiles, floors, chores, choreFloors);
             // (The look-ahead works on a thread of its own: Bob stands a tick or two for its answer.)
             if (p == BoardSearch.THINKING) return;
+            if (p != null && p.isChore()) {
+                if (startChore(bot, p)) return;
+                p = null;
+            }
             pick = lookAhead(bot, p, choices);
         }
         if (pick == null) pick = difficulty == Difficulty.EASY ? choices.get(0) : route(bot, choices);
@@ -463,6 +513,12 @@ public final class LockoutBrain implements BotBrain {
         if (netherBound(bot, pick) && packForNether(bot)) return;
         startGoal(bot, pick, choices.size());
     }
+
+    /**
+     * With the look-ahead: the share of Bob's own (believed) estimate it believes a tile takes at
+     * least, whatever its simulator says (knob {@code ownfloor}; round 1: 0.5).
+     */
+    static final double OWN_FLOOR = 1.0;
 
     /** Seconds from where things stand at most for a tile to be taken before everything else. */
     static final double QUICK_SECONDS = 30;
@@ -1573,6 +1629,144 @@ public final class LockoutBrain implements BotBrain {
         }
         return true;
     }
+    // ---- the chores the look-ahead decides (search=2) --------------------------------------------
+
+    /** Day clock from which the shield (on hard) and a meal's worth of food are got whatever the look-ahead says: the night is near. */
+    private static final long SHIELD_BY = 10000;
+    /** Food points under which the night is not gone into (search=2): a meal and a bit. */
+    private static final int FOOD_BEFORE_NIGHT = 8;
+
+    /** A chore the look-ahead chose is not offered again before this game tick (bit as in {@link #choresOpen}). */
+    private final Map<Long, Long> choreRest = new HashMap<>();
+    /** Ticks a chore once begun waits before it is a candidate again (one that failed at once is not chosen in a loop). */
+    private static final long CHORE_REST = 600;
+
+    /** The chores open to the look-ahead now (bits of sim.Ms, and SearchPolicy.FOOD_BIT). */
+    private long choresOpen(Bot bot) {
+        long m = choresAvailable(bot), now = bot.body().level().getGameTime();
+        for (var e : choreRest.entrySet()) if (now < e.getValue()) m &= ~e.getKey();
+        return m;
+    }
+
+    private long choresAvailable(Bot bot) {
+        var body = bot.body();
+        boolean overworld = body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
+        boolean hard = body.level().getDifficulty() == net.minecraft.world.Difficulty.HARD;
+        long m = 0;
+        if (net.kasax.challengecraft.bot.task.EatTask.foodPoints(body) < 16) m |= net.kasax.challengecraft.bot.lockout.sim.SearchPolicy.FOOD_BIT;
+        if (!overworld) return m;
+        if (hard && bot.params.on("shield") && !has(body, Set.of(net.minecraft.world.item.Items.SHIELD)))
+            m |= net.kasax.challengecraft.bot.lockout.sim.Ms.SHIELD.bit;
+        if (ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
+                net.minecraft.world.item.Items.NETHERITE_PICKAXE)) == 0 && kitTries < 4)
+            m |= net.kasax.challengecraft.bot.lockout.sim.Ms.IRON_PICK.bit;
+        if (ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.BUCKET, net.minecraft.world.item.Items.WATER_BUCKET,
+                net.minecraft.world.item.Items.LAVA_BUCKET)) == 0 && kitTries < 4)
+            m |= net.kasax.challengecraft.bot.lockout.sim.Ms.BUCKET.bit;
+        if (hard && bot.params.on("copper") && has(body, Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4) {
+            for (var piece : COPPER_SET.keySet()) {
+                if (armourSlotFree(body, piece)) {
+                    m |= net.kasax.challengecraft.bot.lockout.sim.Ms.COPPER_ARMOR.bit;
+                    break;
+                }
+            }
+        }
+        if (netherTilesOpen(bot) && body.level().getGameTime() >= netherRetryAt) m |= net.kasax.challengecraft.bot.lockout.sim.Ms.NETHER_VISITED.bit;
+        return m;
+    }
+
+    /** The single bits set in a chore mask. */
+    private static List<Long> choreBits(long mask) {
+        List<Long> out = new ArrayList<>();
+        for (long m = mask; m != 0; m &= m - 1) out.add(Long.lowestOneBit(m));
+        return out;
+    }
+
+    /** Bob's own estimate (seconds) of a chore, as {@link #startChore} would plan it; 1e9: no way. */
+    private double choreEstimate(Bot bot, long bit) {
+        var body = bot.body();
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.SearchPolicy.FOOD_BIT) {
+            return planner.estimate(bot, FOODS, ObtainPlanner.countAny(body, FOODS) + 4);
+        }
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.Ms.NETHER_VISITED.bit) {
+            LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
+            return trip == null ? 1e9 : trip.cost();
+        }
+        if (bit == net.kasax.challengecraft.bot.lockout.sim.Ms.COPPER_ARMOR.bit) {
+            int ingots = 0, n = 0;
+            for (var piece : COPPER_SET.keySet()) {
+                if (n < 2 && armourSlotFree(body, piece)) {
+                    ingots += COPPER_SET.get(piece);
+                    n++;
+                }
+            }
+            if (n == 0) return 1e9;
+            int have = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.COPPER_INGOT));
+            return planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), have + ingots);
+        }
+        var item = bit == net.kasax.challengecraft.bot.lockout.sim.Ms.SHIELD.bit ? net.minecraft.world.item.Items.SHIELD
+                : bit == net.kasax.challengecraft.bot.lockout.sim.Ms.IRON_PICK.bit ? net.minecraft.world.item.Items.IRON_PICKAXE
+                : bit == net.kasax.challengecraft.bot.lockout.sim.Ms.BUCKET.bit ? net.minecraft.world.item.Items.BUCKET : null;
+        return item == null ? 1e9 : planner.estimate(bot, Set.of(item), 1);
+    }
+
+    /**
+     * Starts the chore the look-ahead chose (search=2) - the task its decider would start: false
+     * if it cannot be had (the look-ahead's picture of the world was wrong) or the cortex says no.
+     */
+    private boolean startChore(Bot bot, BoardSearch.Pick p) {
+        bot.say(p.why());
+        startRefused = false;
+        var body = bot.body();
+        choreRest.put(p.food() ? net.kasax.challengecraft.bot.lockout.sim.SearchPolicy.FOOD_BIT : p.chore().bit, body.level().getGameTime() + CHORE_REST);
+        try {
+            if (p.food()) {
+                stepKey = "food";
+                int have = ObtainPlanner.countAny(body, FOODS);
+                double cost = planner.estimate(bot, FOODS, have + 4);
+                if (cost >= 1e8) return false;
+                bot.say("stocking up on food (~" + Math.round(cost) + " s, the look-ahead's choice)");
+                nextErrand = "food";
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner), budget(cost, 600, 2400));
+            } else if (p.chore() == net.kasax.challengecraft.bot.lockout.sim.Ms.NETHER_VISITED) {
+                stepKey = "nether";
+                LockoutGoals.Option trip = LockoutGoals.netherForTest(bot, planner);
+                if (trip == null) return false;
+                netherRetryAt = body.level().getGameTime() + (3600L << Math.min(3, netherFails++));
+                start(bot, trip.task().get(), budget(trip.cost(), 2400, 9000));
+            } else if (p.chore() == net.kasax.challengecraft.bot.lockout.sim.Ms.COPPER_ARMOR) {
+                stepKey = "armour";
+                List<net.minecraft.world.item.Item> missing = new ArrayList<>();
+                for (var piece : COPPER_SET.keySet()) if (armourSlotFree(body, piece)) missing.add(piece);
+                if (missing.isEmpty()) return false;
+                int have = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.COPPER_INGOT));
+                int ingots = 0;
+                for (int i = 0; i < Math.min(2, missing.size()); i++) ingots += COPPER_SET.get(missing.get(i));
+                int want = have + ingots;
+                double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want);
+                if (est >= 1e8) return false;
+                armourTries++;
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want, planner),
+                        budget(est, 1200, 6000));
+            } else {
+                stepKey = "invest";
+                var item = p.chore() == net.kasax.challengecraft.bot.lockout.sim.Ms.SHIELD ? net.minecraft.world.item.Items.SHIELD
+                        : p.chore() == net.kasax.challengecraft.bot.lockout.sim.Ms.IRON_PICK ? net.minecraft.world.item.Items.IRON_PICKAXE
+                        : p.chore() == net.kasax.challengecraft.bot.lockout.sim.Ms.BUCKET ? net.minecraft.world.item.Items.BUCKET : null;
+                if (item == null) return false;
+                if (item != net.minecraft.world.item.Items.SHIELD) kitTries++;
+                start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(item), 1, planner), 4800);
+            }
+        } finally {
+            stepKey = null;
+        }
+        if (startRefused) {
+            startRefused = false;
+            return false;
+        }
+        return true;
+    }
+
     private long netherRetryAt, kitRetryAt;
     private int kitTries;
     /** The shield on hard when nothing else wants iron: only for so many seconds of effort (iron in sight, a cave by). */
@@ -1617,6 +1811,11 @@ public final class LockoutBrain implements BotBrain {
         // starts half dead (seed live: half health, no food, a creeper hunt in a cave - killed).
         boolean hurt = bot.body().getHealth() < 12 && bare;
         if (points >= 16 || level >= 17 && !bare) return false;
+        // (search=2: a stock while well fed, a meal or more in the pack and not hurt is the
+        // look-ahead's to decide - a chore beside the tiles. Once hunger bites (below 14: on hard
+        // the hearts stop coming back below 18, and the simulator does not know that), with less
+        // than a meal in the pack, or hurt: the rules below, as always.)
+        if (searchingChores(bot) && !hurt && level >= 14 && points >= FOOD_BEFORE_NIGHT) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = cortex.believe("food:" + plain(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner)), planner.estimate(bot, FOODS, have + 4));
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
@@ -1726,11 +1925,11 @@ public final class LockoutBrain implements BotBrain {
                 String id = tile.goal().id();
                 if (model != null) {
                     double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, tile.goal(), plain, o.proxy(), minutes(now), deathsSeen,
-                            tries.getOrDefault(id, 0), overruns.getOrDefault(id, 0), GoalExperience.factor(id));
+                            tries.getOrDefault(id, 0), overruns.getOrDefault(id, 0), GoalExperience.factor(id, bot.params.on("goalprior")));
                     double secs = model.seconds(plain, x) / Math.max(0.3, 1 - model.failChance(x));
                     o = o.costing(Math.max(0.5 * plain, Math.min(3.5 * Math.max(1, plain), secs)));
                 } else {
-                    double f = GoalExperience.factor(id);
+                    double f = GoalExperience.factor(id, bot.params.on("goalprior"));
                     if (f != 1) o = o.costing(o.cost() * f);
                 }
             }
@@ -1924,7 +2123,7 @@ public final class LockoutBrain implements BotBrain {
                 for (Choice o : cand) {
                     if (o == f) continue;
                     LockoutGoals.Option again = LockoutGoals.plan(bot, planner, o.tile().goal());
-                    if (again != null) m.put(o.tile().goal().id(), again.cost() * GoalExperience.factor(o.tile().goal().id()));
+                    if (again != null) m.put(o.tile().goal().id(), again.cost() * GoalExperience.factor(o.tile().goal().id(), bot.params.on("goalprior")));
                 }
                 return m;
             }));
@@ -2307,6 +2506,11 @@ public final class LockoutBrain implements BotBrain {
                 boolean ours = tile.claimedBy() == Chal_40_LockoutBingo.teamOf(server, bot.id);
                 // Ours, and in the middle of an ore vein (the diamonds: the tile wanted one, the
                 // tools and the armour want the rest): the vein first, as an errand of its own.
+                // (Ours: the tile is done, however the task stands - counted as done in the journal
+                // and learnt as such. Before round 2 it went down as "dropped" and taught nothing:
+                // a tile got while its task ran - the item in the pack before the task's end, the
+                // bed in the village - left only its overruns in the experience.)
+                if (ours) succeeded(bot, now);
                 if (ours && BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.MineTask m && m.veinOpen(bot)) {
                     bot.say("got " + targetId + "; the rest of the vein too");
                     targetIndex = -1;
@@ -2631,6 +2835,11 @@ public final class LockoutBrain implements BotBrain {
             return;
         }
         journalGoalEnd(bot, "failed");
+        // (Knob failexp: a failed start teaches as an overrun does - the tile takes at least what
+        // was spent and another go; "Fall 20 Blocks" failed four times in eight in leagues 9 and
+        // 10, quickly, and was believed as cheap as ever. A lower bound: it only ever raises.)
+        if (bot.params.on("failexp") && !goalProxy && goalFirstEstimate > 0)
+            GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now) + goalFirstEstimate, 0.5);
         fails.merge(targetId, 1, Integer::sum);
         // Failed: try it again later, but not forever.
         if (tries.merge(targetId, 1, Integer::sum) >= MAX_TRIES) {
@@ -2641,6 +2850,16 @@ public final class LockoutBrain implements BotBrain {
         targetIndex = -1;
         goalTask = null;
         pause = difficulty.pauseTicks / 2;
+    }
+
+    /**
+     * The goal's tile is ours: the journal's line ends "done" and the experience learns it (as when
+     * its task finishes well, see {@link #finished}).
+     */
+    private void succeeded(Bot bot, long now) {
+        if (goalRecord == null) return;
+        journalGoalEnd(bot, "done");
+        if (targetId != null && !goalProxy && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now));
     }
 
     // ---- the journal: each tile set out for, the plan's figure and how long it really took ------
@@ -2662,7 +2881,7 @@ public final class LockoutBrain implements BotBrain {
         var g = pick.tile().goal();
         long now = bot.body().level().getGameTime();
         double[] x = net.kasax.challengecraft.bot.learn.GoalModel.features(bot, g, pick.plain(), pick.option().proxy(), minutes(now), deathsSeen,
-                tries.getOrDefault(g.id(), 0), overruns.getOrDefault(g.id(), 0), GoalExperience.factor(g.id()));
+                tries.getOrDefault(g.id(), 0), overruns.getOrDefault(g.id(), 0), GoalExperience.factor(g.id(), bot.params.on("goalprior")));
         var o = new com.google.gson.JsonObject();
         o.addProperty("id", net.kasax.challengecraft.bot.learn.Journal.newId());
         o.addProperty("bot", bot.name);
@@ -2673,6 +2892,9 @@ public final class LockoutBrain implements BotBrain {
         o.addProperty("plain", pick.plain());
         o.addProperty("estimate", pick.option().cost());
         o.addProperty("estimates", net.kasax.challengecraft.bot.plan.ObtainPlanner.ESTIMATES);
+        // (Whether the planner made it with round 2's estimates: the trainer's goal priors take the
+        // goals those changed only from lines made with them.)
+        o.addProperty("estfix", bot.params.on("estfix"));
         double expert = net.kasax.challengecraft.bot.plan.SpeedrunKnowledge.get().expert(g.id());
         if (!Double.isNaN(expert)) o.addProperty("expert", expert);
         o.addProperty("quick", quick);

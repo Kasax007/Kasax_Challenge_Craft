@@ -51,6 +51,8 @@ public final class SimBench {
                     case "opp" -> s.opponentTrue = v != 0;
                     case "greedyopp" -> s.greedyOpponent = v != 0;
                     case "rollme" -> s.rolloutRoute = v != 0;
+                    case "ch" -> s.chores = v != 0;
+                    case "dc" -> s.deathCost = v;
                     default -> throw new IllegalArgumentException("search knob " + p[0]);
                 }
             }
@@ -75,6 +77,11 @@ public final class SimBench {
             case "search-err60" -> {
                 SearchPolicy s = new SearchPolicy();
                 s.modelError = 0.6;
+                yield s;
+            }
+            case "search-chores" -> {
+                SearchPolicy s = new SearchPolicy();
+                s.chores = true;
                 yield s;
             }
             case "search-fast" -> {
@@ -132,13 +139,14 @@ public final class SimBench {
             case "calibrate" -> calibrate(o);
             case "show" -> {
                 long seed = Long.parseLong(o.getOrDefault("seed", "1"));
-                Profile p = Profile.named(o.getOrDefault("profile", "bob"));
+                Profile p = Profile.named(o.getOrDefault("profile", "bob")).tune(o.get("tune"));
                 Result r = play(seed, o.getOrDefault("a", "greedy"), o.getOrDefault("b", "search"), p, p,
                         Double.parseDouble(o.getOrDefault("length", "5400")), true);
                 System.out.println("score " + r.score[0] + ":" + r.score[1] + ", winner " + r.winner + ", end " + Math.round(r.end) + " s");
             }
             case "speed" -> speed(o);
             case "costs" -> costs(o);
+            case "goaltimes" -> goalTimes(o);
             default -> throw new IllegalArgumentException("mode " + args[0]);
         }
     }
@@ -251,15 +259,21 @@ public final class SimBench {
 
     /**
      * Bob (greedy, Bob's pace) against himself on each league game's board, twenty minutes: tiles,
-     * first tile, deaths, and per goal how often it was claimed within the twenty minutes - next to
-     * the leagues' figures. Titles in the leagues are matched to goals through the board of each
+     * first tile, deaths, and per goal how often a bot claimed it within the twenty minutes - next
+     * to the leagues' figures. Titles in the leagues are matched to goals through the board of each
      * seed and the English titles (lang files) - given as a tab-separated file goal-id/title
      * ({@code --titles}, by default {@code docs/bob-leagues/goal-titles.tsv}: the titles as the
      * game showed them in 26.3, from the mod's and the game's English lang files; a goal added to
      * the pool needs a line there to be counted).
+     *
+     * <p>{@code --params X}: only the league's bots with these knobs count (one side of a league of
+     * two variants, "-" for the defaults), and only the simulator's player 0 ({@code --a}) against
+     * {@code --b} (default: the same brain). Per goal the rate is per bot: the share of the bots
+     * counted, on whose board it was, that claimed it.
      */
     private static void calibrate(Map<String, String> o) throws Exception {
-        Path dir = Path.of(o.getOrDefault("leagues", "docs/bob-leagues"));
+        java.util.List<Path> dirs = new ArrayList<>();
+        for (String d : o.getOrDefault("leagues", "docs/bob-leagues").split(",")) dirs.add(Path.of(d));
         Map<String, String> titleToId = new HashMap<>();
         Path titles = Path.of(o.getOrDefault("titles", "docs/bob-leagues/goal-titles.tsv"));
         if (Files.exists(titles)) {
@@ -268,49 +282,62 @@ public final class SimBench {
                 if (p.length == 2) titleToId.put(p[0] + "|" + p[1], p[0]);
             }
         }
+        String params = o.get("params");
         List<Long> seeds = new ArrayList<>();
         Map<String, Integer> onBoard = new HashMap<>(), claimedLeague = new HashMap<>();
         double leagueTiles = 0, leagueDeaths = 0;
-        int leagueNone = 0;
+        int leagueNone = 0, bots = 0;
         List<Double> leagueFirst = new ArrayList<>();
-        int bots = 0;
-        try (var files = Files.list(dir)) {
-            for (Path f : files.sorted().toList()) {
+        int perGameBots = 0;
+        for (Path dir : dirs) {
+            List<Path> files;
+            try (var fl = Files.list(dir)) {
+                files = fl.sorted().toList();
+            }
+            for (Path f : files) {
                 if (!f.toString().endsWith(".jsonl")) continue;
                 for (String line : Files.readAllLines(f)) {
-                    Matcher m = SEED.matcher(line);
-                    if (!m.find()) continue;
-                    long seed = Long.parseLong(m.group(1));
-                    seeds.add(seed);
+                    if (line.isBlank()) continue;
+                    var game = com.google.gson.JsonParser.parseString(line).getAsJsonObject();
+                    if (!game.has("seed")) continue;
+                    long seed = game.get("seed").getAsLong();
                     Board board = PoolBoards.board(seed);
                     Map<String, String> byTitle = new HashMap<>();
                     for (int t = 0; t < Board.SIZE; t++) {
-                        onBoard.merge(board.goal[t].id, 1, Integer::sum);
                         for (var e : titleToId.entrySet()) if (e.getValue().equals(board.goal[t].id)) byTitle.put(e.getKey().split("\\|", 2)[1], e.getValue());
                     }
-                    Matcher c = CLAIM.matcher(line);
-                    while (c.find()) {
-                        String id = byTitle.get(c.group(1));
-                        if (id != null) claimedLeague.merge(id, 1, Integer::sum);
-                    }
-                    Matcher tm = TILES.matcher(line), fm = FIRST.matcher(line), dm = DEATHS.matcher(line);
-                    while (tm.find()) {
-                        leagueTiles += Integer.parseInt(tm.group(1));
+                    int counted = 0;
+                    for (var be : game.getAsJsonArray("bots")) {
+                        var bot = be.getAsJsonObject();
+                        if (params != null && !params.equals(bot.get("params").getAsString())) continue;
+                        counted++;
                         bots++;
-                    }
-                    while (fm.find()) {
-                        if (Integer.parseInt(fm.group(1)) > 0) leagueFirst.add(Double.parseDouble(fm.group(1)));
+                        leagueTiles += bot.get("tiles").getAsInt();
+                        leagueDeaths += bot.get("deaths").getAsInt();
+                        int first = bot.get("first").getAsInt();
+                        if (first > 0) leagueFirst.add((double) first);
                         else leagueNone++;
+                        for (var c : bot.getAsJsonArray("claims")) {
+                            String title = c.getAsString().substring(0, c.getAsString().lastIndexOf('@'));
+                            String id = byTitle.get(title);
+                            if (id != null) claimedLeague.merge(id, 1, Integer::sum);
+                        }
                     }
-                    while (dm.find()) leagueDeaths += Integer.parseInt(dm.group(1));
+                    if (counted == 0) continue;
+                    perGameBots = Math.max(perGameBots, counted);
+                    seeds.add(seed);
+                    for (int t = 0; t < Board.SIZE; t++) onBoard.merge(board.goal[t].id, counted, Integer::sum);
                 }
             }
         }
         int reps = Integer.parseInt(o.getOrDefault("reps", "20"));
         int threads = Integer.parseInt(o.getOrDefault("threads", "4"));
-        String brain = o.getOrDefault("a", "greedy");
+        String brain = o.getOrDefault("a", "greedy"), other = o.getOrDefault("b", brain);
         Profile prof = Profile.named(o.getOrDefault("profile", "bob")).tune(o.get("tune"));
+        Profile profB = Profile.named(o.getOrDefault("profile", "bob")).tune(o.get("tune-b") != null ? o.get("tune-b") : o.get("tune"));
         double length = Double.parseDouble(o.getOrDefault("length", "1200"));
+        // (Only player 0 counted: one side of a league of two variants, or a brain against another.)
+        boolean oneSide = params != null && perGameBots == 1 || !brain.equals(other);
         ExecutorService ex = Executors.newFixedThreadPool(threads);
         List<Future<Result>> fs = new ArrayList<>();
         for (int rep = 0; rep < reps; rep++) {
@@ -319,7 +346,7 @@ public final class SimBench {
                 fs.add(ex.submit(() -> {
                     World w = World.sample(luck);
                     Board board = PoolBoards.board(seed);
-                    Sim sim = new Sim(w, board, prof, prof, policy(brain), policy(brain), length, luck);
+                    Sim sim = new Sim(w, board, prof, profB, policy(brain), policy(other), length, luck);
                     sim.run();
                     List<String> claims = new ArrayList<>();
                     for (int t = 0; t < Board.SIZE; t++) if (board.owner[t] >= 0) claims.add(board.goal[t].id + "@" + board.owner[t] + "@" + Math.round(board.claimedAt[t]));
@@ -330,15 +357,17 @@ public final class SimBench {
             }
         }
         double simTiles = 0, simDeaths = 0;
-        int simNone = 0;
+        int simNone = 0, simBots = 0;
         List<Double> simFirst = new ArrayList<>();
-        Map<String, Integer> claimedSim = new HashMap<>(), firstSim = new HashMap<>();
+        Map<String, Integer> claimedSim = new HashMap<>(), firstSim = new HashMap<>(), onBoardSim = new HashMap<>();
         double[] time = new double[Sim.ACCOUNTS.length];
-        int games = 0;
         for (Future<Result> f : fs) {
             Result r = f.get();
-            games++;
-            for (int i = 0; i < 2; i++) {
+            Board board = PoolBoards.board(r.seed());
+            int sides = oneSide ? 1 : 2;
+            for (int t = 0; t < Board.SIZE; t++) onBoardSim.merge(board.goal[t].id, sides, Integer::sum);
+            for (int i = 0; i < sides; i++) {
+                simBots++;
                 simTiles += r.score[i];
                 simDeaths += r.deaths[i];
                 if (r.first[i] >= 0) simFirst.add(r.first[i]);
@@ -348,53 +377,79 @@ public final class SimBench {
                 double at = 1e9;
                 for (String c : r.claims) {
                     String[] parts = c.split("@");
-                    if (Integer.parseInt(parts[1]) == i && Double.parseDouble(parts[2]) < at) {
+                    if (Integer.parseInt(parts[1]) != i) continue;
+                    claimedSim.merge(parts[0], 1, Integer::sum);
+                    if (Double.parseDouble(parts[2]) < at) {
                         at = Double.parseDouble(parts[2]);
                         first = parts[0];
                     }
                 }
                 if (first != null) firstSim.merge(first, 1, Integer::sum);
             }
-            for (String c : r.claims) claimedSim.merge(c.split("@")[0], 1, Integer::sum);
         }
         ex.shutdown();
-        System.out.printf("leagues: %d bot-games, tiles per bot %.2f, first tile median %.0f s, deaths per bot %.2f%n", bots, leagueTiles / bots,
-                median(leagueFirst), leagueDeaths / bots);
-        System.out.printf("sim:     %d bot-games, tiles per bot %.2f, first tile median %.0f s, deaths per bot %.2f%n", 2 * games,
-                simTiles / (2 * games), median(simFirst), simDeaths / (2 * games));
-        System.out.printf("sim: bot-games without a tile %.0f%% (leagues: %.0f%%)%n", 100.0 * simNone / (2 * games), 100.0 * leagueNone / bots);
+        System.out.printf("leagues: %d bot-games%s, tiles per bot %.2f, first tile median %.0f s, deaths per bot %.2f, without a tile %.0f%%%n", bots,
+                params == null ? "" : " (" + params + ")", leagueTiles / bots, median(leagueFirst), leagueDeaths / bots, 100.0 * leagueNone / Math.max(1, bots));
+        System.out.printf("sim:     %d bot-games (%s%s), tiles per bot %.2f, first tile median %.0f s, deaths per bot %.2f, without a tile %.0f%%%n", simBots,
+                brain, brain.equals(other) ? "" : " vs " + other, simTiles / simBots, median(simFirst), simDeaths / simBots, 100.0 * simNone / simBots);
         StringBuilder fsb = new StringBuilder("sim first tiles:");
-        int botGames = 2 * games;
+        int botGames = simBots;
         firstSim.entrySet().stream().sorted((x, y) -> y.getValue() - x.getValue()).limit(12)
                 .forEach(e -> fsb.append(String.format(" %s %.0f%%", e.getKey(), 100.0 * e.getValue() / botGames)));
         System.out.println(fsb);
         StringBuilder sb = new StringBuilder("sim time per bot-game (s):");
-        for (int j = 0; j < time.length; j++) sb.append(String.format(" %s %.0f", Sim.ACCOUNTS[j], time[j] / (2 * games)));
+        for (int j = 0; j < time.length; j++) sb.append(String.format(" %s %.0f", Sim.ACCOUNTS[j], time[j] / simBots));
         System.out.println(sb);
-        // Per goal: the share of games on whose board it was that it got claimed, league against sim.
+        // Per goal: the share of the bots counted, on whose board it was, that claimed it - league against sim.
         List<String> ids = new ArrayList<>(onBoard.keySet());
         ids.sort((x, y) -> Double.compare(rate(claimedLeague, onBoard, y, 1), rate(claimedLeague, onBoard, x, 1)));
-        double se = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+        double se = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, w = 0;
         int k = 0;
-        System.out.println("goal                                 boards  league  sim");
+        boolean list = !o.containsKey("quiet");
+        if (list) System.out.println("goal                                 bots  league  sim");
         for (String id : ids) {
-            double x = rate(claimedLeague, onBoard, id, 1), y = rate(claimedSim, onBoard, id, reps);
+            double x = rate(claimedLeague, onBoard, id, 1), y = rate(claimedSim, onBoardSim, id, 1);
             int nb = onBoard.get(id);
-            System.out.printf("  %-34s %4d   %5.2f  %5.2f%n", id, nb, x, y);
+            if (list) System.out.printf("  %-34s %4d   %5.2f  %5.2f%n", id, nb, x, y);
+            // (Weighted by the bots behind the league's rate: a goal on one board says little.)
             se += nb * (x - y) * (x - y);
-            sx += x;
-            sy += y;
-            sxx += x * x;
-            syy += y * y;
-            sxy += x * y;
+            w += nb;
+            sx += nb * x;
+            sy += nb * y;
+            sxx += nb * x * x;
+            syy += nb * y * y;
+            sxy += nb * x * y;
             k++;
         }
-        double cov = sxy / k - sx / k * sy / k, vx = sxx / k - sx / k * sx / k, vy = syy / k - sy / k * sy / k;
-        System.out.printf("per-goal claim rates: correlation %.2f, weighted squared error %.3f over %d goals%n", cov / Math.sqrt(vx * vy), se / Math.max(1, ids.size()), k);
+        double mx = sx / w, my = sy / w;
+        double cov = sxy / w - mx * my, vx = sxx / w - mx * mx, vy = syy / w - my * my;
+        System.out.printf("per-goal claim rates: correlation %.2f (weighted by bots), mean squared error %.3f over %d goals; league mean %.3f, sim mean %.3f%n",
+                cov / Math.sqrt(vx * vy), se / w, k, mx, my);
+        if (o.containsKey("perseed")) {
+            // Per board: the simulator's tiles of player 0 less player 1's (a against b), to set
+            // beside a two-variant league's paired results seed by seed.
+            Map<Long, double[]> per = new java.util.LinkedHashMap<>();
+            for (Future<Result> f : fs) {
+                Result r = f.get();
+                double[] a = per.computeIfAbsent(r.seed(), x -> new double[3]);
+                a[0] += r.score[0];
+                a[1] += r.score[1];
+                a[2]++;
+            }
+            System.out.println("per seed (sim, " + brain + " less " + other + "):");
+            double sum = 0;
+            for (var e : per.entrySet()) {
+                double[] a = e.getValue();
+                sum += (a[0] - a[1]) / a[2];
+                System.out.printf("  %21d  %5.2f - %5.2f = %+5.2f%n", e.getKey(), a[0] / a[2], a[1] / a[2], (a[0] - a[1]) / a[2]);
+            }
+            System.out.printf("  mean %+5.2f over %d boards%n", sum / per.size(), per.size());
+        }
     }
 
     private static double rate(Map<String, Integer> claimed, Map<String, Integer> onBoard, String id, int reps) {
-        return claimed.getOrDefault(id, 0) / (double) (onBoard.get(id) * reps);
+        Integer n = onBoard.get(id);
+        return n == null || n == 0 ? 0 : claimed.getOrDefault(id, 0) / (double) (n * reps);
     }
 
     /** Each tile's cost at the start (own figures and true average) for one seed - to check the recipes. */
@@ -418,6 +473,89 @@ public final class SimBench {
             double luck = sim.planner.lastLuck();
             double tru = sim.planner.estimate(sim, 0, r, p);
             System.out.printf("%-36s own %7.0f (luck %5.0f)  true %7.0f%n", r.id, own, luck, tru);
+        }
+    }
+
+    // ---- goal times ---------------------------------------------------------------------------------------
+
+    /**
+     * Per goal, what it takes Bob in the simulator to get it alone, from a typical state after the
+     * opening (stone tools, a furnace, some food, five minutes in, by day), trying again after a
+     * failure as the brain does, up to {@code --cap} seconds: the mean seconds per tile got, the
+     * share got within the cap. To set beside the journals' seconds per claim
+     * (scripts/bot/analysis/goal_priors.py: "per_claim"). {@code --goals a,b}: only these.
+     */
+    private static void goalTimes(Map<String, String> o) {
+        Profile p = Profile.named(o.getOrDefault("profile", "bob")).tune(o.get("tune"));
+        int trials = Integer.parseInt(o.getOrDefault("trials", "200"));
+        double cap = Double.parseDouble(o.getOrDefault("cap", "1200"));
+        java.util.Set<String> only = o.containsKey("goals") ? java.util.Set.of(o.get("goals").split(",")) : null;
+        Policy idle = new Policy() {
+            @Override
+            public String name() {
+                return "idle";
+            }
+
+            @Override
+            public Decision choose(Sim sim, int me) {
+                return null;
+            }
+
+            @Override
+            public Policy fresh() {
+                return this;
+            }
+        };
+        Policy first = new Policy() {
+            @Override
+            public String name() {
+                return "first";
+            }
+
+            @Override
+            public Decision choose(Sim sim, int me) {
+                return sim.board.isOpen(0) && sim.usable(me, 0) ? Decision.tile(0, sim.planner.estimate(sim, me, sim.board.goal[0], sim.naive[me]), null) : null;
+            }
+
+            @Override
+            public Policy fresh() {
+                return this;
+            }
+        };
+        System.out.println("goal                                 got    s/claim  mean-start");
+        for (Recipe r : GoalBook.all()) {
+            if (!r.bob || r.impossible || only != null && !only.contains(r.id)) continue;
+            double spent = 0;
+            int got = 0;
+            for (int t = 0; t < trials; t++) {
+                long seed = SearchPolicy.mix(r.index * 100_003L + t);
+                World w = World.sample(seed);
+                List<String> ids = new ArrayList<>(List.of(r.id));
+                for (Recipe x : GoalBook.all()) {
+                    if (ids.size() >= Board.SIZE) break;
+                    if (!ids.contains(x.id)) ids.add(x.id);
+                }
+                Board board = Board.of(ids, null, null);
+                for (int k = 1; k < Board.SIZE; k++) board.close(k);
+                Profile solo = p.copy("solo");
+                solo.shieldFirst = false;
+                solo.copper = false;
+                solo.bundle = false;
+                Sim sim = new Sim(w, board, solo, solo, first, idle, 300 + cap, seed);
+                for (PlayerState s : sim.players) {
+                    s.ms = Ms.WOOD.bit | Ms.STONE.bit | Ms.FURNACE.bit;
+                    s.res[Res.FOOD.ordinal()] = 4;
+                    s.fedAt = 600;
+                }
+                sim.now = 300;
+                sim.run();
+                double at = board.owner[0] == 0 ? board.claimedAt[0] : -1;
+                if (at >= 0) {
+                    got++;
+                    spent += at - 300;
+                } else spent += cap;
+            }
+            System.out.printf("  %-34s %5.2f  %7.0f%n", r.id, got / (double) trials, got == 0 ? Double.POSITIVE_INFINITY : spent / got);
         }
     }
 

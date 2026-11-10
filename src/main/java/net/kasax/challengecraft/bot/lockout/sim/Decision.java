@@ -22,8 +22,27 @@ public final class Decision {
         return new Decision(-1, m, estimate, why);
     }
 
+    /** A stock of food (a chore the look-ahead may decide on, see {@link Policy#decidesChores}). */
+    public static Decision food(double estimate, String why) {
+        Decision d = new Decision(-1, null, estimate, why);
+        d.food = true;
+        return d;
+    }
+
+    /** Whether this is the food chore. */
+    public boolean food;
+
+    /** Seconds a floor put on the estimate beyond the simulator's own figure (see SearchPolicy#choreFloor). */
+    public double extra;
+
+    /** A chore rather than a tile (an investment or the food). */
+    public boolean chore() {
+        return invest != null || food;
+    }
+
     @Override
     public String toString() {
+        if (food) return "food (~" + Math.round(estimate) + " s, " + why + ")";
         return invest != null ? "invest " + invest + " (~" + Math.round(estimate) + " s, " + why + ")"
                 : "tile " + tile + " (~" + Math.round(estimate) + " s" + (why == null ? "" : ", " + why) + ")";
     }

@@ -36,6 +36,36 @@ public final class GoalBook {
         return Collections.unmodifiableList(ALL);
     }
 
+    /** The share of the attempts that failed in the leagues' journals, over all goals (see {@link #measured}). */
+    public static double SEEN_FAIL = 0.415;
+
+    /**
+     * What the leagues' journals saw of each goal (bob-models/goal-priors.json as shipped, "outcomes":
+     * attempts counted and got, from scripts/bot/analysis/goal_priors.py) into the recipes, for the
+     * simulator's failure chances per goal. Without the file (or Gson), nothing: the kinds' chances.
+     */
+    private static void measured() {
+        try (var in = GoalBook.class.getResourceAsStream("/bob-models/goal-priors.json")) {
+            if (in == null) return;
+            var root = com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            if (!root.has("outcomes")) return;
+            int starts = 0, done = 0;
+            for (var e : root.getAsJsonObject("outcomes").entrySet()) {
+                var a = e.getValue().getAsJsonArray();
+                int n = a.get(0).getAsInt(), k = a.get(1).getAsInt();
+                starts += n;
+                done += k;
+                Recipe r = BY_ID.get(e.getKey());
+                if (r == null) continue;
+                r.seenStarts = n;
+                r.seenDone = k;
+            }
+            if (starts >= 20) SEEN_FAIL = 1 - done / (double) starts;
+        } catch (Exception | LinkageError e) {
+            // (No goal priors to be read: every goal fails as its kind does.)
+        }
+    }
+
     private static Recipe g(String id) {
         Recipe r = new Recipe(id);
         r.index = ALL.size();
@@ -73,7 +103,7 @@ public final class GoalBook {
         g("obtain_packed_ice").ms(ENCHANTING_TABLE).use(LAPIS, 6).at(SNOWY).craft(280).noBob();
         g("obtain_blue_ice").ms(ENCHANTING_TABLE).use(LAPIS, 6).at(SNOWY).craft(320).noBob();
         g("obtain_slime_ball").have(SLIME, 1);
-        g("obtain_honey_bottle").ms(FURNACE).use(SAND, 3).gather(70, 0.7);
+        g("obtain_honey_bottle").ms(FURNACE).use(SAND, 3).gather(220, 0.85);
         g("obtain_honeycomb").ms(SHEARS).gather(65, 0.7);
         // Chests of a dungeon or a mineshaft, or a fishing treasure.
         g("obtain_name_tag").at(CAMP).gather(60, 0.7);
@@ -107,7 +137,8 @@ public final class GoalBook {
         g("obtain_all_log_types_basic").at(JUNGLE).gather(70, 0.5);
         g("obtain_3_flower_types").gather(25, 0.5);
         g("obtain_5_dye_colors").ms(WOOD).gather(120, 0.5);
-        g("obtain_3_sapling_types").gather(90, 0.6);
+        // (Three kinds of tree: two of them in other biomes as often as not - leagues 9 and 10: 0 of 5.)
+        g("obtain_3_sapling_types").gather(160, 0.7);
 
         // ---- the Nether ------------------------------------------------------------------------
         g("enter_nether").ms(NETHER_VISITED).auto(NETHER_VISITED);
@@ -192,8 +223,9 @@ public final class GoalBook {
         g("craft_note_block").ms(WOOD).use(REDSTONE, 1).craft(3);
         g("craft_painting").ms(WOOD).use(WOOL, 1).craft(3);
         g("craft_item_frame").ms(WOOD).use(LEATHER, 1).craft(3);
-        g("craft_flower_pot").ms(FURNACE).use(CLAY, 3).craft(35);
-        g("craft_bricks").ms(FURNACE).use(CLAY, 4).craft(45);
+        g("craft_flower_pot").ms(FURNACE).use(CLAY, 3).craft(20);
+        // (The furnace smelts while the player does something else beside it: Bob's meanwhile.)
+        g("craft_bricks").ms(FURNACE).use(CLAY, 4).craft(25);
         g("craft_lightning_rod").ms(WOOD).use(COPPER, 3).craft(2);
         g("craft_copper_bulb").ms(WOOD).use(COPPER, 27).use(BLAZE_ROD, 1).use(REDSTONE, 1).craft(5);
         g("craft_spyglass").ms(STONE).use(COPPER, 2).at(CAVE).gather(100, 0.8);
@@ -202,7 +234,7 @@ public final class GoalBook {
         g("craft_pumpkin_pie").ms(WOOD).use(PAPER, 1).gather(120, 0.7).noBob();
 
         // ---- doing things ------------------------------------------------------------------------
-        g("block_damage_with_shield").ms(SHIELD).monster(35, 5, 0.03);
+        g("block_damage_with_shield").ms(SHIELD).monster(35, 5, 0.03).chance(0.12, SHIELD);
         g("hit_target_block").ms(BOW).use(REDSTONE, 4).use(WHEAT, 9).use(FLINT, 1).use(FEATHER, 1).craft(10);
         g("ignite_tnt").ms(FLINT_STEEL).use(GUNPOWDER, 5).use(SAND, 4).craft(5);
         g("place_tnt").ms(WOOD).use(GUNPOWDER, 5).use(SAND, 4).craft(4);
@@ -213,13 +245,13 @@ public final class GoalBook {
         g("throw_trident").ms(STONE).at(OCEAN).monster(900, 30, 0.06).noBob();
         g("use_totem").at(MANSION).monster(300, 60, 0.2).heavy().noBob();
         g("drink_potion").ms(FURNACE).use(SAND, 3).at(WATER).craft(15);
-        g("advancement_monster_hunter").ms(STONE).monster(25, 6, 0.03);
+        g("advancement_monster_hunter").ms(STONE).monster(25, 6, 0.03).chance(0.15);
         g("advancement_take_aim").ms(BOW).use(FLINT, 1).use(FEATHER, 1).craft(15);
         g("advancement_sniper_duel").ms(BOW, STONE).use(FLINT, 2).use(FEATHER, 2).monster(200, 20, 0.06).noBob();
         g("advancement_return_to_sender").ms(STONE, NETHER_VISITED).at(SOUL_VALLEY).monster(200, 20, 0.1).heavy();
         g("advancement_best_friends_forever").use(BONE, 2).animal(45, 0.6);
         g("advancement_fishy_business").ms(ROD).at(WATER).animal(25, 0.6);
-        g("advancement_tactical_fishing").ms(BUCKET).at(OCEAN).animal(40, 0.6);
+        g("advancement_tactical_fishing").ms(BUCKET).at(WATER).animal(40, 0.6);
         g("advancement_local_brewery").ms(BREWING_STAND, FURNACE).use(SAND, 3).use(NETHER_WART, 1).use(BLAZE_ROD, 1).craft(30);
         g("advancement_enchanter").ms(ENCHANTING_TABLE).use(LAPIS, 3).craft(60);
         g("advancement_into_fire").have(BLAZE_ROD, 1);
@@ -280,23 +312,24 @@ public final class GoalBook {
         g("eat_dried_kelp").ms(FURNACE).at(OCEAN).gather(20, 0.2);
         g("eat_glow_berries").at(LUSH).gather(5, 0.3);
         g("eat_golden_apple").ms(WOOD).use(GOLD, 8).gather(60, 0.75);
-        g("eat_honey_bottle").ms(FURNACE).use(SAND, 3).gather(75, 0.7);
+        g("eat_honey_bottle").ms(FURNACE).use(SAND, 3).gather(225, 0.85);
         g("eat_pumpkin_pie").ms(WOOD).use(PAPER, 1).gather(125, 0.7).noBob();
         g("eat_rabbit_stew").ms(FURNACE).at(VILLAGE).animal(150, 0.6);
-        g("eat_suspicious_stew").ms(WOOD).gather(60, 0.6);
+        g("eat_suspicious_stew").ms(WOOD).gather(140, 0.75);
 
         // ---- the body: falls, fire, effects, heights ------------------------------------------------
         g("burn_and_survive").ms(WOOD).use(COAL, 1).stunt(6, 0);
         g("fall_20_blocks_and_survive").ms(STONE).stunt(45, 0).hazard(0.02);
         g("freeze_in_powder_snow").at(SNOWY).stunt(20, 0.5);
-        g("get_shot_by_skeleton").monster(30, 2, 0.04);
+        g("get_shot_by_skeleton").monster(30, 2, 0.04).chance(0.12);
         g("survive_explosion").ms(STONE).monster(35, 5, 0.05);
         g("take_fall_damage").stunt(8, 0);
         g("have_10_hearts_missing").ms(STONE).stunt(90, 0).hazard(0.03);
         g("get_levitation").at(END).stunt(10, 0).impossible();
         g("get_poisoned").monster(70, 5, 0.03);
         g("get_withered").ms(STONE, NETHER_VISITED).at(FORTRESS).monster(60, 5, 0.12).heavy();
-        g("reach_y_minus_50").ms(WOOD).at(DEEP).stunt(30, 0);
+        // (Fifty levels of staircase below where the deepslate begins.)
+        g("reach_y_minus_50").ms(WOOD).at(DEEP).stunt(90, 0);
         g("stand_on_bedrock").ms(STONE).at(DEEP).stunt(50, 0);
         g("reach_build_limit").ms(WOOD).stunt(220, 0);
         g("enter_end_gateway").at(END).stunt(10, 0).impossible();
@@ -348,7 +381,7 @@ public final class GoalBook {
         // ---- monsters of the Overworld ---------------------------------------------------------------
         g("kill_breeze").ms(STONE).at(TRIAL_CHAMBERS).monster(60, 20, 0.08).heavy().noBob();
         g("kill_cave_spider").ms(STONE).at(MINESHAFT).monster(40, 8, 0.05);
-        g("kill_creeper").ms(STONE).monster(35, 6, 0.04);
+        g("kill_creeper").ms(STONE).monster(35, 6, 0.04).chance(0.05);
         g("kill_drowned").ms(STONE).at(WATER).monster(60, 10, 0.05);
         g("kill_elder_guardian").ms(STONE).at(MONUMENT).monster(120, 60, 0.15).heavy().noBob();
         g("kill_enderman").ms(STONE).monster(80, 20, 0.12).heavy();
@@ -358,12 +391,12 @@ public final class GoalBook {
         g("kill_pillager").ms(STONE).at(OUTPOST).monster(20, 15, 0.08);
         g("kill_ravager").ms(STONE).at(OUTPOST).monster(1500, 30, 0.15).heavy().noBob();
         g("kill_silverfish").ms(STONE).at(MOUNTAIN).monster(200, 5, 0.01);
-        g("kill_skeleton").ms(STONE).monster(30, 10, 0.06);
+        g("kill_skeleton").ms(STONE).monster(30, 10, 0.06).chance(0.08);
         g("kill_slime").ms(STONE).at(SWAMP).monster(150, 10, 0.02);
-        g("kill_spider").ms(STONE).monster(30, 6, 0.03);
+        g("kill_spider").ms(STONE).monster(30, 6, 0.03).chance(0.08);
         g("kill_stray").ms(STONE).at(SNOWY).monster(30, 10, 0.06);
         g("kill_witch").ms(STONE).at(WITCH_HUT).monster(200, 15, 0.08).heavy();
-        g("kill_zombie").ms(STONE).monster(25, 5, 0.03);
+        g("kill_zombie").ms(STONE).monster(25, 5, 0.03).chance(0.10);
         // Off the board: the End and the deep dark's warden.
         g("kill_shulker").at(END).monster(60, 30, 0.1).impossible();
         g("kill_warden").at(ANCIENT_CITY).monster(60, 120, 0.5).impossible();
@@ -379,12 +412,14 @@ public final class GoalBook {
         g("buy_bread").use(EMERALD, 1).at(VILLAGE).trade(10, 0.3);
         g("buy_lapis").use(EMERALD, 3).at(VILLAGE).trade(200, 0.5);
         g("obtain_emerald_by_trade").use(WHEAT, 20).at(VILLAGE).trade(20, 0.3);
-        g("trade_with_villager").use(WHEAT, 20).at(VILLAGE).trade(20, 0.3);
+        // (Any offer: the fletcher's sticks, the farmer's wheat.)
+        g("trade_with_villager").at(VILLAGE).trade(30, 0.3);
         g("trade_with_armorer").use(COAL, 15).at(VILLAGE).trade(45, 0.5);
         g("trade_with_cleric").at(VILLAGE).trade(140, 0.6);
         g("trade_with_farmer").use(WHEAT, 20).at(VILLAGE).trade(25, 0.3);
         g("trade_with_fletcher").ms(WOOD).at(VILLAGE).trade(35, 0.5);
         g("trade_with_librarian").use(PAPER, 24).at(VILLAGE).trade(40, 0.5);
         g("trade_with_toolsmith").use(COAL, 15).at(VILLAGE).trade(45, 0.5);
+        measured();
     }
 }

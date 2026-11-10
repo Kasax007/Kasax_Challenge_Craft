@@ -15,6 +15,7 @@ PyTorch installed (and a CUDA GPU) the cover model trains there.
 """
 import glob
 import json
+import collections
 import math
 import os
 import random
@@ -432,6 +433,52 @@ def _logistic(Xs, y, lam=1.0, iters=50):
         w -= np.linalg.solve(H, g)
         b -= gb / hb
     return w, b
+
+
+# ---- the goal priors -----------------------------------------------------------------------------
+
+# Goals whose estimates round 2 changed (the knob estfix): their lines count only when made with it.
+ESTFIX_GOALS = {"obtain_3_sapling_types", "visit_dripstone_caves", "visit_lush_caves", "visit_deep_dark",
+                "fall_20_blocks_and_survive", "take_fall_damage", "have_10_hearts_missing", "reach_y_minus_50",
+                "eat_apple", "craft_golden_apple", "eat_golden_apple"}
+PRIOR_COUNTED = {"done", "failed", "overrun", "died"}
+
+
+def goal_priors(records, per_start=0.5, min_starts=2, min_ratio=0.5):
+    """Per goal what the journals measured against the plan (GoalExperience's prior; the same rule as
+    scripts/bot/analysis/goal_priors.py): log((seconds of the counted starts / max(done, 0.5)) / mean
+    plan), clamped to [log min_ratio, log 8], and the games it counts as (per_start a start); and every
+    goal's counted starts and how many got it (the simulator's failure chances). None if there is
+    nothing of the newest estimates."""
+    records = [r for r in records if r.get("t", "goal") == "goal"]
+    version = max((estimates_version(r) for r in records), default=0)
+    counted = [r for r in records if estimates_version(r) == version and not r.get("proxy") and r.get("outcome") in PRIOR_COUNTED]
+    # (The failures per goal from every counted line - a fact of the game, whatever the estimate; the
+    # priors only from lines planned the way the mod plans now, and never from a negative plan, a bug
+    # before 36f80f1.)
+    every = collections.defaultdict(list)
+    for r in counted:
+        every[r["goal"]].append(r)
+    outcomes = {g: [len(xs), sum(1 for x in xs if x["outcome"] == "done")] for g, xs in sorted(every.items())}
+    rows = [r for r in counted if (r.get("goal") not in ESTFIX_GOALS or r.get("estfix") is True) and float(r.get("plain", 1)) >= 0]
+    if not rows:
+        return None
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[r["goal"]].append(r)
+    goals = {}
+    for g, xs in sorted(by.items()):
+        done = sum(1 for x in xs if x["outcome"] == "done")
+        if len(xs) < min_starts:
+            continue
+        spent = sum(max(0.0, float(x.get("secs", 0))) for x in xs)
+        plan = sum(max(1.0, float(x.get("plain", 1))) for x in xs) / len(xs)
+        ratio = spent / max(done, 0.5) / plan
+        log = max(math.log(max(0.25, min_ratio)), min(math.log(8), math.log(max(1e-6, ratio))))
+        goals[g] = {"log": round(log, 4), "games": round(per_start * len(xs), 2), "starts": len(xs), "done": done,
+                    "plan": round(plan, 1), "per_claim": round(spent / max(done, 0.5), 1)}
+    return {"estimates": version, "journal_goals": len(rows), "per_start": per_start, "version": time.strftime("%Y%m%d-%H%M%S"),
+            "goals": goals, "outcomes": outcomes}
 
 
 def estimates_version(record):

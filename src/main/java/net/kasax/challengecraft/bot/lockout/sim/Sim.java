@@ -52,6 +52,13 @@ public final class Sim {
     private final long[] demandKey = {-1, -1};
     /** Optional log of decisions and claims (null: none). */
     public StringBuilder log;
+    /**
+     * How much longer (or shorter) each goal's own work really is in this game than its recipe
+     * says (by recipe index; null: as the recipe says) - drawn at the start from
+     * {@link Profile#goalNoise}: the world's truth that no plan knows. A look-ahead's copies do not
+     * have it: they play with the recipes.
+     */
+    double[] goalMult;
 
     public Sim(World world, Board board, Profile p0, Profile p1, Policy a, Policy b, double length, long seed) {
         this.world = world;
@@ -69,7 +76,15 @@ public final class Sim {
             PlayerState p = new PlayerState();
             p.known = world.knownAtStart(profiles[i].worldsense);
             p.res[Res.FOOD.ordinal()] = 0;
+            p.fedAt = profiles[i].fedFor;
             players[i] = p;
+        }
+        double noise = Math.max(p0.goalNoise, p1.goalNoise);
+        if (noise > 0) {
+            // (Its own stream: the same truth for a seed whoever plays it.)
+            SplittableRandom r = new SplittableRandom(world.seed ^ 0x6A09E667F3BCC909L);
+            goalMult = new double[GoalBook.all().size()];
+            for (int k = 0; k < goalMult.length; k++) goalMult[k] = Math.exp(noise * r.nextGaussian() - noise * noise / 2);
         }
     }
 
@@ -158,9 +173,13 @@ public final class Sim {
         eat(i);
         p.decisions++;
         int food = p.res[Res.FOOD.ordinal()];
+        // (A brain that decides the chores itself: the rules below only where life depends on them.)
+        boolean ruled = !policies[i].decidesChores();
         // Food: a stock at the start, topped up when low - and before the night (dusk: ready for it).
         boolean dusk = prof.nightShelter && p.dim == 0 && Planner.untilNight(now) < 150 && food < 1;
         boolean hungry = food < prof.foodLow && now > p.fedAt - 60;
+        // (Deciding the chores: starving - nothing left and the belly empty - is not a choice.)
+        if (!ruled) hungry = food < 1 && now > p.fedAt;
         if (hungry || now < 1 && food < prof.foodStart || dusk) {
             int want = now < 1 ? prof.foodStart : food + prof.foodBatch;
             if (startChore(i, A_FOOD, () -> planner.plan(this, i, Res.FOOD, want, prof, null))) return;
@@ -178,9 +197,11 @@ public final class Sim {
                 return;
             }
         }
-        if (prof.bundle && !p.has(Ms.BUNDLE) && now >= prof.bundleAfter && now >= p.choreRetryAt) {
-            p.choreRetryAt = now + 300;
-            if (planner.estimate(this, i, Ms.BUNDLE, naive[i]) < 120
+        if (prof.bundle && !p.has(Ms.BUNDLE) && now >= prof.bundleAfter && now >= p.bundleRetryAt) {
+            // (Its own clock: on the chores' one, every look at a bundle too dear put the copper
+            // armour off by five minutes - it never came while the bundle did not.)
+            p.bundleRetryAt = now + 300;
+            if (planner.estimate(this, i, Ms.BUNDLE, naive[i]) < prof.bundleMax
                     && startChore(i, A_BUNDLE, () -> planner.plan(this, i, Ms.BUNDLE, prof, demand(i)))) return;
         }
         Decision inv = policies[i].invest(this, i);
@@ -188,17 +209,63 @@ public final class Sim {
             if (log != null) log(i, "invests: " + inv);
             if (startChore(i, A_INVEST, () -> planner.plan(this, i, inv.invest, prof, demand(i)), Econ.MS_WORK[inv.invest.ordinal()])) return;
         }
-        if (prof.shieldFirst && !p.has(Ms.SHIELD) && p.dim == 0
+        // (The shield on hard is not left out when the brain decides the chores: only put off, and
+        // not into the night - "no night without one".)
+        boolean shieldDue = ruled ? !investLater(i, planner.estimate(this, i, Ms.SHIELD, naive[i]))
+                : Planner.untilNight(now) < SHIELD_BEFORE_NIGHT || Planner.night(now);
+        if (prof.shieldFirst && !p.has(Ms.SHIELD) && p.dim == 0 && shieldDue
                 && startChore(i, A_SHIELD, () -> planner.plan(this, i, Ms.SHIELD, prof, demand(i)))) return;
-        if (prof.copper && p.has(Ms.SHIELD) && !p.has(Ms.COPPER_ARMOR) && p.dim == 0 && now >= p.choreRetryAt
-                && planner.estimate(this, i, Ms.COPPER_ARMOR, naive[i]) <= 300
-                && startChore(i, A_COPPER, () -> planner.plan(this, i, Ms.COPPER_ARMOR, prof, null))) return;
+        if (ruled && prof.copper && p.has(Ms.SHIELD) && !p.has(Ms.COPPER_ARMOR) && p.dim == 0 && now >= p.choreRetryAt) {
+            double copper = planner.estimate(this, i, Ms.COPPER_ARMOR, naive[i]);
+            if (copper <= 300 && !investLater(i, copper)
+                    && startChore(i, A_COPPER, () -> planner.plan(this, i, Ms.COPPER_ARMOR, prof, null))) return;
+        }
         Decision d = policies[i].choose(this, i);
+        if (d != null && d.chore()) {
+            if (log != null) log(i, "chore " + d);
+            if (startChore(i, d)) return;
+        }
         if (d != null && d.tile >= 0 && board.isOpen(d.tile)) {
             if (log != null) log(i, "goal " + board.goal[d.tile].id + " " + d);
             if (startGoal(i, d.tile, d.estimate, false)) return;
         }
         startWait(i, A_IDLE, 20);
+    }
+
+    /**
+     * The real brain's {@code investLater} ({@link Profile#interleave}): an investment dearer than
+     * {@link Profile#investCheap} waits while a tile of at most {@link Profile#tileFirst} seconds
+     * (by the player's own figures) is open - early in the day, before the first tiles are in.
+     */
+    boolean investLater(int i, double estimate) {
+        Profile prof = profiles[i];
+        if (!prof.interleave || estimate <= prof.investCheap || now % Planner.DAY >= prof.investBy || board.score[i] >= prof.investAfterTiles) return false;
+        for (int t = 0; t < Board.SIZE; t++) {
+            if (!usable(i, t) || players[i].restUntil[t] > now) continue;
+            if (planner.estimate(this, i, board.goal[t], naive[i]) <= prof.tileFirst) return true;
+        }
+        return false;
+    }
+
+    /** Seconds before the night the shield is got whatever the brain says (on hard, deciding the chores itself). */
+    static final double SHIELD_BEFORE_NIGHT = 150;
+
+    /**
+     * A chore a brain decided on (see {@link Policy#decidesChores}): the food stock, or a milestone
+     * - the shield, the copper armour, the iron kit's pieces, the way into the Nether - planned
+     * and begun as the rules would; false if it cannot be planned.
+     */
+    public boolean startChore(int i, Decision d) {
+        Profile prof = profiles[i];
+        PlayerState p = players[i];
+        if (d.food) {
+            int want = p.res[Res.FOOD.ordinal()] + prof.foodBatch;
+            return startChore(i, A_FOOD, () -> planner.plan(this, i, Res.FOOD, want, prof, null));
+        }
+        Ms m = d.invest;
+        int account = m == Ms.SHIELD ? A_SHIELD : m == Ms.COPPER_ARMOR ? A_COPPER : A_INVEST;
+        int[] dem = m == Ms.COPPER_ARMOR ? null : demand(i);
+        return startChore(i, account, () -> planner.plan(this, i, m, prof, dem), account == A_INVEST ? Econ.MS_WORK[m.ordinal()] : null);
     }
 
     /** Ready for a night out (nightarmour=0): a weapon and something to eat. */
@@ -306,7 +373,7 @@ public final class Sim {
         p.stepsSinceCheck = 0;
         // (Some attempts fail whatever the plan: then part of the way in.)
         p.goalFailsAt = Double.MAX_VALUE;
-        if (rng.nextDouble() < profiles[i].fail[r.kind.ordinal()]) {
+        if (rng.nextDouble() < failChance(i, r)) {
             double expected = planner.estimate(this, i, r, profiles[i]);
             p.goalFailsAt = now + (0.3 + 0.9 * rng.nextDouble()) * Math.max(20, Math.min(900, expected));
         }
@@ -389,8 +456,33 @@ public final class Sim {
         p.busyUntil = end;
     }
 
+    /**
+     * The chance an attempt at the goal fails for reasons beyond the plan: its kind's, and with
+     * {@link Profile#goalFails} scaled by how this goal fared in the leagues against all goals
+     * there ({@link GoalBook#SEEN_FAIL}), the leagues' count shrunk towards that mean by
+     * {@link #FAIL_DOUBT} attempts: "3 Sapling Types" (0 got in 5) about twice its kind's.
+     */
+    double failChance(int i, Recipe r) {
+        Profile prof = profiles[i];
+        double f = prof.fail[r.kind.ordinal()];
+        if (!prof.goalFails || r.seenStarts == 0) return f;
+        double seen = (r.seenStarts - r.seenDone + FAIL_DOUBT * GoalBook.SEEN_FAIL) / (r.seenStarts + FAIL_DOUBT);
+        return Math.max(0.02, Math.min(0.9, f * seen / GoalBook.SEEN_FAIL));
+    }
+
+    /** Attempts' worth of doubt in a goal's own failure count (see {@link #failChance}). */
+    static final double FAIL_DOUBT = 3;
+
     /** Seconds the step takes, drawn: travel as the land lies, finding by luck, work around its usual time. */
     private double duration(int i, int k, int a, int amt) {
+        double d = rawDuration(i, k, a, amt);
+        PlayerState p = players[i];
+        // (On the surface at night: the fights, the box, the hole while they pass - Profile.nightSlow.)
+        if (k != Planner.S_WAIT && d < Planner.INF / 2 && p.dim == 0 && p.layer == 0 && Planner.night(now)) d *= profiles[i].nightSlow;
+        return d;
+    }
+
+    private double rawDuration(int i, int k, int a, int amt) {
         PlayerState p = players[i];
         Profile prof = profiles[i];
         switch (k) {
@@ -412,11 +504,12 @@ public final class Sim {
                 return travel(i, Place.ALL[a]);
             case Planner.S_SEARCH: {
                 Recipe r = GoalBook.all().get(a);
-                return exp(r.work * r.luck * prof.pace(r.kind) * Planner.monsterFactor(now, p.layer, p.dim));
+                double truth = goalMult == null ? 1 : goalMult[a];
+                return exp(r.work * r.luck * prof.pace(r.kind) * truth * Planner.monsterFactor(now, p.layer, p.dim));
             }
             case Planner.S_WORK: {
                 Recipe r = GoalBook.all().get(a);
-                double pace = prof.pace(r.kind);
+                double pace = prof.pace(r.kind) * (goalMult == null ? 1 : goalMult[a]);
                 if (r.nightOnly && !Planner.night(now)) return Planner.untilNight(now) + r.work * pace;
                 if (r.monster) return r.work * (1 - r.luck) * pace * noise(0.2);
                 return r.work * (1 - r.luck) * pace * noise(0.2) + exp(r.work * r.luck * pace);
@@ -472,7 +565,12 @@ public final class Sim {
         } else if (k == Planner.S_RES && Econ.RES_MONSTER[a]) {
             h += 0.03 * prof.hzFight;
         }
-        if (p.has(Ms.SHIELD) || p.has(Ms.ARMOR) || p.has(Ms.COPPER_ARMOR)) h *= prof.gear;
+        if (prof.armourGear > 0) {
+            // (Shield and armour each take their share: the copper set on top of the shield is
+            // a third off every blow and arrow - before, one or the other counted as both.)
+            if (p.has(Ms.SHIELD)) h *= prof.gear;
+            if (p.has(Ms.ARMOR) || p.has(Ms.COPPER_ARMOR)) h *= prof.armourGear;
+        } else if (p.has(Ms.SHIELD) || p.has(Ms.ARMOR) || p.has(Ms.COPPER_ARMOR)) h *= prof.gear;
         return h;
     }
 
@@ -484,6 +582,7 @@ public final class Sim {
         if (k < 0) return; // (free: nothing under way)
         double ran = now - p.stepStart;
         account(i, ran);
+        chances(i, now - p.stepBeganAt);
         if (p.stepDies && p.stepDeathAt <= now && p.stepDeathAt <= p.stepEnd) {
             die(i);
             return;
@@ -523,6 +622,28 @@ public final class Sim {
                 // (Plan done but the tile not claimed: try again later.)
                 dropGoal(i, true);
             } else if (p.target >= 0) finishGoal(i);
+        }
+    }
+
+    /**
+     * The tiles met by the way (see {@link Recipe#chance}): for a step of {@code seconds} spent on
+     * the surface at night or in the caves, armed, each such open tile is claimed with the chance
+     * of meeting it in that time. (Bob's chances on the way: a zombie at the door is the tile.)
+     */
+    private void chances(int i, double seconds) {
+        PlayerState p = players[i];
+        if (!profiles[i].chances || seconds <= 0 || over || p.dim != 0 || !p.has(Ms.STONE)) return;
+        boolean dark = p.layer >= 1 || Planner.night(now);
+        if (!dark || p.stepKind == Planner.S_WAIT && (p.chore == A_NIGHT || p.chore == A_DEAD)) return;
+        for (int t = 0; t < Board.SIZE && !over; t++) {
+            if (!board.isOpen(t)) continue;
+            Recipe r = board.goal[t];
+            if (r.chance <= 0 || r.chanceNeeds >= 0 && (p.ms & (1 << r.chanceNeeds)) == 0) continue;
+            if (profiles[i].bobGoals && !r.bob) continue;
+            if (rng.nextDouble() < 1 - Math.exp(-r.chance * seconds / 60)) {
+                if (log != null) log(i, "by the way: " + r.id);
+                claim(i, t);
+            }
         }
     }
 

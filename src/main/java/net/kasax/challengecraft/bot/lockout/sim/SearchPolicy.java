@@ -41,6 +41,12 @@ public final class SearchPolicy implements Policy {
     /** What a won game is worth beyond its tiles, in tiles. */
     public double winBonus = 2;
     /**
+     * What a death in a game played ahead costs beyond the time and the things it loses there, in
+     * tiles: the user's rule is "never die" - a plan that wins a tile by dying once more is not
+     * one he wants (round 2; 0: only what the death costs in play, as round 1).
+     */
+    public double deathCost = 1;
+    /**
      * For testing how much the plan relies on a right picture of the game: the paces and failure
      * chances it plays ahead with are off by this much (log-normal spread, drawn once per game).
      */
@@ -61,6 +67,12 @@ public final class SearchPolicy implements Policy {
      */
     public double[] floor;
     /**
+     * Per chore (its bit, as in {@link #choresAllowed}), the least it is believed to take (seconds;
+     * absent: no floor) - as {@link #floor} for the tiles, from Bob's own estimate of the chore in
+     * the real game, so that tiles and chores are weighed alike.
+     */
+    public java.util.Map<Long, Double> choreFloor;
+    /**
      * Varies the luck of the games played ahead from one decision to the next where a fresh
      * instance makes each decision (the real game: the decision's number).
      */
@@ -72,6 +84,20 @@ public final class SearchPolicy implements Policy {
     public volatile int progress;
     /** Set from another thread when the answer is no longer wanted: the decision stops and returns null. */
     public volatile boolean cancelled;
+    /**
+     * It decides the chores too (round 2): besides the tiles, the stock of food, the shield, the
+     * copper armour, the iron kit's pickaxe and bucket and the way into the Nether are candidates
+     * of the same look-ahead - each played out as "now, then the rules" against a tile "now, then
+     * the rules". The game's own rules for them give way (see {@link Policy#decidesChores}), but
+     * for starving and the shield before the night.
+     */
+    public boolean chores;
+    /** The chores it may choose among now (bit per {@link Ms}, and {@link #FOOD_BIT}; -1: all it can). */
+    public long choresAllowed = -1L;
+    /** The food chore's bit in {@link #choresAllowed}. */
+    public static final long FOOD_BIT = 1L << 40;
+    /** The milestones that are chores it may decide on. */
+    static final Ms[] CHORES = {Ms.SHIELD, Ms.IRON_PICK, Ms.BUCKET, Ms.COPPER_ARMOR, Ms.NETHER_VISITED};
 
     /** The other player of a game alone: never goes for a tile. */
     private static final Policy IDLE = new Policy() {
@@ -118,7 +144,52 @@ public final class SearchPolicy implements Policy {
         s.solo = solo;
         s.allowed = allowed;
         s.floor = floor;
+        s.choreFloor = choreFloor;
+        s.chores = chores;
+        s.choresAllowed = choresAllowed;
+        s.deathCost = deathCost;
         return s;
+    }
+
+    @Override
+    public boolean decidesChores() {
+        return chores;
+    }
+
+    /**
+     * The chores worth a look now: the food while the stock is short, the shield (on the profile's
+     * habit), the iron pickaxe and the bucket, copper armour once the shield is in hand, the way
+     * into the Nether while Nether tiles are open - each that can be planned, with its estimate.
+     */
+    List<Decision> choreOptions(Sim sim, int me, Profile own) {
+        List<Decision> out = new ArrayList<>();
+        PlayerState p = sim.players[me];
+        Profile prof = sim.profiles[me];
+        if ((choresAllowed & FOOD_BIT) != 0 && p.res[Res.FOOD.ordinal()] < prof.foodLow + prof.foodBatch) {
+            double c = sim.planner.estimate(sim, me, Res.FOOD, prof.foodBatch, own);
+            if (c < Planner.INF / 2) out.add(floored(Decision.food(c, "chore"), FOOD_BIT, c));
+        }
+        int netherTiles = 0;
+        for (int t = 0; t < Board.SIZE; t++) if (sim.board.isOpen(t) && sim.board.nether(t) && sim.usable(me, t)) netherTiles++;
+        for (Ms m : CHORES) {
+            if ((choresAllowed & m.bit) == 0 || p.has(m)) continue;
+            if (m == Ms.SHIELD && (!prof.shieldFirst || p.dim != 0)) continue;
+            if (m == Ms.BUCKET && p.has(Ms.WATER_BUCKET)) continue;
+            if (m == Ms.COPPER_ARMOR && (!prof.copper || !p.has(Ms.SHIELD) || p.dim != 0)) continue;
+            if (m == Ms.NETHER_VISITED && (p.dim != 0 || netherTiles == 0)) continue;
+            double c = sim.planner.estimate(sim, me, m, own);
+            if (c < Planner.INF / 2) out.add(floored(Decision.invest(m, c, "chore"), m.bit, c));
+        }
+        return out;
+    }
+
+    /** The chore believed to take at least its floor (see {@link #choreFloor}): the estimate raised, the rest as {@code extra}. */
+    private Decision floored(Decision d, long bit, double c) {
+        Double f = choreFloor == null ? null : choreFloor.get(bit);
+        if (f == null || f <= c) return d;
+        Decision out = d.food ? Decision.food(f, d.why) : Decision.invest(d.invest, f, d.why);
+        out.extra = f - c;
+        return out;
     }
 
     @Override
@@ -174,7 +245,8 @@ public final class SearchPolicy implements Policy {
                 order.add(new int[]{t});
             }
         }
-        if (order.isEmpty()) return null;
+        List<Decision> choreList = chores ? choreOptions(sim, me, own) : List.of();
+        if (order.isEmpty() && choreList.isEmpty()) return null;
         order.sort((a, b) -> Double.compare(cost[a[0]], cost[b[0]]));
         int n = Math.min(candidates, order.size());
         int[] tiles = new int[n];
@@ -185,7 +257,12 @@ public final class SearchPolicy implements Policy {
             tiles = java.util.Arrays.copyOf(tiles, n + 1);
             tiles[n++] = theirs;
         }
-        if (n == 1) return Decision.tile(tiles[0], cost[tiles[0]], "only one");
+        // (The chores after the tiles, as candidates -1, -2...: chore k is choreList.get(-1 - c).)
+        if (!choreList.isEmpty()) {
+            tiles = java.util.Arrays.copyOf(tiles, n + choreList.size());
+            for (int k = 0; k < choreList.size(); k++) tiles[n++] = -1 - k;
+        }
+        if (n == 1) return tiles[0] >= 0 ? Decision.tile(tiles[0], cost[tiles[0]], "only one") : choreList.get(-1 - tiles[0]);
         double[] sum = new double[n];
         int[] cnt = new int[n];
         List<Integer> alive = new ArrayList<>();
@@ -210,15 +287,17 @@ public final class SearchPolicy implements Policy {
                     if (observe) f.players[1 - me] = model != null ? model.draw(sim, 1 - me, sure, new java.util.SplittableRandom(seed ^ 0x51L)) : plain.copy();
                     f.players[me].idle();
                     f.players[me].busyUntil = sim.now;
-                    if (!f.startGoal(me, tiles[i], cost[tiles[i]], false)) {
+                    boolean started = tiles[i] >= 0 ? f.startGoal(me, tiles[i], cost[tiles[i]], false) : f.startChore(me, choreList.get(-1 - tiles[i]));
+                    if (!started) {
                         sum[i] -= 1;
                         cnt[i]++;
                         progress++;
                         continue;
                     }
-                    f.lengthen(me, extra[tiles[i]]);
+                    f.lengthen(me, tiles[i] >= 0 ? extra[tiles[i]] : choreList.get(-1 - tiles[i]).extra);
+                    int died = f.players[me].deaths;
                     f.runUntil(until);
-                    sum[i] += value(f, me);
+                    sum[i] += value(f, me) - deathCost * (f.players[me].deaths - died);
                     cnt[i]++;
                     progress++;
                 }
@@ -229,7 +308,12 @@ public final class SearchPolicy implements Policy {
             per *= 2;
         }
         int best = alive.get(0);
-        return Decision.tile(tiles[best], cost[tiles[best]], String.format("%.2f over %d games", sum[best] / Math.max(1, cnt[best]), cnt[best]));
+        String why = String.format("%.2f over %d games", sum[best] / Math.max(1, cnt[best]), cnt[best]);
+        if (tiles[best] < 0) {
+            Decision c = choreList.get(-1 - tiles[best]);
+            return c.food ? Decision.food(c.estimate, why) : Decision.invest(c.invest, c.estimate, why);
+        }
+        return Decision.tile(tiles[best], cost[tiles[best]], why);
     }
 
     /** What a game played ahead is worth to {@code me}: the tiles ahead of the opponent, and a won game. */

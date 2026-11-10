@@ -16,6 +16,16 @@ public interface Policy {
         return null;
     }
 
+    /**
+     * Whether this brain decides the chores too (the stock of food, the shield, the copper armour,
+     * the iron kit, the way into the Nether): then the game's own rules for them give way to its
+     * {@link #choose} - except where they are about staying alive (starving, the night coming
+     * without a shield on hard).
+     */
+    default boolean decidesChores() {
+        return false;
+    }
+
     /** The next tile to go for, or null when there is none (the player waits a little and looks again). */
     Decision choose(Sim sim, int me);
 

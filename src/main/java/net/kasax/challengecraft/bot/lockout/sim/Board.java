@@ -63,7 +63,7 @@ public final class Board {
     }
 
     /** Takes a tile out of the game (for tests: a board where only some tiles are in play). */
-    void close(int tile) {
+    public void close(int tile) {
         if (owner[tile] >= 0) return;
         owner[tile] = CLOSED;
         open--;

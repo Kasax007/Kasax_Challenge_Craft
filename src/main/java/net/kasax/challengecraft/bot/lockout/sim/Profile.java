@@ -36,8 +36,10 @@ public final class Profile {
     public final double[] fail = new double[Econ.Work.values().length];
     /** Deaths per minute: anywhere, on the surface at night, in caves, in the Nether; fights' hazard times this. */
     public double hzBase, hzNight, hzCave, hzNether, hzFight;
-    /** What a shield or armour leaves of the danger. */
+    /** What a shield or armour leaves of the danger (with {@link #armourGear}: the shield's share alone). */
     public double gear;
+    /** What armour (copper or iron) leaves of the danger on top of the shield's share; 0: one or the other counts, as {@link #gear}. */
+    public double armourGear;
     /** Seconds to respawn and get going; the chance to get the things back after a death. */
     public double respawn, recover;
     /** Food stock: at the start, the mark it is topped up at, by how much; seconds per unit eaten. */
@@ -51,6 +53,35 @@ public final class Profile {
     /** A tile this cheap from where things stand (seconds, by the estimate) is taken before anything else; 0: off. */
     public double quick;
     public boolean worldsense = true;
+    /** Seconds a full belly lasts at the start (the first unit of food eaten then). */
+    public double fedFor = 240;
+    /**
+     * The real brain's {@code interleave} (round 1): a dear investment (the shield, copper, the
+     * iron kit dearer than {@link #investCheap} by its own figures) waits while a tile of at most
+     * {@link #tileFirst} seconds is open - until {@link #investBy} seconds into the day or
+     * {@link #investAfterTiles} tiles.
+     */
+    public boolean interleave;
+    public double investCheap = 150, tileFirst = 120, investBy = 400;
+    public int investAfterTiles = 2;
+    /** The bundle only while it costs at most this by its own figures (the string and the leather about). */
+    public double bundleMax = 120;
+    /**
+     * Steps begun on the surface at night take this many times as long: the fights, the box, the
+     * hole while the monsters pass (Bob: about a minute a night in league 9).
+     */
+    public double nightSlow = 1;
+    /** Each goal's own failure chance where the leagues measured one ({@link Recipe#fail}); else only its kind's. */
+    public boolean goalFails;
+    /** Tiles met by the way at night and in caves ({@link Recipe#chance}). */
+    public boolean chances;
+    /**
+     * For testing a brain against a world its figures do not know: each goal's own work is this
+     * much off its recipe in every game (log-normal spread, drawn per game and goal) - and no
+     * plan knows by how much ({@code Sim.goalMult}). The leagues' estimates were off by factors
+     * of two to eight for single goals.
+     */
+    public double goalNoise;
     /** Only the goals Bob knows a way to ({@link Recipe#bob}); a human player knows them all. */
     public boolean bobGoals;
     /**
@@ -82,6 +113,7 @@ public final class Profile {
         p.hzNether = hzNether;
         p.hzFight = hzFight;
         p.gear = gear;
+        p.armourGear = armourGear;
         p.respawn = respawn;
         p.recover = recover;
         p.foodStart = foodStart;
@@ -96,25 +128,45 @@ public final class Profile {
         p.openingExtra = openingExtra;
         p.quick = quick;
         p.worldsense = worldsense;
+        p.fedFor = fedFor;
+        p.interleave = interleave;
+        p.investCheap = investCheap;
+        p.tileFirst = tileFirst;
+        p.investBy = investBy;
+        p.investAfterTiles = investAfterTiles;
+        p.bundleMax = bundleMax;
+        p.nightSlow = nightSlow;
+        p.ownTruth = ownTruth;
+        p.goalFails = goalFails;
+        p.chances = chances;
+        p.goalNoise = goalNoise;
         p.bobGoals = bobGoals;
         p.seenOnly = seenOnly;
         return p;
     }
 
-    /** The same player, but every step at a good player's pace: what its plan figures assume. */
+    /**
+     * How near the player's own figures are to what things really take it: 0, every step at a
+     * good player's pace (Bob before round 1: monsters four to nine times his estimate); 1, its
+     * true paces. Since round 1's knowledge (batches, mob searches by the spawn rules) Bob's own
+     * estimate is in the median 0.94 times the simulator's true figure (league 10).
+     */
+    public double ownTruth;
+
+    /** The same player at the pace its own plan figures assume ({@link #ownTruth} of the way from a good player's to its own). */
     public Profile naive() {
         Profile p = copy(name + "-naive");
         p.seenOnly = bobGoals;
-        Arrays.fill(p.pace, 1);
-        p.accessPace = 1;
-        p.perPace = 1;
+        for (int k = 0; k < p.pace.length; k++) p.pace[k] = Math.pow(pace[k], ownTruth);
+        p.accessPace = Math.pow(accessPace, ownTruth);
+        p.perPace = Math.pow(perPace, ownTruth);
         return p;
     }
 
     /** A key for what this profile plays like (for models learnt per profile). */
     public String hashKey() {
         return Arrays.toString(pace) + Arrays.toString(fail) + speed + "/" + accessPace + "/" + perPace + "/" + hzBase + "/" + hzFight
-                + "/" + foodEvery + "/" + shieldFirst + copper + bundle + nightShelter + bobGoals;
+                + "/" + foodEvery + "/" + shieldFirst + copper + bundle + nightShelter + bobGoals + "/" + fedFor + interleave + bundleMax + nightSlow + "/" + ownTruth + goalFails + chances + "/" + goalNoise + "/" + gear + "/" + armourGear;
     }
 
     public double pace(Econ.Work w) {
@@ -130,8 +182,41 @@ public final class Profile {
         return s;
     }
 
-    /** Bob as measured (calibrated against the leagues, see SimBench "calibrate"). */
+    /**
+     * Bob as measured in leagues 9 and 10 (9./10.11.2026: round 1's knowledge, estimates and
+     * opening; SimBench "calibrate --leagues ... --params -"): his tiles per game (2.91 against the
+     * leagues' 2.86), first tile (median 292 s against 265), deaths (0.28 against 0.28); the claim
+     * rates per goal correlate at 0.78 (177 goals). On top of {@link #bob1()}: no food stock at the
+     * start (the stone tools first), the dear investments after the quick tiles (interleave), the
+     * bundle only when cheap, a slower night on the surface, his own estimates near the truth (they
+     * are since round 1), each goal's own failure chance from the journals, the monsters met by the
+     * way, the staircase to the deepslate at the leagues' pace, shield and armour each a share.
+     */
     public static Profile bob() {
+        Profile p = bob1();
+        p.foodStart = 0;
+        p.fedFor = 300;
+        p.foodEvery = 260;
+        p.interleave = true;
+        p.investCheap = 100;
+        p.bundleMax = 40;
+        p.nightSlow = 1.3;
+        p.ownTruth = 0.9;
+        p.openingExtra = 70;
+        p.hzBase = 0.006;
+        p.hzNight = 0.02;
+        p.hzCave = 0.016;
+        p.goalFails = true;
+        p.chances = true;
+        p.deepDown = 130;
+        p.pace[Econ.Work.GATHER.ordinal()] = 2.2;
+        p.gear = 0.7;
+        p.armourGear = 0.75;
+        return p;
+    }
+
+    /** Bob as calibrated in round 1 against leagues 1 to 8 (the code before round 1's knowledge and opening). */
+    public static Profile bob1() {
         Profile p = new Profile("bob");
         p.speed = 3.0;
         p.netherSpeed = 2.2;
@@ -239,8 +324,9 @@ public final class Profile {
     public static Profile named(String name) {
         return switch (name) {
             case "bob" -> bob();
+            case "bob1" -> bob1();
             case "expert" -> expert();
-            default -> throw new IllegalArgumentException("no profile " + name + " (bob, expert)");
+            default -> throw new IllegalArgumentException("no profile " + name + " (bob, bob1, expert)");
         };
     }
 }
