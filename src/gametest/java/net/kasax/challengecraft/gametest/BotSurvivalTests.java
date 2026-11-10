@@ -117,6 +117,39 @@ public class BotSurvivalTests {
     }
 
     /**
+     * The same staircase under the lake, dug dry and then filled from the lake as it is in a game -
+     * flowing water down the steps, not still water - with the bot at its foot when the water comes:
+     * the air runs out under eight blocks of bank with no way back it knows of (it was dry when it
+     * came down). Up the steps and the lake, or the water walled off round its two blocks so that it
+     * runs off and leaves air; alive and breathing.
+     */
+    @GameTest(environment = "challengecraft:survival_water", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 8)
+    public void drownFlowingStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drown_flowing_stairs");
+        command(h, "difficulty hard");
+        a.fill(0, GROUND - 6, 0, BotArena.SIZE - 1, GROUND - 1, BotArena.SIZE - 1, Blocks.DIRT);
+        a.fill(6, 10, 10, 17, GROUND, 24, Blocks.WATER);
+        a.fill(6, 9, 10, 17, 9, 24, Blocks.STONE);
+        // The staircase as dug: from feet (16, 10) on the lake's floor, step k at x 16+k, y 10-k ..
+        // 12-k - carved dry, the lake's water runs down it.
+        for (int k = 1; k <= 5; k++) a.fill(16 + k, 10 - k, 17, 16 + k, 12 - k, 17, Blocks.AIR);
+        Bot bot = a.spawn(21, 5, 17, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 12));
+        var body = bot.body();
+        boolean[] under = {false};
+        a.run(new WaitTask(900), 980, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_flowing_stairs: drowned");
+            boolean eyeIn = body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            if (eyeIn && !under[0]) BotArena.LOG.info("[BOTTEST] drown_flowing_stairs under water at tick {}", h.getTick());
+            under[0] |= eyeIn;
+            if (h.getTick() % 40 == 0) BotArena.LOG.info("[BOTTEST] drown_flowing_stairs air {} hp {} at {} ({})", body.getAirSupply(), body.getHealth(), a.feet().toShortString(), bot.status());
+            // Done once it was under and breathes again, with the air back to half.
+            boolean ok = under[0] && !eyeIn && body.getAirSupply() >= body.getMaxAirSupply() / 2;
+            if (ok) BotArena.LOG.info("[BOTTEST] drown_flowing_stairs breathing at {} after {} ticks, hp {}", a.feet().toShortString(), h.getTick(), body.getHealth());
+            return ok;
+        });
+    }
+
+    /**
      * Stone wanted (a wooden pickaxe in hand, sticks and planks), the bot afloat in the middle of a
      * lake six deep whose banks are soil all round: the stone dug from dry ground, never a staircase
      * from the water (league 9: "no rock at hand: a staircase down" out of a lake on seed -3882...,
