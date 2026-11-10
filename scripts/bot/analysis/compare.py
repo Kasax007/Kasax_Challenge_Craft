@@ -1,15 +1,33 @@
 """Two leagues on the same seeds, variant by variant: tiles, deaths, and the time sinks, before and after.
 
+Figures are per bot (in a mirror league the mean of the two bots of a game).
+
     python3 compare.py before.jsonl after.jsonl
 """
 import json, math, sys
 
 def load(path):
+    """seed -> variant -> its bots' figures, averaged (a mirror league - "-" against "-" - has two bots of one variant)."""
     out = {}
     for line in open(path):
         r = json.loads(line)
-        out[r["seed"]] = {b["params"]: b for b in r["bots"]}
+        by = {}
+        for b in r["bots"]:
+            by.setdefault(b["params"], []).append(b)
+        out[r["seed"]] = {p: merged(bots) for p, bots in by.items()}
     return out
+
+
+def merged(bots):
+    """One variant's figures in a game: the mean over its bots (the first tile: of those that got one)."""
+    n = len(bots)
+    firsts = [b["first"] for b in bots if b["first"] >= 0]
+    time = {}
+    for b in bots:
+        for k, v in b.get("time", {}).items():
+            time[k] = time.get(k, 0) + v / n
+    return {"tiles": sum(b["tiles"] for b in bots) / n, "deaths": sum(b["deaths"] for b in bots) / n,
+            "hearts": sum(b["hearts"] for b in bots) / n, "first": sum(firsts) / len(firsts) if firsts else -1, "time": time}
 
 before, after = load(sys.argv[1]), load(sys.argv[2])
 seeds = [s for s in before if s in after]

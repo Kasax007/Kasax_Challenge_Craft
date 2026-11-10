@@ -73,6 +73,55 @@ public final class MobHabitats {
         return ANYWHERE.getOrDefault(type, false);
     }
 
+    /**
+     * Of the mobs of its category a biome's spawn list makes (by weight times the pack size), the
+     * share of this kind: a skeleton is about a quarter of the plains' night monsters, an enderman
+     * one in seventy, a witch one in three hundred. Slimes are left out of the others' lists: they
+     * spawn only in slime chunks deep down and in swamps, whatever the list says. 0: not here.
+     */
+    public static double share(ServerLevel level, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome, EntityType<?> type) {
+        MobSpawnSettings spawns = biome.value().getAttributes().applyModifier(
+                net.minecraft.world.attribute.EnvironmentAttributes.NATURAL_MOB_SPAWNS, MobSpawnSettings.EMPTY);
+        if (spawns == null) return 0;
+        double mine = 0, all = 0;
+        for (var w : spawns.getMobsToSpawn(type.getCategory()).unwrap()) {
+            var data = w.value();
+            if (data.type() == net.minecraft.world.entity.EntityTypes.SLIME && type != net.minecraft.world.entity.EntityTypes.SLIME) continue;
+            double n = w.weight() * (data.count().minInclusive() + data.count().maxInclusive()) / 2.0;
+            all += n;
+            if (data.type() == type) mine += n;
+        }
+        return all <= 0 ? 0 : mine / all;
+    }
+
+    /** {@link #share} where Bob stands. */
+    public static double shareHere(net.kasax.challengecraft.bot.Bot bot, EntityType<?> type) {
+        ServerLevel level = (ServerLevel) bot.body().level();
+        return share(level, level.getBiome(bot.body().blockPosition()), type);
+    }
+
+    private static final Map<EntityType<?>, Double> HOME_SHARE = new HashMap<>();
+    private static Object homeShareFor;
+
+    /** {@link #share} in the biomes it lives in, on average (for a hunt in its habitat, after the walk there). */
+    public static double shareAtHome(ServerLevel level, EntityType<?> type) {
+        if (homeShareFor != level.getServer()) {
+            HOME_SHARE.clear();
+            homeShareFor = level.getServer();
+        }
+        return HOME_SHARE.computeIfAbsent(type, t -> {
+            double sum = 0;
+            int n = 0;
+            for (var holder : level.registryAccess().lookupOrThrow(Registries.BIOME).listElements().toList()) {
+                double s = share(level, holder, t);
+                if (s <= 0) continue;
+                sum += s;
+                n++;
+            }
+            return n == 0 ? 0 : sum / n;
+        });
+    }
+
     /** The nearest spot of its habitat Bob knows of in his atlas, or null. */
     public static BlockPos nearestKnown(net.kasax.challengecraft.bot.Bot bot, EntityType<?> type) {
         ServerLevel level = (ServerLevel) bot.body().level();

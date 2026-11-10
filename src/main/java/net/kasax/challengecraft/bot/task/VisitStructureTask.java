@@ -40,8 +40,10 @@ public final class VisitStructureTask implements BotTask {
             default -> target;
         });
         var registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
-        if (registry.get(ResourceKey.create(Registries.STRUCTURE, id)).isPresent()) return java.util.Set.of(id);
         java.util.Set<Identifier> out = new java.util.HashSet<>();
+        if (registry.get(ResourceKey.create(Registries.STRUCTURE, id)).isPresent()) out.add(id);
+        // (A family name is a tag as well, and the tile counts it so: "shipwreck" is the sunk one
+        // and the beached one. Only the structure's own id, a beached wreck was never known.)
         registry.get(net.minecraft.tags.TagKey.create(Registries.STRUCTURE, id))
                 .ifPresent(set -> set.forEach(h -> h.unwrapKey().ifPresent(k -> out.add(k.identifier()))));
         return out;

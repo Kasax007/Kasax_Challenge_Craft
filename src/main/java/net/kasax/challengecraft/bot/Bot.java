@@ -114,6 +114,14 @@ public final class Bot {
 
     public final java.util.Map<FarLead, java.util.List<String>> farLeads = new java.util.HashMap<>();
 
+    /** Structures already raided for their chests (see {@link #raidKey}): not gone back to for loot. */
+    public final java.util.Set<String> raided = new java.util.HashSet<>();
+
+    /** The key a structure is raided under: its kind and the 64-block cell its spot is in. */
+    public static String raidKey(String kind, net.minecraft.core.BlockPos spot) {
+        return kind + "@" + (spot.getX() >> 6) + "," + (spot.getZ() >> 6);
+    }
+
     /** Where and when it last died, and whether its things can still be there (not in lava, not in the void). */
     /**
      * Where and when it died; whether the things can be had back (not burnt, not in the void),

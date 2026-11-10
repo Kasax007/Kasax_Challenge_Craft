@@ -278,6 +278,47 @@ public final class BotKnowledge {
         };
     }
 
+    /**
+     * How many of a block come together where one is found: a vein of iron is some six ores, a
+     * tree five logs, a patch of flowers four, rock and sand a whole wall. Taking more than that
+     * means looking for the next one (see ObtainPlanner's batches).
+     */
+    public static double patchSize(Block block) {
+        String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+        BlockState s = block.defaultBlockState();
+        if (s.is(BlockTags.LOGS)) return 5;
+        if (s.is(BlockTags.LEAVES)) return 40;
+        if (s.is(BlockTags.SMALL_FLOWERS) || s.is(BlockTags.SAPLINGS)) return 4;
+        return switch (id) {
+            case "coal_ore", "deepslate_coal_ore" -> 10;
+            case "copper_ore", "deepslate_copper_ore" -> 8;
+            case "iron_ore", "deepslate_iron_ore", "redstone_ore", "deepslate_redstone_ore", "nether_quartz_ore" -> 6;
+            case "gold_ore", "deepslate_gold_ore", "lapis_ore", "deepslate_lapis_ore" -> 5;
+            case "nether_gold_ore" -> 8;
+            case "diamond_ore", "deepslate_diamond_ore" -> 4;
+            case "emerald_ore", "deepslate_emerald_ore", "ancient_debris" -> 1.5;
+            case "sugar_cane", "cactus", "pumpkin", "melon", "brown_mushroom", "red_mushroom", "cocoa" -> 3;
+            case "bamboo", "kelp", "kelp_plant", "seagrass", "vine", "sweet_berry_bush", "glow_lichen", "pointed_dripstone",
+                 "amethyst_cluster", "glowstone", "shroomlight", "crimson_fungus", "warped_fungus", "nether_wart" -> 6;
+            case "cobweb", "bee_nest", "beehive", "bell", "hay_block" -> 1.5;
+            default -> 40; // (rock, earth, sand, gravel, snow: a whole wall of it)
+        };
+    }
+
+    /** Seconds from one block of a patch to the next (the next tree, the next flower of the meadow). */
+    public static double hop(Block block) {
+        String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
+        BlockState s = block.defaultBlockState();
+        if (s.is(BlockTags.LOGS)) return 2;
+        if (s.is(BlockTags.SMALL_FLOWERS) || s.is(BlockTags.SAPLINGS)) return 4;
+        return switch (id) {
+            case "sugar_cane", "cactus", "brown_mushroom", "red_mushroom", "cocoa", "sweet_berry_bush" -> 3;
+            case "pumpkin", "melon" -> 8;
+            case "kelp", "kelp_plant", "seagrass" -> 2;
+            default -> 0.6;
+        };
+    }
+
     /** Blocks that only grow or lie in certain biomes (none of those in view: they are far off). */
     private static final java.util.Set<String> BIOME_BOUND = java.util.Set.of(
             "snow", "snow_block", "ice", "packed_ice", "blue_ice", "powder_snow", "cactus", "dead_bush", "red_sand", "red_sandstone",

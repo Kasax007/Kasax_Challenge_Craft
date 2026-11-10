@@ -434,11 +434,24 @@ def _logistic(Xs, y, lam=1.0, iters=50):
     return w, b
 
 
+def estimates_version(record):
+    """Which way of estimating the plan's figure came from (the mod's ObtainPlanner.ESTIMATES; 1 before it was journaled)."""
+    try:
+        return int(record.get("estimates", 1))
+    except (TypeError, ValueError):
+        return 1
+
+
 def train_goal(records, seed=0):
+    # A correction is only good for the estimates it was learnt against: only the goals planned
+    # the newest way count (the mod ignores a model made for another way, see GoalModel).
+    records = list(records)
+    estimates = max((estimates_version(r) for r in records), default=1)
+    records = [r for r in records if estimates_version(r) == estimates]
     X, y, fail, plain, done = goal_data(records)
     n_done = int(done.sum())
     if n_done < 20:
-        return None, {"n": int(len(y)), "n_done": n_done, "note": "zu wenig Daten"}
+        return None, {"n": int(len(y)), "n_done": n_done, "estimates": estimates, "note": "zu wenig Daten"}
     rng = np.random.default_rng(seed)
     idx = rng.permutation(len(y))
     val_n = max(1, len(y) // 5)
@@ -460,8 +473,8 @@ def train_goal(records, seed=0):
     base = float(np.abs(np.log1p(plain[vald]) - y[vald]).mean()) if len(vald) else float("inf")
     model = {"kind": "goal", "version": time.strftime("%Y%m%d-%H%M%S"), "mean": mean.round(6).tolist(), "std": std.round(6).tolist(),
              "w": w.round(6).tolist(), "b": round(float(b), 6), "risk_w": rw.round(6).tolist(), "risk_b": round(float(rb), 6),
-             "min_ratio": 0.5, "max_ratio": 3.0, "trained_on": int(len(y))}
-    metrics = {"n": int(len(y)), "n_done": n_done, "fail_rate": round(float(fail.mean()), 3), "lambda": lam,
+             "min_ratio": 0.5, "max_ratio": 3.0, "trained_on": int(len(y)), "estimates": estimates}
+    metrics = {"n": int(len(y)), "n_done": n_done, "estimates": estimates, "fail_rate": round(float(fail.mean()), 3), "lambda": lam,
                "mae_log_model": round(mae, 4), "mae_log_plan": round(base, 4),
                "gain": round(1 - mae / base, 3) if base > 0 and base != float("inf") else None}
     return model, metrics

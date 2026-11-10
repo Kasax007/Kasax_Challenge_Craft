@@ -39,6 +39,15 @@ Er deckt die fünf besprochenen Punkte ab:
    dauert immer viermal so lange wie geschätzt“. Der Routenplaner nutzt dann diese Zeit statt der
    reinen Planschätzung. Das Modell wird nur eingesetzt, wenn es auf ungesehenen Zielen mindestens
    5 % genauer ist als der Plan.
+
+   Ein Modell korrigiert die Schätzungen, gegen die es gelernt hat. Seit dem Wissensstand
+   (`docs/bob-reference-times.md`) schätzt der Planer anders: Stapel statt Anteile, Mob-Suche nach
+   den Spawnregeln (`ObtainPlanner.ESTIMATES = 2`). Jeder Ziel-Eintrag trägt deshalb die Fassung
+   (`estimates`), und der Trainer lernt nur aus den Einträgen der neuesten. Das Modell bekommt die
+   Fassung mit; Bob setzt ein Modell einer anderen Fassung nicht ein (Log: „trained on estimates
+   v1“). Das mitgelieferte `goal.json` (Fassung 1) ruht also, bis der Trainer genug neue Ziele hat
+   (150 erledigte, `goal_min_done`). Bis dahin gilt die Erfahrung je Ziel (`GoalExperience`, jetzt
+   bis zum Faktor 8).
 5. **Strategie im Spiel gegen sich selbst.** Auf Liga-Servern spielt der Champion gegen einen
    Herausforderer:
    - Der **Champion** spielt mit Bobs aktuellen Knöpfen.

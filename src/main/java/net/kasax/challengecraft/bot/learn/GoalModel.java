@@ -29,11 +29,14 @@ public final class GoalModel {
             "own_tiles", "other_tiles", "open_tiles", "lead", "y_level", "sky", "iron"};
 
     public final String version;
+    /** The planner's way of estimating it was trained against (see ObtainPlanner.ESTIMATES; 1 for the older models). */
+    public final int estimates;
     private final double[] mean, std, w, risk;
     private final double b, riskB, minRatio, maxRatio;
 
-    private GoalModel(String version, double[] mean, double[] std, double[] w, double b, double[] risk, double riskB, double minRatio, double maxRatio) {
+    private GoalModel(String version, int estimates, double[] mean, double[] std, double[] w, double b, double[] risk, double riskB, double minRatio, double maxRatio) {
         this.version = version;
+        this.estimates = estimates;
         this.mean = mean;
         this.std = std;
         this.w = w;
@@ -52,9 +55,19 @@ public final class GoalModel {
             throw new IllegalArgumentException("features: " + w.length + ", the situation has " + NAMES.length);
         double[] risk = o.has("risk_w") ? Mlp.vector(o.get("risk_w")) : new double[w.length];
         if (risk.length != w.length) throw new IllegalArgumentException("risk features: " + risk.length);
-        return new GoalModel(o.has("version") ? o.get("version").getAsString() : "?", mean, std, w, o.get("b").getAsDouble(),
+        return new GoalModel(o.has("version") ? o.get("version").getAsString() : "?", o.has("estimates") ? o.get("estimates").getAsInt() : 1,
+                mean, std, w, o.get("b").getAsDouble(),
                 risk, o.has("risk_b") ? o.get("risk_b").getAsDouble() : -10,
                 o.has("min_ratio") ? o.get("min_ratio").getAsDouble() : 0.5, o.has("max_ratio") ? o.get("max_ratio").getAsDouble() : 3);
+    }
+
+    /**
+     * Whether it corrects the estimates the planner makes now: a model trained against another
+     * way of estimating would correct errors that are no longer there (it learnt "kill tiles take
+     * five times their estimate" when a skeleton was planned at 27 s).
+     */
+    public boolean fitsEstimates() {
+        return estimates == net.kasax.challengecraft.bot.plan.ObtainPlanner.ESTIMATES;
     }
 
     /** The situation's numbers for a tile (see {@link #NAMES}). */
