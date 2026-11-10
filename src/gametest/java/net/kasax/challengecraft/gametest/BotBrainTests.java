@@ -246,7 +246,9 @@ public class BotBrainTests {
         BotArena a = BotArena.flat(h, "loot_village_route");
         chests(a, BuiltInLootTables.VILLAGE_WEAPONSMITH, new int[]{30, FEET, 30}, new int[]{33, FEET, 27});
         chests(a, BuiltInLootTables.VILLAGE_TOOLSMITH, new int[]{27, FEET, 33});
-        a.spawn(5, FEET, 5, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
+        // (No pickaxe: the iron the usual way is a pickaxe first and a staircase - the smiths'
+        // chests are the quicker way; with a stone pickaxe in hand mining was, ~143 s against ~150.)
+        a.spawn(5, FEET, 5, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
         lootRoute(h, a, "loot_village_route", "village", a.abs(30, FEET, 30), 1500);
     }
 
@@ -262,11 +264,13 @@ public class BotBrainTests {
         var bot = a.spawn(5, FEET, 5, new ItemStack(Items.IRON_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.BREAD, 8));
         bot.body().setItemSlot(EquipmentSlot.CHEST, new ItemStack(Items.IRON_CHESTPLATE));
         bot.body().setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
-        var pillager = EntityTypes.PILLAGER.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
-        pillager.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(32, FEET, 32)));
-        pillager.setPersistenceRequired();
-        h.getLevel().addFreshEntity(pillager);
-        huntRoute(h, a, "hunt_pillager_at_outpost", "kill_pillager", "pillager_outpost", a.abs(31, FEET, 31), pillager, 1700);
+        huntRoute(h, a, "hunt_pillager_at_outpost", "kill_pillager", "pillager_outpost", a.abs(31, FEET, 31), () -> {
+            var pillager = EntityTypes.PILLAGER.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
+            pillager.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(32, FEET, 32)));
+            pillager.setPersistenceRequired();
+            h.getLevel().addFreshEntity(pillager);
+            return pillager;
+        }, 1700);
     }
 
     /** A swamp hut known, a witch there, by night, Bob in iron: the hunt at the hut (one witch in three hundred monsters elsewhere). */
@@ -280,15 +284,22 @@ public class BotBrainTests {
         bot.body().setItemSlot(EquipmentSlot.LEGS, new ItemStack(Items.IRON_LEGGINGS));
         bot.body().setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.IRON_BOOTS));
         a.fill(29, FEET, 29, 33, FEET, 33, Blocks.SPRUCE_PLANKS);
-        var witch = EntityTypes.WITCH.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
-        witch.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(31, FEET + 1, 31)));
-        witch.setPersistenceRequired();
-        h.getLevel().addFreshEntity(witch);
-        huntRoute(h, a, "hunt_witch_at_hut", "kill_witch", "swamp_hut", a.abs(31, FEET + 1, 31), witch, 1700);
+        huntRoute(h, a, "hunt_witch_at_hut", "kill_witch", "swamp_hut", a.abs(31, FEET + 1, 31), () -> {
+            var witch = EntityTypes.WITCH.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
+            witch.setPos(net.minecraft.world.phys.Vec3.atBottomCenterOf(a.abs(31, FEET + 1, 31)));
+            witch.setPersistenceRequired();
+            h.getLevel().addFreshEntity(witch);
+            return witch;
+        }, 1700);
     }
 
+    /**
+     * The hunt at a mob's home: planned with the home known and no such mob seen (one in sight is
+     * simply killed, the route is for one that is not), then the mob put there and the route run
+     * till it is dead.
+     */
     private static void huntRoute(GameTestHelper h, BotArena a, String name, String goalId, String family, BlockPos spot,
-                                  net.minecraft.world.entity.LivingEntity prey, int maxTicks) {
+                                  java.util.function.Supplier<net.minecraft.world.entity.LivingEntity> spawnPrey, int maxTicks) {
         var goal = LockoutBingoGoalPool.byId(goalId);
         h.runAfterDelay(20, () -> {
             var bot = a.bot();
@@ -297,6 +308,7 @@ public class BotBrainTests {
             String route = o == null ? "none" : o.task().get().describe();
             BotArena.LOG.info("[BOTTEST] {}: the route {} (~{} s)", name, route, Math.round(cost(o)));
             h.assertTrue(route.startsWith("hunt a"), "the route: " + route);
+            var prey = spawnPrey.get();
             a.run(o.task().get(), maxTicks, () -> {
                 if (!prey.isAlive()) {
                     BotArena.day(h);
