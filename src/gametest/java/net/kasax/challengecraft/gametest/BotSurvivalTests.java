@@ -218,7 +218,9 @@ public class BotSurvivalTests {
 
     /**
      * The brawl of three zombies (one a baby) with a stone sword, the learnt cover model choosing
-     * for the guardian (whatever -PbotLearned says): no more lost than the rules lose there.
+     * for the guardian (whatever -PbotLearned says): no more lost than the rules lose there. (The
+     * rules lose 4.5 hearts alone, up to 10.8 in a loaded suite; running, the model lost 13 to 20:
+     * the limit is between.)
      */
     @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
     public void zombiePackModel(GameTestHelper h) {
@@ -236,7 +238,7 @@ public class BotSurvivalTests {
         float[] low = {body.getHealth()};
         a.run(new net.kasax.challengecraft.bot.task.KillTask(Set.of(EntityTypes.ZOMBIE), Set.of(), 0, 3), 1500, () -> {
             low[0] = Math.min(low[0], body.getHealth());
-            if (20 - low[0] > 8) h.fail("zombie_pack_model: lost " + (20 - low[0]) + " health (runs " + bot.guardian.runs + ")");
+            if (20 - low[0] > 11) h.fail("zombie_pack_model: lost " + (20 - low[0]) + " health (runs " + bot.guardian.runs + ")");
             boolean done = mobs.stream().noneMatch(Mob::isAlive);
             if (done) BotArena.LOG.info("[BOTTEST] zombie_pack_model lost {} health, guardian runs {} fights {}", 20 - low[0], bot.guardian.runs, bot.guardian.fights);
             return done;
