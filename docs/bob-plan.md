@@ -3664,7 +3664,7 @@ verschiedenen Stellen. Git führte sie ohne Konflikt zusammen; geprüft wurde, d
   Die Schwellen (150 s, 120 s, 90 s) stammen aus Messungen mit den alten Schätzungen.
 
 Einziger Konflikt war die Liste der Knöpfe in der Javadoc von `BotParams` (beide Fassungen
-behalten). Dazu kamen vier kleine Commits an den Werkzeugen:
+behalten). Dazu kamen vier kleine Commits an den Werkzeugen und ein Fix:
 
 | Commit | Was |
 | --- | --- |
