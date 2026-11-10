@@ -36,7 +36,12 @@ import java.util.Map;
  *   <li>{@code search} - 0 (the default): the tiles are picked by the strategist's route; 1: by the
  *       look-ahead ({@code lockout.BoardSearch}): the game played out many times in the abstract
  *       simulator ({@code lockout.sim}), calibrated figures for what tiles really take, no iron kit
- *       or Nether phase for their own sake.</li>
+ *       or Nether phase for their own sake; 2: the look-ahead decides the chores too - the stock of
+ *       food while not starving, the shield until the evening, copper armour, the iron pickaxe and
+ *       the bucket, the way into the Nether are candidates beside the tiles (round 2).</li>
+ *   <li>{@code searchfloor} - 1 (the default): with the look-ahead, a tile that what was learnt of
+ *       it (the leagues' prior, the server's experience) says takes longer than planned is believed
+ *       to take at least Bob's whole estimate; 0: at least half of it, as in round 1.</li>
  *   <li>{@code fastopen} - 1 (the default): the stone tools before the stock of food (unless
  *       hungry or hurt), the food on the way; 0: the stock first, as before.</li>
  *   <li>{@code interleave} - 1 (the default): a dear investment (the shield's iron, the iron kit,

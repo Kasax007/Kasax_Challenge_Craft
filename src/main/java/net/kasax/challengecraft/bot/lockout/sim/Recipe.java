@@ -36,6 +36,19 @@ public final class Recipe {
     public boolean bob = true;
     /** No way at all within a Lockout game (the End, silk touch only...). */
     public boolean impossible;
+    /**
+     * What the leagues' journals saw of it (see {@link GoalBook}): attempts counted and how many
+     * got the tile - the simulator's failure chance for this goal (Sim.failChance).
+     */
+    public int seenStarts, seenDone;
+    /**
+     * Claimed by the way: per minute on the surface at night or down in the caves, the chance the
+     * player meets and gets it without going for it (a zombie at the door, an arrow on the shield) -
+     * armed with stone tools at least ({@link Ms#STONE}); 0: never.
+     */
+    public double chance;
+    /** For {@link #chance}: only with this milestone too (-1: none) - the arrow blocked wants the shield. */
+    public int chanceNeeds = -1;
 
     Recipe(String id) {
         this.id = id;
@@ -140,6 +153,18 @@ public final class Recipe {
     /** A resource goal: that many in hand, and it is claimed. */
     Recipe have(Res r, int n) {
         return use(r, n).autoRes(r, n);
+    }
+
+    /** Claimed by the way at this rate per minute at night or in caves (see {@link #chance}). */
+    Recipe chance(double perMinute) {
+        chance = perMinute;
+        return this;
+    }
+
+    Recipe chance(double perMinute, Ms needs) {
+        chance = perMinute;
+        chanceNeeds = needs.ordinal();
+        return this;
     }
 
     Recipe impossible() {

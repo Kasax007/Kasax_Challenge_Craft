@@ -9,6 +9,7 @@ starts that ended done, failed, overrun or died count (dropped and replaced ones
 something else: the other player claimed it, the night, food). log = log((seconds of the counted
 starts / max(done, 0.5)) / mean plan estimate), clamped to [log --min-ratio, log 8]; games =
 --per-start x counted starts. --exclude: goals whose estimates changed since the journals were written.
+"outcomes": every goal's counted starts and how many got it (the simulator's failure chances per goal).
 """
 import argparse
 import collections
@@ -59,8 +60,11 @@ def main():
         log = max(math.log(max(0.25, a.min_ratio)), min(math.log(8), math.log(max(1e-6, ratio))))
         goals[g] = {"log": round(log, 4), "games": round(a.per_start * len(xs), 2), "starts": len(xs), "done": done,
                     "plan": round(plan, 1), "per_claim": round(spent / max(done, 0.5), 1)}
-    json.dump({"estimates": version, "journal_goals": len(rows), "per_start": a.per_start, "excluded": sorted(exclude), "goals": goals},
-              sys.stdout, indent=1, sort_keys=True)
+    # Every goal's counted starts and how many got it, excluded ones too: the simulator's failure
+    # chances per goal (GoalBook.measured) - what failed is a fact of the game, whatever the estimate.
+    outcomes = {g: [len(xs), sum(1 for x in xs if x["outcome"] == "done")] for g, xs in sorted(by.items())}
+    json.dump({"estimates": version, "journal_goals": len(rows), "per_start": a.per_start, "excluded": sorted(exclude), "goals": goals,
+               "outcomes": outcomes}, sys.stdout, indent=1, sort_keys=True)
     print()
 
 

@@ -49,6 +49,8 @@ public final class PlayerState {
     public int netherFails, kitTries;
     /** Chores that failed and wait (bit per chore) - not again before {@link #choreRetryAt}. */
     public double choreRetryAt;
+    /** The bundle looked at again from when (its own clock: it used to hold the copper back with it). */
+    public double bundleRetryAt;
 
     // ---- for the results ----
     public int deaths, decisions;
@@ -102,6 +104,7 @@ public final class PlayerState {
         c.extensions = extensions;
         c.stepsSinceCheck = stepsSinceCheck;
         c.chore = chore;
+        c.bundleRetryAt = bundleRetryAt;
         System.arraycopy(tries, 0, c.tries, 0, Board.SIZE);
         System.arraycopy(overruns, 0, c.overruns, 0, Board.SIZE);
         System.arraycopy(fails, 0, c.fails, 0, Board.SIZE);

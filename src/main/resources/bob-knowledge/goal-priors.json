@@ -233,5 +233,227 @@
   }
  },
  "journal_goals": 130,
+ "outcomes": {
+  "advancement_stone_age": [
+   4,
+   4
+  ],
+  "advancement_tactical_fishing": [
+   2,
+   2
+  ],
+  "advancement_we_need_to_go_deeper": [
+   1,
+   1
+  ],
+  "block_damage_with_shield": [
+   4,
+   2
+  ],
+  "breed_cows": [
+   1,
+   1
+  ],
+  "craft_blast_furnace": [
+   1,
+   1
+  ],
+  "craft_bricks": [
+   7,
+   7
+  ],
+  "craft_campfire": [
+   1,
+   1
+  ],
+  "craft_flower_pot": [
+   3,
+   3
+  ],
+  "craft_iron_armor_piece": [
+   1,
+   0
+  ],
+  "craft_item_frame": [
+   3,
+   3
+  ],
+  "craft_jukebox": [
+   2,
+   2
+  ],
+  "craft_lava_bucket": [
+   7,
+   2
+  ],
+  "craft_note_block": [
+   3,
+   2
+  ],
+  "craft_painting": [
+   3,
+   3
+  ],
+  "craft_shield": [
+   1,
+   0
+  ],
+  "craft_water_bucket": [
+   4,
+   3
+  ],
+  "drink_potion": [
+   1,
+   1
+  ],
+  "eat_suspicious_stew": [
+   1,
+   0
+  ],
+  "fall_20_blocks_and_survive": [
+   8,
+   2
+  ],
+  "freeze_in_powder_snow": [
+   2,
+   1
+  ],
+  "have_10_hearts_missing": [
+   2,
+   1
+  ],
+  "kill_creeper": [
+   3,
+   2
+  ],
+  "kill_drowned": [
+   1,
+   0
+  ],
+  "kill_husk": [
+   1,
+   0
+  ],
+  "light_campfire": [
+   2,
+   2
+  ],
+  "obtain_16_sandstone": [
+   2,
+   0
+  ],
+  "obtain_32_cobblestone": [
+   1,
+   0
+  ],
+  "obtain_3_flower_types": [
+   3,
+   2
+  ],
+  "obtain_3_sapling_types": [
+   5,
+   0
+  ],
+  "obtain_5_dye_colors": [
+   3,
+   0
+  ],
+  "obtain_arrow": [
+   1,
+   0
+  ],
+  "obtain_calcite": [
+   2,
+   0
+  ],
+  "obtain_coal_block": [
+   4,
+   3
+  ],
+  "obtain_crossbow": [
+   1,
+   1
+  ],
+  "obtain_deepslate": [
+   1,
+   1
+  ],
+  "obtain_dripstone_block": [
+   1,
+   0
+  ],
+  "obtain_emerald": [
+   3,
+   2
+  ],
+  "obtain_honeycomb": [
+   2,
+   2
+  ],
+  "obtain_name_tag": [
+   6,
+   3
+  ],
+  "obtain_pointed_dripstone": [
+   1,
+   1
+  ],
+  "obtain_shield": [
+   2,
+   1
+  ],
+  "obtain_snowball": [
+   1,
+   0
+  ],
+  "obtain_tuff": [
+   1,
+   1
+  ],
+  "reach_y_minus_50": [
+   1,
+   1
+  ],
+  "sleep_in_bed": [
+   2,
+   1
+  ],
+  "trade_with_farmer": [
+   1,
+   0
+  ],
+  "trade_with_villager": [
+   3,
+   2
+  ],
+  "use_cartography_table": [
+   3,
+   3
+  ],
+  "visit_abandoned_camp": [
+   2,
+   2
+  ],
+  "visit_dripstone_caves": [
+   4,
+   1
+  ],
+  "visit_lush_caves": [
+   1,
+   0
+  ],
+  "visit_ocean_ruin": [
+   1,
+   1
+  ],
+  "visit_savanna": [
+   2,
+   1
+  ],
+  "visit_swamp": [
+   1,
+   1
+  ]
+ },
  "per_start": 0.5
 }
