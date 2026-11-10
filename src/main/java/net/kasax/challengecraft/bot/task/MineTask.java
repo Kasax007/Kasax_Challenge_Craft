@@ -141,6 +141,11 @@ public final class MineTask implements BotTask {
                     // it reaches up badly and the drops fall who knows where.)
                     if (!rockStairs) target = wallRock(level, bot);
                     if (!rockStairs && target == null) target = groundBlock(level, bot);
+                    // None at hand: rock showing a little way off (a hillside, a cliff, a river
+                    // bank, a cave mouth in the daylight) - walked to, as a player heads for the
+                    // grey he sees, instead of a staircase through the soil (in a savanna it went
+                    // seventeen levels down through dirt for the first three cobblestone).
+                    if (!rockStairs && target == null && bot.params.on("rocksight")) target = rockInSight(level, bot);
                     if (target == null) {
                         if (!rockStairs) bot.say("no rock at hand for " + what + ": a staircase down");
                         rockStairs = true;
@@ -347,6 +352,54 @@ public final class MineTask implements BotTask {
             wet.add(p);
         }
         return null;
+    }
+
+    /** How far off rock in sight is walked to rather than dug for (blocks, flat). */
+    private static final int ROCK_SIGHT = 40;
+
+    /**
+     * The nearest rock showing in the open within {@link #ROCK_SIGHT} blocks (a face with daylight
+     * on it, not one deep in a dark cave), dry, not much below its feet and not under a lake:
+     * on the surface only, where a player would see it. Null when there is none, or underground.
+     */
+    private BlockPos rockInSight(ServerLevel level, Bot bot) {
+        // (Not for one that may not go looking - the work beside a furnace: rock at hand only.)
+        if (knownOnly || SurfaceTask.underground(bot.body())) return null;
+        BlockPos feet = bot.body().blockPosition();
+        // Column by column, the top few blocks under the open sky: bare rock on top (a stony
+        // hill) or in a face with daylight beside it (a cliff, a bank); the nearest first.
+        List<BlockPos> found = new ArrayList<>();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = feet.getX() - ROCK_SIGHT; x <= feet.getX() + ROCK_SIGHT; x++) {
+            for (int z = feet.getZ() - ROCK_SIGHT; z <= feet.getZ() + ROCK_SIGHT; z++) {
+                if (!level.hasChunk(x >> 4, z >> 4)) continue;
+                int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                for (int y = top; y > top - 8 && y >= feet.getY() - 6; y--) {
+                    m.set(x, y, z);
+                    BlockState st = level.getBlockState(m);
+                    if (st.isAir() || !blocks.test(st) || skip.contains(m)) continue;
+                    if (daylit(level, m)) found.add(m.immutable());
+                }
+            }
+        }
+        found.sort(java.util.Comparator.comparingDouble(p -> p.distSqr(feet)));
+        for (BlockPos p : found.subList(0, Math.min(found.size(), 24))) {
+            if (!bot.tools().canHarvest(level.getBlockState(p))) continue;
+            boolean wet = false;
+            for (Direction d : Direction.values()) if (!level.getFluidState(p.relative(d)).isEmpty()) wet = true;
+            if (!wet && worthIt(level, bot, p)) return p;
+        }
+        return null;
+    }
+
+    /** A block with open air in daylight beside it or on top (seen from the surface, not deep in a cave). */
+    private static boolean daylit(ServerLevel level, BlockPos p) {
+        for (Direction d : Direction.values()) {
+            if (d == Direction.DOWN) continue;
+            BlockPos n = p.relative(d);
+            if (level.getBlockState(n).isAir() && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, n) >= 12) return true;
+        }
+        return false;
     }
 
     /**

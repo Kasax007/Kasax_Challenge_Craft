@@ -33,6 +33,15 @@ import java.util.Map;
  *       what is in view.</li>
  *   <li>{@code foodstock} - a factor on what a stock of food may cost while not starving yet
  *       (1, the default; 2: twice as much is worth it - fewer fights begun hungry).</li>
+ *   <li>{@code fastopen} - 1 (the default): the stone tools before the stock of food (unless
+ *       hungry or hurt), the food on the way; 0: the stock first, as before.</li>
+ *   <li>{@code interleave} - 1 (the default): a dear investment (the shield's iron, the iron kit,
+ *       copper armour with no ore in sight) waits for the quick tiles until the evening or two
+ *       tiles; 0: invested in at once.</li>
+ *   <li>{@code meanwhile} - 1 (the default): while a furnace cooks, the kit's stone or wood is
+ *       mined beside it; 0: it waits at the furnace.</li>
+ *   <li>{@code rocksight} - 1 (the default): rock showing in the open up to forty blocks off is
+ *       walked to before a staircase is dug for stone; 0: the staircase at once.</li>
  * </ul>
  */
 public final class BotParams {

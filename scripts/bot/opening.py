@@ -137,6 +137,13 @@ def show(paths):
             continue
         top = sorted(acts.items(), key=lambda kv: -kv[1])
         print(f"    {d:10s} {total:5.0f}: " + ", ".join(f"{a} {s:.0f}" for a, s in top if s >= 0.5))
+    detail = {}
+    for r in rows:
+        for k, v in r[3].get("detail", {}).items():
+            detail[k] = detail.get(k, 0) + v / n
+    if detail:
+        top = sorted(detail.items(), key=lambda kv: -kv[1])[:12]
+        print("  by the task at work (s a game): " + ", ".join(f"{k} {v:.0f}" for k, v in top))
     speeds = [r[3]["speed"] for r in rows if r[3]["speed"] > 0]
     print(f"  walking pace {statistics.mean(speeds):.2f} blocks/s; reflexes {sum(r[3]['reflexes'] for r in rows) / n:.1f} a game; "
           f"tiles {sum(r[4] for r in rows) / n:.2f}, deaths {sum(r[5] for r in rows) / n:.2f} a game")

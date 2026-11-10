@@ -13,7 +13,8 @@
       "net.kasax.challengecraft.gametest.BotLobbyTests",
       "net.kasax.challengecraft.gametest.ChallengeFixTests",
       "net.kasax.challengecraft.gametest.GuardianTests",
-      "net.kasax.challengecraft.gametest.VoidTrailTests"
+      "net.kasax.challengecraft.gametest.VoidTrailTests",
+      "net.kasax.challengecraft.gametest.BotOpeningTests"
     ]
   },
   "depends": {

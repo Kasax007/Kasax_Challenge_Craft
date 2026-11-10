@@ -53,6 +53,8 @@ public final class OpeningClock {
     private final Map<String, Integer> reached = new LinkedHashMap<>();
     private final Map<String, Integer> act = new TreeMap<>(), pre = new TreeMap<>();
     private final Map<String, Map<String, Integer>> by = new TreeMap<>();
+    /** Some activities by the task at work: "wait:SmeltTask", "dig:MineTask"... */
+    private final Map<String, Integer> detail = new TreeMap<>();
     /** Ground covered (flat blocks) and ticks, while walking or searching. */
     private double walked;
     private int walkTicks;
@@ -87,6 +89,11 @@ public final class OpeningClock {
         if (ticks > WINDOW_TICKS) return;
         String what = activity();
         act.merge(what, 1, Integer::sum);
+        // (Which task it was at, for the activities that hide most: what it waited on, what it dug for.)
+        if (what.equals("wait") || what.equals("dig") || what.equals("walk") || what.equals("search")) {
+            BotTask in = BotTask.innermost(bot.current());
+            detail.merge(what + ":" + (in == null ? "-" : in.getClass().getSimpleName()), 1, Integer::sum);
+        }
         if (!firstTile) pre.merge(what, 1, Integer::sum);
         by.computeIfAbsent(decider(), k -> new TreeMap<>()).merge(what, 1, Integer::sum);
         boolean reflex = bot.inReflex();
@@ -164,7 +171,8 @@ public final class OpeningClock {
             if (n++ > 0) sb.append(',');
             sb.append('"').append(e.getKey()).append("\":").append(seconds(e.getValue(), true));
         }
-        sb.append("},\"speed\":").append(String.format(java.util.Locale.ROOT, "%.2f", walkTicks == 0 ? 0 : walked / walkTicks * 20))
+        sb.append("},\"detail\":").append(seconds(detail, true));
+        sb.append(",\"speed\":").append(String.format(java.util.Locale.ROOT, "%.2f", walkTicks == 0 ? 0 : walked / walkTicks * 20))
                 .append(",\"reflexes\":").append(reflexes).append(",\"window\":").append(Math.min(ticks, WINDOW_TICKS) / 20).append('}');
         return sb.toString();
     }
