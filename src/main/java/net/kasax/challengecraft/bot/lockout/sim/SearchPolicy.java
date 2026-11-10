@@ -55,6 +55,12 @@ public final class SearchPolicy implements Policy {
     /** Nobody to play against (a game alone): the other player stands still in the look-ahead. */
     public boolean solo;
     /**
+     * Per tile, the least it is believed to take (seconds; 0: no floor), from what the real game
+     * knows beyond the simulator: Bob's own planner sees the world (no stone to be had down here,
+     * no gold known), the simulator only its picture of it. Null: none (the bench).
+     */
+    public double[] floor;
+    /**
      * Varies the luck of the games played ahead from one decision to the next where a fresh
      * instance makes each decision (the real game: the decision's number).
      */
@@ -111,6 +117,7 @@ public final class SearchPolicy implements Policy {
         s.rolloutRoute = rolloutRoute;
         s.solo = solo;
         s.allowed = allowed;
+        s.floor = floor;
         return s;
     }
 
@@ -152,7 +159,9 @@ public final class SearchPolicy implements Policy {
         Profile own = belief[me];
         // The candidates: the cheapest few by what they really take; resting ones only if nothing else.
         List<int[]> order = new ArrayList<>();
-        double[] cost = new double[Board.SIZE];
+        // (cost: what the tile is believed to take - the simulator's figure, or the floor if that is
+        // more; extra: by how much the floor lengthens the goal in the games played ahead.)
+        double[] cost = new double[Board.SIZE], extra = new double[Board.SIZE];
         for (int pass = 0; pass < 2 && order.isEmpty(); pass++) {
             for (int t = 0; t < Board.SIZE; t++) {
                 if (!sim.usable(me, t) || (allowed & (1L << t)) == 0) continue;
@@ -160,7 +169,8 @@ public final class SearchPolicy implements Policy {
                 if (pass == 1 && p.tries[t] > Sim.MAX_TRIES) continue;
                 double c = sim.planner.estimate(sim, me, sim.board.goal[t], own);
                 if (c >= Planner.INF / 2) continue;
-                cost[t] = c;
+                extra[t] = floor != null && floor[t] > c ? floor[t] - c : 0;
+                cost[t] = c + extra[t];
                 order.add(new int[]{t});
             }
         }
@@ -206,6 +216,7 @@ public final class SearchPolicy implements Policy {
                         progress++;
                         continue;
                     }
+                    f.lengthen(me, extra[tiles[i]]);
                     f.runUntil(until);
                     sum[i] += value(f, me);
                     cnt[i]++;

@@ -412,8 +412,8 @@ public final class LockoutBrain implements BotBrain {
         choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
         Choice pick = null;
         if (searching(bot)) {
-            List<Integer> tiles = new ArrayList<>();
-            for (Choice c : choices) tiles.add(c.tile().index());
+            Map<Integer, Double> tiles = new HashMap<>();
+            for (Choice c : choices) tiles.merge(c.tile().index(), c.option().cost(), Math::min);
             BoardSearch.Pick p = boardSearch.pick(bot, tiles);
             // (The look-ahead works on a thread of its own: Bob stands a tick or two for its answer.)
             if (p == BoardSearch.THINKING) return;

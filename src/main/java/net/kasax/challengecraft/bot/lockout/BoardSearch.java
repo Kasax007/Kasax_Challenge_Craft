@@ -72,6 +72,14 @@ final class BoardSearch {
      */
     static final long HANG_NANOS = 30_000_000_000L;
 
+    /**
+     * The share of Bob's own estimate a tile is believed to take at least ({@link SearchPolicy#floor}):
+     * the learnt goal model (988 goals) never has a tile take less than half of his estimate, and
+     * where his planner sees the world against a tile (no stone to be had, nothing known) his
+     * estimate is the one that knows it.
+     */
+    static final double OWN_FLOOR = 0.5;
+
     /** Not decided yet: the look-ahead is at work, Bob asks again next tick. */
     static final Pick THINKING = new Pick(-1, 0, "thinking");
 
@@ -110,10 +118,11 @@ final class BoardSearch {
     }
 
     /**
-     * The tile to go for among {@code choices} (board indices Bob knows a way to); {@link #THINKING}
-     * while the answer is not there yet; null to fall back to the old route.
+     * The tile to go for among {@code choices} (board indices Bob knows a way to, with his own
+     * estimate in seconds); {@link #THINKING} while the answer is not there yet; null to fall back
+     * to the old route.
      */
-    Pick pick(Bot bot, List<Integer> choices) {
+    Pick pick(Bot bot, Map<Integer, Double> choices) {
         if (workerHung) return null;
         try {
             long now = bot.server().overworld().getGameTime();
@@ -142,9 +151,9 @@ final class BoardSearch {
             job = null;
             Decision d = j.answer().get();
             decisions++;
-            if (d == null || d.tile < 0 || !choices.contains(d.tile)) return null;
-            return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s; %s; %d games, %d ticks)", j.sim().board.goal[d.tile].id,
-                    Math.round(d.estimate), d.why, j.policy().progress, ticks));
+            if (d == null || d.tile < 0 || !choices.containsKey(d.tile)) return null;
+            return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s, own ~%d s; %s; %d games, %d ticks)",
+                    j.sim().board.goal[d.tile].id, Math.round(d.estimate), Math.round(choices.get(d.tile)), d.why, j.policy().progress, ticks));
         } catch (RuntimeException | ExecutionException e) {
             BotManager.LOG.warn("[Bot] {}: look-ahead failed, the route decides ({})", bot.name, e.toString());
             job = null;
@@ -157,14 +166,19 @@ final class BoardSearch {
     }
 
     /** Puts the question: the picture of the game now, handed to the worker. */
-    private Pick ask(Bot bot, List<Integer> choices, long now) {
+    private Pick ask(Bot bot, Map<Integer, Double> choices, long now) {
         Sim sim = snapshot(bot);
         if (sim == null) return null;
         SearchPolicy policy = template.fresh();
         policy.solo = soloGame(bot);
         long allowed = 0;
-        for (int t : choices) allowed |= 1L << t;
+        double[] floor = new double[Board.SIZE];
+        for (var c : choices.entrySet()) {
+            allowed |= 1L << c.getKey();
+            floor[c.getKey()] = OWN_FLOOR * c.getValue();
+        }
         policy.allowed = allowed;
+        policy.floor = floor;
         policy.salt = asked++;
         job = new Job(WORKER.submit(() -> policy.choose(sim, 0)), policy, sim, now);
         return THINKING;

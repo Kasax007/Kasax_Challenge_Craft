@@ -29,6 +29,7 @@ public final class SimSelfTest {
         aClaimStopsTheOther();
         fastEnough();
         searchWorkIsAFixedCount();
+        ownFigureIsAFloor();
         searchBeatsTheGreedyBrain(args.length > 0 ? Integer.parseInt(args[0]) : 150);
         System.out.printf("SimSelfTest: %d checks passed in %.0f s%n", checks, (System.nanoTime() - t0) / 1e9);
     }
@@ -205,6 +206,26 @@ public final class SimSelfTest {
         } finally {
             worker.shutdown();
         }
+    }
+
+    /**
+     * Bob's own figure as a floor ({@link SearchPolicy#floor}): a tile his planner believes far
+     * dearer than the simulator does is not taken while another will do.
+     */
+    static void ownFigureIsAFloor() {
+        long seed = SearchPolicy.mix(777);
+        World w = World.sample(seed);
+        Board board = only("craft_furnace", "obtain_32_cobblestone", "craft_bucket");
+        Profile p = Profile.bob();
+        Sim sim = new Sim(w, board, p, p, new GreedyPolicy(), new GreedyPolicy(), 5400, seed);
+        for (PlayerState s : sim.players) s.ms = Ms.WOOD.bit | Ms.STONE.bit;
+        Decision free = new SearchPolicy().choose(sim.fork(w, null, null, 1), 0);
+        check(free != null, "no choice on a board of three");
+        SearchPolicy floored = new SearchPolicy();
+        floored.floor = new double[Board.SIZE];
+        floored.floor[free.tile] = 5000;
+        Decision d = floored.choose(sim.fork(w, null, null, 1), 0);
+        check(d != null && d.tile != free.tile, "a tile Bob's own planner puts at 5000 s still taken: " + board.goal[free.tile].id);
     }
 
     /** The planner wins more than it loses against today's brain (Bob's pace, 90 minutes). */

@@ -313,6 +313,17 @@ public final class Sim {
         return startStep(i);
     }
 
+    /**
+     * The step under way takes {@code seconds} longer: a look-ahead's first goal believed dearer
+     * than its recipe (see {@link SearchPolicy#floor}). Its time allowance still holds.
+     */
+    public void lengthen(int i, double seconds) {
+        PlayerState p = players[i];
+        if (seconds <= 0 || p.stepKind < 0) return;
+        p.stepEnd += seconds;
+        schedule(p);
+    }
+
     /** LockoutBrain.budget: three times a short estimate, a little over twice a long one, one to seven and a half minutes. */
     public static double budget(double estimate) {
         double factor = estimate > 120 ? 2.2 : 3;
