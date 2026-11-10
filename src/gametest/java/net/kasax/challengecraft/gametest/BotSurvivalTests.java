@@ -38,9 +38,10 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   pack - the pillar ran out of blocks, the hole was dug too slowly.</li>
  *   <li>{@code skeletons_down_the_stairs}: the staircase down to the shield's iron opens onto two
  *   skeletons in the dark, no shield yet.</li>
- *   <li>{@code zombie_trio_model}, {@code spider_pack_model}: the learnt cover model choosing for
- *   the guardian - it ran from three zombies the rules fight (10 to 17 hearts lost against 4.5),
- *   and it took to a pillar or a run with a spider at it (four of four such choices died).</li>
+ *   <li>{@code zombie_trio_model}, {@code spider_pack_model}: a cover model choosing for the
+ *   guardian (one that always runs or pillars first) - the learnt one ran from three zombies the
+ *   rules fight (10 to 17 hearts lost against 4.5), and took to a pillar or a run with a spider at
+ *   it (four of four such choices died).</li>
  * </ul>
  */
 public class BotSurvivalTests {
@@ -351,10 +352,22 @@ public class BotSurvivalTests {
     // ---- the learnt cover model -----------------------------------------------------------------
 
     /**
-     * The brawl of three zombies (brawl_zombie_trio) with a stone sword, the learnt cover model
-     * choosing for the guardian (whatever -PbotLearned says): no run while armed with more than
-     * half the hearts - they are slower, they keep coming, and the fight after the run is had
-     * bunched up (the model ran there and lost 10 to 17 hearts, the rules 4.5 standing).
+     * A cover model for the test that rates a run cheapest, then a pillar to fight from, a pillar, a
+     * hole, a box, and a stand last, whatever the situation (bob-models/cover-reckless.json of the
+     * game tests): the guardian's veto is what keeps the bot from the ways the rules know never work
+     * there - the learnt model left to itself took them now and then (see below).
+     */
+    private static void recklessModel(GameTestHelper h, Bot bot) {
+        bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover-reckless.json");
+        h.assertTrue(bot.cover.model() != null, "the test's cover model (bob-models/cover-reckless.json) did not load");
+    }
+
+    /**
+     * The brawl of three zombies (brawl_zombie_trio) with a stone sword, a model choosing for the
+     * guardian that would always run: no run while armed with more than half the hearts - they are
+     * slower, they keep coming, and the fight after the run is had bunched up (the learnt model ran
+     * there with -PbotLearned and lost 10 to 17 hearts, the rules 4.5 standing). The choice is the
+     * test: it ends a few seconds after the guardian first stepped in.
      */
     @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
     public void zombieTrioModel(GameTestHelper h) {
@@ -365,28 +378,30 @@ public class BotSurvivalTests {
         mobs.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 22));
         mobs.add(mob(h, a, EntityTypes.ZOMBIE, 24, FEET, 26));
         Bot bot = a.spawn(16, FEET, 20, new ItemStack(Items.STONE_SWORD));
-        bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
+        recklessModel(h, bot);
         var body = bot.body();
-        float[] low = {body.getHealth()};
         int[] runs = {0};
+        long[] stepped = {-1};
         a.run(new net.kasax.challengecraft.bot.task.KillTask(Set.of(EntityTypes.ZOMBIE), Set.of(), 0, 3), 1500, () -> {
             h.assertTrue(a.bot().body() == body && body.isAlive(), "zombie_trio_model: killed");
             // (A run chosen this tick: only when down to half the hearts.)
             if (bot.guardian.runs > runs[0] && body.getHealth() > 10) h.fail("zombie_trio_model: ran from them armed, with " + body.getHealth() + " health");
             runs[0] = bot.guardian.runs;
-            low[0] = Math.min(low[0], body.getHealth());
-            boolean done = mobs.stream().noneMatch(Mob::isAlive);
-            if (done) BotArena.LOG.info("[BOTTEST] zombie_trio_model lost {} health, guardian runs {} fights {}", 20 - low[0], bot.guardian.runs, bot.guardian.fights);
-            return done;
+            if (stepped[0] < 0 && bot.guardian.inEpisode()) stepped[0] = h.getTick();
+            boolean done = mobs.stream().noneMatch(Mob::isAlive) || stepped[0] >= 0 && h.getTick() >= stepped[0] + 100;
+            if (!done) return false;
+            BotArena.LOG.info("[BOTTEST] zombie_trio_model guardian in at tick {}: runs {} fights {}, {} health", stepped[0], bot.guardian.runs, bot.guardian.fights, body.getHealth());
+            for (var m : mobs) m.discard();
+            return true;
         });
     }
 
     /**
      * At night a spider and two zombies at him, a stone sword, iron helmet and boots, four blocks
-     * of dirt, the learnt model choosing: not up a pillar to fight from (the spider climbs it) nor a
-     * run (it is quicker) - the league's deaths with a spider among them (four of four times the
-     * model took a pillar, a run or a hole there, he died). The choice is the test: it ends a few
-     * seconds after the guardian first stepped in.
+     * of dirt, a model choosing for the guardian that would always run or pillar: not up a pillar to
+     * fight from (the spider climbs it) nor a run (it is quicker) - the league's deaths with a spider
+     * among them (four of four times the learnt model took a pillar, a run or a hole there, he
+     * died). The choice is the test: it ends a few seconds after the guardian first stepped in.
      */
     @GameTest(environment = "challengecraft:survival_night2", structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 44)
     public void spiderPackModel(GameTestHelper h) {
@@ -394,7 +409,7 @@ public class BotSurvivalTests {
         command(h, "difficulty hard");
         command(h, "time set 14000");
         Bot bot = a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.DIRT, 4), new ItemStack(Items.BREAD, 4));
-        bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
+        recklessModel(h, bot);
         var body = bot.body();
         body.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
         body.setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.IRON_BOOTS));

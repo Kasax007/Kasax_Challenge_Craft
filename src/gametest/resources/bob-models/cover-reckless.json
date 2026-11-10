@@ -1,0 +1,123 @@
+{
+ "kind": "cover",
+ "version": "test-reckless",
+ "note": "Game tests only: rates a run cheapest, then a pillar fight, a pillar, a hole, a box, a stand last - whatever the situation (what the guardian's veto must not let through).",
+ "mean": [
+  0.0
+ ],
+ "std": [
+  1.0
+ ],
+ "layers": [
+  {
+   "w": [
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ],
+    [
+     0.0
+    ]
+   ],
+   "b": [
+    -20.0,
+    10.0,
+    0.0,
+    -20.0,
+    6.0,
+    0.0,
+    -20.0,
+    3.0,
+    0.0,
+    -20.0,
+    2.0,
+    0.0,
+    -20.0,
+    1.0,
+    0.0,
+    -20.0,
+    5.0,
+    0.0,
+    -20.0,
+    4.0,
+    0.0
+   ],
+   "act": "linear"
+  }
+ ],
+ "options": [
+  "FIGHT",
+  "BOX",
+  "PILLAR",
+  "PILLAR_FIGHT",
+  "RUN",
+  "DIG",
+  "SHELTER"
+ ],
+ "heads": [
+  "death",
+  "hp",
+  "secs"
+ ],
+ "cost": {
+  "death": 60,
+  "hp": 1,
+  "secs": 0.15
+ }
+}
