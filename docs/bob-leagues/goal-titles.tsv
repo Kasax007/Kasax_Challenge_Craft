@@ -1,0 +1,312 @@
+obtain_iron_ingot	Iron Ingot
+obtain_gold_ingot	Gold Ingot
+obtain_copper_ingot	Copper Ingot
+obtain_diamond	Diamond
+obtain_emerald	Emerald
+obtain_lapis_lazuli	Lapis Lazuli
+obtain_redstone	Redstone Dust
+obtain_coal_block	Block of Coal
+obtain_raw_iron_block	Block of Raw Iron
+obtain_raw_gold_block	Block of Raw Gold
+obtain_obsidian	Obsidian
+obtain_crying_obsidian	Crying Obsidian
+obtain_amethyst_shard	Amethyst Shard
+obtain_calcite	Calcite
+obtain_tuff	Tuff
+obtain_deepslate	Cobbled Deepslate
+obtain_moss_block	Moss Block
+obtain_dripstone_block	Dripstone Block
+obtain_pointed_dripstone	Pointed Dripstone
+obtain_sculk	Sculk
+obtain_snowball	Snowball
+obtain_ice	Ice
+obtain_packed_ice	Packed Ice
+obtain_blue_ice	Blue Ice
+obtain_slime_ball	Slimeball
+obtain_honey_bottle	Honey Bottle
+obtain_honeycomb	Honeycomb
+obtain_name_tag	Name Tag
+obtain_saddle	Saddle
+obtain_music_disc	Any Music Disc
+obtain_ender_pearl	Ender Pearl
+obtain_ink_sac	Ink Sac
+obtain_glow_ink_sac	Glow Ink Sac
+obtain_tropical_fish	Tropical Fish
+obtain_pufferfish	Pufferfish
+obtain_turtle_scute	Turtle Scute
+craft_lava_bucket	Lava Bucket
+craft_water_bucket	Water Bucket
+craft_golden_apple	Golden Apple
+obtain_trident	Trident
+obtain_crossbow	Crossbow
+obtain_shield	Shield
+obtain_arrow	Arrow
+obtain_spectral_arrow	Spectral Arrow
+obtain_tipped_arrow	Tipped Arrow
+obtain_16_logs	16 Logs
+obtain_32_cobblestone	32 Cobblestone
+obtain_16_glass	16 Glass
+obtain_16_bricks	16 Bricks
+obtain_16_sandstone	16 Sandstone
+obtain_16_mud_bricks	16 Mud Bricks
+obtain_16_terracotta	16 Terracotta
+obtain_16_concrete	16 White Concrete
+obtain_16_prismarine	16 Prismarine
+obtain_16_end_stone	16 End Stone
+obtain_all_log_types_basic	4 Log Types
+obtain_3_flower_types	3 Flower Types
+obtain_5_dye_colors	5 Dye Colors
+obtain_3_sapling_types	3 Sapling Types
+enter_nether	The Nether
+obtain_nether_gold_ore	Nether Gold Ore
+obtain_netherrack	Netherrack
+obtain_quartz	Nether Quartz
+obtain_glowstone	Glowstone
+obtain_blaze_rod	Blaze Rod
+obtain_nether_wart	Nether Wart
+obtain_ghast_tear	Ghast Tear
+obtain_magma_cream	Magma Cream
+obtain_ancient_debris	Ancient Debris
+obtain_glowstone_dust	Glowstone Dust
+obtain_shroomlight	Shroomlight
+obtain_blackstone	Blackstone
+obtain_basalt	Basalt
+obtain_soul_sand	Soul Sand
+obtain_soul_soil	Soul Soil
+obtain_warped_fungus	Warped Fungus
+obtain_crimson_fungus	Crimson Fungus
+obtain_wither_skeleton_skull	Wither Skeleton Skull
+obtain_piglin_barter_item	Any Barter Item
+kill_blaze	Blaze
+kill_wither_skeleton	Wither Skeleton
+kill_ghast	Ghast
+kill_magma_cube	Magma Cube
+kill_piglin	Piglin
+kill_hoglin	Hoglin
+kill_zoglin	Zoglin
+kill_strider	Strider
+visit_nether_wastes	Nether Wastes
+visit_crimson_forest	Crimson Forest
+visit_warped_forest	Warped Forest
+visit_soul_sand_valley	Soul Sand Valley
+visit_basalt_deltas	Basalt Deltas
+barter_with_piglin	Barter with Piglin
+wear_gold_in_nether	Wear Gold in Nether
+craft_furnace	Furnace
+craft_blast_furnace	Blast Furnace
+craft_smoker	Smoker
+craft_campfire	Campfire
+craft_shield	Shield
+craft_bow	Bow
+craft_crossbow	Crossbow
+craft_fishing_rod	Fishing Rod
+craft_shears	Shears
+craft_bucket	Bucket
+craft_compass	Compass
+craft_clock	Clock
+craft_map	Empty Map
+craft_iron_pickaxe	Iron Pickaxe
+craft_diamond_pickaxe	Diamond Pickaxe
+craft_iron_armor_piece	Any Iron Armor
+craft_full_iron_armor	Full Iron Armor
+craft_golden_helmet	Golden Helmet
+craft_anvil	Anvil
+craft_enchanting_table	Enchanting Table
+craft_bookshelf	Bookshelf
+craft_brewing_stand	Brewing Stand
+craft_cauldron	Cauldron
+craft_piston	Piston
+craft_sticky_piston	Sticky Piston
+craft_observer	Observer
+craft_dispenser	Dispenser
+craft_dropper	Dropper
+craft_redstone_lamp	Redstone Lamp
+craft_note_block	Note Block
+craft_jukebox	Jukebox
+craft_tnt	TNT
+craft_fire_charge	Fire Charge
+craft_firework_rocket	Firework Rocket
+craft_lead	Lead
+craft_item_frame	Item Frame
+craft_painting	Painting
+craft_flower_pot	Flower Pot
+craft_bricks	Bricks
+craft_cake	Cake
+craft_cookie	Cookie
+craft_pumpkin_pie	Pumpkin Pie
+craft_spyglass	Spyglass
+craft_lightning_rod	Lightning Rod
+craft_copper_bulb	Copper Bulb
+craft_redstone_torch	Redstone Torch
+craft_repeater	Redstone Repeater
+craft_comparator	Redstone Comparator
+craft_daylight_detector	Daylight Detector
+craft_target_block	Target
+craft_hopper	Hopper
+kill_zombie	Zombie
+kill_skeleton	Skeleton
+kill_creeper	Creeper
+kill_spider	Spider
+kill_enderman	Enderman
+kill_witch	Witch
+kill_slime	Slime
+kill_phantom	Phantom
+kill_pillager	Pillager
+kill_guardian	Guardian
+kill_elder_guardian	Elder Guardian
+kill_drowned	Drowned
+kill_husk	Husk
+kill_stray	Stray
+kill_cave_spider	Cave Spider
+kill_silverfish	Silverfish
+kill_ravager	Ravager
+kill_shulker	Shulker
+kill_breeze	Breeze
+kill_warden	Warden
+visit_desert	Desert
+visit_savanna	Savanna
+visit_jungle	Jungle
+visit_badlands	Badlands
+visit_swamp	Swamp
+visit_dappled_forest	Dappled Forest
+visit_mangrove_swamp	Mangrove Swamp
+visit_snowy_biome	Snowy Plains
+visit_cherry_grove	Cherry Grove
+visit_mushroom_fields	Mushroom Fields
+visit_dark_forest	Dark Forest
+visit_bamboo_jungle	Bamboo Jungle
+visit_ocean	Ocean
+visit_warm_ocean	Warm Ocean
+visit_deep_dark	Deep Dark
+visit_dripstone_caves	Dripstone Caves
+visit_lush_caves	Lush Caves
+visit_village	Village
+visit_desert_pyramid	Desert Pyramid
+visit_jungle_temple	Jungle Temple
+visit_mineshaft	Mineshaft
+visit_shipwreck	Shipwreck
+visit_ocean_ruin	Ocean Ruin
+visit_ruined_portal	Ruined Portal
+visit_abandoned_camp	Abandoned Camp
+visit_pillager_outpost	Pillager Outpost
+visit_trial_chambers	Trial Chambers
+visit_ancient_city	Ancient City
+visit_nether_fortress	Nether Fortress
+visit_bastion_remnant	Bastion Remnant
+visit_ocean_monument	Ocean Monument
+visit_woodland_mansion	Woodland Mansion
+visit_stronghold	Stronghold
+visit_end_city	End City
+milk_cow	Milk a Cow
+shear_sheep	Shear a Sheep
+breed_animals	Breed Animals
+breed_cows	Breed Cows
+breed_sheep	Breed Sheep
+breed_pigs	Breed Pigs
+breed_chickens	Breed Chickens
+tame_wolf	Tame a Wolf
+tame_cat	Tame a Cat
+tame_horse	Tame a Horse
+ride_horse	Ride a Horse
+ride_pig	Ride a Pig
+ride_strider	Ride a Strider
+catch_fish	Catch a Fish
+eat_apple	Apple
+eat_bread	Bread
+eat_cooked_beef	Steak
+eat_cooked_porkchop	Cooked Porkchop
+eat_cooked_chicken	Cooked Chicken
+eat_cooked_mutton	Cooked Mutton
+eat_cooked_cod	Cooked Cod
+eat_cooked_salmon	Cooked Salmon
+eat_cookie	Cookie
+eat_cake_slice	Cake
+eat_pumpkin_pie	Pumpkin Pie
+eat_golden_apple	Golden Apple
+eat_glow_berries	Glow Berries
+eat_suspicious_stew	Suspicious Stew
+eat_beetroot_soup	Beetroot Soup
+eat_rabbit_stew	Rabbit Stew
+eat_dried_kelp	Dried Kelp
+eat_honey_bottle	Honey Bottle
+sleep_in_bed	Sleep in a Bed
+set_spawn	Set Spawn Point
+use_lectern	Use a Lectern
+use_grindstone	Use a Grindstone
+use_stonecutter	Use a Stonecutter
+use_cartography_table	Use a Cartography Table
+use_smithing_table	Use a Smithing Table
+use_loom	Use a Loom
+light_campfire	Light a Campfire
+activate_pressure_plate	Trigger Pressure Plate
+wear_full_leather	Full Leather Armor
+wear_full_iron	Full Iron Armor
+wear_full_gold	Full Gold Armor
+wear_diamond_piece	Any Diamond Armor
+block_damage_with_shield	Block with Shield
+obtain_firework_crossbow	Firework Crossbow
+trade_with_villager	Trade with a Villager
+obtain_emerald_by_trade	Trade for Emerald
+trade_with_librarian	Trade with Librarian
+trade_with_armorer	Trade with Armorer
+trade_with_farmer	Trade with Farmer
+trade_with_cleric	Trade with Cleric
+trade_with_toolsmith	Trade with Toolsmith
+trade_with_fletcher	Trade with Fletcher
+buy_bread	Buy Bread
+buy_arrows	Buy Arrows
+buy_lapis	Buy Lapis
+buy_bell	Bell
+ring_bell	Ring a Bell
+sleep_in_village_bed	Sleep in Village Bed
+enter_end	The End
+obtain_dragon_breath	Dragon's Breath
+obtain_shulker_shell	Shulker Shell
+obtain_elytra	Elytra
+kill_ender_dragon	Ender Dragon
+enter_end_gateway	Enter End Gateway
+advancement_stone_age	Stone Age
+advancement_acquire_hardware	Acquire Hardware
+advancement_suit_up	Suit Up
+advancement_diamonds	Diamonds!
+advancement_enchanter	Enchanter
+advancement_we_need_to_go_deeper	We Need to Go Deeper
+advancement_return_to_sender	Return to Sender
+advancement_into_fire	Into Fire
+advancement_local_brewery	Local Brewery
+advancement_monster_hunter	Monster Hunter
+advancement_take_aim	Take Aim
+advancement_sniper_duel	Sniper Duel
+advancement_best_friends_forever	Best Friends Forever
+advancement_fishy_business	Fishy Business
+advancement_tactical_fishing	Tactical Fishing
+brew_any_potion	Brew Any Potion
+brew_speed_potion	Brew Swiftness
+brew_strength_potion	Brew Strength
+brew_fire_resistance	Brew Fire Resistance
+brew_night_vision	Brew Night Vision
+enchant_item	Enchant an Item
+enchant_sword	Enchant a Sword
+enchant_pickaxe	Enchant a Pickaxe
+drink_potion	Potion
+splash_potion	Throw Splash Potion
+place_tnt	Place TNT
+ignite_tnt	Ignite TNT
+shoot_crossbow	Shoot Crossbow
+hit_target_block	Hit Target Block
+throw_ender_pearl	Throw Ender Pearl
+throw_trident	Throw Trident
+use_totem	Use Totem
+survive_explosion	Survive Explosion
+take_fall_damage	Take Fall Damage
+fall_20_blocks_and_survive	Fall 20 Blocks
+burn_and_survive	Burn and Survive
+freeze_in_powder_snow	Freeze in Snow
+get_shot_by_skeleton	Get Shot by Skeleton
+get_poisoned	Get Poisoned
+get_withered	Get Wither
+get_levitation	Get Levitation
+have_10_hearts_missing	Missing 10 Hearts
+reach_y_minus_50	Reach Y -50
+reach_build_limit	Reach Build Limit
+stand_on_bedrock	Stand on Bedrock

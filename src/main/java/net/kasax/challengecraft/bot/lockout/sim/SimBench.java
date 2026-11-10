@@ -254,13 +254,16 @@ public final class SimBench {
      * first tile, deaths, and per goal how often it was claimed within the twenty minutes - next to
      * the leagues' figures. Titles in the leagues are matched to goals through the board of each
      * seed and the English titles (lang files) - given as a tab-separated file goal-id/title
-     * ({@code --titles}).
+     * ({@code --titles}, by default {@code docs/bob-leagues/goal-titles.tsv}: the titles as the
+     * game showed them in 26.3, from the mod's and the game's English lang files; a goal added to
+     * the pool needs a line there to be counted).
      */
     private static void calibrate(Map<String, String> o) throws Exception {
         Path dir = Path.of(o.getOrDefault("leagues", "docs/bob-leagues"));
         Map<String, String> titleToId = new HashMap<>();
-        if (o.containsKey("titles")) {
-            for (String line : Files.readAllLines(Path.of(o.get("titles")))) {
+        Path titles = Path.of(o.getOrDefault("titles", "docs/bob-leagues/goal-titles.tsv"));
+        if (Files.exists(titles)) {
+            for (String line : Files.readAllLines(titles)) {
                 String[] p = line.split("\t");
                 if (p.length == 2) titleToId.put(p[0] + "|" + p[1], p[0]);
             }
