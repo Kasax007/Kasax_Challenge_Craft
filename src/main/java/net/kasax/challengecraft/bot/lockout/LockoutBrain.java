@@ -1720,10 +1720,11 @@ public final class LockoutBrain implements BotBrain {
         // starts half dead (seed live: half health, no food, a creeper hunt in a cave - killed).
         boolean hurt = bot.body().getHealth() < 12 && bare;
         if (points >= 16 || level >= 17 && !bare) return false;
-        // (search=2: a stock while not starving nor hurt is the look-ahead's to decide - a chore
-        // beside the tiles. Hurt with nothing to eat, starving, or the night coming with less than
-        // a meal in the pack: the rules below, as always.)
-        if (searchingChores(bot) && !hurt && level > 6 && !(nightComing(bot, SHIELD_BY) && points < FOOD_BEFORE_NIGHT)) return false;
+        // (search=2: a stock while well fed, a meal or more in the pack and not hurt is the
+        // look-ahead's to decide - a chore beside the tiles. Once hunger bites (below 14: on hard
+        // the hearts stop coming back below 18, and the simulator does not know that), with less
+        // than a meal in the pack, or hurt: the rules below, as always.)
+        if (searchingChores(bot) && !hurt && level >= 14 && points >= FOOD_BEFORE_NIGHT) return false;
         int have = ObtainPlanner.countAny(bot.body(), FOODS);
         double cost = cortex.believe("food:" + plain(new net.kasax.challengecraft.bot.task.ObtainTask(FOODS, have + 4, planner)), planner.estimate(bot, FOODS, have + 4));
         // Food right here (a cow next to it, bread in a chest) is taken while a little hungry; a
