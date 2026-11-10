@@ -159,7 +159,12 @@ public final class MineTask implements BotTask {
                     // (Things from the surface - logs, sand - seen deep down, a mineshaft's beams,
                     // are not worth digging fifty blocks for: those are left out, see worthIt.)
                     List<BlockPos> seen = new ArrayList<>();
-                    for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), sealed ? 5 : searching ? 12 : 28, sealed ? 4 : searching ? 8 : 20, blocks, true, skip, 12)) {
+                    // (Out on the surface looking for a tree or a sand bank: a look about as far as
+                    // the trees stand out, not only the few blocks beside the way - walking to a
+                    // biome 800 blocks off on seed 2582..., it passed the savanna's lone acacias
+                    // and walked on for ten minutes without wood. In the rock, the near walls.)
+                    int look = sealed ? 5 : !searching ? 28 : SurfaceTask.underground(bot.body()) ? 12 : 24;
+                    for (BlockPos p : BotWorld.nearestN(level, bot.body().blockPosition(), look, sealed ? 4 : searching ? 8 : 20, blocks, true, skip, 12)) {
                         // (A trunk from the bottom: that one is in reach from the ground.)
                         p = endOfColumn(level, p);
                         if (!seen.contains(p) && worthIt(level, bot, p)) seen.add(p);
