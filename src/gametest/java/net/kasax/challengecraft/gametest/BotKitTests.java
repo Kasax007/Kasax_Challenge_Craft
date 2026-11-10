@@ -37,6 +37,9 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   <li>{@code copper_armour}: on hard with the shield in hand, the Lockout brain's copper armour
  *   - a copper vein in the rock face beside the start: the chestplate's eight ingots waited for,
  *   the helmet's five left cooking while the chestplate is made, then fetched ({@code smeltgo}).</li>
+ *   <li>{@code shield_walk_slow}: twenty blocks behind the raised shield - with {@code itemslow} at
+ *   the item's use speed (a fifth), as a player's client has it; {@code shield_walk_fast} the
+ *   same without (the server never slowed a bot so).</li>
  * </ul>
  */
 public class BotKitTests {
@@ -159,6 +162,44 @@ public class BotKitTests {
     @GameTest(environment = "challengecraft:kit_copper_before", structure = STRUCTURE, maxTicks = 4000, skyAccess = true, padding = 24)
     public void copperArmourOldWay(GameTestHelper h) {
         copperArmour(h, "copper_armour_old_way", "smeltgo=0", 4000);
+    }
+
+    /** Twenty blocks with the shield up; passes on arrival, logging the ticks (and, slowed, failing if it was not slowed). */
+    private static void shieldWalk(GameTestHelper h, String name, String knobs, int budget, int atLeast) {
+        BotArena a = BotArena.flat(h, name);
+        Bot bot = a.spawn(8, FEET, 20, new ItemStack(Items.BREAD, 8));
+        var body = bot.body();
+        body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(Items.SHIELD));
+        bot.params = BotParams.parse(knobs);
+        var go = new net.kasax.challengecraft.bot.task.GoToTask(a.abs(28, FEET, 20), 1);
+        long[] start = {-1};
+        a.run(new net.kasax.challengecraft.bot.BotTask() {
+            @Override
+            public Result tick(Bot b) {
+                if (start[0] < 0) start[0] = h.getTick();
+                if (!body.isUsingItem()) body.gameMode.useItem(body, body.level(), body.getOffhandItem(), net.minecraft.world.InteractionHand.OFF_HAND);
+                return go.tick(b);
+            }
+
+            @Override
+            public String describe() {
+                return "walk behind the shield";
+            }
+        }, budget, () -> {
+            if (!a.near(28, FEET, 20, 1.6)) return false;
+            h.assertTrue(h.getTick() - start[0] >= atLeast, name + ": not slowed (" + (h.getTick() - start[0]) + " ticks)");
+            return true;
+        });
+    }
+
+    @GameTest(structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void shieldWalkSlow(GameTestHelper h) {
+        shieldWalk(h, "shield_walk_slow", "itemslow=1", 900, 300);
+    }
+
+    @GameTest(structure = STRUCTURE, maxTicks = 300, skyAccess = true, padding = 8)
+    public void shieldWalkFast(GameTestHelper h) {
+        shieldWalk(h, "shield_walk_fast", "itemslow=0", 300, 0);
     }
 
     /** The whole opening on hard (BotOpeningTests' scene) with this round's knobs off, for the comparison with opening_kit. */

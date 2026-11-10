@@ -331,7 +331,8 @@ public final class ObtainPlanner {
      */
     public double estimate(Bot bot, Collection<Item> items, int count) {
         refresh(bot);
-        int have = countAny(bot.body(), Set.copyOf(items));
+        // (What its furnaces left cooking hold of them counts as had - smeltgo: a walk back.)
+        int have = countAny(bot.body(), Set.copyOf(items)) + leftCookingAny(bot, items);
         if (have >= count) return 0;
         double s = bestBatch(bot, items, count - have).seconds();
         return s >= INF ? INF : s;
@@ -345,7 +346,7 @@ public final class ObtainPlanner {
      */
     public double searchPart(Bot bot, Collection<Item> items, int count) {
         refresh(bot);
-        int have = countAny(bot.body(), Set.copyOf(items));
+        int have = countAny(bot.body(), Set.copyOf(items)) + leftCookingAny(bot, items);
         if (have >= count) return 0;
         Batch b = bestBatch(bot, items, count - have);
         return b.seconds() >= INF ? 0 : b.luck();
@@ -1855,6 +1856,14 @@ public final class ObtainPlanner {
     private List<net.kasax.challengecraft.bot.FurnaceLedger.Stock> furnaceStocks(Bot bot, Collection<Item> items) {
         if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0) return List.of();
         return bot.furnaces.stocks((ServerLevel) bot.body().level(), bot.body().blockPosition(), items);
+    }
+
+    /** How many of any of {@code items} (smelted things only) its furnaces left cooking hold or cook. */
+    private int leftCookingAny(Bot bot, Collection<Item> items) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0 || items.stream().noneMatch(SMELTED::contains)) return 0;
+        int n = 0;
+        for (var st : furnaceStocks(bot, items)) n += st.all();
+        return n;
     }
 
     /** How many of {@code item} its furnaces left cooking hold or cook. */

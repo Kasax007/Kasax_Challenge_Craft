@@ -78,8 +78,14 @@ public final class BotParams {
         this.values = values;
     }
 
-    /** The knobs that won the self-play league (bob-models/champion.json), or the defaults. */
+    /**
+     * The knobs that won the self-play league (bob-models/champion.json), or the defaults; knobs
+     * forced for a whole run ({@code -Dbob.knobs=k=v,...} or BOB_KNOBS - the game tests with
+     * {@code -PbotKnobs}: a knob's cost measured over the scenarios that do not set their own) first.
+     */
     public static BotParams champion() {
+        String forced = System.getProperty("bob.knobs", System.getenv("BOB_KNOBS"));
+        if (forced != null && !forced.isBlank()) return parse(forced);
         String c = net.kasax.challengecraft.bot.learn.ModelStore.championParams();
         if (c == null) return DEFAULT;
         try {

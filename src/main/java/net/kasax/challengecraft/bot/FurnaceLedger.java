@@ -27,8 +27,11 @@ public final class FurnaceLedger {
     private static final int IN = 0, FUEL = 1, OUT = 2;
     /** Ticks a furnace takes for one item. */
     public static final int COOK_TICKS = 200;
-    /** Farther than this (blocks) a furnace is not worth the walk back (and its chunk may be gone). */
-    public static final double FAR = 96;
+    /**
+     * Farther than this (blocks) a furnace is not counted (its chunk may be gone; a walk back of
+     * more than a minute). A walk of 190 blocks still beats a second trip down for the iron.
+     */
+    public static final double FAR = 192;
 
     private record Left(BlockPos pos, ResourceKey<Level> dimension, long since) {
     }
