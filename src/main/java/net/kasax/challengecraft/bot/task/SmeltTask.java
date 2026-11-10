@@ -2,6 +2,7 @@ package net.kasax.challengecraft.bot.task;
 
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotPlayer;
+import net.kasax.challengecraft.bot.BotTask;
 import net.kasax.challengecraft.bot.plan.BotKnowledge;
 import net.kasax.challengecraft.bot.plan.ObtainPlanner;
 import net.minecraft.server.level.ServerLevel;
@@ -89,6 +90,38 @@ public final class SmeltTask extends StationTask {
             }
         }
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
+        // Not stood beside it while it cooks: the kit's stone or wood from within a few blocks
+        // (a player puts the meat in and mines the wall beside it), back for what is done.
+        int left = 0;
+        for (var f : all) left = Math.max(left, f.getItem(IN).getCount() * COOK_TICKS - COOK_TICKS / 2);
+        // And a bite while waiting, if the stomach has room for a whole one: the eating reflex
+        // would stop a walk for it a little later (only with nothing after it close by).
+        if (!ateWaiting && left >= 40 && bot.params.on("meanwhile") && !bot.targeted(8)) {
+            int slot = EatTask.bestFood(body);
+            var food = slot < 0 ? null : body.getInventory().getNonEquipmentItems().get(slot).get(net.minecraft.core.component.DataComponents.FOOD);
+            // (Proper food only: not the raw meat that is about to be cooked.)
+            if (food != null && food.nutrition() >= 5 && body.getFoodData().getFoodLevel() <= 20 - food.nutrition()) {
+                ateWaiting = true;
+                bot.interject(new EatTask());
+                return Result.RUNNING;
+            }
+        }
+        if (meanwhileTries < 2 && bot.params.on("meanwhile")) {
+            if (left >= MEANWHILE_MIN) {
+                meanwhileTries++;
+                BotTask work = meanwhileWork(bot, level);
+                if (work != null) {
+                    var furnaces = new java.util.ArrayList<net.minecraft.core.BlockPos>();
+                    furnaces.add(station);
+                    furnaces.addAll(extras);
+                    var home = station;
+                    bot.say("while it cooks (~" + left / 20 + " s): " + work.describe());
+                    bot.interject(new MeanwhileTask(work, left, () -> cooked(level, furnaces)
+                            || bot.body().blockPosition().distSqr(home) > MEANWHILE_REACH * MEANWHILE_REACH));
+                    return Result.RUNNING;
+                }
+            }
+        }
         // Keep it burning if the fuel was short; give up if it went out with input left.
         if (++waited % 40 == 0 && !furnace.getItem(IN).isEmpty() && furnace.getItem(FUEL).isEmpty()) {
             if (!loadFuel(body, furnace, furnace.getItem(IN).getCount()) && waited > 400 && !isLit(furnace)) {
@@ -141,6 +174,73 @@ public final class SmeltTask extends StationTask {
         tookBack = true;
         bot.interject(new CollectDropsTask(station, 2, 100));
         return Result.RUNNING;
+    }
+
+    /** Ticks a furnace takes for one item. */
+    private static final int COOK_TICKS = 200;
+    /** Work in between only for a wait at least this long (ticks), and only this far from the furnace (blocks). */
+    private static final int MEANWHILE_MIN = 160, MEANWHILE_REACH = 10;
+    /** Cobblestone the kit keeps (spare stone and blocks to build with): mined while the furnace cooks, up to this. */
+    private static final int MEANWHILE_COBBLE = 32;
+    private int meanwhileTries;
+    private boolean ateWaiting;
+
+    /** Ores worth taking beside a furnace, with what each drops. */
+    private static final java.util.Map<net.minecraft.world.level.block.Block, net.minecraft.world.item.Item> ORE_DROPS = java.util.Map.ofEntries(
+            java.util.Map.entry(Blocks.COAL_ORE, Items.COAL), java.util.Map.entry(Blocks.DEEPSLATE_COAL_ORE, Items.COAL),
+            java.util.Map.entry(Blocks.IRON_ORE, Items.RAW_IRON), java.util.Map.entry(Blocks.DEEPSLATE_IRON_ORE, Items.RAW_IRON),
+            java.util.Map.entry(Blocks.COPPER_ORE, Items.RAW_COPPER), java.util.Map.entry(Blocks.DEEPSLATE_COPPER_ORE, Items.RAW_COPPER),
+            java.util.Map.entry(Blocks.GOLD_ORE, Items.RAW_GOLD), java.util.Map.entry(Blocks.DEEPSLATE_GOLD_ORE, Items.RAW_GOLD),
+            java.util.Map.entry(Blocks.REDSTONE_ORE, Items.REDSTONE), java.util.Map.entry(Blocks.DEEPSLATE_REDSTONE_ORE, Items.REDSTONE),
+            java.util.Map.entry(Blocks.LAPIS_ORE, Items.LAPIS_LAZULI), java.util.Map.entry(Blocks.DEEPSLATE_LAPIS_ORE, Items.LAPIS_LAZULI),
+            java.util.Map.entry(Blocks.DIAMOND_ORE, Items.DIAMOND), java.util.Map.entry(Blocks.DEEPSLATE_DIAMOND_ORE, Items.DIAMOND));
+
+    /** Nothing left to cook in any of these furnaces (or they are gone). */
+    private static boolean cooked(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces) {
+        for (var p : furnaces) if (level.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity f && !f.getItem(IN).isEmpty()) return false;
+        return true;
+    }
+
+    /**
+     * Work worth doing within a few blocks while a furnace cooks, or null: ore showing in a wall
+     * beside it (the whole vein), else rock at body height or in the ground beside (the kit's
+     * cobblestone), else a trunk right there (the spare wood) - only what is in sight, never a
+     * search or a staircase away from the furnace.
+     */
+    static BotTask meanwhileWork(Bot bot, ServerLevel level) {
+        BotPlayer body = bot.body();
+        // Ore showing within a few blocks (the furnace stands in a cave or a tunnel often enough):
+        // the whole vein, as a player takes what the wall beside him shows.
+        net.minecraft.core.BlockPos ore = net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 8, 4,
+                st -> ORE_DROPS.containsKey(st.getBlock()) && bot.tools().canHarvest(st), true, bot.unreachable());
+        if (ore != null) {
+            var item = ORE_DROPS.get(level.getBlockState(ore).getBlock());
+            java.util.Set<net.minecraft.world.level.block.Block> family = new java.util.HashSet<>();
+            ORE_DROPS.forEach((b, i) -> {
+                if (i == item) family.add(b);
+            });
+            int have = ObtainPlanner.countAny(body, java.util.Set.of(item));
+            return new MineTask(ObtainPlanner.name(item), st -> family.contains(st.getBlock()), java.util.Set.of(item), have + 8)
+                    .atLeast(have + 1).knownOnly();
+        }
+        var stone = java.util.Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE);
+        int cobble = ObtainPlanner.countAny(body, stone);
+        java.util.function.Predicate<net.minecraft.world.level.block.state.BlockState> rock = st -> (st.is(Blocks.STONE) || st.is(Blocks.DEEPSLATE)
+                || st.is(Blocks.COBBLESTONE) || st.is(Blocks.COBBLED_DEEPSLATE)) && bot.tools().canHarvest(st);
+        if (cobble < MEANWHILE_COBBLE && net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 6, 2, rock, true, bot.unreachable()) != null)
+            return new MineTask("cobblestone", rock, stone, Math.min(MEANWHILE_COBBLE, cobble + 16)).knownOnly();
+        var logs = net.minecraft.tags.BlockTags.OVERWORLD_NATURAL_LOGS;
+        int planks = 0;
+        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
+            if (st.is(net.minecraft.tags.ItemTags.LOGS)) planks += 4 * st.getCount();
+            else if (st.is(net.minecraft.tags.ItemTags.PLANKS)) planks += st.getCount();
+        }
+        if (planks < 20 && net.kasax.challengecraft.bot.BotWorld.nearest(level, body.blockPosition(), 8, 4, st -> st.is(logs), true, bot.unreachable()) != null) {
+            java.util.Set<net.minecraft.world.item.Item> logItems = new java.util.HashSet<>();
+            for (var b : net.minecraft.core.registries.BuiltInRegistries.BLOCK) if (b.defaultBlockState().is(logs)) logItems.add(b.asItem());
+            return new MineTask("logs", st -> st.is(logs), logItems, ObtainPlanner.countAny(body, logItems) + 4).knownOnly();
+        }
+        return null;
     }
 
     private final java.util.List<net.minecraft.core.BlockPos> extras = new java.util.ArrayList<>();

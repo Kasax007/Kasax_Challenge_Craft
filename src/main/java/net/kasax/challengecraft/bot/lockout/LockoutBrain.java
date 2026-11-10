@@ -313,6 +313,12 @@ public final class LockoutBrain implements BotBrain {
                     kitRetryAt = bot.body().level().getGameTime() + 1200;
                     break;
                 }
+                // (Dear now - no ore in sight, no cave by - and the day young: the board's quick
+                // tiles first, the trip down later; see investLater.)
+                if (investLater(bot, planner.estimate(bot, Set.of(item), 1), ObtainPlanner.name(item))) {
+                    kitRetryAt = bot.body().level().getGameTime() + 600;
+                    break;
+                }
                 kitRetryAt = bot.body().level().getGameTime() + (1200L << Math.min(3, kitTries++));
                 bot.say("investing: " + ObtainPlanner.name(item) + (item == net.minecraft.world.item.Items.SHIELD
                         ? " (hard: no night without one)" : " (the plan wants the iron kit)"));
@@ -347,7 +353,7 @@ public final class LockoutBrain implements BotBrain {
                     for (int i = 0; i < Math.min(2, missing.size()); i++) ingots += COPPER_SET.get(missing.get(i));
                     int want = Math.max(0, have - Math.max(0, spare)) + ingots;
                     double est = planner.estimate(bot, Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want);
-                    if (est <= COPPER_ARMOUR_MAX) {
+                    if (est <= COPPER_ARMOUR_MAX && !investLater(bot, est, "copper armour")) {
                         armourTries++;
                         bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
                         start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want, planner),
@@ -1495,6 +1501,45 @@ public final class LockoutBrain implements BotBrain {
 
     private int openingTries;
     private boolean openingWood;
+    /** A stock of food at most this dear (seconds) is near enough to be had at once (an animal in sight, bread in a chest). */
+    private static final double FOOD_NEAR = 90;
+    /** An investment this cheap (seconds) is made at once; a dearer one waits while the board has quicker tiles. */
+    private static final double INVEST_CHEAP = 150;
+    /** A tile at most this dear (seconds, by the estimate) goes before a dear investment. */
+    private static final double TILE_FIRST = 120;
+    /** From this time of day on (the evening coming), and from this many tiles taken on, the investments wait no longer. */
+    private static final long INVEST_BY = 8000;
+    private static final int INVEST_AFTER_TILES = 2;
+    private long investLaterSaid;
+
+    /**
+     * Whether an investment (the shield's iron, the iron kit, copper armour) waits while the board
+     * has quicker things to do: when it is dear now (no ore in sight, no cave about: minutes of
+     * staircase and tunnel), the day still young and fewer than two tiles taken, and a tile of
+     * at most {@link #TILE_FIRST} seconds is open. Those first - their ways lead about the map,
+     * where the ore often turns up in a cliff or a cave mouth - and the trip down when the evening
+     * comes or two tiles are in. In a self-play bench the shield's trip down took six minutes of
+     * tunnelling at the start (seed -2951...) while a flower pot and bricks waited on the board.
+     * (interleave=0: invest at once, whatever it costs, as before.)
+     */
+    private boolean investLater(Bot bot, double estimate, String what) {
+        if (!bot.params.on("interleave") || estimate <= INVEST_CHEAP || clock(bot) >= INVEST_BY) return false;
+        var team = Chal_40_LockoutBingo.teamOf(bot.server(), bot.id);
+        if (team == null || Chal_40_LockoutBingo.score(bot.server(), team) >= INVEST_AFTER_TILES) return false;
+        Choice quickest = null;
+        for (Choice c : choices(bot, -1)) {
+            if (c.option().proxy() || c.option().cost() > TILE_FIRST) continue;
+            if (quickest == null || c.option().cost() < quickest.option().cost()) quickest = c;
+        }
+        if (quickest == null) return false;
+        long now = bot.body().level().getGameTime();
+        if (now - investLaterSaid > 1200) {
+            investLaterSaid = now;
+            bot.say(what + " later (~" + Math.round(estimate) + " s now): first " + quickest.tile().goal().title().getString()
+                    + " (~" + Math.round(quickest.option().cost()) + " s) and what else is quick");
+        }
+        return true;
+    }
     private long netherRetryAt, kitRetryAt;
     private int kitTries;
     /** The shield on hard when nothing else wants iron: only for so many seconds of effort (iron in sight, a cave by). */
@@ -1553,6 +1598,20 @@ public final class LockoutBrain implements BotBrain {
         // is not to be had without one, and on hard no heart comes back without food; 30 of 54
         // deaths had nothing to eat in the pack.)
         boolean opened = ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) > 0;
+        // Not hungry yet, not hurt: the opening first - the wood and the four stone tools, the
+        // sword with them - and food from what comes in sight on the way (an animal close by is
+        // taken as a chance), no stock-up hunt across the country with a full stomach. At the
+        // start of a bench it took two to four minutes (a cow hunt 300 blocks off through a lake,
+        // seed 4416..., the axe and the shovel after it at minute seven and nine). After the
+        // tools a dear stock (a search, not an animal in sight) waits like an investment while
+        // the board has quick tiles, until the evening or two tiles (see investLater) - the
+        // hunger comes first anyway. (fastopen=0: the stock as soon as it pays, as before.)
+        if (bot.params.on("fastopen") && !hurt && level >= 14) {
+            boolean tools = true;
+            for (var tool : OPENING) if (ObtainPlanner.countAny(bot.body(), tool) == 0) tools = false;
+            if (!tools) return false;
+            if (cost > FOOD_NEAR && investLater(bot, cost, "food")) return false;
+        }
         // (On hard twice that: there no heart comes back below eighteen shanks, and a bare pack
         // was how most deaths began - seed 77: one failed search for apples at minute two, then
         // nothing for seventeen minutes, a night in a hole at nine hp that healed nothing.)
@@ -1961,6 +2020,21 @@ public final class LockoutBrain implements BotBrain {
             return Double.MAX_VALUE;
         }
     }
+    /**
+     * The decider behind what the bot is doing now, for the stopwatch (see OpeningClock): "side"
+     * for a chance taken on the way, "quick" for a tile taken before anything else, else the
+     * decider of the errand under way ("food", "opening", "kit", "invest", "goal"...); "other"
+     * for something no decider set going, "-" for nothing at all.
+     */
+    public String doing(Bot bot) {
+        if (sideTask != null && bot.tasks().contains(sideTask)) return "side";
+        if (running != null && runningKey != null && bot.tasks().contains(running)) {
+            String decider = runningKey.substring(0, Math.max(0, runningKey.indexOf(':')));
+            return decider.equals("goal") && goalQuick ? "quick" : decider.isEmpty() ? runningKey : decider;
+        }
+        return bot.tasks().isEmpty() ? "-" : "other";
+    }
+
     /** Whatever the brain set going last (a goal, food, the opening), and its time allowance. */
     private BotTask running;
     private long runningSince, runningBudget;
@@ -2141,9 +2215,13 @@ public final class LockoutBrain implements BotBrain {
             drop(bot);
             return;
         }
-        // In the middle of a long goal (digging for diamonds) the pickaxe wears out too: a spare
-        // made before it breaks, without dropping the goal.
-        if (checkTicks % 200 == 0 && goalTask != null && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask) && pickaxeAlmostGone(bot)) {
+        // In the middle of a long goal (digging for diamonds) or errand (the shield's iron eighty
+        // levels down) the pickaxe wears out too: a spare made before it breaks, without dropping
+        // what is under way. (Not while the spare itself is being made. The errands had no such
+        // check: a staircase was dug on by hand on seed -987....)
+        if (checkTicks % 200 == 0 && (goalTask != null || running != null)
+                && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask o && o.items().stream().anyMatch(PICKAXES::contains))
+                && pickaxeAlmostGone(bot)) {
             bot.say("the pickaxe is about to break: a spare one first");
             bot.interject(new net.kasax.challengecraft.bot.task.ObtainTask(GOOD_PICKAXES, ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) + 1, planner));
         }

@@ -56,3 +56,6 @@ replay_*.log
 # Bob training runs (scripts/train): worlds, journals, models
 runs/
 __pycache__/
+
+# self-play and bench servers (scripts/bot/league.py, opening.py)
+run-*/
