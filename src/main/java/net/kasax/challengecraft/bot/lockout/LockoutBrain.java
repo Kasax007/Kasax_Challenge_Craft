@@ -334,7 +334,8 @@ public final class LockoutBrain implements BotBrain {
         // hand, and only while it comes cheap.
         stepKey = "armour";
         // (copper=0: none of it - self-play comparisons; it cost three minutes a game in league 3.)
-        if (hard && bot.params.on("copper") && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < 4
+        // (smeltgo: a piece at a time, the next one's ingots fetched from the furnace - two more rounds.)
+        if (hard && bot.params.on("copper") && has(bot.body(), Set.of(net.minecraft.world.item.Items.SHIELD)) && armourTries < (bot.params.on("smeltgo") ? 6 : 4)
                 && bot.body().level().getGameTime() >= armourRetryAt && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
             List<net.minecraft.world.item.Item> missing = new ArrayList<>();
             for (var piece : COPPER_SET.keySet()) if (armourSlotFree(bot.body(), piece)) missing.add(piece);
@@ -356,7 +357,15 @@ public final class LockoutBrain implements BotBrain {
                     if (est <= COPPER_ARMOUR_MAX && !investLater(bot, est, "copper armour")) {
                         armourTries++;
                         bot.say("armour on hard: copper for " + Math.min(2, missing.size()) + " pieces (" + ingots + " ingots, ~" + Math.round(est) + " s)");
-                        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), want, planner),
+                        // (smeltgo: the copper of both pieces mined and put in the furnace, the first
+                        // piece's ingots waited for, the second's left cooking while it goes on -
+                        // thirteen ingots stood for were ninety seconds at the furnace on seed 2116....)
+                        int now = want;
+                        if (bot.params.on("smeltgo") && missing.size() > 1) {
+                            now = want - COPPER_SET.get(missing.get(1));
+                            planner.boardDemand.merge(net.minecraft.world.item.Items.RAW_COPPER, want - now, Integer::sum);
+                        }
+                        start(bot, new net.kasax.challengecraft.bot.task.ObtainTask(Set.of(net.minecraft.world.item.Items.COPPER_INGOT), now, planner),
                                 budget(est, 1200, 6000));
                         if (!startRefused) return;
                         startRefused = false;
@@ -2358,6 +2367,9 @@ public final class LockoutBrain implements BotBrain {
             bot.interject(sideTask);
             return;
         }
+        // Its furnace left cooking (smeltgo), something done in it, a few steps off: taken out in
+        // passing (and the furnace back along once it is empty) - not left behind for good.
+        if (furnaceReady(bot)) return;
         // A treasure map from a shipwreck: the X is worth a detour when it is not too far.
         net.kasax.challengecraft.bot.task.TreasureTask treasure = net.kasax.challengecraft.bot.task.TreasureTask.of(bot.body());
         if (treasure != null && !treasureTried.contains(treasure.column())
@@ -2444,6 +2456,33 @@ public final class LockoutBrain implements BotBrain {
         }
     }
 
+    private long furnaceChanceAt;
+
+    /** One of its furnaces left cooking within a dozen blocks has something done in it: picked up as a side errand. */
+    private boolean furnaceReady(Bot bot) {
+        if (!bot.params.on("smeltgo") || bot.furnaces.size() == 0) return false;
+        long now = bot.body().level().getGameTime();
+        if (now < furnaceChanceAt) return false;
+        furnaceChanceAt = now + 200;
+        var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
+        for (net.minecraft.core.BlockPos p : bot.furnaces.readyNear(level, bot.body().blockPosition(), 12)) {
+            if (!(level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity f)) continue;
+            var out = f.getItem(2);
+            // (Only when the cooking is done, or a good lot is: not a walk over for every ingot.)
+            if (!f.getItem(0).isEmpty() && out.getCount() < 4) continue;
+            sideTask = new net.kasax.challengecraft.bot.task.FurnaceCollectTask(p, Set.of(out.getItem()),
+                    ObtainPlanner.countAny(bot.body(), Set.of(out.getItem())) + out.getCount());
+            sideId = null;
+            sideWant = null;
+            sideStarted = now;
+            sideBudget = 400;
+            bot.say("on the way: the " + ObtainPlanner.name(out.getItem()) + " from my furnace at " + p.toShortString());
+            bot.interject(sideTask);
+            return true;
+        }
+        return false;
+    }
+
     private static final Set<net.minecraft.world.entity.EntityType<?>> FOOD_ANIMALS = Set.of(net.minecraft.world.entity.EntityTypes.COW,
             net.minecraft.world.entity.EntityTypes.PIG, net.minecraft.world.entity.EntityTypes.SHEEP, net.minecraft.world.entity.EntityTypes.CHICKEN,
             net.minecraft.world.entity.EntityTypes.MOOSHROOM);
@@ -2460,15 +2499,19 @@ public final class LockoutBrain implements BotBrain {
         if (points >= 16) return false;
         if (!me.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, me.getBoundingBox().inflate(16),
                 m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && m.getTarget() == me).isEmpty()) return false;
+        // (Next to nothing to eat in the pack: as far as a player would run for it - a cow in the
+        // open twenty blocks off is a few seconds' sprint, and saves the hunt across the country
+        // the stock of food would be later; foodsight.)
+        int reach = bot.params.on("foodsight") && points < 8 ? 24 : 12;
         net.minecraft.world.entity.animal.Animal prey = null;
-        for (var a : me.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, me.getBoundingBox().inflate(12, 3, 12),
+        for (var a : me.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, me.getBoundingBox().inflate(reach, 3, reach),
                 a -> a.isAlive() && !a.isBaby() && FOOD_ANIMALS.contains(a.getType()) && me.hasLineOfSight(a))) {
             if (prey == null || a.distanceToSqr(me) < prey.distanceToSqr(me)) prey = a;
         }
         if (prey == null) return false;
         foodChanceAt = now + 600;
         sideTask = new net.kasax.challengecraft.bot.task.KillTask(Set.of(prey.getType()), RAW_MEAT,
-                ObtainPlanner.countAny(me, RAW_MEAT) + 1, 1).nearby(14);
+                ObtainPlanner.countAny(me, RAW_MEAT) + 1, 1).nearby(reach + 2);
         sideId = null;
         sideWant = null;
         sideStarted = now;

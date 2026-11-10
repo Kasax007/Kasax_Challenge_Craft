@@ -23,13 +23,33 @@ public final class SmeltTask extends StationTask {
 
     private final BotKnowledge.SmeltRoute route;
     private final int count;
-    private int target = -1, waited, breakTicks;
+    /** Of {@link #count}, what is wanted now; the rest is for later (the board's other iron tiles). */
+    private final int needNow;
+    private int target = -1, targetNow, waited, breakTicks;
     private boolean loaded, takingBack, tookBack;
 
     public SmeltTask(BotKnowledge.SmeltRoute route, int count) {
+        this(route, count, count);
+    }
+
+    /**
+     * {@code count} to smelt, of them {@code needNow} wanted now: with {@code smeltgo} it goes on
+     * once those are out, the rest left cooking (see {@link net.kasax.challengecraft.bot.FurnaceLedger}).
+     */
+    public SmeltTask(BotKnowledge.SmeltRoute route, int count, int needNow) {
         super(Blocks.FURNACE, Items.FURNACE);
         this.route = route;
         this.count = count;
+        this.needNow = Math.max(1, Math.min(needNow, count));
+    }
+
+    /** A furnace with something else cooking in it (one of its own left so, say): not this one. */
+    @Override
+    protected boolean usable(ServerLevel level, net.minecraft.core.BlockPos pos) {
+        if (!(level.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity f)) return true;
+        // (What is in its output is taken out first, whatever it is; what still cooks stays.)
+        ItemStack in = f.getItem(IN);
+        return in.isEmpty() || route.input().test(in);
     }
 
     @Override
@@ -44,7 +64,12 @@ public final class SmeltTask extends StationTask {
         ServerLevel level = (ServerLevel) body.level();
         if (takingBack) return takeBack(bot, level);
         if (!(level.getBlockEntity(station) instanceof AbstractFurnaceBlockEntity furnace)) return Result.FAILED;
-        if (target < 0) target = ObtainPlanner.countAny(body, java.util.Set.of(route.result())) + count;
+        if (leaving) return finish(bot, furnace);
+        if (target < 0) {
+            int have = ObtainPlanner.countAny(body, java.util.Set.of(route.result()));
+            target = have + count;
+            targetNow = have + needNow;
+        }
 
         takeOutput(body, furnace);
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
@@ -62,6 +87,10 @@ public final class SmeltTask extends StationTask {
         // ores in a minute, one in three (eight cobblestone each, there are always some about).
         Result side = spread(bot, level, furnace);
         if (side != null) return side;
+        // The raw meat in the pack cooked beside it, in a furnace of its own (cookalong).
+        side = cookAlong(bot, level);
+        if (side != null) return side;
+        if (foodFurnace != null && level.getBlockEntity(foodFurnace) instanceof AbstractFurnaceBlockEntity ff) takeOutput(body, ff);
         List<AbstractFurnaceBlockEntity> all = new java.util.ArrayList<>();
         all.add(furnace);
         for (var e : extras) if (level.getBlockEntity(e) instanceof AbstractFurnaceBlockEntity f) all.add(f);
@@ -90,6 +119,10 @@ public final class SmeltTask extends StationTask {
             }
         }
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
+        // What is wanted now is out, the rest only for later: it goes on, the furnaces cooking on
+        // (smeltgo). A player puts the twelve ore in for the board's tiles and walks off with
+        // the one ingot the shield wants - he does not stand there for two minutes.
+        if (leaveEarly(bot) && ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= targetNow) return leave(bot, level, all);
         // Not stood beside it while it cooks: the kit's stone or wood from within a few blocks
         // (a player puts the meat in and mines the wall beside it), back for what is done.
         int left = 0;
@@ -141,8 +174,20 @@ public final class SmeltTask extends StationTask {
      * One with input still in it stays where it is.
      */
     private Result finish(Bot bot, AbstractFurnaceBlockEntity furnace) {
-        // The extra furnaces first, back into the pack (each one empty by now).
         var level = (ServerLevel) bot.body().level();
+        // The food cooking beside it: what is done taken; still cooking, it stays on the list of
+        // furnaces left (come back for, counted by the planner); done, back into the pack.
+        if (foodFurnace != null) {
+            if (level.getBlockEntity(foodFurnace) instanceof AbstractFurnaceBlockEntity ff) {
+                takeOutput(bot.body(), ff);
+                if (ff.getItem(IN).isEmpty()) {
+                    bot.furnaces.remove(level, foodFurnace);
+                    extras.add(foodFurnace);
+                } else bot.furnaces.add(level, foodFurnace);
+            }
+            foodFurnace = null;
+        }
+        // The extra furnaces first, back into the pack (each one empty by now).
         while (!extras.isEmpty()) {
             var e = extras.get(0);
             if (!level.getBlockState(e).is(Blocks.FURNACE) || !bot.actions().inReach(e) || extraBreak > 200) {
@@ -174,6 +219,34 @@ public final class SmeltTask extends StationTask {
         tookBack = true;
         bot.interject(new CollectDropsTask(station, 2, 100));
         return Result.RUNNING;
+    }
+
+    /** Whether it goes on before all is smelted (smeltgo): something is for later, and the knob is on. */
+    private boolean leaveEarly(Bot bot) {
+        return needNow < count && bot.params.on("smeltgo");
+    }
+
+    /**
+     * Goes on with what is wanted now, the furnaces left cooking the rest: on the bot's list of
+     * them (the planner counts what is in them, the brain comes back for it); an empty one of its
+     * own taken back along as always.
+     */
+    private boolean leaving;
+
+    private Result leave(Bot bot, ServerLevel level, List<AbstractFurnaceBlockEntity> all) {
+        leaving = true;
+        int cooking = 0;
+        for (var f : all) {
+            takeOutput(bot.body(), f);
+            if (!f.getItem(IN).isEmpty()) {
+                bot.furnaces.add(level, f.getBlockPos());
+                cooking += f.getItem(IN).getCount();
+            }
+        }
+        // (An extra one already empty goes back into the pack; one still cooking stays.)
+        extras.removeIf(e -> level.getBlockEntity(e) instanceof AbstractFurnaceBlockEntity f && !f.getItem(IN).isEmpty());
+        bot.say("on with it: " + cooking + " more " + ObtainPlanner.name(route.result()) + " cooking for later at " + station.toShortString());
+        return finish(bot, (AbstractFurnaceBlockEntity) level.getBlockEntity(station));
     }
 
     /** Ticks a furnace takes for one item. */
@@ -243,6 +316,74 @@ public final class SmeltTask extends StationTask {
         return null;
     }
 
+    /** The furnace the raw meat cooks in beside the batch (cookalong), while it is beside it. */
+    private net.minecraft.core.BlockPos foodFurnace;
+    private boolean cookTried, fetchingFoodFurnace;
+
+    /** Raw food a furnace makes good food of (raw chicken too: cooked it is no gamble). */
+    private static final java.util.Set<net.minecraft.world.item.Item> RAW_FOOD = java.util.Set.of(Items.BEEF, Items.PORKCHOP, Items.MUTTON,
+            Items.CHICKEN, Items.RABBIT, Items.COD, Items.SALMON, Items.POTATO);
+
+    /**
+     * The raw meat in the pack cooked along with the batch, in a furnace of its own beside it
+     * ({@code cookalong}, with {@code smeltgo}): a player puts the steak in next to the ore - no
+     * second stop at a furnace for the food, and none of it eaten raw. Only while the pack keeps
+     * a meal without it, or the batch takes as long as the meat. Returns a result while busy
+     * with that (a furnace being made), else null.
+     */
+    private Result cookAlong(Bot bot, ServerLevel level) {
+        if (cookTried || !bot.params.on("cookalong") || !bot.params.on("smeltgo") || RAW_FOOD.stream().anyMatch(i -> route.input().test(new ItemStack(i)))) return null;
+        BotPlayer body = bot.body();
+        ItemStack raw = null;
+        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
+            if (!st.isEmpty() && RAW_FOOD.contains(st.getItem()) && (raw == null || st.getCount() > raw.getCount())) raw = st;
+        }
+        if (raw == null) {
+            cookTried = true;
+            return null;
+        }
+        var food = raw.get(net.minecraft.core.component.DataComponents.FOOD);
+        int rawPoints = food == null ? 0 : food.nutrition() * raw.getCount();
+        int batchTicks = Math.min(needNow, count) * COOK_TICKS / (1 + extras.size());
+        boolean spare = EatTask.foodPoints(body) - rawPoints >= 8 || batchTicks >= raw.getCount() * COOK_TICKS / 2;
+        if (!spare) {
+            cookTried = true;
+            return null;
+        }
+        if (body.getInventory().countItem(Items.FURNACE) == 0) {
+            int stone = ObtainPlanner.countAny(body, java.util.Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.BLACKSTONE));
+            if (stone < 8 || fetchingFoodFurnace) {
+                cookTried = true;
+                return null;
+            }
+            fetchingFoodFurnace = true;
+            bot.interject(new ObtainTask(java.util.Set.of(Items.FURNACE), 1, new ObtainPlanner(), true));
+            return Result.RUNNING;
+        }
+        cookTried = true;
+        net.minecraft.core.BlockPos at = bot.actions().placeNearby(Items.FURNACE);
+        if (at == null || !(level.getBlockEntity(at) instanceof AbstractFurnaceBlockEntity f)) return null;
+        int n = raw.getCount();
+        f.setItem(IN, raw.copyWithCount(n));
+        raw.shrink(n);
+        // (Fuel: what is least use otherwise, never the meat nor what the batch smelts.)
+        ItemStack best = null;
+        for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
+            if (st.isEmpty() || RAW_FOOD.contains(st.getItem()) || route.input().test(st) || st.is(route.result()) || BotKnowledge.fuelValue(st) <= 0) continue;
+            if (best == null || rank(st) < rank(best)) best = st;
+        }
+        if (best != null) {
+            int units = (int) Math.min(best.getCount(), Math.ceil(n / BotKnowledge.fuelValue(best)));
+            f.setItem(FUEL, best.copyWithCount(units));
+            best.shrink(units);
+        }
+        f.setChanged();
+        foodFurnace = at;
+        bot.furnaces.add(level, at);
+        bot.say("cooking " + n + " " + ObtainPlanner.name(f.getItem(IN).getItem()) + " beside it");
+        return Result.RUNNING;
+    }
+
     private final java.util.List<net.minecraft.core.BlockPos> extras = new java.util.ArrayList<>();
     private int extraTries, extraBreak, extraFuelCheck;
     private boolean fetchingFurnace;
@@ -271,7 +412,10 @@ public final class SmeltTask extends StationTask {
             if (!st.isEmpty() && !route.input().test(st) && !st.is(route.result()) && BotKnowledge.fuelValue(st) > 0) smelts += BotKnowledge.fuelValue(st) * st.getCount();
         }
         int pieces = per <= 0 ? 0 : (int) (smelts / per);
-        int want = Math.min(Math.min(2, count / 6), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
+        // (Going on once what is wanted now is out - smeltgo: furnaces for that part only; the
+        // rest cooks while it is away.)
+        int batch = leaveEarly(bot) ? needNow : count;
+        int want = Math.min(Math.min(2, batch / 6), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
         if (extras.size() >= want || waiting < 6 || extraTries > 3) return null;
         if (body.getInventory().countItem(Items.FURNACE) == 0) {
             // (Eight cobblestone and a table: a few seconds. Without the stone, one furnace it is.)

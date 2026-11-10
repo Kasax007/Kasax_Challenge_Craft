@@ -50,7 +50,14 @@ abstract class StationTask implements BotTask {
         ServerLevel level = (ServerLevel) bot.body().level();
         if (station != null && !level.getBlockState(station).is(block)) station = null;
         if (station == null) {
-            station = BotWorld.nearest(level, bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, bot.unreachableStations);
+            // (Not one busy with something else: a furnace of its own left cooking other things.)
+            Set<BlockPos> busy = new HashSet<>(bot.unreachableStations);
+            for (int i = 0; i < 4; i++) {
+                station = BotWorld.nearest(level, bot.body().blockPosition(), StationTaskRange.RANGE, 8, s -> s.is(block), false, busy);
+                if (station == null || usable(level, station)) break;
+                busy.add(station);
+                station = null;
+            }
             walking = false;
             if (station == null) {
                 if (BotInventory.slotOf(bot.body(), item) < 0) {
@@ -145,6 +152,11 @@ abstract class StationTask implements BotTask {
             return p;
         }
         return null;
+    }
+
+    /** Whether a station found about may be used for this (a furnace with other things in it may not). */
+    protected boolean usable(ServerLevel level, BlockPos pos) {
+        return true;
     }
 
     /** Called every tick once the station is in reach. */

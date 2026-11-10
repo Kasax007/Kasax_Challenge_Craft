@@ -389,6 +389,22 @@ public final class BotKnowledge {
      * The height to dig to for a block found underground (the most common height of an ore),
      * or null for blocks the bot looks for on the surface.
      */
+    /** The height above which a mountain's own rock holds iron enough to tunnel for it there (see {@link #depth(Block, int, boolean)}). */
+    public static final int MOUNTAIN_IRON = 110;
+
+    /**
+     * As {@link #depth(Block, int)}, and with {@code mountains} (the knob {@code mountainiron}):
+     * standing on a mountain (at {@link #MOUNTAIN_IRON} or higher), iron is tunnelled for a few
+     * blocks under the feet, in the mountain itself - the ore's upper band (from 80 up, the most
+     * at 232) puts as much of it there as at 16, and the staircase down a hundred levels (four
+     * minutes and more, seed -2332... in league 9) is saved.
+     */
+    public static Integer depth(Block block, int surfaceY, boolean mountains) {
+        if (mountains && surfaceY >= MOUNTAIN_IRON && (block == net.minecraft.world.level.block.Blocks.IRON_ORE
+                || block == net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE)) return surfaceY - 4;
+        return depth(block, surfaceY);
+    }
+
     public static Integer depth(Block block, int surfaceY) {
         String id = BuiltInRegistries.BLOCK.getKey(block).getPath();
         return switch (id) {
