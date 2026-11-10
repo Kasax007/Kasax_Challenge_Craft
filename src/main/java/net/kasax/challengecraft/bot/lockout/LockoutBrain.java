@@ -410,7 +410,15 @@ public final class LockoutBrain implements BotBrain {
         }
         // By the plan: the effort, less what a tile is worth beyond itself (see LockoutStrategist).
         choices.sort(Comparator.comparingDouble(c -> c.option().cost() - strategist.bonus(c.tile().goal().id())));
-        Choice pick = searching(bot) ? lookAhead(bot, choices) : null;
+        Choice pick = null;
+        if (searching(bot)) {
+            List<Integer> tiles = new ArrayList<>();
+            for (Choice c : choices) tiles.add(c.tile().index());
+            BoardSearch.Pick p = boardSearch.pick(bot, tiles);
+            // (The look-ahead works on a thread of its own: Bob stands a tick or two for its answer.)
+            if (p == BoardSearch.THINKING) return;
+            pick = lookAhead(bot, p, choices);
+        }
         if (pick == null) pick = difficulty == Difficulty.EASY ? choices.get(0) : route(bot, choices);
         if (difficulty.mistakes > 0 && choices.size() > 1 && bot.body().getRandom().nextDouble() < difficulty.mistakes) {
             pick = choices.get(1 + bot.body().getRandom().nextInt(Math.min(3, choices.size() - 1)));
@@ -1879,12 +1887,9 @@ public final class LockoutBrain implements BotBrain {
      * The look-ahead's pick among the choices (see {@link BoardSearch}), believed to take what the
      * simulator's figures say if that is more than Bob's own estimate (it sets the time allowance:
      * a skeleton hunt planned at half a minute was given up before the skeleton was found). Null
-     * when the look-ahead cannot decide: then the route does.
+     * when the look-ahead could not decide: then the route does.
      */
-    private Choice lookAhead(Bot bot, List<Choice> choices) {
-        List<Integer> tiles = new ArrayList<>();
-        for (Choice c : choices) tiles.add(c.tile().index());
-        BoardSearch.Pick p = boardSearch.pick(bot, tiles);
+    private Choice lookAhead(Bot bot, BoardSearch.Pick p, List<Choice> choices) {
         if (p == null) return null;
         for (Choice c : choices) {
             if (c.tile().index() != p.tile()) continue;

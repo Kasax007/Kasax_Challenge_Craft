@@ -28,29 +28,6 @@ public final class OpponentModel {
         return CACHE.computeIfAbsent(p.name + "|" + p.hashKey(), k -> learn(p));
     }
 
-    /** The model if it is learnt already; else null, and it is learnt in the background (a daemon thread). */
-    public static OpponentModel ifReady(Profile p) {
-        String key = p.name + "|" + p.hashKey();
-        synchronized (OpponentModel.class) {
-            OpponentModel m = CACHE.get(key);
-            if (m != null || LEARNING.contains(key)) return m;
-            LEARNING.add(key);
-        }
-        Thread t = new Thread(() -> {
-            OpponentModel m = learn(p);
-            synchronized (OpponentModel.class) {
-                CACHE.put(key, m);
-                LEARNING.remove(key);
-            }
-        }, "Bob opponent model");
-        t.setDaemon(true);
-        t.setPriority(Thread.MIN_PRIORITY);
-        t.start();
-        return null;
-    }
-
-    private static final java.util.Set<String> LEARNING = new java.util.HashSet<>();
-
     private static OpponentModel learn(Profile prof) {
         OpponentModel m = new OpponentModel();
         int[] n = new int[MINUTES];

@@ -24,11 +24,16 @@ import java.util.List;
 public final class SearchPolicy implements Policy {
     /**
      * First tiles looked at; games each in the first round; rounds of halving (8, 5, 3: about 120
-     * games played ahead per decision, some 6 ms; 6, 4, 3 was 0.15 tiles a game worse).
+     * games played ahead per decision, some 3 ms; 6, 4, 3 was 0.15 tiles a game worse).
      */
     public int candidates = 8, firstRound = 5, rounds = 3;
-    /** Game seconds played ahead in each game (at most to the end). */
-    public double horizon = 2400;
+    /**
+     * Game seconds played ahead in each game (at most to the end). A quarter of an hour: the games
+     * played ahead use a plain cheapest-first brain, and further out they say more about its
+     * habits than about the choice. 2000 games (90 minutes, Bob's pace, against today's brain):
+     * 600 s +1.76 tiles a game, 900 s +1.84, 1200 s +1.58, 2400 s +1.24, 3600 s +1.16.
+     */
+    public double horizon = 900;
     /** Only what a player could know of the opponent (tiles, advancements, time); false: its true state. */
     public boolean observe = true;
     /** The opponent is believed to choose by the true averages (a strong player) rather than by Bob's figures. */
@@ -41,18 +46,26 @@ public final class SearchPolicy implements Policy {
      */
     public double modelError;
     private Profile[] believed;
-    /** Wall-clock milliseconds a decision may take before the halving stops early (0: no limit). */
-    public double budgetMillis;
     /** The opponent plays ahead with Bob's present brain (strategist and route) rather than cheapest-first. */
     public boolean greedyOpponent;
     /** It plays ahead itself with the route (true figures) rather than cheapest-first. */
     public boolean rolloutRoute;
     /** The tiles it may set out for now (bit per tile; Bob's own choices in a real game): the rest only later in the look-ahead. */
     public long allowed = -1L;
-    /** Learn the opponent model in the background (a real game: no hitch); until then the plain picture of the opponent. */
-    public boolean asyncModel;
     /** Nobody to play against (a game alone): the other player stands still in the look-ahead. */
     public boolean solo;
+    /**
+     * Varies the luck of the games played ahead from one decision to the next where a fresh
+     * instance makes each decision (the real game: the decision's number).
+     */
+    public long salt;
+    /**
+     * Games played ahead so far in the decision under way (or the last one): the look-ahead's work.
+     * Read from another thread (the real game counts it against the game's ticks in self-play).
+     */
+    public volatile int progress;
+    /** Set from another thread when the answer is no longer wanted: the decision stops and returns null. */
+    public volatile boolean cancelled;
 
     /** The other player of a game alone: never goes for a tile. */
     private static final Policy IDLE = new Policy() {
@@ -84,7 +97,7 @@ public final class SearchPolicy implements Policy {
     }
 
     @Override
-    public Policy fresh() {
+    public SearchPolicy fresh() {
         SearchPolicy s = new SearchPolicy();
         s.candidates = candidates;
         s.firstRound = firstRound;
@@ -94,11 +107,10 @@ public final class SearchPolicy implements Policy {
         s.opponentTrue = opponentTrue;
         s.winBonus = winBonus;
         s.modelError = modelError;
-        s.budgetMillis = budgetMillis;
         s.greedyOpponent = greedyOpponent;
         s.rolloutRoute = rolloutRoute;
-        s.asyncModel = asyncModel;
         s.solo = solo;
+        s.allowed = allowed;
         return s;
     }
 
@@ -134,6 +146,7 @@ public final class SearchPolicy implements Policy {
     }
 
     private Decision decide(Sim sim, int me) {
+        progress = 0;
         PlayerState p = sim.players[me];
         Profile[] belief = believed(sim);
         Profile own = belief[me];
@@ -168,15 +181,15 @@ public final class SearchPolicy implements Policy {
         List<Integer> alive = new ArrayList<>();
         for (int i = 0; i < n; i++) alive.add(i);
         double until = Math.min(sim.length, sim.now + horizon);
-        OpponentModel model = !observe ? null : asyncModel ? OpponentModel.ifReady(sim.profiles[1 - me]) : OpponentModel.of(sim.profiles[1 - me]);
+        OpponentModel model = observe ? OpponentModel.of(sim.profiles[1 - me]) : null;
         PlayerState plain = observe ? observed(sim, 1 - me) : null;
         int sure = observe ? plain.ms : 0;
         int per = firstRound, game = 0;
-        long base = sim.world.seed * 31 + me * 7919L + (decisions++) * 104729L;
-        long started = System.nanoTime();
+        long base = sim.world.seed * 31 + me * 7919L + (salt + decisions++) * 104729L;
+        // (The work is a count of games, never a time: the same decision however fast the machine.)
         for (int round = 0; round < rounds && alive.size() > 1; round++) {
-            if (round > 0 && budgetMillis > 0 && (System.nanoTime() - started) / 1e6 > budgetMillis) break;
             for (int g = 0; g < per; g++, game++) {
+                if (cancelled) return null;
                 long seed = mix(base + game);
                 World w = sim.world.guessed(p.known, seed);
                 for (int i : alive) {
@@ -190,11 +203,13 @@ public final class SearchPolicy implements Policy {
                     if (!f.startGoal(me, tiles[i], cost[tiles[i]], false)) {
                         sum[i] -= 1;
                         cnt[i]++;
+                        progress++;
                         continue;
                     }
                     f.runUntil(until);
                     sum[i] += value(f, me);
                     cnt[i]++;
+                    progress++;
                 }
             }
             alive.sort((a, b) -> Double.compare(sum[b] / Math.max(1, cnt[b]), sum[a] / Math.max(1, cnt[a])));

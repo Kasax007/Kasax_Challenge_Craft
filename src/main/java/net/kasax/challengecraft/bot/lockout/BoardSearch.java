@@ -2,10 +2,12 @@ package net.kasax.challengecraft.bot.lockout;
 
 import net.kasax.challengecraft.bot.Bot;
 import net.kasax.challengecraft.bot.BotManager;
+import net.kasax.challengecraft.bot.BotNavigator;
 import net.kasax.challengecraft.bot.lockout.sim.Board;
 import net.kasax.challengecraft.bot.lockout.sim.Decision;
 import net.kasax.challengecraft.bot.lockout.sim.GoalBook;
 import net.kasax.challengecraft.bot.lockout.sim.Ms;
+import net.kasax.challengecraft.bot.lockout.sim.OpponentModel;
 import net.kasax.challengecraft.bot.lockout.sim.Place;
 import net.kasax.challengecraft.bot.lockout.sim.PlayerState;
 import net.kasax.challengecraft.bot.lockout.sim.Profile;
@@ -32,6 +34,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * The look-ahead board brain in the real game (the {@code search} knob): the game as it stands is
@@ -41,21 +48,61 @@ import java.util.Map;
  * tile takes (the simulator's calibrated figures, not Bob's own, which are four to nine times too
  * low for monsters) also sets the tile's time allowance.
  *
- * <p>Cheap enough to run on the server thread: a few milliseconds per decision, at most
- * {@link #BUDGET_MILLIS} of wall clock (in the self-play simulation mode the same work whatever the
- * clock says, so a league plays the same at any speed). Anything going wrong falls back to the
- * route of the old brain (null).
+ * <p>The picture is taken on the server thread (it reads the world); the games played ahead run
+ * on a worker thread of their own (the simulator touches nothing of Minecraft), and Bob waits the
+ * few ticks until the answer is there ({@link #THINKING}). The work is a fixed count of games, never
+ * a time. In self-play at the machine's pace ({@link BotNavigator#SIM}) the answer counts only
+ * after the game ticks its games take at the real pace ({@link #SIM_GAMES_PER_TICK}), so a league
+ * plays the same at any speed. Anything going wrong falls back to the route of the old brain (null).
  */
 final class BoardSearch {
-    /** Wall-clock milliseconds a decision may take (outside the simulation mode). */
-    static final double BUDGET_MILLIS = 40;
+    /**
+     * Games played ahead per game tick at the real pace, for self-play: a decision of 120 to 160
+     * games is answered two or three ticks after it was asked (the worker does it in a few ms).
+     */
+    static final int SIM_GAMES_PER_TICK = 60;
+    /** An answer asked for this many game ticks ago or more is for a situation gone by: asked anew. */
+    static final long STALE_TICKS = 100;
+    /** The longest wait for an answer in a normal game (game ticks, a very busy machine): then the route decides. */
+    static final long MAX_WAIT_TICKS = 100;
+    /**
+     * A watchdog, not a budget: a self-play wait this long (wall clock) means the worker hangs (a
+     * fault in the simulator) - the look-ahead is then off for good and the route decides, rather
+     * than the game standing still. A decision takes milliseconds.
+     */
+    static final long HANG_NANOS = 30_000_000_000L;
 
-    private final SearchPolicy policy = new SearchPolicy();
-    private int decisions;
+    /** Not decided yet: the look-ahead is at work, Bob asks again next tick. */
+    static final Pick THINKING = new Pick(-1, 0, "thinking");
+
+    /** Set when the worker hangs (see {@link #HANG_NANOS}): no more look-ahead on this server. */
+    private static volatile boolean workerHung;
+
+    /** One worker for all Bobs of the server, a little below the server thread's priority. */
+    private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "bob-board-search");
+        t.setDaemon(true);
+        t.setPriority(Thread.NORM_PRIORITY - 1);
+        return t;
+    });
+
+    /** The settings every decision starts from (a fresh copy per decision: a worker never shares one). */
+    private final SearchPolicy template = new SearchPolicy();
+    /** The question under way, if any. */
+    private Job job;
+    private int decisions, asked;
+
+    /** A question to the worker: its answer to come, the copy that works on it, the picture, when asked. */
+    private record Job(Future<Decision> answer, SearchPolicy policy, Sim sim, long askedAt) {
+    }
 
     BoardSearch() {
-        policy.asyncModel = !net.kasax.challengecraft.bot.BotNavigator.SIM;
-        policy.budgetMillis = net.kasax.challengecraft.bot.BotNavigator.SIM ? 0 : BUDGET_MILLIS;
+        // (The opponent models learnt and the simulator warmed up on the worker before the first
+        // real question - the first answer is then as quick as the others.)
+        WORKER.submit(() -> {
+            OpponentModel.of(Profile.bob());
+            OpponentModel.of(Profile.expert());
+        });
     }
 
     /** What the search decided: the tile (board index), the seconds it believes it takes, a line for the log. */
@@ -63,28 +110,79 @@ final class BoardSearch {
     }
 
     /**
-     * The tile to go for among {@code choices} (board indices Bob knows a way to), or null to fall
-     * back to the old route.
+     * The tile to go for among {@code choices} (board indices Bob knows a way to); {@link #THINKING}
+     * while the answer is not there yet; null to fall back to the old route.
      */
     Pick pick(Bot bot, List<Integer> choices) {
+        if (workerHung) return null;
         try {
-            long t0 = System.nanoTime();
-            Sim sim = snapshot(bot);
-            if (sim == null) return null;
-            policy.solo = soloGame(bot);
-            long allowed = 0;
-            for (int t : choices) allowed |= 1L << t;
-            policy.allowed = allowed;
-            Decision d = policy.choose(sim, 0);
+            long now = bot.server().overworld().getGameTime();
+            if (job != null && now - job.askedAt() >= STALE_TICKS) drop();
+            if (job == null) return ask(bot, choices, now);
+            Job j = job;
+            long ticks = now - j.askedAt();
+            if (BotNavigator.SIM) {
+                // Self-play: the worker is waited for where it is behind the game's time (its games
+                // so far fewer than the ticks since the question allow), and the answer counts only
+                // after the ticks all its games take - the same tick however fast the machine.
+                long allowed = ticks * SIM_GAMES_PER_TICK, since = System.nanoTime();
+                while (!j.answer().isDone() && j.policy().progress < allowed) {
+                    LockSupport.parkNanos(20_000);
+                    if (System.nanoTime() - since > HANG_NANOS) return hung(bot, j);
+                }
+                if (!j.answer().isDone() || ticks < (j.policy().progress + SIM_GAMES_PER_TICK - 1) / SIM_GAMES_PER_TICK) return THINKING;
+            } else if (!j.answer().isDone()) {
+                if (ticks < MAX_WAIT_TICKS) return THINKING;
+                // (Not one game played ahead in five seconds: the worker is stuck, not just slow.)
+                if (j.policy().progress == 0) return hung(bot, j);
+                BotManager.LOG.warn("[Bot] {}: the look-ahead took over {} ticks, the route decides", bot.name, ticks);
+                drop();
+                return null;
+            }
+            job = null;
+            Decision d = j.answer().get();
             decisions++;
-            if (d == null || d.tile < 0 || (allowed & (1L << d.tile)) == 0) return null;
-            double ms = (System.nanoTime() - t0) / 1e6;
-            return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s; %s; %.0f ms)", d.tile >= 0 ? sim.board.goal[d.tile].id : "-",
-                    Math.round(d.estimate), d.why, ms));
-        } catch (RuntimeException e) {
+            if (d == null || d.tile < 0 || !choices.contains(d.tile)) return null;
+            return new Pick(d.tile, d.estimate, String.format("look-ahead: %s (~%d s; %s; %d games, %d ticks)", j.sim().board.goal[d.tile].id,
+                    Math.round(d.estimate), d.why, j.policy().progress, ticks));
+        } catch (RuntimeException | ExecutionException e) {
             BotManager.LOG.warn("[Bot] {}: look-ahead failed, the route decides ({})", bot.name, e.toString());
+            job = null;
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            job = null;
             return null;
         }
+    }
+
+    /** Puts the question: the picture of the game now, handed to the worker. */
+    private Pick ask(Bot bot, List<Integer> choices, long now) {
+        Sim sim = snapshot(bot);
+        if (sim == null) return null;
+        SearchPolicy policy = template.fresh();
+        policy.solo = soloGame(bot);
+        long allowed = 0;
+        for (int t : choices) allowed |= 1L << t;
+        policy.allowed = allowed;
+        policy.salt = asked++;
+        job = new Job(WORKER.submit(() -> policy.choose(sim, 0)), policy, sim, now);
+        return THINKING;
+    }
+
+    /** The worker hangs: the look-ahead off on this server from now on, the route decides. */
+    private Pick hung(Bot bot, Job j) {
+        BotManager.LOG.error("[Bot] {}: the look-ahead's worker hangs ({} games played ahead), the route decides from now on", bot.name,
+                j.policy().progress);
+        workerHung = true;
+        drop();
+        return null;
+    }
+
+    /** The question under way no longer wanted: the worker stops at its next game. */
+    private void drop() {
+        if (job != null) job.policy().cancelled = true;
+        job = null;
     }
 
     // ---- the game as the simulator sees it ----------------------------------------------------

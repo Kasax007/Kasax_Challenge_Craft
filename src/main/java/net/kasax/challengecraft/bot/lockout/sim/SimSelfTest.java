@@ -28,6 +28,7 @@ public final class SimSelfTest {
         gamesAreRepeatable();
         aClaimStopsTheOther();
         fastEnough();
+        searchWorkIsAFixedCount();
         searchBeatsTheGreedyBrain(args.length > 0 ? Integer.parseInt(args[0]) : 150);
         System.out.printf("SimSelfTest: %d checks passed in %.0f s%n", checks, (System.nanoTime() - t0) / 1e9);
     }
@@ -171,6 +172,39 @@ public final class SimSelfTest {
         double perMinute = games / ((System.nanoTime() - t0) / 1e9) * 60;
         System.out.printf("  %.0f games per minute (greedy against greedy, 90 minutes, one core)%n", perMinute);
         check(perMinute > 1000, "too slow: " + perMinute + " games per minute");
+    }
+
+    /**
+     * The look-ahead's work is a count of games, not a time (the real game counts it against the
+     * game's ticks in self-play): the same question gets the same answer after the same number of
+     * games, on any thread; a question no longer wanted stops (null).
+     */
+    static void searchWorkIsAFixedCount() throws Exception {
+        long seed = SearchPolicy.mix(4242);
+        Board board = PoolBoards.board(seed);
+        Profile p = Profile.bob();
+        Sim game = new Sim(World.sample(seed), board, p, p, new GreedyPolicy(), new GreedyPolicy(), 5400, seed);
+        game.runUntil(900);
+        check(!game.over, "the test game is over too soon");
+        SearchPolicy a = new SearchPolicy(), b = new SearchPolicy();
+        Decision da = a.choose(game.fork(game.world, null, null, 1), 0);
+        var worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            Sim copy = game.fork(game.world, null, null, 1);
+            Decision db = worker.submit(() -> b.choose(copy, 0)).get();
+            check(da != null && db != null && da.tile == db.tile && a.progress == b.progress && a.progress >= 100,
+                    "the same question answered differently (" + da + " after " + a.progress + " games, " + db + " after " + b.progress + ")");
+            SearchPolicy c = new SearchPolicy();
+            c.cancelled = true;
+            check(c.choose(game.fork(game.world, null, null, 1), 0) == null && c.progress == 0, "a cancelled question still worked");
+            // (Another salt: other luck in the games played ahead, the same amount of work.)
+            SearchPolicy d = new SearchPolicy();
+            d.salt = 7;
+            d.choose(game.fork(game.world, null, null, 1), 0);
+            check(d.progress == a.progress, "the work depends on the luck: " + d.progress + " vs " + a.progress);
+        } finally {
+            worker.shutdown();
+        }
     }
 
     /** The planner wins more than it loses against today's brain (Bob's pace, 90 minutes). */
