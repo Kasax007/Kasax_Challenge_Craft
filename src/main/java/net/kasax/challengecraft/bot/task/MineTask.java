@@ -202,13 +202,8 @@ public final class MineTask implements BotTask {
                 BlockState st = level.getBlockState(target);
                 if (!retooled) {
                     retooled = true;
-                    for (Item tool : List.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE)) {
-                        if (!new net.minecraft.world.item.ItemStack(tool).isCorrectToolForDrops(st)) continue;
-                        ObtainPlanner pl = new ObtainPlanner();
-                        if (pl.estimate(bot, Set.of(tool), 1) > 40) break;
-                        bot.say("the pickaxe is gone: a new " + ObtainPlanner.name(tool) + " right here");
+                    if (retool(bot, st)) {
                         target = null;
-                        bot.interject(new ObtainTask(Set.of(tool), 1, pl));
                         return Result.RUNNING;
                     }
                 }
@@ -303,6 +298,27 @@ public final class MineTask implements BotTask {
 
     private Boolean rock;
     private boolean rockStairs, retooled;
+    /** When a pickaxe was last made on the spot (game time): not again within half a minute. */
+    private long retooledAt = -100_000;
+
+    /**
+     * A new pickaxe for this block made right here (the stone and the sticks are in the pack), if
+     * that is cheap: returns whether it was set going.
+     */
+    private boolean retool(Bot bot, BlockState st) {
+        long now = bot.body().level().getGameTime();
+        if (now - retooledAt < 600) return false;
+        for (Item tool : List.of(net.minecraft.world.item.Items.STONE_PICKAXE, net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE)) {
+            if (!new net.minecraft.world.item.ItemStack(tool).isCorrectToolForDrops(st)) continue;
+            ObtainPlanner pl = new ObtainPlanner();
+            if (pl.estimate(bot, Set.of(tool), 1) > 40) return false;
+            retooledAt = now;
+            bot.say("the pickaxe is gone: a new " + ObtainPlanner.name(tool) + " right here");
+            bot.interject(new ObtainTask(Set.of(tool), 1, pl));
+            return true;
+        }
+        return false;
+    }
 
     /** Gathering rock or soil (cobblestone, deepslate, netherrack, dirt): found everywhere. */
     private boolean rock(ServerLevel level) {
@@ -891,6 +907,14 @@ public final class MineTask implements BotTask {
                 digTo = null;
                 heading = heading.getOpposite();
                 return Result.RUNNING;
+            }
+            // The pickaxe worn out on the way down (a staircase eighty levels deep wears out two):
+            // a new one made right here, never the rock dug on by hand - a level in half a minute,
+            // and nothing dropped (the shield's iron on seed -987..., minutes seven to ten).
+            if (s.requiresCorrectToolForDrops() && !bot.tools().canHarvest(s)) {
+                if (retool(bot, s)) return Result.RUNNING;
+                bot.say("no pickaxe left for the rock: no digging on by hand");
+                return Result.FAILED;
             }
             bot.actions().breakTick(b);
             if (++stepTicks > 600) {

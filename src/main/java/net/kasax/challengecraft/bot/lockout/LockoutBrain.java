@@ -2170,9 +2170,13 @@ public final class LockoutBrain implements BotBrain {
             drop(bot);
             return;
         }
-        // In the middle of a long goal (digging for diamonds) the pickaxe wears out too: a spare
-        // made before it breaks, without dropping the goal.
-        if (checkTicks % 200 == 0 && goalTask != null && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask) && pickaxeAlmostGone(bot)) {
+        // In the middle of a long goal (digging for diamonds) or errand (the shield's iron eighty
+        // levels down) the pickaxe wears out too: a spare made before it breaks, without dropping
+        // what is under way. (Not while the spare itself is being made. The errands had no such
+        // check: a staircase was dug on by hand on seed -987....)
+        if (checkTicks % 200 == 0 && (goalTask != null || running != null)
+                && !(bot.current() instanceof net.kasax.challengecraft.bot.task.ObtainTask o && o.items().stream().anyMatch(PICKAXES::contains))
+                && pickaxeAlmostGone(bot)) {
             bot.say("the pickaxe is about to break: a spare one first");
             bot.interject(new net.kasax.challengecraft.bot.task.ObtainTask(GOOD_PICKAXES, ObtainPlanner.countAny(bot.body(), GOOD_PICKAXES) + 1, planner));
         }
