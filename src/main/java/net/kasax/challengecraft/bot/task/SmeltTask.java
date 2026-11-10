@@ -412,12 +412,12 @@ public final class SmeltTask extends StationTask {
             if (!st.isEmpty() && !route.input().test(st) && !st.is(route.result()) && BotKnowledge.fuelValue(st) > 0) smelts += BotKnowledge.fuelValue(st) * st.getCount();
         }
         int pieces = per <= 0 ? 0 : (int) (smelts / per);
-        // (Going on once what is wanted now is out - smeltgo: furnaces for that part only; the
-        // rest cooks while it is away. And a second furnace from four items on, not six: four
-        // steaks are forty seconds in one, twenty in two - the furnace is made in three.)
-        boolean go = bot.params.on("smeltgo");
-        int batch = leaveEarly(bot) ? needNow : count, per_ = go ? 4 : 6;
-        int want = Math.min(Math.min(2, batch / per_), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
+        // (smeltgo: a second furnace from four items on, not six - four steaks are forty seconds
+        // in one, twenty in two, and the furnace is made in three. The whole batch counts, not
+        // only what is waited for now: the rest, left cooking, is wanted soon as often as not -
+        // the pickaxe's and the bucket's iron right after the shield's ingot.)
+        int per_ = bot.params.on("smeltgo") ? 4 : 6;
+        int want = Math.min(Math.min(2, count / per_), Math.max(0, pieces - 2)); // (one piece to spare: the shares never come out even)
         if (extras.size() >= want || waiting < per_ || extraTries > 3) return null;
         if (body.getInventory().countItem(Items.FURNACE) == 0) {
             // (Eight cobblestone and a table: a few seconds. Without the stone, one furnace it is.)
