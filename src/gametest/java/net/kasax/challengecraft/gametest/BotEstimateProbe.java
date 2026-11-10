@@ -19,7 +19,7 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
 /**
  * Not a test of skill: the estimates of the tiles the leagues found worst, in one fixed scene by
  * day and by night, logged as [ESTIMATES] lines - to set one estimator against another in the
- * same situation (docs/bob-plan.md, round 21: before and after the batches and the mob search).
+ * same situation (docs/bob-reference-times.md: before and after the batches and the mob search).
  * The scene: trees, a gravel bank, sugar cane by a pond, three chickens; Bob with stone tools,
  * a sword, a shield, two iron ingots and a crafting table. It only uses what every version of the
  * planner has (LockoutGoals.plan), so the same file measures an older one.

@@ -40,8 +40,8 @@ Er deckt die fünf besprochenen Punkte ab:
    reinen Planschätzung. Das Modell wird nur eingesetzt, wenn es auf ungesehenen Zielen mindestens
    5 % genauer ist als der Plan.
 
-   Ein Modell korrigiert die Schätzungen, gegen die es gelernt hat. Seit Runde 21 schätzt der Planer
-   anders (Stapel statt Anteile, Mob-Suche nach den Spawnregeln; `ObtainPlanner.ESTIMATES = 2`).
+   Ein Modell korrigiert die Schätzungen, gegen die es gelernt hat. Seit dem Wissensstand (`docs/bob-reference-times.md`)
+   schätzt der Planer anders (Stapel statt Anteile, Mob-Suche nach den Spawnregeln; `ObtainPlanner.ESTIMATES = 2`).
    Jeder Ziel-Eintrag trägt deshalb die Fassung (`estimates`), und der Trainer lernt nur aus den
    Einträgen der neuesten. Das Modell bekommt die Fassung mit; Bob setzt ein Modell einer anderen
    Fassung nicht ein (Log: „trained on estimates v1“). Bis der Trainer genug neue Ziele hat (150

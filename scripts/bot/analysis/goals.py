@@ -4,11 +4,13 @@
     python3 scripts/bot/analysis/goals.py --md run-*/versus_*.log       # the same as a markdown table
 
 Columns: n starts; est = the believed estimate when it was started (the "goal: X (~N s" line);
-plan = the planner's own figure (logged since round 21 as "plan ~N s"); expert = the knowledge
+plan = the planner's own figure (logged since ObtainPlanner.ESTIMATES 2 as "plan ~N s"); expert = the knowledge
 base's expert time; real = mean game seconds it ran; med = their median; ratio = real / est (of the
 means); ok = the share of starts that ended with the tile claimed. The last lines: how wrong the
 estimates are on the whole - the median and mean of |log(real / est)| over the claimed starts (0:
-exact; 0.69: off by a factor of two), and the share under- and overestimated.
+exact; 0.69: off by a factor of two), and the share under- and overestimated; then, over all starts
+(a start that did not get the tile ran at least that long), how many ran past 1.5 and 3 times the
+estimate.
 """
 import collections
 import math
@@ -135,6 +137,14 @@ def main(argv):
         print(f"estimate error on the claimed ones: median |log(real/est)| {median(errs):.2f}, mean {mean(errs):.2f} "
               f"(a factor of {math.exp(median(errs)):.1f} / {math.exp(mean(errs)):.1f}); "
               f"real over 1.5x the estimate {under} of {len(claimed)}, under 2/3 of it {over}")
+    # (The starts that did not get the tile ran at least that long: a lower bound, but past the
+    # estimate is past it - the underestimates the claimed ones alone do not show.)
+    timed = [x for x in rows if x[2] > 0]
+    if timed:
+        past15 = sum(1 for x in timed if x[3] > 1.5 * x[2])
+        past3 = sum(1 for x in timed if x[3] > 3 * x[2])
+        print(f"all starts, claimed or not: ran past 1.5x the estimate {past15} of {len(timed)} ({100 * past15 / len(timed):.0f}%), "
+              f"past 3x {past3} ({100 * past3 / len(timed):.0f}%)")
     plans = [abs(math.log(x[3] / x[6])) for x in claimed if x[6]]
     if plans:
         print(f"the plan's own figure: median |log(real/plan)| {median(plans):.2f}, mean {mean(plans):.2f} over {len(plans)}")

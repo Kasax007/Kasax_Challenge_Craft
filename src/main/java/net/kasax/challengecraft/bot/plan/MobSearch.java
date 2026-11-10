@@ -14,9 +14,9 @@ import net.minecraft.world.entity.MobCategory;
  * does not burn are left), and the kind's share of them is its share of the biome's spawn list.
  * The search is the wait for the first: 60 / (rate × share) seconds.
  *
- * <p>The rates are calibrated on the hunts of the self-play leagues (league 9 of docs/bob-plan.md:
- * a night hunt for a skeleton took Bob 72 s, one for a zombie or a creeper 80 to 90 s, the fight
- * included). Mobs that only come at their structures (blazes, pillagers, guardians) or by special
+ * <p>The rates are calibrated on the hunts of the self-play leagues (leagues 3 to 8 in
+ * docs/bob-leagues: a night hunt for a skeleton took Bob 72 s, one for a zombie or a creeper 80
+ * to 90 s, the fight included). Mobs that only come at their structures (blazes, pillagers, guardians) or by special
  * rules (slimes, phantoms) are not found this way: {@link #UNKNOWN}, and the caller keeps its own
  * figure for them.
  */

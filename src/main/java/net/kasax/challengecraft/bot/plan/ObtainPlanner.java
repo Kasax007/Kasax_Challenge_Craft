@@ -69,7 +69,7 @@ public final class ObtainPlanner {
     /**
      * The way of estimating, for what is learnt against the estimates (the goal model, the goal
      * experience): 1 - one item's share times the count, flat efforts per mob; 2 - batches along
-     * the plan's ways, the mob search from the spawn rules (round 21 of docs/bob-plan.md). What was
+     * the plan's ways, the mob search from the spawn rules (docs/bob-reference-times.md). What was
      * learnt against another way is not used.
      */
     public static final int ESTIMATES = 2;

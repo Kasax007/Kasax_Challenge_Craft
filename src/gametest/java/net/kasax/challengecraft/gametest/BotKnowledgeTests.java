@@ -20,7 +20,7 @@ import static net.kasax.challengecraft.gametest.BotArena.GROUND;
 import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
 
 /**
- * Bob's knowledge and his time estimates (round 21 of docs/bob-plan.md): the speedrun knowledge
+ * Bob's knowledge and his time estimates (docs/bob-reference-times.md): the speedrun knowledge
  * base read and its loot chances rolled from the game, estimates of the goals the leagues found
  * worst within a sensible range, batches counted as a player would, the better source taken when
  * a structure is known, and goal experience that can take in the factors the leagues measured.
@@ -173,6 +173,29 @@ public class BotKnowledgeTests {
             h.assertTrue(k.startsWith("loot the shipwreck"), "with a shipwreck known: " + k);
             h.assertFalse(b.startsWith("loot"), "with none known: " + b);
             h.assertFalse(r.startsWith("loot the shipwreck"), "raided already: " + r);
+            a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
+        });
+    }
+
+    /**
+     * A name tag, geared, a mineshaft known forty blocks off: its chest minecarts hold one nearly
+     * three times in four, but the raid opens chest blocks only - no trip there
+     * (LockoutGoals.NOT_RAIDED); the usual way instead.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void noRaidOnAMineshaft(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "no_raid_on_a_mineshaft");
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
+        var goal = LockoutBingoGoalPool.byId("obtain_name_tag");
+        h.runAfterDelay(20, () -> {
+            var bot = a.bot();
+            var before = LockoutGoals.plan(bot, new ObtainPlanner(), goal);
+            bot.senses().know(Identifier.withDefaultNamespace("mineshaft"), a.abs(20, FEET, 60), bot.body().blockPosition());
+            var known = LockoutGoals.plan(bot, new ObtainPlanner(), goal);
+            String b = before == null ? "none" : before.task().get().describe(), k = known == null ? "none" : known.task().get().describe();
+            BotArena.LOG.info("[BOTTEST] no_raid_on_a_mineshaft: none known: {} (~{} s); a mineshaft known: {} (~{} s)",
+                    b, before == null ? -1 : Math.round(before.cost()), k, known == null ? -1 : Math.round(known.cost()));
+            h.assertFalse(k.startsWith("loot the mineshaft"), "with a mineshaft known: " + k);
             a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
         });
     }

@@ -1125,6 +1125,14 @@ public final class LockoutGoals {
     private static final double LOOT_WALK = 300;
 
     /**
+     * Structures the knowledge base has loot for that Bob does not raid (yet): a mineshaft's loot
+     * is in chest minecarts, and the raid opens chest blocks only; an ocean ruin's chests lie under
+     * water among drowned (the brain does not loot them on the way either); a dungeon is no
+     * structure, it is only ever come across in a cave.
+     */
+    private static final Set<String> NOT_RAIDED = Set.of("mineshaft", "ocean_ruin", "dungeon");
+
+    /**
      * The speedrunner's way to many items: a structure's chests - iron from a shipwreck's treasure
      * chest, gunpowder and TNT from a desert temple, obsidian and flint and steel from a ruined
      * portal, an apple from a village house - when one is known (seen, or in the atlas the world
@@ -1143,7 +1151,7 @@ public final class LockoutGoals {
         Option best = null;
         for (Item item : items) {
             for (var l : kb.loot(bot.server(), item)) {
-                if (l.dangerous() && !ready) continue;
+                if (l.dangerous() && !ready || NOT_RAIDED.contains(l.family())) continue;
                 Set<Identifier> ids = VisitStructureTask.resolve(level, l.family());
                 if (ids.isEmpty()) continue;
                 BotSenses.SeenStructure seen = VisitStructureTask.nearest(bot, ids);
