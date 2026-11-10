@@ -251,6 +251,18 @@ tasks.register('bobAutopilotJar', Jar) {
 		attributes('Main-Class': 'net.kasax.challengecraft.autopilot.Autopilot', 'Bob-Commit': bobCommit())
 	}
 }
+// The Bob-Trainer app (round 3): the same code with the dashboard as its entry (build/libs/bob-trainer.jar).
+// Packaged with the mods and start scripts by scripts/bot/package_trainer.sh.
+tasks.register('bobTrainerJar', Jar) {
+	group = 'bob'
+	description = 'The Bob-Trainer laptop app (build/libs/bob-trainer.jar).'
+	from sourceSets.autopilot.output
+	archiveFileName = 'bob-trainer.jar'
+	destinationDirectory = layout.buildDirectory.dir('libs')
+	manifest {
+		attributes('Main-Class': 'net.kasax.challengecraft.autopilot.Trainer', 'Bob-Commit': bobCommit())
+	}
+}
 tasks.register('bobAutopilotTest', Test) {
 	group = 'bob'
 	description = 'Tests of the Bob-Autopilot launcher.'

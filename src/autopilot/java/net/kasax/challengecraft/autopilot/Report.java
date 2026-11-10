@@ -46,6 +46,29 @@ final class Report {
         league.put("history", new ArrayList<>(h.subList(Math.max(0, h.size() - 5), h.size())));
         o.put("league", league);
         o.put("paused_min", s.pausedUntil > now ? Math.round((s.pausedUntil - now) / 6000.0) / 10.0 : null);
+        o.put("paused", s.paused);
+        o.put("stopping", s.stopRequested || s.finishRequested);
+        o.put("power", s.power);
+        o.put("active_games", (long) s.activeLeague);
+        o.put("slots", (long) s.leagueSlots);
+        o.put("game_minutes", (long) s.cfg.gameMinutes);
+        o.put("long_game_minutes", (long) s.cfg.longGameMinutes);
+        o.put("long_game_every", (long) s.cfg.longGameEvery);
+        o.put("last_export", s.lastExportFile == null ? null : s.lastExportFile.toAbsolutePath().toString());
+        o.put("last_export_at", s.lastExportAt == 0 ? null : LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(s.lastExportAt),
+                java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd.MM. HH:mm")));
+        o.put("exporting", s.exporting != null && !s.exporting.isDone());
+        List<Object> arms = new ArrayList<>();
+        for (League.Arm a : s.league.arms()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("knob", a.knob());
+            m.put("value", Knobs.format(a.value()));
+            m.put("duels", (long) a.duels());
+            m.put("edge", Math.round(a.mean() * 100) / 100.0);
+            m.put("sd", Math.round(a.sd() * 100) / 100.0);
+            arms.add(m);
+        }
+        o.put("arms", arms);
         List<Object> servers = new ArrayList<>();
         for (Supervisor.Slot slot : s.slots) servers.add(server(s, slot, now));
         o.put("servers", servers);
@@ -74,7 +97,7 @@ final class Report {
             o.put("heap_mb", st.get("memory_mb"));
             if (slot.state == Supervisor.State.PLAYING && slot.tickAtStart >= 0) {
                 o.put("game_secs", (long) ((Json.num(st.get("tick"), 0) - slot.tickAtStart) / 20));
-                o.put("of_secs", (long) s.cfg.gameMinutes * 60);
+                o.put("of_secs", (long) slot.gameMinutes * 60);
             }
             if (g.kind == GameServer.Kind.ARENA) o.put("arena", st.get("arena"));
         }

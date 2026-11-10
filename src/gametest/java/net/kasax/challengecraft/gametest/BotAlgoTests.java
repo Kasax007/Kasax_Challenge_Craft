@@ -34,6 +34,8 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  * <ul>
  *   <li>{@code risk_*} (knob riskpath, BotRisk): a skeleton beside the short way, a causeway
  *   between lava, a dive along a lake's floor, and a plain course (the cost on open ground).</li>
+ *   <li>{@code motion_*} (knob motionsearch, MotionSearch): stopwatch courses - flat, a hill of
+ *   steps, a forest, a ditch and a drop - blocks a second with it on and off.</li>
  *   <li>{@code beliefs_*} (knob beliefs, belief.Beliefs): the estimates by context (unit-style),
  *   iron in rock laid out as the 26.3 placement spreads it (three layouts), a cow across a river
  *   and one further off on this side.</li>
@@ -417,5 +419,101 @@ public class BotAlgoTests {
     @GameTest(environment = "challengecraft:algo_beliefs", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 44)
     public void beliefsCowsOff(GameTestHelper h) {
         beliefsCows(h, 0);
+    }
+
+    // ---- motionsearch: movement by the game's physics -----------------------------------------------
+
+    /** A course timed: from {@code from} to {@code to} (relative), the straight distance over the ticks. */
+    private void course(GameTestHelper h, BotArena a, String scene, int knob, BlockPos from, BlockPos to, int maxTicks) {
+        Bot bot = knobbed(a.spawn(from.getX(), from.getY(), from.getZ()), "motionsearch=" + knob);
+        Record r = new Record(scene, "motionsearch=" + knob);
+        double dist = Math.sqrt(from.distSqr(to));
+        a.run(new GoToTask(a.abs(to.getX(), to.getY(), to.getZ()), 1.5), maxTicks, () -> {
+            r.tick(bot, null);
+            boolean done = a.near(to.getX(), to.getY(), to.getZ(), 1.6);
+            if (done) r.log(h, String.format(java.util.Locale.ROOT, "bps=%.2f", dist / (h.getTick() / 20.0)));
+            return done;
+        });
+    }
+
+    /** Sixty-four blocks of flat ground. */
+    private void motionFlat(GameTestHelper h, int knob) {
+        BotArena a = BotArena.wide(h, "motion_flat_" + knob);
+        BotArena.day(h);
+        course(h, a, "motion_flat", knob, new BlockPos(-12, FEET, 8), new BlockPos(52, FEET, 8), 600);
+    }
+
+    /** A hill of one-block steps, eight up, a top, eight down, across the arena. */
+    private void motionHill(GameTestHelper h, int knob) {
+        BotArena a = BotArena.wide(h, "motion_hill_" + knob);
+        BotArena.day(h);
+        for (int k = 0; k < 8; k++) {
+            a.fill(8 + k, FEET, 12, 31 - k, FEET + k, 28, Blocks.STONE);
+        }
+        course(h, a, "motion_hill", knob, new BlockPos(-10, FEET, 20), new BlockPos(50, FEET, 20), 900);
+    }
+
+    /** A forest: trunks five high with a crown, seeded, across the arena; walked through on a slant. */
+    private void motionForest(GameTestHelper h, int knob) {
+        BotArena a = BotArena.wide(h, "motion_forest_" + knob);
+        BotArena.day(h);
+        java.util.Random rng = new java.util.Random(31);
+        for (int t = 0; t < 70; t++) {
+            int x = rng.nextInt(40), z = rng.nextInt(40);
+            a.fill(x - 1, FEET + 4, z - 1, x + 1, FEET + 5, z + 1, Blocks.OAK_LEAVES.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+            a.fill(x, FEET, z, x, FEET + 4, z, Blocks.OAK_LOG);
+        }
+        course(h, a, "motion_forest", knob, new BlockPos(-10, FEET, -8), new BlockPos(48, FEET, 46), 1200);
+    }
+
+    /** A ditch two wide and three deep, then a drop of three: down and on. */
+    private void motionGap(GameTestHelper h, int knob) {
+        BotArena a = BotArena.wide(h, "motion_gap_" + knob);
+        BotArena.day(h);
+        a.fill(10, GROUND - 2, -20, 11, GROUND, 59, Blocks.AIR);
+        a.fill(26, GROUND - 3, -20, 59, GROUND, 59, Blocks.AIR);
+        a.fill(26, GROUND - 4, -20, 59, GROUND - 4, 59, Blocks.GRASS_BLOCK);
+        course(h, a, "motion_gap", knob, new BlockPos(-10, FEET, 20), new BlockPos(50, FEET - 3, 20), 900);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 24)
+    public void motionFlatOn(GameTestHelper h) {
+        motionFlat(h, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 24)
+    public void motionFlatOff(GameTestHelper h) {
+        motionFlat(h, 0);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void motionHillOn(GameTestHelper h) {
+        motionHill(h, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void motionHillOff(GameTestHelper h) {
+        motionHill(h, 0);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void motionForestOn(GameTestHelper h) {
+        motionForest(h, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 1200, skyAccess = true, padding = 24)
+    public void motionForestOff(GameTestHelper h) {
+        motionForest(h, 0);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void motionGapOn(GameTestHelper h) {
+        motionGap(h, 1);
+    }
+
+    @GameTest(environment = "challengecraft:algo_motion", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 24)
+    public void motionGapOff(GameTestHelper h) {
+        motionGap(h, 0);
     }
 }

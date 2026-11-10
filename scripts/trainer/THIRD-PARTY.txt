@@ -1,0 +1,29 @@
+Bob-Trainer - Software von Dritten in diesem Paket
+==================================================
+
+Minecraft selbst ist NICHT enthalten. Der Fabric-Server-Launcher laedt den Minecraft-Server beim
+ersten Start von Mojang herunter; seine Nutzung unterliegt der Minecraft-EULA
+(https://aka.ms/MinecraftEULA), die der Nutzer im Dashboard selbst akzeptiert.
+
+server/fabric-server-mc.26.3-loader.0.19.5-launcher.1.1.2.jar
+    Fabric server launcher (FabricMC). Apache License 2.0.
+    https://fabricmc.net  -  https://github.com/FabricMC/fabric-installer
+
+server/mods/fabric-api-0.161.0+26.3.jar
+    Fabric API (FabricMC). Apache License 2.0.  https://github.com/FabricMC/fabric
+
+server/mods/lithium-fabric-0.26.3+mc26.3.jar
+    Lithium (CaffeineMC), version mc26.3-0.26.3-fabric, unveraendert von Modrinth
+    (sha512 gegen die Modrinth-API geprueft). GNU Lesser General Public License v3.0 (LGPL-3.0-only).
+    Quellcode: https://github.com/CaffeineMC/lithium-fabric  -  https://modrinth.com/mod/lithium
+
+server/mods/ferritecore-9.0.0-fabric.jar
+    FerriteCore (malte0811), version 9.0.0-fabric, unveraendert von Modrinth
+    (sha512 gegen die Modrinth-API geprueft). MIT License.
+    Quellcode: https://github.com/malte0811/FerriteCore  -  https://modrinth.com/mod/ferrite-core
+
+java/ (nur falls beim ersten Start geladen)
+    Eclipse Temurin JRE 25 (Eclipse Adoptium), GPLv2 mit Classpath Exception.  https://adoptium.net
+
+Challenge Craft (server/mods/challengecraft-*.jar) und der Bob-Trainer selbst (app/bob-trainer.jar)
+stammen vom Autor von Challenge Craft.

@@ -338,4 +338,64 @@ public final class Beliefs {
         double wet = flat * water / steps;
         return (flat - wet) / WALK + wet / SWIM + Math.abs(to.getY() - from.getY()) * 0.5;
     }
+
+    // ---- the context of a goal attempt (the journal) ---------------------------------------------
+
+    /**
+     * Where Bob stands when he sets out for a tile, as the journal keeps it next to the estimate
+     * and the time it really took - so the estimates can be calibrated per context (the depth,
+     * the biome, the time of day, the kit, how near the nearest known source is), not per seed.
+     */
+    public static com.google.gson.JsonObject context(net.kasax.challengecraft.bot.Bot bot) {
+        var o = new com.google.gson.JsonObject();
+        var body = bot.body();
+        ServerLevel level = (ServerLevel) body.level();
+        BlockPos at = body.blockPosition();
+        boolean overworld = level.dimension() == net.minecraft.world.level.Level.OVERWORLD;
+        o.addProperty("dim", level.dimension().identifier().getPath());
+        o.addProperty("biome", level.getBiome(at).unwrapKey().map(k -> k.identifier().getPath()).orElse("?"));
+        o.addProperty("night", overworld && level.isDarkOutside());
+        o.addProperty("y", at.getY());
+        int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ());
+        o.addProperty("surface", surface);
+        o.addProperty("kit", kit(body));
+        BlockPos iron = bot.memory().nearest(level, at, st -> st.is(net.minecraft.world.level.block.Blocks.IRON_ORE)
+                || st.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_IRON_ORE), java.util.Set.of());
+        o.addProperty("iron_seen", iron == null ? -1 : (int) Math.sqrt(iron.distSqr(at)));
+        BlockPos log = bot.memory().nearest(level, at, st -> st.is(net.minecraft.tags.BlockTags.LOGS), java.util.Set.of());
+        o.addProperty("log_seen", log == null ? -1 : (int) Math.sqrt(log.distSqr(at)));
+        o.addProperty("cells_read", bot.memory().beliefs.cellsSeen());
+        o.addProperty("beliefs", bot.params.on("beliefs"));
+        if (overworld) {
+            double stone = Math.min(1.15, Math.min(15, bot.tools().breakTicks(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()) / 20.0));
+            Estimate e = ore("iron", at, surface, stairSeconds(stone), exposePerSecond(stone), bot.memory().cave(level, at, 16, 24, 128, java.util.List.of()));
+            o.addProperty("iron_s", Math.round(e.seconds()));
+            o.addProperty("iron_y", e.y());
+            o.addProperty("logs_s", Math.round(bot.memory().beliefs.logs(level, at, net.kasax.challengecraft.bot.BotWorld.viewChunks(level)).seconds()));
+        }
+        return o;
+    }
+
+    /** The kit in a word: the best pickaxe and sword, the armour points, a shield. */
+    static String kit(net.minecraft.world.entity.player.Player body) {
+        String pick = "none", sword = "none";
+        String[] tiers = {"wooden", "stone", "copper", "iron", "golden", "diamond", "netherite"};
+        int bp = -1, bs = -1;
+        var inv = body.getInventory();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+            for (int t = 0; t < tiers.length; t++) {
+                if (id.equals(tiers[t] + "_pickaxe") && t > bp) {
+                    bp = t;
+                    pick = tiers[t];
+                }
+                if (id.equals(tiers[t] + "_sword") && t > bs) {
+                    bs = t;
+                    sword = tiers[t];
+                }
+            }
+        }
+        boolean shield = body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) || inv.countItem(net.minecraft.world.item.Items.SHIELD) > 0;
+        return "pick:" + pick + ",sword:" + sword + ",armour:" + body.getArmorValue() + ",shield:" + (shield ? 1 : 0);
+    }
 }

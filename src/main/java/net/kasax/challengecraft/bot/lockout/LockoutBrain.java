@@ -2903,6 +2903,12 @@ public final class LockoutBrain implements BotBrain {
         o.addProperty("minute", Math.round(minutes(now) * 10) / 10.0);
         o.addProperty("params", bot.params.toString());
         o.add("x", net.kasax.challengecraft.bot.learn.Journal.array(x));
+        // (Round 3: the context the estimate was made in - to calibrate per context, not per seed.)
+        try {
+            o.add("ctx", net.kasax.challengecraft.bot.belief.Beliefs.context(bot));
+        } catch (RuntimeException e) {
+            // (No context is no reason to lose the line.)
+        }
         goalRecord = o;
     }
 

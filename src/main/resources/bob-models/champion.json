@@ -1,5 +1,5 @@
 {
- "params": "bowmanwary=0,cookalong=0,copper=1,cover=1,coverveto=0,descent=1,estfix=0,failexp=0,fallheal=0,foodcap=-1,foodsight=0,foodstock=1,goalmodel=1,goalprior=0,guardian=1,itemslow=0,mountainiron=0,nightarmour=0,pillarblocks=0,quick=30,search=0,shield=0,smeltgo=0,swordstone=0,treasureiron=0,unarmedrun=0,veinfirst=0,worldsense=1",
+ "params": "beliefs=0,bowmanwary=0,cookalong=0,copper=1,cover=1,coverveto=0,descent=1,estfix=0,failexp=0,fallheal=0,foodcap=-1,foodsight=0,foodstock=1,goalmodel=1,goalprior=0,guardian=1,itemslow=0,motionsearch=0,mountainiron=0,nightarmour=0,pillarblocks=0,quick=30,riskpath=0,search=0,shield=0,smeltgo=0,swordstone=0,treasureiron=0,unarmedrun=0,veinfirst=0,worldsense=1",
  "version": "20261016-112118",
  "games": 6,
  "mean_diff": 2.17,

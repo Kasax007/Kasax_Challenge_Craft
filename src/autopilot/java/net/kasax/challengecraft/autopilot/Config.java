@@ -24,6 +24,13 @@ final class Config {
     String leagueGames = "auto";
     int arenaServers = 0;
     int gameMinutes = 90;
+    /** Every so many games a long one of this many minutes (0: never). */
+    int longGameEvery = 0;
+    int longGameMinutes = 90;
+    /** The app's dashboard (127.0.0.1 only). */
+    int dashboardPort = 8765;
+    /** Round 3's tuning for bot-only servers (properties, JVM flags); false: as before, for a comparison. */
+    boolean tuned = true;
     int gameMemoryMb = 4096;
     int arenaMemoryMb = 3072;
     int arenaBots = 6;
@@ -45,13 +52,18 @@ final class Config {
     String machine = "bisect";
 
     private static final Set<String> KEYS = Set.of("league_games", "arena_servers", "game_minutes", "game_memory_mb", "arena_memory_mb",
-            "arena_bots", "arena_restart_minutes", "view_distance", "simulation_distance", "difficulty", "search_threads", "server_jar",
+            "arena_bots", "arena_restart_minutes", "long_game_every", "long_game_minutes", "dashboard_port", "tuned", "view_distance", "simulation_distance", "difficulty", "search_threads", "server_jar",
             "mods_folder", "java", "extra_jvm_flags", "journal_max_mb", "game_logs_max_mb", "export_hours", "export_max_mb",
             "keep_exports", "seeds", "machine");
 
     /** Reads the file (writing the default one first if there is none); {@code warn} hears what was wrong. */
     static Config load(Path file, Consumer<String> warn) throws IOException {
-        if (!Files.exists(file)) Files.writeString(file, TEMPLATE, StandardCharsets.UTF_8);
+        return load(file, warn, TEMPLATE);
+    }
+
+    /** As {@link #load(Path, Consumer)}, with this file written when there is none (the app has its own). */
+    static Config load(Path file, Consumer<String> warn, String template) throws IOException {
+        if (!Files.exists(file)) Files.writeString(file, template, StandardCharsets.UTF_8);
         Properties p = new Properties();
         try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             p.load(r);
@@ -67,6 +79,10 @@ final class Config {
         }
         c.arenaServers = number(p, "arena_servers", c.arenaServers, 0, 16, warn);
         c.gameMinutes = number(p, "game_minutes", c.gameMinutes, 1, 600, warn);
+        c.longGameEvery = number(p, "long_game_every", c.longGameEvery, 0, 1000, warn);
+        c.longGameMinutes = number(p, "long_game_minutes", c.longGameMinutes, 1, 600, warn);
+        c.dashboardPort = number(p, "dashboard_port", c.dashboardPort, 1024, 65535, warn);
+        c.tuned = !text(p, "tuned", "true").equalsIgnoreCase("false");
         c.gameMemoryMb = number(p, "game_memory_mb", c.gameMemoryMb, 1024, 65536, warn);
         c.arenaMemoryMb = number(p, "arena_memory_mb", c.arenaMemoryMb, 1024, 65536, warn);
         c.arenaBots = number(p, "arena_bots", c.arenaBots, 1, 32, warn);
@@ -217,5 +233,54 @@ final class Config {
 
             # Name dieses Rechners in den Ergebnissen.
             machine=bisect
+            """;
+
+    /** The Bob-Trainer app's file (its defaults for a laptop: shorter games, every fifth a long one). */
+    static final String TEMPLATE_APP = """
+            # Bob-Trainer (Challenge Craft): Bob spielt auf diesem Rechner Lockout gegen sich selbst.
+            # Die meisten Einstellungen macht das Dashboard (Leistung, Pause). Aenderungen hier gelten
+            # beim naechsten Start. Zeilen mit # sind Erklaerungen.
+
+            # Laenge eines Liga-Spiels in Spielminuten, und jedes wievielte Spiel ein langes ist
+            # (0 = nie) mit wie vielen Minuten (90 = ein ganzes Lockout-Spiel).
+            game_minutes=30
+            long_game_every=5
+            long_game_minutes=90
+
+            # Arbeitsspeicher (MB) je Spiel. Ein Spiel braucht dazu etwa 1,3 GB ausserhalb dieses Wertes.
+            game_memory_mb=3072
+
+            # So viel Platz duerfen Bobs Tagebuch (Journal) und die Spiel-Logs belegen (MB).
+            journal_max_mb=3000
+            game_logs_max_mb=1500
+
+            # Alle so viele Stunden ein Paket zum Hochladen (0 = nur mit dem Knopf "Export jetzt").
+            export_hours=0
+            export_max_mb=25
+            keep_exports=6
+
+            # ---- Erweitert: normalerweise nicht noetig ----
+
+            # Sicht- und Simulationsweite der Spiele (Chunks), Schwierigkeit. Bob sieht so weit, wie
+            # die Sichtweite reicht: kleiner macht die Spiele schneller, aber Bob blinder.
+            view_distance=12
+            simulation_distance=8
+            difficulty=hard
+
+            # Wegsuche-Threads je Spiel.
+            search_threads=2
+
+            # Java fuer die Spiele (auto = dasselbe Java wie der Trainer) und zusaetzliche Parameter.
+            java=auto
+            extra_jvm_flags=
+
+            # Der Port des Dashboards (nur auf diesem Rechner erreichbar: 127.0.0.1).
+            dashboard_port=8765
+
+            # Feste Seeds, der Reihe nach (durch Komma getrennt). Leer = jede Partie eine neue Welt.
+            seeds=
+
+            # Name dieses Rechners in den Ergebnissen.
+            machine=laptop
             """;
 }

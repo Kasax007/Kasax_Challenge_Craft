@@ -49,7 +49,7 @@ class LeagueTest {
     }
 
     @Test
-    void aClearlyBetterChallengerIsPromotedAfterSixGames() {
+    void aClearlyBetterChallengerIsPromotedAfterEightGames() {
         League l = new League(new Random(2));
         Map<String, Object> verdict = null;
         for (int i = 0; i < League.MIN_GAMES; i++) {
@@ -57,7 +57,7 @@ class LeagueTest {
             String challenger = g.challenger();
             League.Outcome o = l.record(g, result(g, 2, 0, 5 + i % 2, 0));
             assertTrue(o.counted());
-            if (i < League.MIN_GAMES - 1) assertNull(o.verdict(), "decided before six games");
+            if (i < League.MIN_GAMES - 1) assertNull(o.verdict(), "decided before eight games");
             else {
                 verdict = o.verdict();
                 assertEquals(challenger, Knobs.text(l.champion));
@@ -85,7 +85,7 @@ class LeagueTest {
     }
 
     @Test
-    void aDrawnOutDuelEndsAfterSixteenGames() {
+    void aDrawnOutDuelEndsAtItsCap() {
         League l = new League(new Random(4));
         Map<String, Object> verdict = null;
         int n = 0;
@@ -139,5 +139,43 @@ class LeagueTest {
         Map<String, Object> back = Json.map(l.toJson().get("champion"));
         assertEquals(30L, back.get("quick"));
         assertEquals(1.0, back.get("foodstock"));
+    }
+
+    @Test
+    void untestedKnobsFirstRoundThreeLeading() {
+        League l = new League(new Random(5));
+        League.Game g = l.nextGame(null);
+        Map<String, Double> ch = Knobs.parse(g.challenger()), cp = Knobs.parse(g.champion());
+        String changed = null;
+        for (String k : ch.keySet()) if (Double.compare(ch.get(k), cp.getOrDefault(k, Knobs.ALL.get(k).def())) != 0) changed = k;
+        assertTrue(List.of("riskpath", "beliefs", "motionsearch").contains(changed), "first challenger changes " + changed);
+    }
+
+    @Test
+    void thompsonPrefersAKnobThatWonBefore() {
+        League l = new League(new Random(6));
+        // Every value tried once and found even; one of them clearly ahead.
+        for (League.Arm a : l.arms()) {
+            Map<String, Double> ch = new java.util.TreeMap<>(l.champion);
+            ch.put(a.knob(), a.value());
+            Map<String, Object> h = new LinkedHashMap<>();
+            h.put("challenger", Knobs.text(ch));
+            h.put("champion", Knobs.text(l.champion));
+            h.put("mean_diff", a.knob().equals("beliefs") ? 1.5 : 0.0);
+            h.put("se", 0.3);
+            l.history.add(h);
+        }
+        int beliefs = 0;
+        for (int i = 0; i < 200; i++) if (l.choose().get("beliefs") == 1.0) beliefs++;
+        assertTrue(beliefs > 150, "beliefs drawn " + beliefs + " of 200");
+    }
+
+    @Test
+    void thePosteriorIsSceptical() {
+        assertEquals(0.5, League.posterior(new double[0]).pBetter(), 1e-9);
+        assertTrue(League.posterior(new double[]{3, 3, 3, 3, 3, 3, 3, 3}).pBetter() > 0.99);
+        double[] noisy = {2, -1, 3, -2, 1, 0, 2, -1};
+        assertTrue(League.posterior(noisy).pBetter() < 0.95, "half a tile on a noisy eight worlds is not proof");
+        assertEquals(0.975, League.phi(1.96), 1e-3);
     }
 }

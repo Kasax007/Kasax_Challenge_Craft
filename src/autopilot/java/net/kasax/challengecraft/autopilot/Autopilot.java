@@ -100,6 +100,22 @@ public final class Autopilot {
         System.exit(0);
     }
 
+    /**
+     * The app's power settings, league games at once: niedrig one; mittel what leaves two cores
+     * and four GB to the person at the laptop (a game uses about two cores when it runs fast);
+     * hoch what leaves one core and two GB. Never fewer than one.
+     */
+    static int powerGames(String level, Config cfg) {
+        int cores = Host.cores();
+        long total = Host.totalMb();
+        long perGame = cfg.gameMemoryMb + Host.OVERHEAD_MB;
+        if ("niedrig".equals(level)) return 1;
+        boolean high = "hoch".equals(level);
+        long byMem = (total - (high ? 2048 : 4096) - 512) / perGame;
+        long byCores = high ? Math.max(1, cores - 1) / 2 + (cores > 4 ? 1 : 0) : Math.max(0, cores - 2) / 2;
+        return (int) Math.max(1, Math.min(byMem, byCores));
+    }
+
     /** How many league games at once: the setting, or what memory and cores allow; never more than fit in memory. */
     static int leagueGames(Config cfg, Log log) {
         long total = Host.totalMb() - ownMemoryMb(log);

@@ -36,12 +36,22 @@ final class Disk {
         Path t = target.toAbsolutePath().normalize(), w = within.toAbsolutePath().normalize();
         if (!t.startsWith(w) || t.equals(w)) throw new IOException("not deleting " + t + ": outside " + w);
         if (!Files.exists(t, LinkOption.NOFOLLOW_LINKS)) return;
-        if (!Files.isDirectory(t, LinkOption.NOFOLLOW_LINKS)) {
+        if (!Files.isDirectory(t, LinkOption.NOFOLLOW_LINKS) || junction(t)) {
             Files.delete(t);
             return;
         }
         // (walkFileTree follows no links unless told to: a link is visited as a file, and deleted as one.)
         Files.walkFileTree(t, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                // (A Windows junction is a folder to the walk: only the junction goes, not what it points to.)
+                if (attrs.isOther() && !dir.equals(t)) {
+                    Files.delete(dir);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Files.deleteIfExists(file);
@@ -64,12 +74,28 @@ final class Disk {
         });
     }
 
+    /** A Windows directory junction (a reparse point the walk would take for a folder); false elsewhere. */
+    static boolean junction(Path p) {
+        try {
+            BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            return a.isDirectory() && a.isOther();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     /** The bytes of all files under {@code dir}, links not followed (a link counts nothing). */
     static long size(Path dir) {
         if (!Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) return 0;
         long[] total = {0};
         try {
             Files.walkFileTree(dir, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path d, BasicFileAttributes attrs) {
+                    // (A Windows junction: what it points to is counted where it lives.)
+                    return attrs.isOther() && !d.equals(dir) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                }
+
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (attrs.isRegularFile()) total[0] += attrs.size();

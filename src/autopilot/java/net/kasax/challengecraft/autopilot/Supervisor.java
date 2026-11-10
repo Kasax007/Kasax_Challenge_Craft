@@ -48,6 +48,10 @@ final class Supervisor {
         long gameNo;
         /** The server's tick when the game began (from Bob's status file), for its progress. */
         long tickAtStart = -1;
+        /** This game's length in game minutes (every so many games a long one). */
+        int gameMinutes;
+        /** The league slot's number (1, 2, ...), 0 for an arena. */
+        int leagueNo;
         Future<?> stopping;
 
         Slot(GameServer server) {
@@ -86,6 +90,17 @@ final class Supervisor {
     private final Deque<Long> recentFailures = new ArrayDeque<>();
     long pausedUntil;
     volatile boolean stopRequested, finishRequested;
+    /** Paused (the app's button): no new games; kept across a restart (bob-autopilot/paused). */
+    volatile boolean paused;
+    /** League games at once now (the app's power setting); at most the slots there are. */
+    volatile int activeLeague;
+    /** The app's power setting: niedrig, mittel, hoch (null: not the app). */
+    volatile String power;
+    /** The latest status as JSON, made by the loop each second (the dashboard serves it). */
+    volatile String snapshot = "{}";
+    /** The last export's file and when (for the dashboard). */
+    volatile Path lastExportFile;
+    volatile long lastExportAt;
     private long lastStatus, lastReport, lastHousekeeping, lastSummary, lastExport;
     volatile long diskBytes = -1;
     Future<?> exporting;
@@ -111,8 +126,12 @@ final class Supervisor {
         league = loadLeague();
         saveLeague();
         for (int i = 1; i <= leagueSlots; i++) {
-            slots.add(new Slot(new GameServer("liga-" + i, GameServer.Kind.LEAGUE, work.resolve("liga-" + i), home)));
+            Slot slot = new Slot(new GameServer("liga-" + i, GameServer.Kind.LEAGUE, work.resolve("liga-" + i), home));
+            slot.leagueNo = i;
+            slots.add(slot);
         }
+        activeLeague = leagueSlots;
+        paused = Files.exists(home.resolve("paused"));
         for (int i = 1; i <= cfg.arenaServers; i++) {
             slots.add(new Slot(new GameServer("arena-" + i, GameServer.Kind.ARENA, work.resolve("arena-" + i), home)));
         }
@@ -219,6 +238,11 @@ final class Supervisor {
                 break;
             }
             housekeeping(now);
+            try {
+                snapshot = Json.write(Report.json(this));
+            } catch (RuntimeException e) {
+                // (The dashboard keeps the last one.)
+            }
             sleep(1000);
         }
         shutdown();
@@ -228,7 +252,9 @@ final class Supervisor {
         GameServer g = s.server;
         switch (s.state) {
             case IDLE -> {
-                if (finishRequested || now < s.retryAt || now < pausedUntil) return;
+                if (finishRequested || paused || now < s.retryAt || now < pausedUntil) return;
+                // (The app's power setting: only so many league games at once.)
+                if (s.leagueNo > activeLeague) return;
                 // (One server starting at a time: the first one also downloads Minecraft, if need be.)
                 if (slots.stream().anyMatch(o -> o.state == State.STARTING)) return;
                 start(s, now);
@@ -261,7 +287,7 @@ final class Supervisor {
                     failure(s, "Server beendet" + why(g));
                     beginStop(s);
                 } else if (now - s.since >= 3000) {
-                    int secs = cfg.gameMinutes * 60;
+                    int secs = s.gameMinutes * 60;
                     g.command("difficulty " + cfg.difficulty);
                     // (Sprint: as fast as the machine goes - the bots count their searches in game ticks then.)
                     g.command("tick sprint " + (secs * 20 + 400));
@@ -287,7 +313,7 @@ final class Supervisor {
                 } else if (hangs(g, now)) {
                     failure(s, "Server haengt (10 Minuten ohne Ausgabe)" + why(g));
                     beginStop(s);
-                } else if (now - s.since > cfg.gameMinutes * 60_000L * 4 + SLOW_GRACE_MS) {
+                } else if (now - s.since > s.gameMinutes * 60_000L * 4 + SLOW_GRACE_MS) {
                     failure(s, "Spiel zu langsam (unter einem Viertel der Echtzeit)" + why(g));
                     beginStop(s);
                 }
@@ -335,6 +361,8 @@ final class Supervisor {
             s.game = league.nextGame(fixed);
             s.gameNo = ++gameCounter;
             seed = s.game.seed();
+            // (Every so many games a long one: the endgame is learnt from too.)
+            s.gameMinutes = cfg.longGameEvery > 0 && s.gameNo % cfg.longGameEvery == 0 ? cfg.longGameMinutes : cfg.gameMinutes;
         } else {
             seed = rng.nextLong();
         }
@@ -350,7 +378,7 @@ final class Supervisor {
         s.state = State.STARTING;
         s.since = now;
         if (g.kind == GameServer.Kind.LEAGUE) {
-            log.info(g.name + ": Spiel " + s.gameNo + " startet (Seed " + seed + "): " + s.game.names()[0] + " " + s.game.knobs()[0]
+            log.info(g.name + ": Spiel " + s.gameNo + " startet (Seed " + seed + ", " + s.gameMinutes + " Spielminuten): " + s.game.names()[0] + " " + s.game.knobs()[0]
                     + " gegen " + s.game.names()[1] + " " + s.game.knobs()[1]);
         } else {
             log.info(g.name + ": Arena-Server startet");
@@ -365,6 +393,14 @@ final class Supervisor {
         List<String> c = new ArrayList<>(List.of(javaCommand, "-Xms" + Math.min(1024, mem) + "M", "-Xmx" + mem + "M", "-XX:+UseG1GC",
                 "-XX:MaxGCPauseMillis=200", "-XX:ParallelGCThreads=" + cores, "-XX:ConcGCThreads=" + Math.max(1, cores / 4),
                 "-Dmax.bg.threads=" + Math.max(2, cores - 1), "-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"));
+        if (cfg.tuned) {
+            // (Round 3: the usual flags for a Minecraft server's G1 - short pauses, a young
+            // generation large enough for a chunk-generating server's garbage.)
+            c.addAll(List.of("-XX:+ParallelRefProcEnabled", "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC",
+                    "-XX:G1NewSizePercent=30", "-XX:G1MaxNewSizePercent=40", "-XX:G1HeapRegionSize=8M", "-XX:G1ReservePercent=20",
+                    "-XX:G1HeapWastePercent=5", "-XX:G1MixedGCCountTarget=4", "-XX:InitiatingHeapOccupancyPercent=15",
+                    "-XX:G1MixedGCLiveThresholdPercent=90", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem", "-XX:MaxTenuringThreshold=1"));
+        }
         c.addAll(cfg.extraFlags());
         c.add("-jar");
         c.add(layout.fabricJar.getFileName().toString());
@@ -557,6 +593,12 @@ final class Supervisor {
                     event("Fertig spielen: keine neuen Spiele mehr, danach endet der Autopilot");
                 }
                 case "status" -> log.plain(Report.text(this));
+                case "pause" -> setPaused(true, false);
+                case "pausenow", "pause-now", "pause now" -> setPaused(true, true);
+                case "resume", "weiter" -> setPaused(false, false);
+                case "power low", "power niedrig" -> setPower("niedrig");
+                case "power mid", "power mittel" -> setPower("mittel");
+                case "power high", "power hoch" -> setPower("hoch");
                 case "export" -> startExport("auf Befehl");
                 case "help", "hilfe", "?" -> log.plain("""
                         Befehle des Bob-Autopilots:
@@ -567,6 +609,48 @@ final class Supervisor {
                 default -> log.plain("Unbekannter Befehl: " + c.trim() + " (help zeigt die Befehle)");
             }
         }
+    }
+
+    /**
+     * Paused: no new games ({@code now}: the running ones stopped at once and thrown away - they
+     * count for nothing, everything else stays). Kept across a restart.
+     */
+    void setPaused(boolean on, boolean now) {
+        paused = on;
+        try {
+            if (on) Files.writeString(home.resolve("paused"), "1", StandardCharsets.UTF_8);
+            else Files.deleteIfExists(home.resolve("paused"));
+        } catch (IOException e) {
+            log.warn("Pause nicht gespeichert: " + e.getMessage());
+        }
+        if (!on) {
+            event("Weiter: neue Spiele starten wieder");
+            return;
+        }
+        if (!now) {
+            event("Pause: die laufenden Spiele werden zu Ende gespielt, keine neuen");
+            return;
+        }
+        int stopped = 0;
+        for (Slot s : slots) {
+            if (s.state == State.STARTING || s.state == State.SPAWNING || s.state == State.PLAYING || s.state == State.ARENA) {
+                beginStop(s);
+                stopped++;
+            }
+        }
+        event("Sofort pausiert: " + stopped + " laufende(s) Spiel(e) beendet und verworfen");
+    }
+
+    /** The app's power setting: how many league games at once (the slots are made for the highest). */
+    void setPower(String level) {
+        power = level;
+        activeLeague = "hoch".equals(level) ? Math.max(1, leagueSlots) : Math.max(1, Math.min(leagueSlots, Autopilot.powerGames(level, cfg)));
+        try {
+            Files.writeString(home.resolve("power"), level, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.warn("Leistung nicht gespeichert: " + e.getMessage());
+        }
+        event("Leistung " + level + ": " + activeLeague + " Spiel(e) gleichzeitig");
     }
 
     // ---- status, limits, exports ------------------------------------------------------------------------
@@ -615,6 +699,8 @@ final class Supervisor {
         exporting = workers.submit(() -> {
             try {
                 Path zip = export.write();
+                lastExportFile = zip;
+                lastExportAt = System.currentTimeMillis();
                 log.info("Paket zum Herunterladen (" + why + "): bob-autopilot/export/" + zip.getFileName() + " (" + Disk.human(Files.size(zip)) + ")");
             } catch (IOException | RuntimeException e) {
                 log.warn("Paket nicht angelegt: " + e);

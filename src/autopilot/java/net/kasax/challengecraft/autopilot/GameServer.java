@@ -97,10 +97,34 @@ final class GameServer {
         }
         try {
             Files.createSymbolicLink(at, rel);
+            return;
         } catch (IOException | UnsupportedOperationException e) {
+            // (Windows: symbolic links need administrator rights - a hard link for a file, a
+            // junction for a folder need none.)
+            if (linkWithoutRights(at, target)) return;
             log.info(name + ": Verknuepfung nicht moeglich (" + e.getMessage() + "), kopiere " + target.getFileName());
             Disk.copyTree(target, at);
         }
+    }
+
+    /** A hard link to a file, or (Windows) a directory junction to a folder; false if neither could be made. */
+    static boolean linkWithoutRights(Path at, Path target) {
+        try {
+            if (Files.isRegularFile(target)) {
+                Files.createLink(at, target);
+                return true;
+            }
+            if (Files.isDirectory(target) && System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+                Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", at.toAbsolutePath().toString(), target.toAbsolutePath().toString())
+                        .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+                return p.waitFor() == 0 && Files.isDirectory(at);
+            }
+        } catch (IOException | UnsupportedOperationException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return false;
     }
 
     /** The properties of a game's server: its seed, a free port on 127.0.0.1 only, no RCON, nothing waiting for players. */
@@ -129,6 +153,13 @@ final class GameServer {
         p.put("pause-when-empty-seconds", "-1");
         p.put("player-idle-timeout", "0");
         p.put("log-ips", "false");
+        if (cfg.tuned) {
+            // (Round 3, bots only: nothing goes over a network, the world is thrown away after the
+            // game - no packet compression, regions written with the fastest compression.)
+            p.put("network-compression-threshold", "-1");
+            p.put("region-file-compression", "lz4");
+            p.put("entity-broadcast-range-percentage", "50");
+        }
         return p;
     }
 

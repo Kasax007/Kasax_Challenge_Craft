@@ -44,6 +44,10 @@ KNOBS = {
     "failexp": ("choice", [0, 1], 0),
     "fallheal": ("choice", [0, 1], 0),
     "search": ("choice", [0, 2], 0),
+    # Round 3 of 10.11.2026: risk-aware paths, the world model, movement by the game's physics.
+    "riskpath": ("choice", [0, 1], 0),
+    "beliefs": ("choice", [0, 1], 0),
+    "motionsearch": ("choice", [0, 1], 0),
 }
 
 

@@ -45,6 +45,9 @@ final class Knobs {
                 "veinfirst", "smeltgo", "cookalong", "foodsight", "treasureiron", "mountainiron", "itemslow",
                 "estfix", "goalprior", "failexp", "fallheal"}) choice(m, k, 0, 0, 1);
         choice(m, "search", 0, 0, 2);
+        // Round 3 of 10.11.2026 (BotParams): risk-aware paths, the world model, movement by the
+        // game's physics - off in normal play until the league finds them better.
+        for (String k : new String[] {"riskpath", "beliefs", "motionsearch"}) choice(m, k, 0, 0, 1);
         ALL = Collections.unmodifiableMap(m);
     }
 
