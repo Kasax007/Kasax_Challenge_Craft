@@ -119,13 +119,21 @@
    "plan": 25.1,
    "starts": 3
   },
-  "light_campfire": {
+  "kill_skeleton": {
    "done": 2,
    "games": 1.0,
    "log": -0.6931,
-   "per_claim": 3.3,
-   "plan": 11.0,
+   "per_claim": 67.7,
+   "plan": 181.8,
    "starts": 2
+  },
+  "light_campfire": {
+   "done": 3,
+   "games": 1.5,
+   "log": -0.6585,
+   "per_claim": 7.3,
+   "plan": 14.2,
+   "starts": 3
   },
   "obtain_16_sandstone": {
    "done": 0,
@@ -199,6 +207,14 @@
    "plan": 75.2,
    "starts": 2
   },
+  "sleep_in_village_bed": {
+   "done": 2,
+   "games": 1.0,
+   "log": -0.171,
+   "per_claim": 21.1,
+   "plan": 25.1,
+   "starts": 2
+  },
   "trade_with_villager": {
    "done": 2,
    "games": 1.5,
@@ -232,7 +248,7 @@
    "starts": 2
   }
  },
- "journal_goals": 130,
+ "journal_goals": 137,
  "outcomes": {
   "advancement_stone_age": [
    4,
@@ -334,9 +350,17 @@
    1,
    0
   ],
-  "light_campfire": [
+  "kill_skeleton": [
    2,
    2
+  ],
+  "kill_spider": [
+   1,
+   1
+  ],
+  "light_campfire": [
+   3,
+   3
   ],
   "obtain_16_sandstone": [
    2,
@@ -418,6 +442,10 @@
    2,
    1
   ],
+  "sleep_in_village_bed": [
+   2,
+   2
+  ],
   "trade_with_farmer": [
    1,
    0
@@ -439,8 +467,8 @@
    1
   ],
   "visit_lush_caves": [
-   1,
-   0
+   2,
+   1
   ],
   "visit_ocean_ruin": [
    1,

@@ -2413,6 +2413,11 @@ public final class LockoutBrain implements BotBrain {
                 boolean ours = tile.claimedBy() == Chal_40_LockoutBingo.teamOf(server, bot.id);
                 // Ours, and in the middle of an ore vein (the diamonds: the tile wanted one, the
                 // tools and the armour want the rest): the vein first, as an errand of its own.
+                // (Ours: the tile is done, however the task stands - counted as done in the journal
+                // and learnt as such. Before round 2 it went down as "dropped" and taught nothing:
+                // a tile got while its task ran - the item in the pack before the task's end, the
+                // bed in the village - left only its overruns in the experience.)
+                if (ours) succeeded(bot, now);
                 if (ours && BotTask.innermost(bot.current()) instanceof net.kasax.challengecraft.bot.task.MineTask m && m.veinOpen(bot)) {
                     bot.say("got " + targetId + "; the rest of the vein too");
                     targetIndex = -1;
@@ -2688,6 +2693,16 @@ public final class LockoutBrain implements BotBrain {
         targetIndex = -1;
         goalTask = null;
         pause = difficulty.pauseTicks / 2;
+    }
+
+    /**
+     * The goal's tile is ours: the journal's line ends "done" and the experience learns it (as when
+     * its task finishes well, see {@link #finished}).
+     */
+    private void succeeded(Bot bot, long now) {
+        if (goalRecord == null) return;
+        journalGoalEnd(bot, "done");
+        if (targetId != null && !goalProxy && tries.getOrDefault(targetId, 0) == 0) GoalExperience.record(targetId, goalFirstEstimate, goalSeconds(now));
     }
 
     // ---- the journal: each tile set out for, the plan's figure and how long it really took ------
