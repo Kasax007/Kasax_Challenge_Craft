@@ -43,6 +43,8 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   <li>{@code treasure_iron}: on hard, the shield wanted and no iron about, a buried treasure the
  *   world sense knows of thirty blocks off: dug up (a chest under the sand, block nine-nine of its
  *   chunk), its iron made into the shield ({@code treasureiron}).</li>
+ *   <li>{@code staircase_pace}: a staircase twenty-six levels down through solid stone to a layer
+ *   of iron ore - the pace of the way down to the ore, in ticks a level (logged).</li>
  * </ul>
  */
 public class BotKitTests {
@@ -195,6 +197,26 @@ public class BotKitTests {
             h.assertTrue(ok, name + ": not yet");
             BotArena.LOG.info("[BOTTEST] {} passed in {} ticks", name, h.getTick());
             endGame(h, bot);
+        });
+    }
+
+    /** Down a staircase of twenty-six levels through solid stone to a layer of iron: logs the ticks a level. */
+    @GameTest(structure = STRUCTURE, maxTicks = 3600, skyAccess = true, padding = 8)
+    public void staircasePace(GameTestHelper h) {
+        String name = "staircase_pace";
+        BotArena a = BotArena.flat(h, name);
+        int top = 30;
+        a.fill(0, BotArena.GROUND, 0, BotArena.SIZE - 1, top - 1, BotArena.SIZE - 1, Blocks.STONE);
+        a.fill(0, 2, 0, BotArena.SIZE - 1, 2, BotArena.SIZE - 1, Blocks.IRON_ORE);
+        Bot bot = a.spawn(20, top, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.BREAD, 8));
+        var body = bot.body();
+        int depth = a.abs(0, 3, 0).getY();
+        long[] start = {-1};
+        a.run(new net.kasax.challengecraft.bot.task.MineTask("raw_iron", st -> st.is(Blocks.IRON_ORE), Set.of(Items.RAW_IRON), 1, depth), 3600, () -> {
+            if (start[0] < 0) start[0] = h.getTick();
+            boolean ok = ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 1;
+            if (ok) BotArena.LOG.info("[BOTTEST] {} {} levels in {} ticks: {} ticks a level", name, top - 3, h.getTick(), h.getTick() / (top - 3));
+            return ok;
         });
     }
 
