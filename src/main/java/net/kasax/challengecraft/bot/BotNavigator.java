@@ -575,6 +575,35 @@ public final class BotNavigator {
             advance();
             return status;
         }
+        // Round 3 (knob motionsearch): on a plain stretch, the inputs from a short search with the
+        // game's own physics (see MotionSearch) - sprint-jumps, cut corners, no stop at the steps.
+        if (knobs.get().on("motionsearch") && !bot.isInWater() && !bot.isInLava() && !bot.onClimbable()) {
+            java.util.List<BlockPos> ahead = new java.util.ArrayList<>();
+            // (Only on the level: up and down steps the old way - a jump lined up at each riser beat
+            // the search's short horizon on the hill course, 196 to 230 ticks against 193 to 195.)
+            boolean climbing = false;
+            for (int k = index; k < path.size() && ahead.size() < 12; k++) {
+                BotPathfinder.Step st = path.get(k);
+                if (!st.breaks().isEmpty() || st.place() != null || st.leap()) break;
+                if (ahead.size() < 4 && st.to().getY() != feet.getY()) climbing = true;
+                ahead.add(st.to());
+            }
+            boolean nextWork = ahead.size() < path.size() - index && ahead.size() <= 2 || climbing;
+            if (ahead.size() >= 2 && !nextWork) {
+                MotionSearch.Choice c = motion.choose(bot, ahead, bot.getFoodData().getFoodLevel() > 6);
+                if (c != null) {
+                    bot.setYRot(c.yaw());
+                    bot.setYHeadRot(c.yaw());
+                    bot.setXRot(10f);
+                    bot.forward = 1f;
+                    bot.strafe = 0;
+                    bot.sprintNow = c.sprint();
+                    bot.jump = c.jump();
+                    diving = false;
+                    return progressChecks(feet, to, flat);
+                }
+            }
+        }
         float yaw = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90f;
         bot.setYRot(yaw);
         bot.setYHeadRot(yaw);
@@ -612,6 +641,14 @@ public final class BotNavigator {
             if (far >= index + 3 && flat > 3.5 && bot.sprintNow && bot.onGround() && !up && !careful && !byDrop(feet)
                     && bot.getFoodData().getFoodLevel() > 6 && bot.getHealth() > 6 && runningAlong(dx, dz) && jumpRoom) bot.jump = true;
         }
+        return progressChecks(feet, to, flat);
+    }
+
+    /** Movement by the game's physics (knob motionsearch): one per navigator, it keeps no state between ticks. */
+    private final MotionSearch motion = new MotionSearch();
+
+    /** After the inputs for a step: stuck (no progress for a while) or knocked off the path - another way. */
+    private Status progressChecks(BlockPos feet, BlockPos to, double flat) {
         // Stuck: no progress for a while.
         double d = flat + Math.abs(bot.getY() - to.getY());
         if (d < lastDistance - 0.02) stuck = 0;

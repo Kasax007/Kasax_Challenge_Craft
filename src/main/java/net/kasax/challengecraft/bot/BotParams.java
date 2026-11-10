@@ -131,6 +131,12 @@ import java.util.Map;
  *       promise; an animal's search time is scaled by the herds seen about and the country read
  *       without one; the herd hunted is the nearest by the way there (water at swimming pace);
  *       0: the flat figures, y 14, the fixed caps, the nearest by the straight line.</li>
+ *   <li>{@code motionsearch} - 1 (the default): on a level stretch of plain path the inputs come
+ *       from a short search with the game's own physics (MotionSearch, round 3): headings and jumps
+ *       played out ten ticks on a copy of the body with the level's collision shapes, the one
+ *       furthest along the path's corridor taken, unsafe ones (off the corridor, a fall that
+ *       hurts, lava, unplanned water) dropped; steps up and down, leaps, digging and water the old
+ *       way; 0: the old way everywhere.</li>
  * </ul>
  */
 public final class BotParams {
