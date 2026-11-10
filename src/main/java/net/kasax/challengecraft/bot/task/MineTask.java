@@ -141,9 +141,9 @@ public final class MineTask implements BotTask {
                     // it reaches up badly and the drops fall who knows where.)
                     if (!rockStairs) target = wallRock(level, bot);
                     if (!rockStairs && target == null) target = groundBlock(level, bot);
-                    // None at hand: rock showing a little way off (a hillside, a cliff, a river
-                    // bank, a cave mouth in the daylight) - walked to, as a player heads for the
-                    // grey he sees, instead of a staircase through the soil (in a savanna it went
+                    // None at hand: rock showing a little way off under the open sky (a stony
+                    // hill, a cliff, a river bank) - walked to, as a player heads for the grey he
+                    // sees, instead of a staircase through the soil (in a savanna it went
                     // seventeen levels down through dirt for the first three cobblestone).
                     if (!rockStairs && target == null && bot.params.on("rocksight")) target = rockInSight(level, bot);
                     if (target == null) {
@@ -379,9 +379,10 @@ public final class MineTask implements BotTask {
     private static final int ROCK_SIGHT = 40;
 
     /**
-     * The nearest rock showing in the open within {@link #ROCK_SIGHT} blocks (a face with daylight
-     * on it, not one deep in a dark cave), dry, not much below its feet and not under a lake:
-     * on the surface only, where a player would see it. Null when there is none, or underground.
+     * The nearest rock showing under the open sky within {@link #ROCK_SIGHT} blocks (on top of a
+     * stony hill or in a cliff face, not in a cave), with dry ground round it, not much below its
+     * feet and with no monster about it: on the surface only, where a player would see it. Null
+     * when there is none, or underground.
      */
     private BlockPos rockInSight(ServerLevel level, Bot bot) {
         // (Not for one that may not go looking - the work beside a furnace: rock at hand only.)
