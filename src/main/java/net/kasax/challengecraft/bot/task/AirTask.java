@@ -304,10 +304,10 @@ public final class AirTask implements BotTask {
 
     /**
      * What to try next, the ways that got nowhere left out (all of them spent: from the top
-     * again): a thin roof dug through; back along the dive; the way it came by the trail; still
-     * water open to the sky close by; the water round its own two blocks walled off, so that what
-     * fills them runs off and leaves air (a player's block in the flow); the path finder's search;
-     * last, the roof dug at.
+     * again): still water open to the sky close by, swum to; back along the dive; a thin roof dug
+     * through, when that is quicker than the air lasts; the way it came by the trail; the water
+     * round its own two blocks walled off, so that what fills them runs off and leaves air (a
+     * player's block in the flow); the path finder's search; last, the roof dug at.
      */
     private Way nextSafe(Bot bot, ServerLevel level, BlockPos feet) {
         if (spent.size() >= Way.values().length - 1) spent.clear();
