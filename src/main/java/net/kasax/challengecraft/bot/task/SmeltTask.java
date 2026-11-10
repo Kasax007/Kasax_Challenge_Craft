@@ -457,7 +457,7 @@ public final class SmeltTask extends StationTask {
         // share is done is lost: no more furnaces than pieces, the shares whole pieces' worth.)
         ItemStack mainFuel = furnace.getItem(FUEL);
         double per = mainFuel.isEmpty() ? 0 : BotKnowledge.fuelValue(mainFuel);
-        double smelts = mainFuel.isEmpty() ? 0 : per * mainFuel.getCount() + (isLit(furnace) ? per : 0);
+        double smelts = mainFuel.isEmpty() ? 0 : per * mainFuel.getCount() + burning(furnace);
         for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
             if (!st.isEmpty() && !route.input().test(st) && !st.is(route.result()) && BotKnowledge.fuelValue(st) > 0) smelts += BotKnowledge.fuelValue(st) * st.getCount();
         }
@@ -502,8 +502,10 @@ public final class SmeltTask extends StationTask {
         extra.setItem(IN, in.copyWithCount(share));
         in.shrink(share);
         furnace.setChanged();
-        // (The fuel all went into the first one: its share moved across.)
-        if (!loadFuel(body, extra, share)) shareFuel(furnace, extra, share);
+        // (The fuel all went into the first one: its share moved across first - the first keeps
+        // what its own share needs - and only what is still short taken from the pack.)
+        shareFuel(furnace, extra, share);
+        loadFuel(body, extra, share);
         extra.setChanged();
         furnace.setChanged();
         bot.say("another furnace for the batch (" + share + " of " + count + " in it)");
@@ -515,8 +517,8 @@ public final class SmeltTask extends StationTask {
         ItemStack fuel = from.getItem(FUEL);
         double per = fuel.isEmpty() ? 0 : BotKnowledge.fuelValue(fuel);
         if (per <= 0 || !to.getItem(FUEL).isEmpty() && !ItemStack.isSameItemSameComponents(to.getItem(FUEL), fuel)) return;
-        // (What the first still has to smelt keeps its share; a lit one has its fire going already.)
-        int keep = (int) Math.ceil(from.getItem(IN).getCount() / per) - (isLit(from) ? 1 : 0);
+        // (What the first still has to smelt keeps its share, less what its fire burning now does.)
+        int keep = (int) Math.ceil(Math.max(0, from.getItem(IN).getCount() - burning(from)) / per);
         int n = Math.min(fuel.getCount() - Math.max(0, keep), (int) Math.ceil(items / per));
         if (n <= 0) return;
         if (to.getItem(FUEL).isEmpty()) to.setItem(FUEL, fuel.copyWithCount(n));
@@ -528,6 +530,11 @@ public final class SmeltTask extends StationTask {
 
     private static boolean isLit(AbstractFurnaceBlockEntity furnace) {
         return furnace.getBlockState().getValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT);
+    }
+
+    /** How many items the fuel burning in it now still smelts (its slot not counted). */
+    static double burning(AbstractFurnaceBlockEntity furnace) {
+        return ((net.kasax.challengecraft.mixin.FurnaceAccessor) furnace).challengecraft$litTimeRemaining() / (double) COOK_TICKS;
     }
 
     /** Moves up to {@code count} matching input items into the furnace. */
@@ -550,10 +557,15 @@ public final class SmeltTask extends StationTask {
         return moved;
     }
 
-    /** Adds fuel for {@code items} more items; the cheapest-to-spare fuel first. */
+    /**
+     * Adds fuel for {@code items} more items; the cheapest-to-spare fuel first. What burns already
+     * counts: the coal lit for the batch smelts eight, and topping the furnace up with the pack's
+     * planks while it burns put the planks the shield wanted into the fire (smelt_and_go: six of
+     * eight planks gone, the shield never made) and made a second furnace look worth it.
+     */
     private boolean loadFuel(BotPlayer body, AbstractFurnaceBlockEntity furnace, int items) {
         ItemStack slot = furnace.getItem(FUEL);
-        double have = slot.isEmpty() ? 0 : BotKnowledge.fuelValue(slot) * slot.getCount();
+        double have = (slot.isEmpty() ? 0 : BotKnowledge.fuelValue(slot) * slot.getCount()) + burning(furnace);
         if (have >= items) return true;
         var inv = body.getInventory().getNonEquipmentItems();
         ItemStack best = null;
