@@ -167,11 +167,18 @@ public class BotOpeningTests {
         });
     }
 
+    /**
+     * The scene's game over and gone: the brain off, the board cleared (a game left "started"
+     * refuses the lobby's next bot - the lobby test after this batch), Lockout off, the bot out.
+     */
     private static void end(GameTestHelper h, Bot bot) {
         if (!BotManager.all().contains(bot)) return;
         bot.setBrain(null);
+        var server = h.getLevel().getServer();
+        var data = net.kasax.challengecraft.data.LockoutBingoSavedData.get(server.overworld());
+        data.resetForRun(data.getRunId());
         Chal_40_LockoutBingo.setActive(false);
-        BotManager.remove(h.getLevel().getServer(), bot);
+        BotManager.remove(server, bot);
     }
 
     /**
