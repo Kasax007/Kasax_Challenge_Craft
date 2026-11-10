@@ -1242,12 +1242,42 @@ public final class LockoutGoals {
             boolean night = facts.night();
             String name = BuiltInRegistries.ENTITY_TYPE.getKey(type).getPath();
             best = new Option(cost, () -> new SequenceTask("hunt a " + name + " at the " + family.replace('_', ' '), List.of(
-                    () -> new VisitStructureTask(level, family),
+                    () -> approach(level, family, type),
                     () -> night && !level.isDarkOutside() ? net.kasax.challengecraft.bot.task.WaitTask.pause(
                             (int) Math.min(6000, 20 * Math.max(20, untilDarkNow(level)))) : null,
                     () -> new KillTask(Set.of(type), Set.of(), 0, 1))));
         }
         return best;
+    }
+
+    /** Blocks from the spot it knows of a mob's home at which the hunt there begins. */
+    private static final double HUNT_NEAR = 12;
+
+    /**
+     * To a mob's home for the hunt: there once close to the spot known of it, or once such a mob
+     * is in sight on the way - not only standing inside one of its parts (a swamp hut on its stilts
+     * over the water, an outpost's tower: the visit alone gave up after eight spots tried).
+     */
+    private static BotTask approach(ServerLevel level, String family, EntityType<?> type) {
+        VisitStructureTask visit = new VisitStructureTask(level, family);
+        Set<Identifier> ids = VisitStructureTask.resolve(level, family);
+        return new BotTask() {
+            @Override
+            public Result tick(Bot b) {
+                var body = b.body();
+                if (VisitStructureTask.near(b, ids, HUNT_NEAR) || !body.level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                        body.getBoundingBox().inflate(24), e -> e.getType() == type && e.isAlive()).isEmpty()) {
+                    b.navigator().stop();
+                    return Result.DONE;
+                }
+                return visit.tick(b);
+            }
+
+            @Override
+            public String describe() {
+                return "to the " + family.replace('_', ' ');
+            }
+        };
     }
 
     private static double untilDarkNow(ServerLevel level) {

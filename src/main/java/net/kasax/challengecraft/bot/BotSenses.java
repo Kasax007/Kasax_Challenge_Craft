@@ -308,6 +308,12 @@ public final class BotSenses {
         nearestFrom(from);
     }
 
+    /** A biome known without having seen it - as the world sense gives one (a test sets one). */
+    public void knowBiome(Identifier id, BlockPos spot, BlockPos from) {
+        noteBiome(id, spot.immutable(), from);
+        nearestFrom(from);
+    }
+
     /** Everything known of a structure kind in this dimension, nearest to {@code from} first. */
     public List<SeenStructure> structuresOf(Identifier id, BlockPos from) {
         List<SeenStructure> out = new ArrayList<>(structureAtlas.getOrDefault(dimension, Map.of()).getOrDefault(id, List.of()));

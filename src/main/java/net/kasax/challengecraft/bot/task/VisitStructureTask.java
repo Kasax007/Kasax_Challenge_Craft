@@ -62,6 +62,20 @@ public final class VisitStructureTask implements BotTask {
         return false;
     }
 
+    /**
+     * Whether the bot stands within {@code range} blocks (over the land, and not far above or below)
+     * of the spot it knows of the nearest such structure - there for its chests or its mobs, whether
+     * or not it stands inside one of the structure's parts. (A buried treasure's one part is its
+     * chest under the sand: nobody stands inside it.)
+     */
+    public static boolean near(Bot bot, java.util.Set<Identifier> ids, double range) {
+        BotSenses.SeenStructure seen = nearest(bot, ids);
+        if (seen == null) return false;
+        BlockPos p = bot.body().blockPosition(), s = seen.spot();
+        double dx = p.getX() - s.getX(), dz = p.getZ() - s.getZ();
+        return dx * dx + dz * dz <= range * range && Math.abs(p.getY() - s.getY()) <= 16;
+    }
+
     /** The nearest seen structure of these kinds, or null. */
     public static BotSenses.SeenStructure nearest(Bot bot, java.util.Set<Identifier> ids) {
         BotSenses.SeenStructure best = null;
