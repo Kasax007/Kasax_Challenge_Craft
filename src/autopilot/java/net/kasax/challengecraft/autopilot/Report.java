@@ -121,9 +121,10 @@ final class Report {
         if (s.league.challenger != null) {
             Map<String, Object> d = s.league.duel();
             b.append("  Herausforderer: ").append(Knobs.text(s.league.challenger)).append('\n');
-            b.append(String.format(Locale.GERMANY, "  Duell: %d Spiele, der Herausforderer %+.2f Felder je Spiel (Tode als halbes Feld), %d Siege, %d Niederlagen%n",
-                    (long) Json.num(d.get("games"), 0), Json.num(d.get("mean_diff"), 0), (long) Json.num(d.get("wins"), 0),
-                    (long) Json.num(d.get("losses"), 0)));
+            long games = (long) Json.num(d.get("games"), 0), wins = (long) Json.num(d.get("wins"), 0), losses = (long) Json.num(d.get("losses"), 0);
+            b.append(String.format(Locale.GERMANY, "  Duell: %d %s, der Herausforderer %+.2f Felder je Spiel (Tode als halbes Feld), %d %s, %d %s%n",
+                    games, games == 1 ? "Spiel" : "Spiele", Json.num(d.get("mean_diff"), 0), wins, wins == 1 ? "Sieg" : "Siege",
+                    losses, losses == 1 ? "Niederlage" : "Niederlagen"));
         }
         if (s.pausedUntil > now) {
             b.append("  PAUSE nach mehreren Fehlern, noch ").append(duration(s.pausedUntil - now)).append(" (siehe Ereignisse)\n");
