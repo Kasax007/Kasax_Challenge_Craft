@@ -425,6 +425,26 @@ public final class SimBench {
         double cov = sxy / w - mx * my, vx = sxx / w - mx * mx, vy = syy / w - my * my;
         System.out.printf("per-goal claim rates: correlation %.2f (weighted by bots), mean squared error %.3f over %d goals; league mean %.3f, sim mean %.3f%n",
                 cov / Math.sqrt(vx * vy), se / w, k, mx, my);
+        if (o.containsKey("perseed")) {
+            // Per board: the simulator's tiles of player 0 less player 1's (a against b), to set
+            // beside a two-variant league's paired results seed by seed.
+            Map<Long, double[]> per = new java.util.LinkedHashMap<>();
+            for (Future<Result> f : fs) {
+                Result r = f.get();
+                double[] a = per.computeIfAbsent(r.seed(), x -> new double[3]);
+                a[0] += r.score[0];
+                a[1] += r.score[1];
+                a[2]++;
+            }
+            System.out.println("per seed (sim, " + brain + " less " + other + "):");
+            double sum = 0;
+            for (var e : per.entrySet()) {
+                double[] a = e.getValue();
+                sum += (a[0] - a[1]) / a[2];
+                System.out.printf("  %21d  %5.2f - %5.2f = %+5.2f%n", e.getKey(), a[0] / a[2], a[1] / a[2], (a[0] - a[1]) / a[2]);
+            }
+            System.out.printf("  mean %+5.2f over %d boards%n", sum / per.size(), per.size());
+        }
     }
 
     private static double rate(Map<String, Integer> claimed, Map<String, Integer> onBoard, String id, int reps) {
