@@ -928,6 +928,22 @@ public final class Bot {
                 if ((creeper || body.getHealth() <= (fighting ? 6 : 7) + (hard ? 2 : 0)
                         + (m instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob ? 4 : 0))
                         && !tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.PillarFightTask)) {
+                    // In the water: ashore, not "away" through more water - a drowned swims twice as
+                    // fast as he does, and struck him down at nightfall on seed 2582... (the run led
+                    // on through the river three times, seven hearts to none).
+                    if (!creeper && body.isInWater() && params.on("drowsafe") && !(top instanceof net.kasax.challengecraft.bot.task.NavGoalTask)) {
+                        net.minecraft.world.phys.Vec3 off = body.position().subtract(m.position()).multiply(1, 0, 1);
+                        net.minecraft.core.BlockPos steer = net.minecraft.core.BlockPos.containing(body.position().add(off.lengthSqr() < 1e-4 ? off : off.normalize().scale(12)));
+                        say("low (" + Math.round(body.getHealth()) + " hp), a " + m.getType().toShortString() + " at me in the water: ashore, away from it");
+                        actions.reset();
+                        retreat = new net.kasax.challengecraft.bot.task.NavGoalTask("ashore, away from the " + m.getType().toShortString(),
+                                (lv, p) -> lv.getFluidState(p).isEmpty() && lv.getFluidState(p.below()).isEmpty()
+                                        && !lv.getBlockState(p.below()).getCollisionShape(lv, p.below()).isEmpty(),
+                                b -> steer, 600);
+                        body.hurry = true;
+                        reflex(retreat);
+                        return;
+                    }
                     net.minecraft.world.phys.Vec3 away = openWayFrom(m.position(), 16);
                     say((creeper ? "a creeper hissing " + String.format("%.1f", m.distanceTo(body)) + " blocks off" : "low (" + Math.round(body.getHealth()) + " hp), a "
                             + m.getType().toShortString() + " at me") + ": away");

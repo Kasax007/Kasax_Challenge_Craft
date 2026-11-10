@@ -65,7 +65,9 @@ import java.util.Map;
  *   <li>{@code swordstone} - 1 (the default): stone dug while there is no weapon includes the
  *       sword's two; 0: only what is wanted now.</li>
  *   <li>{@code bowmanwary} - 1 (the default): without a shield, no block is gone for (nor a cave
- *       walked or broken into) with two bowmen by it; 0: as before.</li>
+ *       walked or broken into, nor a known spot walked to) with two bowmen by it; 0: as before.</li>
+ *   <li>{@code drowsafe} - 1 (the default): low on hearts in the water with something at it: ashore,
+ *       not away through more water; 0: away whichever way is open.</li>
  * </ul>
  */
 public final class BotParams {
