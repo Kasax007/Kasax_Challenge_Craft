@@ -3672,17 +3672,32 @@ behalten). Dazu kamen vier kleine Commits an den Werkzeugen:
 | `186d944` | `deaths.py`: jede Todesmeldung „was …“ zählt (der Dreizack eines Ertrunkenen, „impaled“, fehlte) |
 | `be1661e` | `versus.sh`, `bench.sh`: ein Server, der beim Stoppen hängt, bekommt nach TERM noch KILL |
 | `0711dd9` | `scripts/bot/launchfiles.py`: die Startdatei des Servers aus `build/bob/launch-spec.json` |
+| `36f80f1` | `ObtainPlanner`: keine negativen Schätzungen mehr bei mehreren Drops je Tötung (nach den Ligen, siehe unten) |
 
 **Der hängende Server:** Ein Server der Liga hing beim Stoppen („Saving chunks“) und ignorierte TERM.
 Er hielt die Ports seines Platzes, und die nächsten zwei Spiele dort fanden ihre Ports belegt
 („FAILED TO BIND TO PORT“, RCON-Zeitüberschreitung): zwei Seeds ohne Ergebnis. Seit `be1661e` folgt
 nach 10 s KILL.
 
+**Negative Schätzung** (`36f80f1`, gefunden in Liga 10):
+- **Was geschah:** Bob nahm „5 Dye Colors (~-1913 s)“ als schnelles Tile.
+- **Ursache:** Ein Tintenfisch war in Sicht, der nächste aber eine lange Suche weit weg. Für einen
+  Mob in Sicht ist der Teil „einmal“ eines Stapels der erste Kill minus ein „je Stück“.
+  `Leaf.perDrop` teilte bei mehreren Drops je Kill (Tintenbeutel: 2) nur „je Stück“ und ließ
+  „einmal“ stehen; die Summe für ein Stück wurde negativ.
+- **Jetzt:** Das erste Stück kostet einen ganzen Kill oder Block, jedes weitere ein n-tel. Bei
+  weniger als einem Stück je Block (Feuerstein aus Kies) ändert sich nichts.
+- **Test** `squid_in_sight_drops`: ein Tintenbeutel vorher ~−824 s (rot), jetzt ~92 s (grün).
+- Der Fix kam nach den Ligen 9 und 10. Er hebt die Schätzung für ein einzelnes Stück aller Dinge
+  mit mehreren Drops je Block oder Kill (Redstone, Lapis, Glowstone, Ton, Rindfleisch) auf
+  mindestens einen Block oder Kill.
+
 **Tests:**
 
 | Lauf | Ergebnis |
 | --- | --- |
 | volle Suite, Regeln (`*`) | 213 Tests, 212 grün; `brawl_zombie_trio` rot (10,8 HP verloren, Grenze 8), allein 3 von 3 grün (je 4,5 HP) |
+| volle Suite mit dem Fix (`36f80f1`) | 214 Tests, 211 grün; rot `barter_in_hole`, `brawl_enderman_slope`, `shield_walk_strays` (alle drei bekannt wackelig); allein mit dem Fix: `barter_in_hole` 3 von 5, `brawl_enderman_slope` 2 von 4, `shield_walk_strays` 1 von 1 grün; ohne Fix (`be1661e`): 3 von 3 und 2 von 3 |
 | `*brawl*` mit `-PbotLearned` | 11 von 12; `brawl_zombie_trio` rot (8,2 HP) |
 | `guardian_tests_*` mit `-PbotLearned` | 15 von 15 |
 | `*shield*` mit `-PbotLearned` | 7 von 7 |
@@ -3805,8 +3820,34 @@ ersten Stein (24 statt 53, `rocksight`).
 
 ### 27.6 Liga 10: neuer Stand gegen `search=1`
 
-Läuft: dieselben 12 Seeds, 20 Minuten, hart, SIM=1, `-` gegen `search=1` auf `be1661e`. Das
-Ergebnis folgt in einem eigenen Commit.
+Dieselben 12 Seeds, 20 Minuten, hart, SIM=1, Standard gegen `search=1`, beide auf `be1661e`
+(Spielcode wie Liga 9, noch ohne den Fix aus 27.4). Zwei Spiele endeten unentschieden.
+
+| Seite | Siege | Tiles | Tode | Herzen verloren | erstes Tile (Mittel / Median) | nach 5 / 10 / 20 min |
+| --- | --- | --- | --- | --- | --- | --- |
+| Standard (`-`) | 6 | 2,83 | 0,33 (4) | 25,9 | 429 / 242 s | 1,08 / 2,00 / 2,83 |
+| `search=1` | 4 | 1,83 | 0,42 (5) | 21,5 | 476 / 478 s | 0,33 / 0,58 / 1,83 |
+
+`search=1` minus Standard: −1,00 Tiles je Spiel (Standardfehler 0,75); Vorzeichentest auf die
+Siege p = 0,75.
+
+**Lesart:**
+- **Kein Gewinn im echten Spiel:** Der Simulator sagte +1,10 Tiles in 20 Minuten voraus, die
+  Spiele des Agenten (8, auf dem Stand vor Wissen und Eröffnung) zeigten 5 Siege. Auf dem neuen
+  Stand ist die Vorausschau eher schlechter. Der Knopf bleibt aus.
+- **Selten am Zug:** Sie entschied 21-mal in 12 Spielen; die Pflichten belegen den Rest der Zeit.
+- **Zu billige Ziele:** Das erste Tile kommt viel später (Median 478 gegen 242 s). Gewählt wurden
+  oft Biom-Besuche und Sammel-Ziele: 3 Sapling Types (3-mal), Dripstone Caves oder Dripstone Block
+  (3-mal), Sumpf, Ozeanruine, y −50. Solche Ziele sind im `GoalBook` und in Bobs Schätzung zu
+  billig (Dripstone Caves: in der Wissens-Liga 84 s geschätzt, 379 s gebraucht).
+- **Die Kalibrierung passt nicht mehr:** Bobs eigene Schätzung liegt jetzt im Median beim
+  0,94-fachen der Simulator-Zahl; vor dem Wissensstand lag sie beim 4,6-ten Teil. Der Boden
+  (0,5 × eigene Schätzung) greift kaum noch, und der Simulator ist gegen die Ligen 1 bis 8 (alte
+  Schätzungen, altes Eröffnungstempo) kalibriert.
+- **Ohne Eisen-Kit:** Die `search=1`-Seite verbrachte kaum Zeit mit Eisenspitzhacke und Eimer
+  (Standard: 133 und 54 s je Bot-Partie), dafür mehr mit Essen (185 gegen 107 s) und mit dem Weg zu
+  den Dripstone Caves (70 s).
+- **Tode:** 5 gegen 4, darunter wieder ein Ertrinken auf Seed `−3882…` (Standard-Seite).
 
 ### 27.7 Entscheidung
 
@@ -3858,14 +3899,17 @@ Grundlage der Reihenfolge:
 3. **Der Essensvorrat** (148 s je Bot-Partie, dazu 57 s nachts eingegraben). Ansatz: Essen aus dem,
    was in Sicht ist, mit dem Eisen zusammen braten. Der Simulator traut „kein Vorrat am Anfang“
    +0,74 Tiles zu. Auf hart kostete weniger Vorrat aber Tode (Liga 2).
-4. **Die Vorausschau** (`search=1`, Ergebnis in 27.6). Vor dem Standard:
-   - den Simulator an den Journalen kalibrieren (Profil und Rezepte automatisch, `speedrun.json` als
-     Expertenzeiten);
-   - die Pflichten (Essen, Schild, Kupfer, Bündel) mitentscheiden lassen, weil sie 50 bis 99 % von
-     Bobs Zeit belegen;
-   - eine Liga über 90 Minuten.
+4. **Die Vorausschau** (`search=1`): im echten Spiel −1,0 Tiles (Liga 10), im Simulator +1,1. Vor
+   einem neuen Versuch:
+   - den Simulator auf die Schätzfassung 2 und die Journale kalibrieren (Profil und Rezepte
+     automatisch, `speedrun.json` als Expertenzeiten; Biom-Besuche wie Dripstone Caves teurer);
+   - den Boden aus dem gelernten Zielmodell statt pauschal 0,5;
+   - die Pflichten (Essen, Schild, Kupfer, Bündel) und das Eisen-Kit mitentscheiden lassen, weil
+     sie 50 bis 99 % von Bobs Zeit belegen;
+   - dann eine 12-Seed-Liga und eine über 90 Minuten.
 5. **Schätzungen außerhalb des Planers** (Stunts, Biom-Besuche, 3 Sapling Types) sind jetzt die
-   optimistischen und werden zuerst gewählt. Fall 20 Blocks scheitert und wird wieder versucht.
+   optimistischen und werden zuerst gewählt (die Vorausschau nahm in Liga 10 dreimal 3 Sapling
+   Types). Fall 20 Blocks scheitert und wird wieder versucht.
    Ansatz: aus den Journalen kalibrieren und das Zielmodell auf Journalen der Fassung 2 neu
    trainieren.
 6. **Die neuen Beute- und Jagdwege** kamen in keiner Liga vor. Ansatz: eine Szenario-Liga mit
@@ -3878,7 +3922,7 @@ Grundlage der Reihenfolge:
 ### 27.9 Wo alles liegt
 
 - **Code:** `26.3-lockout-bot` = `bob/r1-int` (Merges `d85295b`, `e0e03f9`, `6ad6da7`, dann die
-  Werkzeug-Commits aus 27.4 und dieser Abschnitt). Die Branches `bob/r1-brain`, `bob/r1-knowledge`
+  Werkzeug-Commits und der Fix `36f80f1` aus 27.4 und dieser Abschnitt). Die Branches `bob/r1-brain`, `bob/r1-knowledge`
   und `bob/r1-opening` bleiben auf origin.
 - **Ergebnisse** (Ligen als JSON-Zeilen, Spiel-Logs, Journale, Testprotokolle) im Scratchpad der
   Sitzung unter `int/` (`league-old`, `league-new`, `league-new-rerun`, `league-search`,
