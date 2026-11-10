@@ -43,22 +43,25 @@ Außerdem: **Fabric für Minecraft 26.3** und **Java 25** auf dem Server (Schrit
 
 ## Schritt für Schritt
 
+Die Namen der Reiter und Felder stammen aus der Hilfe von BisectHosting. Heißen sie in deinem Panel
+etwas anders, such nach dem ähnlichsten.
+
 ### 1. Fabric 26.3 installieren
 
-Im BisectHosting-Panel gibt es einen Bereich zum Wechseln der Minecraft-Version bzw. der Server-Jar.
-Wähle dort **Fabric** und die Minecraft-Version **26.3**.
+Server stoppen. Im Reiter **Minecraft Tools** das Menü **Minecraft Jar** öffnen, **Fabric** wählen
+und die Version für Minecraft **26.3** installieren.
 
-Falls es Fabric dort nicht gibt:
+Falls es Fabric für 26.3 dort nicht gibt:
 
 1. Lade auf <https://fabricmc.net/use/server/> den Fabric-Server für Minecraft **26.3** herunter
    („Executable Server (.jar)“).
-2. Lade die Datei im Panel unter **Dateien** in den Hauptordner hoch.
-3. Trage ihren Namen unter **Startup** als Server-Jar ein.
+2. Lade die Datei im Panel in den Hauptordner hoch.
+3. Trage ihren Namen im Reiter **Startup** im Feld **Server Jar File** ein.
 
 ### 2. Java 25 einstellen
 
-Minecraft 26.3 braucht **Java 25**. Unter **Startup** gibt es eine Auswahl für die Java-Version
-(manchmal „Docker Image“ genannt). Stelle sie auf **Java 25**.
+Minecraft 26.3 braucht **Java 25**. Im Reiter **Home** unter **Java Version** die Version
+**Java 25** wählen (BisectHosting nennt sie „Java 25 Adoptium“).
 
 ### 3. Den Server einmal normal starten
 
@@ -93,15 +96,20 @@ Unter **Dateien**:
 
 ### 5. Die Server-Jar auf den Autopiloten stellen
 
-Unter **Startup** die Server-Jar auf **`bob-autopilot.jar`** ändern. Den Arbeitsspeicher und andere
-Startparameter lässt du, wie sie sind: Der Autopilot teilt den Speicher selbst auf.
+Im Reiter **Startup** im Feld **Server Jar File** den Namen der Fabric-Jar (zum Beispiel
+`fabric-server-launch.jar`) durch **`bob-autopilot.jar`** ersetzen. Notiere dir den alten Namen:
+Du brauchst ihn zum normalen Spielen wieder. Den Arbeitsspeicher und die anderen Startparameter
+lässt du, wie sie sind; der Autopilot teilt den Speicher selbst auf.
 
-Lässt das Panel keinen eigenen Namen für die Jar zu, sondern startet immer `server.jar`:
+Lässt sich das Feld nicht ändern (eigene Jars gibt es bei manchen Tarifen nicht), geht es auch
+über die Dateinamen:
 
-1. Die Fabric-Jar in `fabric-server.jar` umbenennen.
-2. `bob-autopilot.jar` in `server.jar` umbenennen.
+1. Die Jar, deren Name im Feld **Server Jar File** steht, umbenennen, zum Beispiel von
+   `fabric-server-launch.jar` in `fabric-original.jar`. Das ist die Fabric-Jar.
+2. `bob-autopilot.jar` in genau den Namen umbenennen, der im Feld steht.
 
-Der Autopilot findet die Fabric-Jar an ihrem Inhalt, egal wie sie heißt.
+Der Autopilot findet die Fabric-Jar an ihrem Inhalt, egal wie sie heißt. Zum normalen Spielen
+benennst du beide wieder zurück.
 
 ### 6. Starten
 
@@ -117,7 +125,7 @@ Starte den Server. In der Konsole sollte nach wenigen Sekunden etwa das stehen:
 ```
 
 Das erste Spiel braucht etwa eine Minute bis zum Start, die weiteren starten nacheinander. Steht
-statt dessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zeile davor, was fehlt
+stattdessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Zeile davor, was fehlt
 (siehe „Wenn etwas nicht geht“).
 
 ## Läuft es?
@@ -133,7 +141,9 @@ statt dessen eine **WARNUNG** mit „Der Autopilot startet nicht“, sagt die Ze
     wie Echtzeit),
   - die letzten Spiele und Ereignisse.
 
-Ein 90-Minuten-Spiel dauert je nach Tempo etwa 30 bis 60 echte Minuten.
+Ein 90-Minuten-Spiel dauert je nach Tempo etwa 30 bis 60 echte Minuten. Die Uhrzeiten stehen in
+der Zeitzone des Servers. Oft ist das UTC: Dann zeigen sie im Winter eine Stunde weniger als die
+deutsche Uhr, im Sommer zwei.
 
 ## Die Ergebnisse herunterladen und mir schicken
 
@@ -154,8 +164,8 @@ hineinpasst, kommt ins nächste.
   Minute. Halb gespielte Spiele zählen nicht. Beim nächsten Start geht die Liga weiter, wo sie war.
 - **`finish`** in der Konsole: Die laufenden Spiele werden zu Ende gespielt, dann hört der Autopilot
   auf. Das dauert bis zu einer Stunde.
-- **Wieder normal spielen:** Server stoppen, unter **Startup** die Server-Jar zurück auf die
-  Fabric-Jar stellen, starten. Der Ordner `bob-autopilot` stört dabei nicht; du kannst ihn liegen
+- **Wieder normal spielen:** Server stoppen, im Reiter **Startup** im Feld **Server Jar File** wieder
+  den Namen der Fabric-Jar eintragen (oder die Jars zurückbenennen), starten. Der Ordner `bob-autopilot` stört dabei nicht; du kannst ihn liegen
   lassen (dann geht die Liga beim nächsten Mal weiter) oder löschen.
 
 Geplante Neustarts des Panels schaden nicht. Nur das gerade laufende Spiel geht dabei verloren.
@@ -191,12 +201,13 @@ Bekommst du im Chat eine neue `challengecraft-1.1.4.jar`:
 3. Starten.
 
 Die Liga läuft weiter. Jedes Ergebnis merkt sich, mit welcher Bob-Version es gespielt wurde.
+Kommt im Chat auch eine neue `bob-autopilot.jar` mit, ersetzt du sie im Hauptordner genauso.
 
 ## Wenn etwas nicht geht
 
 | Meldung oder Problem | Lösung |
 | --- | --- |
-| „Minecraft 26.3 braucht Java 25“ | Unter **Startup** Java 25 wählen. |
+| „Minecraft 26.3 braucht Java 25“ | Im Reiter **Home** unter **Java Version** Java 25 wählen. |
 | „Die Minecraft-EULA ist … noch nicht akzeptiert“ | Schritt 3: einmal normal starten und die EULA bestätigen, oder in `eula.txt` `eula=true` eintragen. |
 | „Keine Fabric-Server-Jar im Hauptordner gefunden“ | Schritt 1. Oder in `bob-autopilot.properties` `server_jar=<Name der Fabric-Jar>` eintragen. |
 | „Im Mods-Ordner ist keine Challenge-Craft-Jar“ / „fehlt Fabric API“ | Schritt 4. |

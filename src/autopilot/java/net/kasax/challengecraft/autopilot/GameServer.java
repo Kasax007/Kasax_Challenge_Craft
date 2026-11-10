@@ -117,7 +117,7 @@ final class GameServer {
         p.put("management-server-enabled", "false");
         p.put("difficulty", cfg.difficulty);
         p.put("spawn-protection", "0");
-        p.put("max-players", "16");
+        p.put("max-players", Integer.toString(Math.max(16, cfg.arenaBots + 4)));
         p.put("motd", "Bob-Autopilot " + name);
         boolean arena = kind == Kind.ARENA;
         p.put("view-distance", Integer.toString(arena ? 6 : cfg.viewDistance));
