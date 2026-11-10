@@ -45,6 +45,10 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   chunk), its iron made into the shield ({@code treasureiron}).</li>
  *   <li>{@code staircase_pace}: a staircase twenty-six levels down through solid stone to a layer
  *   of iron ore - the pace of the way down to the ore, in ticks a level (logged).</li>
+ *   <li>{@code mountain_iron}: on a mountain of solid stone (its top at y 125), iron ore in its rock
+ *   a dozen blocks off at the height of the feet and a layer of it at y 14 far below: the
+ *   tunnel a few blocks under the feet ({@code mountainiron}), against the staircase down a hundred
+ *   levels ({@code mountain_iron_old_way}).</li>
  * </ul>
  */
 public class BotKitTests {
@@ -218,6 +222,46 @@ public class BotKitTests {
             if (ok) BotArena.LOG.info("[BOTTEST] {} {} levels in {} ticks: {} ticks a level", name, top - 3, h.getTick(), h.getTick() / (top - 3));
             return ok;
         });
+    }
+
+    /**
+     * A mountain of stone round the start, its top at y 125 (built up from the arena's floor),
+     * four little iron veins in its rock twelve blocks off at the height of the feet less four,
+     * and a layer of iron at y 14: the first raw iron, by the knobs given.
+     */
+    private static void mountainIron(GameTestHelper h, String name, String knobs, int budget) {
+        BotArena a = BotArena.flat(h, name);
+        int base = a.abs(0, 0, 0).getY();
+        int top = 125 - base; // (relative: the mountain's top block)
+        a.fill(8, BotArena.GROUND, 8, 32, top, 32, Blocks.STONE);
+        // The layer at y 14 (or the arena's lowest stone, whichever is higher).
+        int layer = Math.max(1, 14 - base);
+        a.fill(8, layer, 8, 32, layer, 32, Blocks.IRON_ORE);
+        // The veins at the tunnel's height (the feet at top + 1, the tunnel four lower).
+        int vein = top + 1 - 4;
+        for (int[] d : new int[][]{{12, 0}, {-12, 0}, {0, 12}, {0, -12}}) {
+            a.fill(20 + d[0], vein, 20 + d[1], 20 + d[0] + Integer.signum(d[0]), vein + 1, 20 + d[1] + Integer.signum(d[1]), Blocks.IRON_ORE);
+        }
+        Bot bot = a.spawn(20, top + 1, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_PICKAXE),
+                new ItemStack(Items.BREAD, 16), new ItemStack(Items.COBBLESTONE, 32));
+        bot.params = BotParams.parse(knobs);
+        var body = bot.body();
+        a.run(new ObtainTask(Set.of(Items.RAW_IRON), 1), budget, () -> ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)) >= 1);
+    }
+
+    /** On the mountain: the iron in its own rock, a short tunnel away. */
+    @GameTest(environment = "challengecraft:kit_mountain", structure = STRUCTURE, maxTicks = 2400, skyAccess = true, padding = 8)
+    public void mountainIron(GameTestHelper h) {
+        mountainIron(h, "mountain_iron", "-", 2400);
+    }
+
+    /**
+     * The same the old way: the staircase down to y 14, for the comparison. (Optional: its time
+     * is the reference; a staircase of a hundred levels may not make it within the budget.)
+     */
+    @GameTest(environment = "challengecraft:kit_mountain", structure = STRUCTURE, maxTicks = 9000, skyAccess = true, padding = 8, required = false)
+    public void mountainIronOldWay(GameTestHelper h) {
+        mountainIron(h, "mountain_iron_old_way", "mountainiron=0", 9000);
     }
 
     /** Copper armour, a piece at a time from one batch: the second piece's ingots cook while the first is made. */
