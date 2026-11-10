@@ -101,7 +101,7 @@ public final class SmeltTask extends StationTask {
             for (var f : all) {
                 if (f.getItem(IN).isEmpty() || !f.getItem(FUEL).isEmpty() || isLit(f)) continue;
                 if (loadFuel(body, f, f.getItem(IN).getCount())) continue;
-                for (var g : all) if (g != f && f.getItem(FUEL).isEmpty()) shareFuel(g, f, f.getItem(IN).getCount());
+                for (var g : all) if (g != f && f.getItem(FUEL).isEmpty()) shareFuel(g, f, f.getItem(IN).getCount(), bot.params.on("smeltgo"));
                 if (!f.getItem(FUEL).isEmpty()) continue;
                 for (var g : all) {
                     if (g == f || !isLit(g) && g.getItem(FUEL).isEmpty()) continue;
@@ -457,7 +457,10 @@ public final class SmeltTask extends StationTask {
         // share is done is lost: no more furnaces than pieces, the shares whole pieces' worth.)
         ItemStack mainFuel = furnace.getItem(FUEL);
         double per = mainFuel.isEmpty() ? 0 : BotKnowledge.fuelValue(mainFuel);
-        double smelts = mainFuel.isEmpty() ? 0 : per * mainFuel.getCount() + burning(furnace);
+        // (smeltgo counts what the fire burning now still smelts; off: the old way, a lit furnace
+        // one piece's worth - so a game with the knob off spreads its batch as before.)
+        boolean go = bot.params.on("smeltgo");
+        double smelts = mainFuel.isEmpty() ? 0 : per * mainFuel.getCount() + (go ? burning(furnace) : (isLit(furnace) ? per : 0));
         for (ItemStack st : body.getInventory().getNonEquipmentItems()) {
             if (!st.isEmpty() && !route.input().test(st) && !st.is(route.result()) && BotKnowledge.fuelValue(st) > 0) smelts += BotKnowledge.fuelValue(st) * st.getCount();
         }
@@ -502,10 +505,13 @@ public final class SmeltTask extends StationTask {
         extra.setItem(IN, in.copyWithCount(share));
         in.shrink(share);
         furnace.setChanged();
-        // (The fuel all went into the first one: its share moved across first - the first keeps
-        // what its own share needs - and only what is still short taken from the pack.)
-        shareFuel(furnace, extra, share);
-        loadFuel(body, extra, share);
+        // (The fuel all went into the first one. smeltgo: its share moved across first - the first
+        // keeps what its own share needs - and only what is still short taken from the pack; off:
+        // from the pack first, as before.)
+        if (go) {
+            shareFuel(furnace, extra, share, true);
+            loadFuel(body, extra, share);
+        } else if (!loadFuel(body, extra, share)) shareFuel(furnace, extra, share, false);
         extra.setChanged();
         furnace.setChanged();
         bot.say("another furnace for the batch (" + share + " of " + count + " in it)");
@@ -513,12 +519,14 @@ public final class SmeltTask extends StationTask {
     }
 
     /** Fuel for {@code items} moved from one furnace to another (the first keeps what it needs). */
-    private static void shareFuel(AbstractFurnaceBlockEntity from, AbstractFurnaceBlockEntity to, int items) {
+    private static void shareFuel(AbstractFurnaceBlockEntity from, AbstractFurnaceBlockEntity to, int items, boolean go) {
         ItemStack fuel = from.getItem(FUEL);
         double per = fuel.isEmpty() ? 0 : BotKnowledge.fuelValue(fuel);
         if (per <= 0 || !to.getItem(FUEL).isEmpty() && !ItemStack.isSameItemSameComponents(to.getItem(FUEL), fuel)) return;
-        // (What the first still has to smelt keeps its share, less what its fire burning now does.)
-        int keep = (int) Math.ceil(Math.max(0, from.getItem(IN).getCount() - burning(from)) / per);
+        // (What the first still has to smelt keeps its share - smeltgo: less what its fire burning
+        // now does; off: a lit one has its fire going already, as before.)
+        int keep = go ? (int) Math.ceil(Math.max(0, from.getItem(IN).getCount() - burning(from)) / per)
+                : (int) Math.ceil(from.getItem(IN).getCount() / per) - (isLit(from) ? 1 : 0);
         int n = Math.min(fuel.getCount() - Math.max(0, keep), (int) Math.ceil(items / per));
         if (n <= 0) return;
         if (to.getItem(FUEL).isEmpty()) to.setItem(FUEL, fuel.copyWithCount(n));

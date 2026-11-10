@@ -3961,3 +3961,14 @@ nichts bringt.
 **Lehre:** Einzelne Fähigkeiten werden in festen Szenen klar besser, aber 12 echte Partien sind zu
 wenige, um 0,5 Felder sicher zu sehen (SE 0,4–1,2). Messen gehört auf Hardware, die rund um die Uhr
 spielt und keine Tokens kostet.
+
+**Stand der Tests am Merge (`bob/r2-knobs`, 252 Spieltests):** Mit den Runde-2-Schaltern aus (wie im
+normalen Spiel, `-PbotKnobs=…=0`) bestehen alle alten Tests bis auf die bekannten wackligen
+(`brawl_zombie_trio`, `brawl_enderman_slope`, `shield_walk_strays`, `walk_item_not_for_portals` unter
+Last). Beim Merge fiel auf: drei Rechnungen des Kit-Zweigs in `SmeltTask` (Brennstoff des Ofens, der
+gerade brennt, und die Verteilung auf weitere Öfen) hingen an keinem Schalter, dadurch nutzte Bob für
+18 Eisen nur einen Ofen (`parallel_smelt`); sie gelten jetzt nur mit `smeltgo`. Offen, für später:
+die Szenen `copper_armour` und `smelt_and_go` (scheitern auf beiden Wegen), `loot_village_route`
+(Testaufbau), `search_first_tile` (Bob holt das erste Feld inzwischen nebenbei, bevor die Vorausschau
+mit `search=1` entscheidet; `search_chores_first_tile` mit `search=2` besteht), mit `smeltgo` an
+scheitert `parallel_smelt` weiter.
