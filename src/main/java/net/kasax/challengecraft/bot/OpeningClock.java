@@ -23,6 +23,11 @@ import java.util.TreeMap;
  * seconds, {@code act} the seconds per activity over the window, {@code pre} the same up to the
  * first tile, {@code by} the seconds per decider and activity, {@code speed} how fast it covered
  * ground while walking (blocks a second), {@code reflexes} how often a reflex took over.
+ *
+ * <p>Over the whole game (not only the window), for the errands that make the kit and the food
+ * ({@link #KIT_DECIDERS}): {@code kit} the seconds per decider and "activity:task at work" (where a
+ * shield's trip goes: the walk, the staircase, the tunnel, the furnace...), and {@code pace} the
+ * walking: the share of it sprinting and the pace on level ground.
  */
 public final class OpeningClock {
     /** How long the activities are counted (the milestones are looked for the whole game). */
@@ -44,7 +49,12 @@ public final class OpeningClock {
             new Milestone("shield", Set.of(Items.SHIELD)),
             new Milestone("iron_ingot", Set.of(Items.IRON_INGOT)),
             new Milestone("iron_pickaxe", Set.of(Items.IRON_PICKAXE, Items.DIAMOND_PICKAXE)),
-            new Milestone("bucket", Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET)));
+            new Milestone("bucket", Set.of(Items.BUCKET, Items.WATER_BUCKET, Items.LAVA_BUCKET)),
+            new Milestone("raw_iron", Set.of(Items.RAW_IRON, Items.IRON_INGOT)),
+            new Milestone("copper_ingot", Set.of(Items.COPPER_INGOT)),
+            new Milestone("copper_armour", Set.of(Items.COPPER_HELMET, Items.COPPER_CHESTPLATE, Items.COPPER_LEGGINGS, Items.COPPER_BOOTS)));
+    /** The deciders whose time is broken down over the whole game: the kit, the food, the opening. */
+    public static final Set<String> KIT_DECIDERS = Set.of("invest", "armour", "kit", "food", "opening", "night", "raid", "side");
     /** A stock of food: what a night or a fight wants in the pack (the brain's own "bare" line is 8). */
     private static final int FOOD_STOCK = 8;
 
@@ -58,6 +68,11 @@ public final class OpeningClock {
     /** Ground covered (flat blocks) and ticks, while walking or searching. */
     private double walked;
     private int walkTicks;
+    /** The whole game: per kit decider, seconds per "activity:task" (see {@link #KIT_DECIDERS}). */
+    private final Map<String, Map<String, Integer>> kit = new TreeMap<>();
+    /** The whole game's walking: ticks sprinting, and ground and ticks on the level. */
+    private int walkAll, sprintTicks, levelTicks;
+    private double levelWalked, lastY;
     private double lastX, lastZ;
     private int reflexes, lastNavWait;
     private boolean wasReflex, firstTile;
@@ -66,6 +81,7 @@ public final class OpeningClock {
         this.bot = bot;
         lastX = bot.body().getX();
         lastZ = bot.body().getZ();
+        lastY = bot.body().getY();
         lastNavWait = bot.navigator().waitTicks;
     }
 
@@ -86,8 +102,28 @@ public final class OpeningClock {
             if (!reached.containsKey("stone_tools") && List.of("stone_pickaxe", "stone_sword", "stone_axe", "stone_shovel").stream().allMatch(reached::containsKey))
                 reached.put("stone_tools", ticks);
         }
-        if (ticks > WINDOW_TICKS) return;
         String what = activity();
+        String doing = decider();
+        // (The whole game, the kit's errands only: what the task at work was.)
+        if (KIT_DECIDERS.contains(doing)) {
+            BotTask in = BotTask.innermost(bot.current());
+            kit.computeIfAbsent(doing, k -> new TreeMap<>()).merge(what + ":" + (in == null ? "-" : in.getClass().getSimpleName()), 1, Integer::sum);
+        }
+        double mx = body.getX() - lastX, mz = body.getZ() - lastZ, my = body.getY() - lastY;
+        if ((what.equals("walk") || what.equals("search")) && mx * mx + mz * mz < 4) {
+            walkAll++;
+            if (body.isSprinting()) sprintTicks++;
+            if (Math.abs(my) < 0.05 && body.onGround()) {
+                levelTicks++;
+                levelWalked += Math.sqrt(mx * mx + mz * mz);
+            }
+        }
+        lastY = body.getY();
+        if (ticks > WINDOW_TICKS) {
+            lastX = body.getX();
+            lastZ = body.getZ();
+            return;
+        }
         act.merge(what, 1, Integer::sum);
         // (Which task it was at, for the activities that hide most: what it waited on, what it dug for.)
         if (what.equals("wait") || what.equals("dig") || what.equals("walk") || what.equals("search")) {
@@ -95,7 +131,7 @@ public final class OpeningClock {
             detail.merge(what + ":" + (in == null ? "-" : in.getClass().getSimpleName()), 1, Integer::sum);
         }
         if (!firstTile) pre.merge(what, 1, Integer::sum);
-        by.computeIfAbsent(decider(), k -> new TreeMap<>()).merge(what, 1, Integer::sum);
+        by.computeIfAbsent(doing, k -> new TreeMap<>()).merge(what, 1, Integer::sum);
         boolean reflex = bot.inReflex();
         if (reflex && !wasReflex) reflexes++;
         wasReflex = reflex;
@@ -175,7 +211,16 @@ public final class OpeningClock {
         }
         sb.append("},\"detail\":").append(seconds(detail, true));
         sb.append(",\"speed\":").append(String.format(java.util.Locale.ROOT, "%.2f", walkTicks == 0 ? 0 : walked / walkTicks * 20))
-                .append(",\"reflexes\":").append(reflexes).append(",\"window\":").append(Math.min(ticks, WINDOW_TICKS) / 20).append('}');
+                .append(",\"reflexes\":").append(reflexes).append(",\"window\":").append(Math.min(ticks, WINDOW_TICKS) / 20);
+        sb.append(",\"kit\":{");
+        n = 0;
+        for (var e : kit.entrySet()) {
+            if (n++ > 0) sb.append(',');
+            sb.append('"').append(e.getKey()).append("\":").append(seconds(e.getValue(), true));
+        }
+        sb.append("},\"pace\":{\"walk\":").append(String.format(java.util.Locale.ROOT, "%.1f", walkAll / 20.0))
+                .append(",\"sprint\":").append(String.format(java.util.Locale.ROOT, "%.2f", walkAll == 0 ? 0 : sprintTicks / (double) walkAll))
+                .append(",\"level\":").append(String.format(java.util.Locale.ROOT, "%.2f", levelTicks == 0 ? 0 : levelWalked / levelTicks * 20)).append("}}");
         return sb.toString();
     }
 
