@@ -134,7 +134,7 @@
   "obtain_nether_gold_ore": {"expert": 600, "needs": "Silk Touch", "ways": ["mine: nether gold ore with Silk Touch (nuggets drop otherwise)"]},
   "obtain_netherrack": {"expert": 5, "needs": "pickaxe", "ways": ["mine: anywhere in the Nether"]},
   "obtain_quartz": {"expert": 30, "needs": "pickaxe", "ways": ["mine: nether quartz ore, common in nether wastes"]},
-  "obtain_glowstone": {"expert": 120, "ways": ["mine: glowstone under the Nether ceiling (pillar up), four dust a block", "barter: none - only the dust from witches and clerics"]},
+  "obtain_glowstone": {"expert": 120, "ways": ["mine: glowstone under the Nether ceiling (pillar up), four dust a block", "trade: a journeyman cleric, four emeralds for a block", "craft: four glowstone dust (witches drop it)"]},
   "obtain_blaze_rod": {"expert": 300, "ways": ["kill: blazes at a fortress spawner (1 in 2 drop a rod)"]},
   "obtain_nether_wart": {"expert": 240, "ways": ["mine: the wart gardens on a fortress's stairs", "loot: bastion treasure"]},
   "obtain_ghast_tear": {"expert": 300, "ways": ["kill: a ghast over land (the tear falls into lava otherwise)"]},
@@ -272,7 +272,7 @@
   "visit_stronghold": {"expert": 1800, "ways": ["follow: eyes of ender, triangulated"]},
   "visit_end_city": {"expert": 3600, "needs": "the End, the dragon dead", "ways": ["fly: through an end gateway after the dragon, ender pearls across"]},
   "enter_end_gateway": {"expert": 3300, "needs": "the End, the dragon dead", "ways": ["throw: an ender pearl into the gateway the dragon's death opens"]},
-  "use_totem": {"expert": 2400, "ways": ["loot: woodland mansion evokers drop totems", "trade: none"]},
+  "use_totem": {"expert": 2400, "ways": ["kill: an evoker, it always drops a totem (woodland mansions, the later waves of a raid)", "use: the totem in a hand, then a deadly hit (a long fall)"]},
   "get_levitation": {"expert": 3600, "ways": ["fight: a shulker's bullet (end cities)"]},
 
   "milk_cow": {"expert": 60, "needs": "bucket", "ways": ["use: a bucket on a cow"]},
