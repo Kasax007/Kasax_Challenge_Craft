@@ -1248,8 +1248,8 @@ public final class Bot {
         }
     }
 
-    /** When it last ran from something slow for want of a weapon (body ticks), and when a weapon was last tried for after that. */
-    private int keptAwayAt = -1000, weaponTriedAt = -1000;
+    /** When it last ran from something slow for want of a weapon, and when a weapon was last tried for after that (game time: a new body after a death starts its ticks again). */
+    private long keptAwayAt = -1000, weaponTriedAt = -1000;
     private static final java.util.Set<net.minecraft.world.item.Item> MAKESHIFT_SWORDS = java.util.Set.of(
             net.minecraft.world.item.Items.WOODEN_SWORD, net.minecraft.world.item.Items.STONE_SWORD);
 
@@ -1274,8 +1274,9 @@ public final class Bot {
             if (closest == null || m.distanceToSqr(body) < closest.distanceToSqr(body)) closest = m;
         }
         // Well behind (or none after it): a weapon, if the pack has what one is made of.
-        if ((closest == null || closest.distanceTo(body) > 10) && body.tickCount - keptAwayAt < 600 && body.tickCount - weaponTriedAt > 600) {
-            weaponTriedAt = body.tickCount;
+        long now = body.level().getGameTime();
+        if ((closest == null || closest.distanceTo(body) > 10) && now - keptAwayAt < 600 && now - weaponTriedAt > 600) {
+            weaponTriedAt = now;
             var planner = new net.kasax.challengecraft.bot.plan.ObtainPlanner();
             double est = planner.estimate(this, MAKESHIFT_SWORDS, 1);
             if (est <= 10) {
@@ -1319,7 +1320,7 @@ public final class Bot {
         if (!roomToRun(centre, Guardian.UNARMED_RUN_ROOM)) return false;
         net.minecraft.core.BlockPos to = escapeCrumb(centre);
         if (to == null) to = net.minecraft.core.BlockPos.containing(body.position().add(openWayFrom(centre, 24)));
-        keptAwayAt = body.tickCount;
+        keptAwayAt = now;
         say("no weapon, " + close + " " + closest.getType().toShortString() + (close > 1 ? "s" : "") + " coming (" + String.format("%.1f", closest.distanceTo(body))
                 + " off): away at a run, to " + to.toShortString());
         actions.reset();
