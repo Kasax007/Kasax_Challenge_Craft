@@ -1268,6 +1268,17 @@ public final class Bot {
                 reflex(new net.kasax.challengecraft.bot.task.ObtainTask(MAKESHIFT_SWORDS, 1, planner));
                 return true;
             }
+            // No sword to be had, and it is night: dug in till the morning while they are far
+            // enough behind for the digging (they burn at dawn) - running on in the dark only meets
+            // the next ones.
+            if (body.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && body.level().isDarkOutside()
+                    && (net.kasax.challengecraft.bot.task.HideTask.possible(this) || net.kasax.challengecraft.bot.task.HideTask.shelterPossible(this))) {
+                say("no weapon at night, " + (closest == null ? "nothing after me now" : "they are well behind") + ": dug in till morning");
+                actions.reset();
+                navigator.stop();
+                reflex(net.kasax.challengecraft.bot.task.HideTask.shelter());
+                return true;
+            }
             return false;
         }
         if (closest == null || closest.distanceTo(body) > 6 || !body.hasLineOfSight(closest) && closest.distanceTo(body) > 3) return false;
