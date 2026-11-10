@@ -3972,3 +3972,122 @@ die Szenen `copper_armour` und `smelt_and_go` (scheitern auf beiden Wegen), `loo
 (Testaufbau), `search_first_tile` (Bob holt das erste Feld inzwischen nebenbei, bevor die Vorausschau
 mit `search=1` entscheidet; `search_chores_first_tile` mit `search=2` besteht), mit `smeltgo` an
 scheitert `parallel_smelt` weiter.
+
+## 29. Runde 3 (10.11.2026): drei Algorithmen und der Bob-Trainer
+
+Auftrag des Nutzers: modernere Algorithmen, die zu Bobs Umgebung passen (drei freigegeben), und eine
+Software für den Laptop, die im Hintergrund trainiert, pausier- und fortsetzbar ist und Ergebnisse
+zum Hochladen exportiert. Dazu sein Einwand: Welten sind verschieden, ein fester Seed deckt das nicht
+ab, und Zeitschätzungen hängen vom Kontext ab, in dem sie gemessen wurden. Zweig `bob/r3-algos`
+(von `0249894`). Alle drei Knöpfe sind im Code standardmäßig an (die Tests prüfen die neuen Wege),
+in `champion.json` und den Liga-Tabellen (`Knobs.java`, `bobleague.py`) aber 0: Die Liga testet sie
+zuerst als Herausforderer.
+
+### 29.1 Risikobewusste Wege (`riskpath`, `BotRisk`)
+
+- Gefahr ist Teil der Kantenkosten der Wegsuche, in Ticks: ein verlorenes Herz kostet die Zeit zum
+  Heilen (4 s, bis vierfach bei wenig Herzen), ein Tod 240 s.
+- Bewertet werden: Monster in Sicht nach Art (Nahkämpfer nach Schlag und Abstand, Schützen nur mit
+  freier Sichtlinie, Creeper-Explosion, Spinnen am Tag kaum), Lava neben dem Schritt (Ausrutschen,
+  Rückstoß; mit Monster in der Nähe fünffach), Abgrundkanten, Sprünge über Abgründe, die Luft beim
+  Tauchen (von Schritt zu Schritt mitgeführt, auch über das vorausgeplante Wegstück) und offenes
+  Gelände bei Nacht. Ersetzt die alten Pauschalen (Lavakante +8, Kante +5, Faktor bei Monstern).
+- Nur Aufschläge: die Heuristik bleibt zulässig. Aufwand begrenzt: höchstens 16 Monster, Wert je
+  Zelle einmal je Suche, Sichtlinien nur in Schussweite.
+- Beim Weg aus dem Wasser mit fast leerer Luft (Suche nach Luft) gilt der Luftterm nicht: Jeder Weg
+  ist dann gleich knapp, der kürzeste ist der sichere (`drown_flooded_stairs` schlug sonst fehl).
+
+| Szene (`BotAlgoTests`, je 3 Läufe) | aus | an |
+| --- | --- | --- |
+| Zwei Skelette hinter einer Mauer, Weg gräbt durch | 12 / 13,5 / 13,5 HP verloren, nicht angekommen (im Loch versteckt) | 0 / 0 / 0 HP, angekommen in 276 Ticks, nie in ihrer Schussweite |
+| Damm zwischen Lava (17 lang), Umweg ~50 Blöcke | Damm, 117 Ticks, 0 HP | Umweg, 283 Ticks, 0 HP |
+| Tauchgang über einen Seeboden, 60 Blöcke | 470 Ticks, 0 HP | 471 Ticks, 0 HP (der Luft-Reflex aus Runde 2 rettet auch den alten Weg) |
+| 75 Blöcke flach | 216 Ticks | 216 Ticks (+0 %) |
+
+### 29.2 Weltmodell (`beliefs`, `belief.Beliefs`)
+
+- **Priors aus den echten 26.3-Daten** (`scripts/bot/belief_priors.py` liest die Worldgen-JSON der
+  Server-Jar, schreibt `bob-knowledge/beliefs.json`): Erzblöcke je Chunk und Höhe aus den
+  Placed Features (Anzahl, Höhenverteilung uniform/trapezförmig, Adergröße), je Biom die Bäume je
+  Chunk und die Spawn-Gewichte. Eisen: 1,5 Blöcke je Chunk-Schicht bei y 16, 0,44 bei y 100, 2,5 bei
+  y 200 (Berge).
+- **Beobachtungen:** jeder vom Gedächtnis gelesene Chunk (Biom, Stämme in Sicht – keine ist ein
+  Beleg), jedes gesehene Tier.
+- **Schätzungen nach Kontext:** Erz ohne Sichtung – die beste Grabhöhe von hier (Treppe 2,3 s je
+  Ebene gegen die Dichte dort, ein bekannter Höhlengang, das Tempo der Spitzhacke; gemessen:
+  2,3 s je Treppenstufe, 2,5 s je Tunnelschritt mit Steinspitzhacke). Stämme ohne Sichtung – der Weg
+  bis zum ersten Chunk mit Bäumen: Biome sind breit, also gilt erst das Biom am Rand der Sicht, dann
+  die Weltmischung. Tiere – Faktor auf die Suchzeit nach Herden in Sicht und gelesenem Land ohne.
+  Reisezeit – gerade Linie mit Wasser im Schwimmtempo.
+- **Suche:** Gegraben wird in der geschätzt besten Höhe; aufgegeben wird, wenn die Posterior, dass
+  die Stelle so gut ist wie der Prior (gegen „ein Fünftel davon“), unter 0,2 fällt – nicht nach
+  fester Zeit. Bei Jagden die nächste Herde nach Reisezeit.
+- **Journal:** Jeder Zielversuch trägt `ctx` (Biom, Nacht, Höhe, Oberfläche, Ausrüstung, nächstes
+  bekanntes Eisen/Holz, die Schätzungen des Modells) neben Schätzung und echter Zeit: Kalibrierung
+  je Kontext statt je Seed.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Schätzung Eisen (Ebene y 65 / Berg y 150 / Höhle bekannt) | 202 s bei y 30 / 68 s bei y 150 / 37 s (alt pauschal 208 s, immer y 14) |
+| Schätzung Holz (alles gelesene Land Wüste / Ebene / nichts gelesen) | 139 s / 46 s / 100 s |
+| Planer Roheisen (Eisenerz in Sicht / keins) | 6 s / 113 s |
+| Kuh jenseits eines Flusses (29 Blöcke) oder diesseits (30) | aus: über den Fluss, 184 Ticks; an: diesseits, 103 Ticks (3 Läufe gleich) |
+| Eisen in Fels nach der 26.3-Verteilung, 120 breit, Start y 65 (3 Layouts, Ticks) | an 2305 / 616 / 2003; aus 2200 / 1556 / nicht gefunden in 8990 |
+
+Der Eisentest ist Glückssache (eine Ader in Hunderten Blöcken); er zeigt die Richtung, beweist aber
+nichts. Nicht gebaut: eine eigene Suche nach Monstern bei Nacht (`MobSearch` aus Runde 1 rechnet
+Tageszeit und Biom schon ein).
+
+### 29.3 Bewegung mit der Physik des Spiels (`motionsearch`, `MotionSearch`)
+
+- Auf ebenen, einfachen Wegstücken jeden Tick: vier Richtungen × drei Sprungarten (keiner, jetzt,
+  immer wieder) zehn Ticks auf einer Kopie des Körpers ausgespielt – Konstanten des Spiels,
+  Kollision über `Entity.collideBoundingBox`, Stufe 0,6 –, genommen wird, was am weitesten den
+  Korridor entlang kommt; verworfen: mehr als 1,5 Blöcke neben dem Weg, unter dem Weg, ein Fall mit
+  Schaden, Lava, ungeplantes Wasser. Deterministisch, 12 Rollouts je Tick.
+- Stufen auf und ab bleiben beim alten Regler (er setzt den Sprung an jeder Stufe; die Suche verlor
+  dort Zeit).
+- Bob läuft in den Testkursen schon 5–7 Blöcke/s (Sprint-Sprünge); die 3,3 Blöcke/s aus echten
+  Partien kommen von anderem (Suchpausen, Gelände, Wasser, Graben).
+
+| Kurs (3 Läufe, Ticks) | aus | an |
+| --- | --- | --- |
+| 64 flach | 187 / 187 / 187 (6,84 Bl/s) | 187 / 187 / 187 |
+| Hügel aus Stufen | 201 / 195 / 195 | 191 / 191 / 191 (+3 %) |
+| Wald | 254 / 235 / 254 (6,41 Bl/s) | 234 / 232 / 232 (6,81 Bl/s, +6 %) |
+| Graben und Abbruch | 232 / 232 / 232 | 236 / 236 / 236 (−2 %) |
+
+Kein zusätzlicher Schaden in keinem Lauf.
+
+### 29.4 Der Bob-Trainer (Laptop-App aus `src/autopilot`)
+
+- `Trainer` (Einstieg der App, `bob-trainer.jar`) und `Dashboard` (HTTP auf 127.0.0.1, Deutsch):
+  Stand, laufende Spiele (Welt, Minute, Tempo), Duell mit P(besser), jede Knopf-Stellung mit
+  geschätzter Wirkung und Unsicherheit, letzte Spiele, Platz, letzter Export. Knöpfe: Pause,
+  Sofort pausieren, Weiter, Beenden, Export jetzt, Leistung niedrig/mittel/hoch. Die EULA
+  akzeptiert der Nutzer selbst im Dashboard; vorher startet kein Server.
+- Startskripte: Windows (`Bob-Trainer starten.bat` → PowerShell, `javaw`, kein Konsolenfenster),
+  macOS (`.command`), Linux (`bob-trainer.sh`). Sie suchen Java 25 (JAVA_HOME, PATH,
+  Installationsordner, die Java-Laufzeiten des Minecraft-Launchers) und bieten sonst Temurin JRE 25
+  von api.adoptium.net an. Der gebündelte Fabric-Launcher lädt Minecraft beim ersten Start.
+- Windows: harte Links und Verzeichnis-Junctions statt symbolischer Links; Junctions werden beim
+  Löschen nur als Link entfernt, nie verfolgt.
+- Nichts geht verloren: Zustand nach jedem Spiel, Pause bleibt über Neustarts, nur laufende Spiele
+  zählen bei Absturz oder „Sofort pausieren“ nicht. Spiele enden mit der App (`BOB_PARENT_PID`,
+  Shutdown-Hook).
+- **Liga (auch auf dem Server):** jede Partie eine neue Zufallswelt, Champion und Herausforderer in
+  derselben (gepaart). Entscheidung sequentiell und Bayes'sch auf den Differenzen je Welt (Felder,
+  Tod = halbes Feld): skeptischer Prior (sd 1 Feld), Champion ab P(besser) > 0,95 nach mindestens 8
+  Welten, raus unter 0,05 (ab 4) oder nach 24. Herausforderer: ungetestete Stellungen zuerst (Runde 3,
+  dann Runde 2), danach Thompson Sampling über die Wirkung jeder Stellung aus allen Duellen.
+  Standard in der App: 30 Spielminuten, jedes 5. Spiel 90.
+- **Tempo:** Lithium 0.26.3 und FerriteCore 9.0.0 (Modrinth, sha512 geprüft, LGPL-3.0/MIT, siehe
+  `THIRD-PARTY.txt`); Server ohne Paketkompression, Regionen mit lz4, G1-Flags (`tuned=true`).
+  Sichtweite bleibt 12: Bobs Wahrnehmung ist die Sichtweite (`BotWorld.viewChunks`), kleiner hieße
+  blinder. Paper geht nicht (keine Fabric-Mods). C2ME und ScalableLux (Alpha) nicht gebündelt: Die
+  Prüfung, ob derselbe Seed dieselben Blöcke ergibt, fehlt.
+- Gemessen (je ein 10-Minuten-Spiel, derselbe Seed, Container mit 4 Kernen; eine Messung, verrauscht):
+  vorher 4,00-fach Echtzeit (150 s), nachher 4,72-fach (127 s), +18 %.
+- Ende-zu-Ende im Container: Zip entpackt, Linux-Skript, EULA über die API, zwei Spiele parallel
+  (5 min), Pause (laufende spielen zu Ende, keine neuen), Weiter, Sofort pausieren, Beenden (kein
+  Spiel-Java bleibt übrig), Neustart (Duell, Herausforderer und Pause erhalten), Export (68 KB) – bestanden.

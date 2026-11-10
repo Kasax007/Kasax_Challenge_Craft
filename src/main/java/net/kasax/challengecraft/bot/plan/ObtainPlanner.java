@@ -1164,9 +1164,13 @@ public final class ObtainPlanner {
         });
     }
 
-    /** The common trees' logs (their kinds grow in most wooded biomes). */
+    /**
+     * The logs the world model's tree priors stand for: oak, which grows in most wooded biomes. (The
+     * priors count trees per biome, not per kind: a birch or spruce not in sight is a matter of its
+     * own biomes - the old rule; with them "3 Sapling Types" was believed half as dear as it is.)
+     */
     private static boolean commonLog(Block b) {
-        return b == Blocks.OAK_LOG || b == Blocks.BIRCH_LOG || b == Blocks.SPRUCE_LOG || b == Blocks.DARK_OAK_LOG;
+        return b == Blocks.OAK_LOG;
     }
 
     private double blockCost(Bot bot, BotKnowledge k, Block block, Map<Item, Double> cost) {
