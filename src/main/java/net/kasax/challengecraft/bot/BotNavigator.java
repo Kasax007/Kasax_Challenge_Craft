@@ -70,6 +70,8 @@ public final class BotNavigator {
     });
 
     private final BotPlayer bot;
+    /** The knobs of the bot this navigator walks for (set by Bot; the defaults until then). */
+    public java.util.function.Supplier<BotParams> knobs = () -> BotParams.DEFAULT;
     private final BotTools tools;
     private final BotActions actions;
 
@@ -1058,6 +1060,21 @@ public final class BotNavigator {
         BotPathfinder finder = new BotPathfinder(view, abilities, new java.util.HashSet<>(avoid)).favouring(favoured).near(near).toAnyOf(anyOf)
                 .notLeapingTo(new java.util.HashSet<>(failedLeaps.keySet()));
         finder.avoiding(monstersAbout(level, from), spawnersAbout(level, from));
+        // (Round 3: danger priced into the way - see BotRisk.)
+        if (knobs.get().on("riskpath")) {
+            BotRisk risk = BotRisk.capture(bot, target);
+            // (Planning on from the end of the way being walked: the air that way uses under
+            // water first - else the next leg believes the lungs full at its start.)
+            if (ahead && path != null) {
+                int used = risk.airUsed;
+                for (int i = index; i < path.size(); i++) {
+                    BlockPos head = path.get(i).to().above();
+                    used = BotRisk.airAfter(used, 8, level.getFluidState(head).is(net.minecraft.tags.FluidTags.WATER));
+                }
+                risk = risk.withAirUsed(used);
+            }
+            finder.risk(risk);
+        }
         finder.fromUnderWater(bot.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)).anyWater(forAir);
         var guideFuture = guide(level, from);
         if (guideFuture != null && guideReady(guideFuture)) finder.guided(guideOf(guideFuture));

@@ -19,7 +19,8 @@
       "net.kasax.challengecraft.gametest.BotOpeningTests",
       "net.kasax.challengecraft.gametest.BotSurvivalTests",
       "net.kasax.challengecraft.gametest.BotKitTests",
-      "net.kasax.challengecraft.gametest.BotBrainTests"
+      "net.kasax.challengecraft.gametest.BotBrainTests",
+      "net.kasax.challengecraft.gametest.BotAlgoTests"
     ]
   },
   "depends": {

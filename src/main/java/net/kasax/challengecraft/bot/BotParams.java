@@ -118,6 +118,11 @@ import java.util.Map;
  *   <li>{@code fallheal} - 1 (the default): a deliberate fall that the hearts would not survive any
  *       more (a scratch on the way up) waits up to half a minute on a full belly for them to come
  *       back, if the missing ones can in that time (a half each four seconds); 0: given up at once.</li>
+ *   <li>{@code riskpath} - 1 (the default): danger is part of the way's price (BotRisk, round 3):
+ *       monsters in sight by type (bowmen in a clear line), lava beside a step, the edge of a deep
+ *       drop, a leap over one, the air of a dive, open ground at night - in ticks of risk times
+ *       the cost of a hurt or a death; 0: the old flat extras (lava edge, drop edge, a factor near
+ *       monsters).</li>
  * </ul>
  */
 public final class BotParams {

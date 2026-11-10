@@ -122,6 +122,12 @@ public final class BotPathfinder {
             return p.getY() >= minY && p.getY() < maxY && chunks.containsKey(net.minecraft.world.level.ChunkPos.pack(p.getX() >> 4, p.getZ() >> 4));
         }
 
+        /** Nothing over the head at feet {@code p} that stops the sky (open ground). */
+        boolean skyOpen(BlockPos p) {
+            LevelChunk c = chunks.get(net.minecraft.world.level.ChunkPos.pack(p.getX() >> 4, p.getZ() >> 4));
+            return c != null && p.getY() >= c.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, p.getX() & 15, p.getZ() & 15);
+        }
+
         BlockState state(BlockPos p) {
             if (p.getY() < minY || p.getY() >= maxY) return Blocks.BEDROCK.defaultBlockState();
             LevelChunk c = chunks.get(net.minecraft.world.level.ChunkPos.pack(p.getX() >> 4, p.getZ() >> 4));
@@ -168,6 +174,15 @@ public final class BotPathfinder {
         return this;
     }
 
+    /** Danger priced into the steps (knob riskpath): null - the old flat extras and factors. */
+    private BotRisk risk;
+    private final it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap mobRates = new it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap();
+
+    public BotPathfinder risk(BotRisk risk) {
+        this.risk = risk;
+        return this;
+    }
+
     /** How much dearer a step to here is for the monsters and spawners near it: up to four times close by a monster, twice within sixteen of a spawner. */
     private double threatFactor(BlockPos p) {
         double f = 1;
@@ -178,6 +193,8 @@ public final class BotPathfinder {
                 break;
             }
         }
+        // (With the risk model the monsters are priced by what they would do: see riskTicks.)
+        if (risk != null) return f;
         // (Graded by how close: Baritone's flat 1.5 within eight blocks still leaves the straight
         // way past a monster's nose the cheaper one - a way round has to be worth it.)
         double m = 1;
@@ -248,6 +265,8 @@ public final class BotPathfinder {
         Node parent;
         Step step;
         boolean closed;
+        /** With the risk model: air used (ticks under water) on the way here. */
+        int air;
 
         Node(BlockPos pos) {
             this.pos = pos;
@@ -291,6 +310,7 @@ public final class BotPathfinder {
         PriorityQueue<Node> open = new PriorityQueue<>();
         Node first = new Node(start);
         first.f = heuristic(start, target);
+        if (risk != null) first.air = risk.airUsed;
         nodes.put(start.asLong(), first);
         open.add(first);
         Node[] best = new Node[COEFFICIENTS.length];
@@ -330,6 +350,12 @@ public final class BotPathfinder {
                 if (s.breaks().isEmpty() && inWater(s.to()) && !breathAbove(s.to())) continue;
                 double cost = cost(n.pos, s) + (avoid.contains(s.to().asLong()) ? 400 : 0);
                 if (favoured.contains(s.to().asLong())) cost *= 0.5;
+                int air = 0;
+                if (risk != null) {
+                    // (Danger is not halved for staying on the old way: the price of the step itself.)
+                    air = BotRisk.airAfter(n.air, lastMove, inWater(s.to().above()));
+                    cost += riskTicks(n.pos, s, lastMove) + risk.drownTicks(n.air, air);
+                }
                 long key = s.to().asLong();
                 Node m = nodes.get(key);
                 if (m == null) {
@@ -343,6 +369,7 @@ public final class BotPathfinder {
                 m.f = g + heuristic(s.to(), target);
                 m.parent = n;
                 m.step = s;
+                m.air = air;
                 open.add(m);
             }
         }
@@ -402,6 +429,7 @@ public final class BotPathfinder {
         else if (dy < 0 && dx == 0 && dz == 0) c = FALL[Math.min(-dy, FALL.length - 1)] + CENTRE;
         else if (dy < 0) c = WALK_OFF + FALL[Math.min(-dy, FALL.length - 1)] + CENTRE;
         else c = flatCost * (diagonal ? Math.sqrt(2) : 1);
+        lastMove = c;
         // Digging while afloat is five times slower (not on the ground), with the head under
         // water five times more.
         // (Every step through lava burns: by far the dearest way, only to get out.)
@@ -409,7 +437,9 @@ public final class BotPathfinder {
         // Out on magma (only when escaping): it burns at every step too.
         else if (escapeLava && loaded(s.to().below()) && state(s.to().below()).is(Blocks.MAGMA_BLOCK)) c += 20;
         // Along the edge of lava: a slip, a knock-back, and it is in. Kept a block off where it can.
-        else if (!escapeLava && besideLava(s.to())) c += LAVA_EDGE;
+        else if (risk != null) {
+            // (Priced by the risk model instead: see riskTicks.)
+        } else if (!escapeLava && besideLava(s.to())) c += LAVA_EDGE;
         // Along the edge of a deep drop (a ledge, a cliff over the lava sea): a knock-back there
         // is a long fall. A block in from the edge where there is room.
         else if (!escapeLava && besideDrop(s.to())) c += DROP_EDGE;
@@ -428,6 +458,91 @@ public final class BotPathfinder {
             }
         }
         return c;
+    }
+
+    /** The movement's own ticks of the step last priced by {@link #cost} (the risk model's exposure time). */
+    private double lastMove;
+
+    /**
+     * What a step risks, in ticks (the risk model, knob riskpath): the monsters' rate of damage
+     * over the step's time, a slip into lava beside it, a knock-back over a deep edge, a leap
+     * falling short, open ground at night. Never negative: the estimate stays a lower bound.
+     */
+    private double riskTicks(BlockPos from, Step s, double move) {
+        BlockPos t = s.to();
+        double rate = mobRate(t);
+        double r = rate * move / 20 * risk.hpTicks;
+        if (!escapeLava) {
+            int sides = lavaSides(t);
+            if (sides > 0) r += risk.lavaTicks(sides, rate);
+            else if (besideDrop(t)) {
+                int depth = edgeDepth(t);
+                r += risk.edgeTicks(depth, depth >= 99, rate);
+            }
+        }
+        if (s.leap()) {
+            int dx = Integer.signum(t.getX() - from.getX()), dz = Integer.signum(t.getZ() - from.getZ());
+            int gap = Math.max(Math.abs(t.getX() - from.getX()), Math.abs(t.getZ() - from.getZ())) - 1, depth = 0;
+            for (int k = 1; k <= gap; k++) {
+                BlockPos over = from.offset(dx * k, 0, dz * k);
+                if (!waterBelow(over)) depth = Math.max(depth, dropBelow(over));
+            }
+            r += risk.leapTicks(Math.max(1, gap), depth, rate);
+        }
+        if (risk.night && !inWater(t) && world.skyOpen(t)) r += risk.nightTicks(move);
+        return r;
+    }
+
+    /** The monsters' rate of damage at feet {@code p} (hp a second), once per cell and search. */
+    private double mobRate(BlockPos p) {
+        if (risk.threats.length == 0) return 0;
+        long key = p.asLong();
+        double v = mobRates.getOrDefault(key, -1);
+        if (v < 0) {
+            v = risk.mobRate(p.getX(), p.getY(), p.getZ(), this::clearLine);
+            mobRates.put(key, v);
+        }
+        return v;
+    }
+
+    /** A clear line from a bowman's eye to the chest of a body at feet {@code (x, y, z)}, block by block. */
+    private boolean clearLine(BotRisk.Threat t, int x, int y, int z) {
+        double ax = t.x() + 0.5, ay = t.eyeY(), az = t.z() + 0.5, bx = x + 0.5, by = y + 1.3, bz = z + 0.5;
+        double len = Math.sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay) + (bz - az) * (bz - az));
+        int n = (int) Math.ceil(len / 0.8);
+        BlockPos.MutableBlockPos q = new BlockPos.MutableBlockPos();
+        for (int i = 1; i < n; i++) {
+            double f = i / (double) n;
+            q.set(Math.floor(ax + (bx - ax) * f), Math.floor(ay + (by - ay) * f), Math.floor(az + (bz - az) * f));
+            if (!loaded(q)) return true;
+            BlockState st = state(q);
+            if (!st.getCollisionShape(NO_WORLD, q).isEmpty() && st.isSolidRender()) return false;
+        }
+        return true;
+    }
+
+    /** Sides (and over the head) with lava beside the feet at {@code p}. */
+    private int lavaSides(BlockPos p) {
+        int n = 0;
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos q = p.relative(d);
+            if (lava(q) || lava(q.below()) || lava(q.above())) n++;
+        }
+        if (lava(p.above(2)) || lava(p.above(3))) n++;
+        return n;
+    }
+
+    /** The deepest open drop beside {@code p} (99: lava under it, or no ground for forty). */
+    private int edgeDepth(BlockPos p) {
+        int worst = 0;
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos q = p.relative(d);
+            if (!loaded(q) || !state(q).getCollisionShape(NO_WORLD, q).isEmpty()) continue;
+            if (deadlyBelow(q)) return 99;
+            if (waterBelow(q)) continue;
+            worst = Math.max(worst, dropBelow(q));
+        }
+        return worst;
     }
 
     // ---- moves -----------------------------------------------------------------------------

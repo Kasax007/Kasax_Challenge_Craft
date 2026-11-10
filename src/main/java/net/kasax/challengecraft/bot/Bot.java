@@ -166,6 +166,7 @@ public final class Bot {
         this.tools = new BotTools(body);
         this.actions = new BotActions(body, tools);
         this.navigator = new BotNavigator(body, tools, actions);
+        this.navigator.knobs = () -> params;
         // Whatever was going on was about the old body's position and inventory.
         tasks.clear();
         // (The timers count the new body's ticks, which start again at nought.)
