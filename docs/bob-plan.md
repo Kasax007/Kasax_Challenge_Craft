@@ -3387,3 +3387,508 @@ die vollen Schwellen: 300 Kämpfe und 120 Paare.
 - `brawl_zombie_trio` (8,2 statt höchstens 7 HP verloren) und `brawl_enderman_slope` waren nur unter
   der Last der vollen Suite rot. Einzeln sind beide grün, ebenso alle anderen Enderman-Tests. Sie
   sollten in der nächsten vollen Suite erneut geprüft werden.
+
+## 27. Runde 22 (9./10.11.2026): Brett-Gehirn, Wissen, Eröffnung
+
+Der Auftrag des Nutzers: Bob soll im Lockout so gut werden wie die besten Speedrunner und klug mit
+dem Brett umgehen. „Er muss einfach besser werden in Algorithmen und Wissen – das ist das Einzige,
+was langfristig hilft.“ Drei Agenten arbeiteten parallel auf eigenen Branches, alle von `d85f36f`:
+
+| Branch | Thema | Stand |
+| --- | --- | --- |
+| `bob/r1-brain` | Brett-Gehirn mit Vorausschau (Knopf `search=1`) auf einem abstrakten Lockout-Simulator | `aec254a`, 5 Commits |
+| `bob/r1-knowledge` | Speedrun-Wissensbasis, ehrliche Zeitschätzungen, Mob-Suche, Strukturbeute | `1948f01`, 6 Commits |
+| `bob/r1-opening` | Schnellere Eröffnung, Stoppuhr über die ersten zehn Minuten | `4199eb8`, 13 Commits |
+
+Danach führte ein vierter Schritt die drei in `bob/r1-int` zusammen, prüfte sie mit der vollen
+Testsuite und maß sie in einer Liga gegen den alten Stand. Ein Neustart des Containers unterbrach
+die Runde einmal; die verlorenen Messungen wurden nachgeholt.
+
+### 27.1 Das Brett-Gehirn mit Vorausschau (`bob/r1-brain`)
+
+**Wie Bob bisher wählt:** `LockoutBrain.think` fragt seine Entscheider der Reihe nach (Cortex,
+Essen, Nacht, schnelles Tile bis 30 s, Eröffnung, Schild und Eisen-Kit, Nether, Raubzüge, Jagden,
+Schlaf). Erst danach wählt es vom Brett: `choices()` listet jedes offene Tile mit einem Weg und
+seiner Schätzung, sortiert nach Kosten minus Strategen-Bonus, dann sucht `route()` per Strahlsuche
+(Tiefe 4, Breite 10). Schwächen: Schätzungen für Monster 4- bis 9-mal zu niedrig, kein Bild vom
+Gegner, geteilter Nutzen (Eisen öffnet mehrere Tiles) nur über handgemachte Boni.
+
+**Der Simulator** (`bot/lockout/sim`, reines Java ohne Minecraft-Klassen):
+
+- `GoalBook`: alle 312 Ziele des Pools als abstraktes Rezept – Meilensteine (Holz, Stein, Ofen,
+  Eisenspitzhacke, Eimer, Schild, Portal, Bett …), verbrauchte Ressourcen, Ort (Dorf, Wüste, Höhlen,
+  Tiefe, Festung, Bastion …), Sekunden eines guten Spielers mit Glücksanteil, Art der Arbeit,
+  Kampfgefahr, Nacht/Dunkel, Neben-Claims (jedes Eisen schmelzen holt „Iron Ingot“). 46 Ziele, für
+  die Bob keinen Weg hat, sind als `noBob` markiert.
+- `Econ` (Meilensteine und Ressourcen), `PoolBoards` (der Brettwähler des Mods; ein Selbsttest
+  prüft Gleichheit mit `pickBoard`), `World` (gezogene Welten; ein Spieler kennt nur, was der
+  Weltsinn-Knopf ihm gäbe), `Planner` (Schrittpläne mit geteilten Vorstufen), `Sim` (ereignisgesteuertes
+  Spiel zu zweit mit Bobs Pflichten, Zeitbudgets, Aufgaben, Todesraten, Neben-Claims, Sieg bei 13).
+- `Profile`: `bob()` (kalibriert), `expert()`, `naive()` (was Bobs eigene Schätzungen annehmen).
+- Tempo auf einem Kern: etwa 36.000 bis 48.000 Spiele pro Minute mit dem bisherigen Gehirn auf beiden
+  Seiten (90 Minuten), etwa 1.300 pro Minute mit Vorausschau auf einer Seite.
+- `GreedyPolicy` baut die bisherige Wahl als Vergleich nach (Bonus, Eisen-Kit, Nether-Phase,
+  Strahlsuche).
+
+**Kalibrierung** gegen die Ligen 1 bis 8 (190 Bot-Partien, `SimBench calibrate`):
+
+| | Ligen | Simulator |
+| --- | --- | --- |
+| Tiles je Bot (20 min) | 1,76 | 2,37 |
+| erstes Tile, Median | 332 s | 418 s |
+| Tode je Bot | 0,33 | 0,25 |
+| Partien ohne Tile | 29 % | 12 % |
+
+Die Claim-Raten je Ziel korrelieren mit 0,65 (267 Ziele). Bobs Tempo gegenüber einem guten Spieler:
+Handwerk 2,2-mal, Sammeln 2,0-mal, Tiere 3,0-mal, Monster 3,0-mal so lange (dazu langsamere
+Monstersuche bei Tag), Ressourcen finden 1,6-mal. Damit kommen Monster-Ziele wie gemessen auf das 4-
+bis 9-fache von Bobs Schätzung. Der Simulator ist für Bob zu optimistisch (zu gleichmäßig).
+
+**Der Planer (`SearchPolicy`):** Kandidaten sind die 8 billigsten Tiles plus das Tile, das der
+Gegner wahrscheinlich als nächstes nimmt. Von jedem Kandidaten aus spielt er die nächsten 900 s
+Spielzeit viele Male durch (danach nehmen beide das billigste Tile); Wert: eigene minus fremde
+Tiles, plus 2 für einen Sieg. Budget: aufeinanderfolgendes Halbieren (5, 10, 20 Spiele), 115 bis
+155 Spiele je Entscheidung, 3 bis 4 ms; alle Kandidaten spielen dieselben gezogenen Welten. Vom
+Gegner weiß er nur, was ein Spieler wüsste (Tiles, Fortschritte, Zeit); der Rest kommt aus einem
+je Spielminute gelernten `OpponentModel`.
+
+| Horizont | Tile-Differenz gegen das bisherige Gehirn (2.000 Spiele) |
+| --- | --- |
+| 600 s | +1,76 |
+| **900 s** | **+1,84** |
+| 1.200 s | +1,58 |
+| 2.400 s (erste Fassung) | +1,24 |
+| 3.600 s | +1,16 |
+
+**Ergebnis im Simulator** (frische Seeds, je 2.000 Spiele):
+
+| Partie | Tiles | Differenz (SE) | Siege der Vorausschau (entschiedene) | erstes Tile |
+| --- | --- | --- | --- | --- |
+| 90 min, Bobs Tempo, bisher gegen Vorausschau | 7,41 gegen 9,09 | +1,68 (0,09) | 67,9 % | 417 / 403 s |
+| 20 min (Ligaformat) | 2,48 gegen 3,58 | +1,10 (0,05) | 67,8 % | 378 / 389 s |
+| bisheriges Gehirn mit wahren Zahlen | 7,78 gegen 8,88 | +1,09 (0,09) | 61,9 % | 433 / 396 s |
+| Experten-Tempo auf beiden Seiten | 8,66 gegen 10,91 | +2,25 (0,10) | 71,4 % | 135 / 87 s |
+| Vorausschau mit 30 % / 60 % Fehler in allen Tempi | | +1,21 / +0,39 | 62,5 / 52,9 % | |
+| Bob gegen einen Experten (bisher / Vorausschau) | 1,80 / 2,10 gegen 12,96 | | 0 Siege | |
+
+Das erste Tile bewegt sich kaum: Es hängt an der Eröffnung, nicht am Brett.
+
+**Im Spiel (Knopf `search=1`, Standard 0, nie auf leicht):** `BoardSearch.snapshot` nimmt Brett,
+Claims, Bobs Gepäck als Meilensteine und Ressourcen, Ort, gesehene oder gespürte Strukturen, Biome
+und Lava, Tageszeit, Restzeit und die Fortschritte des Gegners. Die Spiele laufen auf einem eigenen
+Thread (`bob-board-search`); Bob wartet (`THINKING`), bis die Antwort da ist. Im Selbstspiel (SIM)
+zählt die Antwort erst nach den Spielticks, die ihre Spiele bei echtem Tempo bräuchten (60 Spiele
+je Tick; in der Liga 2 Ticks je Entscheidung), unabhängig vom Rechner. Sonst entscheidet nach 100
+Ticks ohne Antwort die alte Route; ein Wachhund schaltet die Vorausschau bei Hängern ab. Boden:
+Ein Tile kostet mindestens 0,5 × Bobs eigene Schätzung. Unter `search=1` gibt es kein Eisen-Kit und
+keine Nether-Phase um ihrer selbst willen; der Schild auf hart bleibt.
+
+**Echte Spiele des Agenten** (20 min, hart, SIM=1, Standard gegen `search=1`): 8 Spiele, die
+Vorausschau gewann 5, Tiles 2,75 gegen 1,88, aber 2 Tode gegen 0 (Zombies bei gesenktem Schild,
+einmal bei einer Jagd ohne Rüstung, einmal beim Bündel). Ohne Boden wurden 11 von 23 Wahlen nach
+Sekunden verworfen (Bobs Schätzung im Median 4,6-mal die des Simulators).
+
+**Was der Simulator anderen Arbeiten zutraut** (Bob mit Vorausschau gegen sich selbst mit einer
+Änderung, je 2.000 Spiele; Tile-Gewinn durch die Änderung):
+
+| Änderung | 20 min | 90 min |
+| --- | --- | --- |
+| kein Essensvorrat am Anfang | +0,74 | +0,62 |
+| kein Schild zuerst (Tode 0,91 → 1,26) | +0,65 | +0,57 |
+| keine Ersatzblöcke | +0,57 | +0,52 |
+| keine Kupferrüstung | 0,00 | +0,64 |
+| kein Bündel | 0,00 | +0,60 |
+| alle fünf Pflichten aus | +2,03 | +2,29 |
+| Handwerk und Sammeln im Tempo eines guten Spielers | **+2,57** | **+3,63** |
+| Ressourcen finden im Tempo eines guten Spielers | **+1,92** | **+3,49** |
+| Monster doppelt so schnell | +0,66 | +1,23 |
+| Gehen mit 4,5 statt 3,0 Blöcken/s | +0,25 | +0,60 |
+| halbe Todesgefahr | +0,05 | +0,35 |
+
+Schild, Ersatzblöcke und Bündel sind Regeln des Nutzers; die Tabelle zeigt, wo es sich lohnt, sie
+schneller zu erledigen. Die größten Hebel sind Ausführung und Wissen.
+
+**Rust-Server (Pumpkin, Valence, FerrumC) als schnellere Trainingswelt:** nein. Keiner führt Bob
+(Java/Fabric im Server) aus, keiner bildet Mob-KI, Beute, Kampf und Fortschritte nach, die Bobs
+Zeiten und Tode bestimmen. Für die Strategie dient der Simulator, für die Fertigkeiten der echte
+Server (SIM=1 mit Sprint, Spieltest-Arenen, vorgenerierte Welten, mehr Server auf dem Laptop).
+
+**Tests:** `./gradlew bobSimTest` (4.110 Prüfungen in etwa 20 s, darunter: Brett gleich
+`pickBoard`, jedes mögliche Ziel hat einen Weg, gleiche Frage gleiche Antwort auf jedem Thread,
+Vorausschau schlägt das bisherige Gehirn um +1,64 Tiles in 300 Spielen); Spieltest
+`search_claims_first_tile` (eigene Umgebung `lockout_search`). Benchmark: `./gradlew bobSim
+--args="match --a greedy --b search --games 1000 --threads 2 --profile bob --length 5400"`.
+
+### 27.2 Wissen und Zeitschätzungen (`bob/r1-knowledge`)
+
+**Die Wissensbasis** (`src/main/resources/bob-knowledge/speedrun.json`, Klasse `SpeedrunKnowledge`):
+
+- **304 Ziele** (alle, die auf einem normalen Brett vorkommen): Expertenzeit (Median 180 s), Wege
+  schnellste zuerst, 36 mit Voraussetzungen, 17 mit Bedingungen. Wege: Handwerk 92, Kampf 58,
+  Abbau 54, Gehen 33, Beute 27, Benutzen 24, Handel 21, dazu Brauen, Tauschen, Angeln, Züchten,
+  Schmelzen.
+- **46 Mobs:** Rudelgröße, Bobs Kampfzeit, Strukturen, in denen sie leben, nur nachts, Fernkampf,
+  Sichtweite.
+- **16 Strukturarten:** Kistentabellen und Anzahl, Plünderzeit, gefährlich oder nicht.
+- **Beutechancen** werden aus den Kistentabellen des laufenden Spiels berechnet (300 Würfe je
+  Tabelle, einmal je Server, 88 bis 347 ms): Eisen aus einem Schiffswrack 94 %, aus einem
+  vergrabenen Schatz 100 %, ein Namensschild aus einem Minenschacht 72 %.
+
+**Wofür Bob es nutzt:**
+
+- **Stapel-Schätzungen** (`ObtainPlanner.batch`, `ESTIMATES = 2`): ein Rezept so oft wie die
+  Menge verlangt, eine Quelle einmal finden und dann je Stück, ein Werkzeug einmal, Adern und Bäume
+  in echter Größe. Kits sind eine Reise (`estimateAll` im Strategen).
+- **Mob-Suche** (`MobSearch`): 60 / (Rate × Anteil an der Spawnliste des Bioms × Sichtweite); Raten
+  pro Minute nachts 5, Höhle oder Nether 6, Tag 0,8, Tiere 6, Fische 4; höchstens 1.800 s. Monster,
+  die in der Sonne brennen, kosten tagsüber das Warten auf die Nacht.
+- **Erfahrung je Ziel** (`GoalExperience`): auf log-Skala im Band 0,25 bis 8 (bisher 0,6 bis 2), mit
+  Zweifel bei wenigen Spielen; sie beginnt neu, wenn sich die Schätzfassung ändert.
+- **Gelerntes Zielmodell:** `goal.json` wurde gegen die alten Schätzungen trainiert und ruht, bis
+  der Trainer eines für Fassung 2 hat (150 erledigte Ziele).
+- **Wege:** `LockoutGoals.loot` (Kisten einer bekannten Struktur bis 300 s Weg, wenn billiger;
+  bewachte nur mit Schild oder Rüstung und vollen Herzen; keine Minenschächte, Ozeanruinen,
+  Verliese, die der Raubzug nicht plündern kann) und `LockoutGoals.huntAt` (Hexe an der Sumpfhütte
+  nachts, Plünderer am Außenposten, Lohe an der Festung …).
+- **Log und Journal:** jede Zielzeile mit Planzahl, Expertenzeit und `[goal_id]`; `goals.py` zählt
+  Überläufe, `compare.py` verglich in Spiegel-Ligen nur einen der beiden Bots (behoben),
+  `reference_times.py` stellt die Zeiten älterer Ligen daneben. Die Tabelle Experte gegen Bob für
+  alle 304 Ziele steht in `docs/bob-reference-times.md`.
+
+**Die schlimmsten Ziele der Übergabe:**
+
+| Ziel | alte Schätzung | echt (Mittel) | neue Schätzung (Nacht / Tag) | Experte |
+| --- | --- | --- | --- | --- |
+| Skeleton | 27 s | 247 s | 118 / 717 s | 45 s |
+| Name Tag | 18 s | 110 s | 18 s (Eisen und Zuckerrohr zur Hand) | 120 s |
+| Arrow | 21 s | 100 s | 39 s | 60 s |
+| Firework Rocket | 30 s | 158 s | 82 / 338 s | 200 s |
+
+**Feste Szene** (`BotEstimateProbe`, Wüste, alt gegen neu): 16 Stämme 113 → 50 s, 32 Bruchstein 698
+→ 66 s, Eimer 335 → 145 s, Kohleblock 281 → 74 s, Hexe 300–899 → 1.830 s (Kappe, solange keine
+Sumpfhütte bekannt ist), Gemälde bei Tag 75 → 532 s (keine Schafe, also Wolle aus Faden).
+
+**Liga des Agenten** (dieselben 8 Seeds, 20 min, hart, Bob gegen Bob, SIM=1; vorher `d85f36f`,
+nachher `10837e6`):
+
+| Messgröße | vorher | nachher |
+| --- | --- | --- |
+| Tiles je Bot | 2,12 | 2,94 (gepaart +0,81, SE 0,28; 6 Seeds besser, 0 schlechter, p = 0,03) |
+| nach 5 / 10 / 20 min | 0,31 / 1,00 / 2,12 | 0,50 / 1,06 / 2,94 |
+| Bots ohne Tile | 4 von 16 | 1 von 16 |
+| erstes Tile | 355 s | 358 s |
+| Tode je Bot | 0,06 (1) | 0,31 (5) |
+| Überläufe über 1,5× / 3× der Schätzung | 31 % / 10 % | 40 % / 11 % |
+
+Alle fünf Tode fielen in Eröffnung oder Kit (zweimal ertrunken beim Luftholen, Zombies in einer
+halbfertigen Box, ein Skelett beim Rüstung-Bauen, Spinnen nachts ohne Essen). Die neuen Beute- und
+Jagdwege kamen in diesen Spielen nicht vor; nur die Spieltests zeigen sie. Die größten Fehler stecken
+jetzt in Schätzungen außerhalb des Planers: Fall 20 Blocks 26 s geschätzt, 184 s echt; Dripstone
+Caves 84 / 379 s; 3 Sapling Types 49 / 113 s.
+
+**Tests:** `BotKnowledgeTests` 8 von 8 (Wissensbasis, Skelett-Schätzung, Stapel, schlimmste Tiles,
+Beute aus einem bekannten Schiffswrack, Hexe an der Sumpfhütte, große Faktoren lernen, kein Raubzug
+auf einen Minenschacht – dieser Test fällt, wenn man den Minenschacht aus der Ausschlussliste
+nimmt).
+
+### 27.3 Die Eröffnung (`bob/r1-opening`)
+
+**Stoppuhr `OpeningClock`:** Sie notiert, wann jeder Meilenstein zum ersten Mal erreicht ist, und
+ordnet jeden Tick der ersten zehn Minuten einer Tätigkeit zu (gehen, suchen, Weg, graben, Handwerk,
+schmelzen, jagen, essen, Reflex, warten, nichts) und dem, was Bob gerade wollte (Essen, Eröffnung,
+Kit, Investition, Ziel, nebenbei …). Sie läuft in der Solo-Bank (`[BOTOPEN]`) und in jedem Bot einer
+Liga (`"opening"` im `[BOTVS] result`). Werkzeuge: `scripts/bot/bench.sh` (SIM=1, eine JVM je
+Server, Knöpfe), `/challengecraft_bot bench <bot> <s> <Schwierigkeit> [Knöpfe]`,
+`scripts/bot/opening.py run|show|compare`.
+
+**Was sich geändert hat** (jede Verhaltensänderung mit Knopf, Standard an):
+
+- **`rocksight`** (`MineTask`): Ohne Fels zur Hand geht Bob zu Fels unter freiem Himmel bis 40
+  Blöcke weit (trockener Boden ringsum, kein Monster in 14 Blöcken), bevor er eine Treppe gräbt.
+- **`meanwhile`** (`SmeltTask`, neu `MeanwhileTask`): Kocht der Ofen 8 s oder länger, arbeitet Bob
+  in 10 Blöcken Umkreis: erst eine sichtbare Erzader bis 8 Blöcke, sonst Bruchstein bis 32, sonst
+  Holz; und er isst, wenn der Hunger Platz für eine ganze Mahlzeit hat.
+- **`fastopen`** (`LockoutBrain`): kein Vorrats-Ausflug vor den vier Steinwerkzeugen, außer Bob ist
+  hungrig oder verletzt. Danach wartet ein Vorrat, der über 90 s kostet, wie eine Investition.
+- **`interleave`** (`LockoutBrain.investLater`): Schild-Eisen, Eisen-Kit, Kupferrüstung und ein
+  teurer Vorrat warten, solange ein Tile bis 120 s offen ist – bis zum Abend (Uhr 8000) oder bis 2
+  Tiles; was höchstens 150 s kostet, geschieht sofort.
+- **Ohne Knopf:** eine neue Spitzhacke an Ort und Stelle statt Fels mit der Hand; eine
+  Ersatz-Spitzhacke vor dem Bruch auch auf Besorgungen; die Suche an der Oberfläche schaut 24 statt
+  12 Blöcke zur Seite.
+
+**Gemessen** (8 Liga-Seeds, 600 s allein, hart, SIM=1; vorher `d1d99d2` = alter Code mit Stoppuhr,
+nachher `0bcbdb8`):
+
+| Meilenstein | vorher: Median (Seeds) | nachher: Median (Seeds) |
+| --- | --- | --- |
+| erster Stamm | 4 s (8) | 4 s (8) |
+| Werkbank | 40 s (7) | 52 s (8) |
+| Steinspitzhacke | 170 s (7) | 96 s (8); gepaart −55 s, SE 20 |
+| alle vier Steinwerkzeuge | 196 s (7) | 109 s (7) |
+| Ofen | 89 s | 190 s |
+| Essensvorrat | 136 s (7) | 192 s (6), mit Absicht später |
+| Schild | 410 s (5) | 387 s (4) |
+| erstes Tile | 87 s (3 von 8) | 152 s (7 von 8) |
+| Tiles in 10 min | 0,62 | 1,88 |
+| Tode | 0 | 1 in 8 |
+
+Zeit je Spiel in den ersten 10 Minuten: Suchen 121 → 42 s, Warten 60 → 47 s, Graben 227 → 234 s,
+Gehen 106 → 145 s, Schmelzen 40 → 64 s, Reflex 10 → 30 s; Essen 115 → 61 s, Investitionen (Schild,
+Eisen) 146 → 144 s. Gehtempo 3,55 → 3,26 Blöcke/s.
+
+**Stoppuhr-Tests** (`BotOpeningTests`, Ticks, neu gegen alt mit allen vier Knöpfen aus, je drei
+Läufe): `hillside_stone` 495–511 gegen 987–988, `cook_and_mine` 853–854 gegen 1.187–1.250,
+`opening_kit` (vier Steinwerkzeuge, Vorrat und Schild auf hart) 2.756–3.041 gegen 4.778–7.064; dort
+kommt die Steinspitzhacke nach 77 bis 87 s statt 204 bis 320 s.
+
+**Offen aus der Eröffnung:** Das erste Eisen bleibt der größte Brocken (etwa 144 s je 10 min:
+Treppe auf y 14, dann Tunnel, trockene Gänge, Umkehr an Wasser oder Lava); baumlose Starts (Seed
+2582…: Steinspitzhacke erst nach 543 s); Warten am Ofen stieg auf 64 s; nach jedem Block auf den
+Drop warten (etwa 28 s je 10 min); Gehtempo 3,3 statt 5,6 Blöcke/s beim Sprinten; die
+Gegenstands-Verlangsamung (Schild oben) gilt im Vanilla-Spiel nur auf dem Client, Bots gehen dann zu
+schnell.
+
+### 27.4 Zusammenführung und Tests (`bob/r1-int`)
+
+**Merges** (`d85295b`, `e0e03f9`, `6ad6da7`): Alle drei Branches änderten `LockoutBrain`, aber an
+verschiedenen Stellen. Git führte sie ohne Konflikt zusammen; geprüft wurde, dass sie sich vertragen:
+
+- **Kit-Entscheider:** Er hat jetzt beide Bedingungen. Unter `search=1` gibt es kein Eisen-Kit um
+  seiner selbst willen (`kitWanted`); sonst wartet eine teure Investition auf die schnellen Tiles
+  (`investLater`). Mit `search=1` bleibt also nur der Schild auf hart, solange er höchstens 240 s
+  kostet, und ab 150 s wartet auch er, solange ein Tile bis 120 s offen ist.
+- **Zielzeile im Log:** Sie trägt Planzahl, Expertenzeit und `[goal_id]`. Die Vorausschau setzt
+  ihre Zeit als neue Schätzung ein und lässt die Planzahl stehen.
+- **Schwellen:** `investLater` und der Essens-Entscheider rechnen mit den neuen Stapel-Schätzungen.
+  Die Schwellen (150 s, 120 s, 90 s) stammen aus Messungen mit den alten Schätzungen.
+
+Einziger Konflikt war die Liste der Knöpfe in der Javadoc von `BotParams` (beide Fassungen
+behalten). Dazu kamen vier kleine Commits an den Werkzeugen:
+
+| Commit | Was |
+| --- | --- |
+| `e36b3ba` | `compare.py`: Tiles aller Bots eines Spiels, besser/schlechter je Seed mit Vorzeichentest, Median des ersten Tiles |
+| `186d944` | `deaths.py`: jede Todesmeldung „was …“ zählt (der Dreizack eines Ertrunkenen, „impaled“, fehlte) |
+| `be1661e` | `versus.sh`, `bench.sh`: ein Server, der beim Stoppen hängt, bekommt nach TERM noch KILL |
+| `0711dd9` | `scripts/bot/launchfiles.py`: die Startdatei des Servers aus `build/bob/launch-spec.json` |
+
+**Der hängende Server:** Ein Server der Liga hing beim Stoppen („Saving chunks“) und ignorierte TERM.
+Er hielt die Ports seines Platzes, und die nächsten zwei Spiele dort fanden ihre Ports belegt
+(„FAILED TO BIND TO PORT“, RCON-Zeitüberschreitung): zwei Seeds ohne Ergebnis. Seit `be1661e` folgt
+nach 10 s KILL.
+
+**Tests:**
+
+| Lauf | Ergebnis |
+| --- | --- |
+| volle Suite, Regeln (`*`) | 213 Tests, 212 grün; `brawl_zombie_trio` rot (10,8 HP verloren, Grenze 8), allein 3 von 3 grün (je 4,5 HP) |
+| `*brawl*` mit `-PbotLearned` | 11 von 12; `brawl_zombie_trio` rot (8,2 HP) |
+| `guardian_tests_*` mit `-PbotLearned` | 15 von 15 |
+| `*shield*` mit `-PbotLearned` | 7 von 7 |
+| `bobSimTest` | 4.110 Prüfungen grün, Vorausschau +1,64 Tiles in 300 Spielen |
+
+Die neuen Tests der drei Agenten liefen in der vollen Suite mit: `opening_kit` in 3.131 Ticks (alte
+Weise 4.524), `hillside_stone` 495 (1.040), `cook_and_mine` 856 (1.215), `search_first_tile` 35 Ticks,
+die acht Wissens-Tests und `estimate_probe`.
+
+**Befund `brawl_zombie_trio` mit gelernten Modellen:**
+- **Messung:** allein auf `bob/r1-int` 2 von 3 rot (13,3 und 13,7 HP, einmal 7,5). Auf dem alten
+  Stand `d85f36f` 3 von 3 rot (20,0 = tot, 13,3, 17,5). Der Fehler ist also alt, nicht aus der
+  Zusammenführung.
+- **Ursache:** Das gelernte Deckungsmodell wählt bei 20 HP ohne Rüstung gegen drei Zombies „away
+  from them“. Bob läuft, die Zombies holen ihn ein und schlagen viermal zu. Nach Regeln kämpft er
+  („no cover here“) und verliert 4,5 HP.
+- **Bedeutung:** In Ligen und im echten Spiel ist das gelernte Modell an (`cover=1`).
+
+### 27.5 Liga 9: alter gegen neuen Stand
+
+**Aufbau:**
+- Zwei Spiegel-Ligen (Bob gegen Bob, Standardknöpfe) auf den 12 Seeds aus 25, je 20 Minuten,
+  hart, SIM=1 mit Sprint, 2 parallel.
+- Alt = `d85f36f`, neu = `e36b3ba` (Spielcode = Merge `6ad6da7`). Jede Liga in frischen
+  Laufordnern, im Bank-Arbeitsbaum, unter dem Build-Lock.
+- Die zwei Seeds ohne Ergebnis (`4416…`, `−117…`, siehe 27.4) liefen neu auf `be1661e`
+  (gleicher Spielcode) in frischen Laufordnern, also ohne die in der Liga gelernte Erfahrung.
+
+Ein Kopf-an-Kopf-Spiel alt gegen neu geht nicht: Beide Stände müssten im selben Server laufen. Der
+Vergleich ist deshalb gepaart nach Seed (gleiche Welt, gleiches Brett).
+
+| Messgröße | alt (`d85f36f`) | neu (`bob/r1-int`) |
+| --- | --- | --- |
+| Tiles je Bot | 2,08 | 2,88 |
+| beide Bots zusammen | 4,17 | 5,75 |
+| nach 5 / 10 / 20 min | 0,33 / 1,08 / 2,08 | 0,67 / 1,50 / 2,88 |
+| erstes Tile, Mittel / Median | 402 / 440 s | 321 / 265 s |
+| Bots ohne Tile | 5 von 24 | 3 von 24 |
+| Tode je Bot | 0,25 (6) | 0,25 (6) |
+| Herzen verloren je Bot | 20,6 | 19,5 |
+
+**Gepaart** (Tiles je Bot, neu minus alt): +0,79 (Standardfehler 0,39, t = 2,0). 8 Seeds besser,
+2 schlechter, 2 gleich; Vorzeichentest p = 0,11.
+
+| Seed | Tiles je Bot alt → neu | Tode alt → neu | erstes Tile alt → neu |
+| --- | --- | --- | --- |
+| `2116751832253586494` | 3,0 → 4,0 | 1 → 0 | 71 s → 62 s |
+| `-2951244321692375177` | 2,5 → 2,5 | 0 → 0 | 469 s → 265 s |
+| `-117881894249851791` | 1,5 → 3,5 | 1 → 0 | 34 s → 54 s |
+| `4416150436638669970` | 2,0 → 2,5 | 0 → 0 | 440 s → 331 s |
+| `1815133796020248645` | 1,0 → 1,5 | 2 → 0 | 110 s → 190 s |
+| `-987677620420906123` | 2,0 → 3,0 | 1 → 1 | 531 s → 164 s |
+| `2582075177845500251` | 0,0 → 0,5 | 1 → 1 | – → 526 s |
+| `4038013524106796838` | 2,5 → 7,0 | 0 → 0 | 72 s → 67 s |
+| `-2038481054814894292` | 2,5 → 3,0 | 0 → 1 | 174 s → 129 s |
+| `-2332405236789101522` | 3,5 → 3,0 | 0 → 0 | 308 s → 115 s |
+| `1668062389011540959` | 1,5 → 1,0 | 0 → 0 | 234 s → 588 s |
+| `-3882669516007583803` | 3,0 → 3,0 | 0 → 3 | 433 s → 558 s |
+
+**Lesart:**
+- **Tiles:** Beide Bots zusammen holen 1,6 Tiles mehr pro Spiel (Liga 3 bis 8: 3,1 bis 4,1). Das
+  ist der höchste Wert aller Ligen. Auf Seed `4038…` holten beide zusammen 14 Tiles (alt 5).
+- **Vergleich mit dem Wissens-Agenten:** Er maß auf 8 dieser Seeds +0,81 (6 besser, 0
+  schlechter).
+- **Rauschen:** Derselbe alte Stand lief auf denselben 8 Seeds zweimal. Der Lauf des
+  Wissens-Agenten ergab 2,12 Tiles und 1 Tod, dieser Lauf 1,81 Tiles und 6 Tode. Tode streuen also
+  zwischen Läufen desselben Codes um ein Vielfaches.
+- **Erstes Tile:** Der Median fällt von 440 auf 265 s, nach 5 Minuten stehen doppelt so viele Tiles.
+  Das ist die Eröffnung (Steinspitzhacke im Median nach 96 s, die vier Steinwerkzeuge nach 119 s).
+
+**Schätzfehler** (`goals.py`, erledigte Ziele): Im Median lag das echte Ziel beim Faktor 2,4 der
+Schätzung, jetzt 1,6 (|log| 0,85 → 0,46). Starts über dem Dreifachen der Schätzung: 17 % → 13 %.
+Zeit auf Zielen je Liga: 6.595 → 5.787 s, bei mehr erledigten Zielen (22 → 30).
+
+**Zeitfresser** (Wurzelaufgaben, s je Bot-Partie, alt → neu; je Bot zählen die 10 größten):
+
+| Aufgabe | alt | neu |
+| --- | --- | --- |
+| Essensvorrat | 201 | 148 |
+| Schild | 184 | 164 |
+| Eisenspitzhacke | 52 | 116 |
+| Kupfer | 56 | 113 |
+| Holz | 96 | 92 |
+| Steinspitzhacke | 75 | 49 |
+| Bündel | 61 | 20 |
+| nachts eingegraben / in der Box | 0 | 57 |
+| Nachtjagden | 19 | 0 |
+
+Schild, Eisen und Kupfer zusammen kosten jetzt 393 s je Bot-Partie: ein Drittel der 20 Minuten.
+`investLater` schob 9-mal auf (7-mal den Schild).
+
+**Die Tode** (je 6):
+
+| Liga | Ursache |
+| --- | --- |
+| alt | Zombie beim Schild-Holen, die Säule ging nicht hoch („no block“), ohne Rüstung |
+| alt | Skelett beim Schild-Holen, ohne Rüstung und Deckung („box: no floor“) |
+| alt | Dreizack eines Ertrunkenen im Wasser beim Eisenspitzhacken-Holen |
+| alt | Spinne und Zombie nachts beim Bündel, eingegraben, trotzdem getroffen |
+| alt | zwei Skelette beim Säulenkampf gegen einen Zombie (Rüstung 10) |
+| alt | Skelett bei 2 HP, keine Blöcke für eine Box |
+| neu | **dreimal ertrunken** auf Seed `−3882…`, immer beim ersten Stein: „mine cobblestone at y 59“ führt in einen See, Bob kommt hoch, gräbt dann die Treppe vom Wasser aus („no rock at hand: a staircase down“), und `AirTask` steckt in „dig instead“ fest (Ort unverändert, 10 Treffer). Nach dem Respawn derselbe Weg. Der alte Stand musste auf diesem Seed 7-mal Luft holen und überlebte. |
+| neu | Zombie in der ersten Minute, noch ohne Schwert: Säule gescheitert, Eingraben zu langsam (Seed `−987…`, wie in der Eröffnungs-Bank) |
+| neu | Zombie nachts in einer Box, die nicht zuging; baumloser Start ohne Waffe und Essen (Seed `2582…`) |
+| neu | Skelette auf der Treppe zum Schild-Eisen, ohne Schild, Box half nicht |
+
+**Neue Wege:** Strukturbeute und Jagd am Wohnort kamen in keiner der beiden Ligen vor (0-mal).
+
+**Wasser:** `AirTask` hat sich in keinem Branch geändert, aber der neue Stand gerät öfter unter
+Wasser in eine Lage ohne Ausweg:
+
+| Liga | Bot-Partien | Luftholen geschafft | „dig instead“ | ertrunken |
+| --- | --- | --- | --- | --- |
+| alt: Wissens-Liga vorher und Liga 9 | 40 | 145 | 0 | 0 |
+| neu: Wissens-Liga nachher und Liga 9 | 40 | 80 | 4 | 5 |
+
+Der neue Stand gräbt mehr und länger nach Eisen (Roheisen-Schritte mit 12 bis 14 Stück statt 4 bis
+10; Eisenspitzhacke und Kupfer zusammen 229 statt 108 s je Bot-Partie) und weniger Treppen für den
+ersten Stein (24 statt 53, `rocksight`).
+
+### 27.6 Liga 10: neuer Stand gegen `search=1`
+
+Läuft: dieselben 12 Seeds, 20 Minuten, hart, SIM=1, `-` gegen `search=1` auf `be1661e`. Das
+Ergebnis folgt in einem eigenen Commit.
+
+### 27.7 Entscheidung
+
+Die Tests sind grün bis auf bekannte Wackler, und der Fehler mit den gelernten Modellen ist alt. Die
+Liga zeigt mehr Tiles (+0,79 je Bot, beide zusammen +1,58) und ein klar schnelleres erstes Tile
+(Median −175 s). Die Tode sind gleich (6 gegen 6). Damit ist das Tor offen:
+
+- `bob/r1-int` ist nach `26.3-lockout-bot` vorgespult (Fast-Forward).
+- `mod_version` bleibt unverändert; es gibt keinen Release.
+- Die Tode bleiben das wichtigste offene Thema (27.8, Punkt 1). Gleich viele heißt nicht dieselben:
+  Ertrinken ist mit dem neuen Stand häufiger geworden (5 in 40 Bot-Partien gegen 0 in 40, siehe
+  „Wasser“ in 27.5). Über beide Ligenpaare zusammen stehen 11 Tode gegen 7; das liegt im Rauschen
+  (der alte Stand allein: 1 und 6 Tode auf denselben 8 Seeds), ist aber eine Warnung.
+
+### 27.8 Offen für Runde 2, nach erwartetem Nutzen geordnet
+
+Grundlage der Reihenfolge:
+- die Tode der Ligen 9 und 10 und der Wissens-Liga (die Regel „nie sterben“ zählt mehr als ein
+  Tile);
+- die Was-wäre-wenn-Tabelle des Simulators (27.1);
+- die Zeitfresser aus Liga 9 und der Stoppuhr (27.3, 27.5).
+
+1. **Tode beim ersten Stein, beim Schild und beim Eisen.** Alle 6 Tode des neuen Stands und 5 der 6
+   alten fielen in Eröffnung, Kit oder die erste Nacht ohne Ausrüstung.
+   - **Luftnot (`AirTask`):** „dig instead“ steckt fest, wenn das Dach dick ist oder nichts Festes
+     über dem Kopf liegt und kein offenes Wasser in 6 Blöcken ist. Bob gräbt oder springt auf der
+     Stelle, bis er ertrinkt (5 Tode in 40 Bot-Partien des neuen Stands, 0 beim alten). Zuerst
+     klären, warum der neue Stand öfter dorthin gerät (längere Eisen-Ausflüge, größere
+     Roheisen-Mengen, Treppe vom Seegrund).
+     - Ansätze: die Regel der halben Luft (umkehren, bevor die Hälfte weg ist); keine Treppe aus
+       dem Wasser oder in geflutete Höhlen; der Rückweg über die eigene Spur mit größerer
+       Reichweite; Blöcke unter sich setzen, um aus dem Wasser zu steigen.
+     - Test: die Lage von Seed `−3882…` nachbauen (Treppe von einem Seegrund aus).
+   - **Ohne Waffe gegen einen Zombie:** Säule und Eingraben scheitern. Ein Spieler läuft im Sprint
+     davon. Ansatz: unbewaffnet gegen Nahkämpfer laufen statt bauen.
+   - **Gelerntes Deckungsmodell gegen drei Zombies:** Es wählt „away“ und verliert 13 bis 20 HP; die
+     Regeln kämpfen und verlieren 4,5 HP (27.4). Ansatz: das Modell an dieser Lage nachtrainieren
+     oder „away“ gegen ein Rudel im Offenen sperren, solange Bob bewaffnet und gesund ist.
+   - **Skelette auf dem Weg zum Schild-Eisen:** Der Schild schützt gegen Pfeile, aber auf dem Weg zu
+     seinem Eisen hat Bob ihn noch nicht. Ansatz: Deckungsblöcke immer dabei; Abstieg nur mit
+     freiem Rückweg.
+2. **Das Kit: Schild, Eisen, Kupfer** (393 s je Bot-Partie in Liga 9; der Simulator traut
+   „Ressourcen finden wie ein guter Spieler“ +1,9 Tiles in 20 Minuten zu, Handwerk und Sammeln +2,6).
+   - **Eisen aus dem Weltsinn:** Schiffswrack (94 % Eisen) und vergrabener Schatz (100 %).
+   - **Eisen sehen statt suchen:** Höhlen und Schluchten von der Oberfläche aus; Streifenabbau mit
+     einer Kappe von 2 Minuten; beim ersten Eisenband aufhören, wenn ein Barren reicht.
+   - **Ohne Warten:** schmelzen, ohne am Ofen zu stehen (laden, gehen, wiederkommen); erst die ganze
+     Ader, dann die Drops; sprinten.
+3. **Der Essensvorrat** (148 s je Bot-Partie, dazu 57 s nachts eingegraben). Ansatz: Essen aus dem,
+   was in Sicht ist, mit dem Eisen zusammen braten. Der Simulator traut „kein Vorrat am Anfang“
+   +0,74 Tiles zu. Auf hart kostete weniger Vorrat aber Tode (Liga 2).
+4. **Die Vorausschau** (`search=1`, Ergebnis in 27.6). Vor dem Standard:
+   - den Simulator an den Journalen kalibrieren (Profil und Rezepte automatisch, `speedrun.json` als
+     Expertenzeiten);
+   - die Pflichten (Essen, Schild, Kupfer, Bündel) mitentscheiden lassen, weil sie 50 bis 99 % von
+     Bobs Zeit belegen;
+   - eine Liga über 90 Minuten.
+5. **Schätzungen außerhalb des Planers** (Stunts, Biom-Besuche, 3 Sapling Types) sind jetzt die
+   optimistischen und werden zuerst gewählt. Fall 20 Blocks scheitert und wird wieder versucht.
+   Ansatz: aus den Journalen kalibrieren und das Zielmodell auf Journalen der Fassung 2 neu
+   trainieren.
+6. **Die neuen Beute- und Jagdwege** kamen in keiner Liga vor. Ansatz: eine Szenario-Liga mit
+   Brettern, die Namensschild, Gold, Obsidian, Hexe, Plünderer und Lohenrute erzwingen.
+7. **Baumlose Starts** (Seed `2582…`: alt 0, neu 0,5 Tiles je Bot und je ein Tod). Ansatz: Holz aus
+   Dörfern und Schiffswracks, das nächste Waldbiom aus dem Weltsinn.
+8. **Fairness:** Die Verlangsamung beim Benutzen eines Gegenstands (Schild oben, Essen) gilt im
+   Vanilla-Spiel nur auf dem Client. Bots gehen dabei zu schnell.
+
+### 27.9 Wo alles liegt
+
+- **Code:** `26.3-lockout-bot` = `bob/r1-int` (Merges `d85295b`, `e0e03f9`, `6ad6da7`, dann die
+  Werkzeug-Commits aus 27.4 und dieser Abschnitt). Die Branches `bob/r1-brain`, `bob/r1-knowledge`
+  und `bob/r1-opening` bleiben auf origin.
+- **Ergebnisse** (Ligen als JSON-Zeilen, Spiel-Logs, Journale, Testprotokolle) im Scratchpad der
+  Sitzung unter `int/` (`league-old`, `league-new`, `league-new-rerun`, `league-search`,
+  `tests-*.txt`). Die Agenten-Ergebnisse liegen unter `brain/`, `kb/` und `opening/`.
+- **Liga auf einem Stand nachspielen**, im Bank-Arbeitsbaum und unter dem Build-Lock:
+  ```
+  git checkout --detach <commit>
+  sh ./gradlew classes bobLaunchSpec -q --offline
+  python3 scripts/bot/launchfiles.py
+  rm -rf run-0 run-1
+  SIM=1 python3 scripts/bot/league.py --a - --b - --seeds "$SEEDS" --seconds 1200 --difficulty hard --parallel 2 --out liga.jsonl
+  ```
+  Auswerten mit `compare.py alt.jsonl neu.jsonl`, `deaths.py`, `goals.py`, `opening.py show`.
