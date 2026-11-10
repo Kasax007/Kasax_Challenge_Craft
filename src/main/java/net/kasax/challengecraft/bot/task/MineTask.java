@@ -602,7 +602,12 @@ public final class MineTask implements BotTask {
         if (depth != null && !cavesDone && !sealed && !rock(level(bot)) && !(digAtLead && lead != null)) return explore(bot);
         if (depth == null && rock(level(bot))) return dig(bot);
         if (depth != null && !(digAtLead && lead != null)) return dig(bot);
-        // Where they are known to be: go there first.
+        // Where they are known to be: go there first - not into the bowmen waiting there, before
+        // the shield (the same as for a block in sight, see bowmenBy).
+        if (lead != null && bot.params.on("bowmanwary") && level(bot).getGameTime() % 20 == 0 && bowmenBy(level(bot), bot, lead)) {
+            lead = null;
+            if (knownOnly) return Result.FAILED;
+        }
         if (lead != null) {
             // Far off: over the surface in legs (a path search straight there would dig through
             // the hills in between, and go underground where it ran out of budget).
