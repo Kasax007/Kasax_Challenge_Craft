@@ -1338,8 +1338,10 @@ public final class LockoutBrain implements BotBrain {
         var body = bot.body();
         long now = body.level().getGameTime();
         if (now < upgradeRetryAt) return false;
-        // Ingots and raw ore alike: the ore is smelted on the way to whatever it becomes.
-        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+        // Ingots and raw ore alike: the ore is smelted on the way to whatever it becomes. (And what
+        // its furnaces left cooking hold - smeltgo: the chestplate's eight come from there as well.)
+        int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON))
+                + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT);
         // The shield whenever there is an ingot about: the arrows and the creepers' blasts end in it.
         if (iron >= 1 && !has(body, Set.of(net.minecraft.world.item.Items.SHIELD))) return make(bot, net.minecraft.world.item.Items.SHIELD, "a shield");
         // On hard, the chestplate next, iron for the board or not: most deaths are arrows,

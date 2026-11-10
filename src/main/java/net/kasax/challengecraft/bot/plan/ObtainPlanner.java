@@ -1870,6 +1870,11 @@ public final class ObtainPlanner {
         return n;
     }
 
+    /** How many of {@code item} its furnaces left cooking hold or cook (smeltgo; 0 with the knob off). */
+    public int inFurnaces(Bot bot, Item item) {
+        return leftCooking(bot, item);
+    }
+
     /** How many of {@code item} its furnaces left cooking hold or cook. */
     private int leftCooking(Bot bot, Item item) {
         int n = 0;
