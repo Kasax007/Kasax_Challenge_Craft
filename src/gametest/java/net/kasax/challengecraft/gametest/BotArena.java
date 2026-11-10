@@ -102,6 +102,9 @@ public final class BotArena {
         BlockPos p = abs(x, y, z);
         String botName = "T" + COUNTER.incrementAndGet();
         bot = BotManager.spawn(helper.getLevel().getServer(), botName, helper.getLevel(), Vec3.atBottomCenterOf(p));
+        // (-PbotKnobs: the same knobs for every test bot - a round's old way, run beside its new one.)
+        String knobs = System.getProperty("bob.knobs");
+        if (knobs != null && !knobs.isBlank()) bot.params = net.kasax.challengecraft.bot.BotParams.parse(knobs);
         bot.body().setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
         bot.body().getInventory().clearContent();
         for (ItemStack s : items) bot.body().getInventory().add(s.copy());

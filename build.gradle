@@ -159,6 +159,9 @@ loom.runs.matching { it.name == 'gameTest' }.configureEach {
 	// The scenarios test the rules; the learnt models are gated by the arena (scripts/train).
 	// With them: ./gradlew runGameTest -PbotLearned
 	if (!project.hasProperty('botLearned')) vmArg "-Dbob.learned=0"
+	// The knobs of every test bot, e.g. the old way of a round for a before/after run in one
+	// build: ./gradlew runGameTest -PbotKnobs=halfair=0,airsafe=0 (a test that sets knobs of its own keeps those).
+	if (project.hasProperty('botKnobs')) vmArg "-Dbob.knobs=${project.property('botKnobs')}"
 }
 
 // Footage for the shorts, frame by frame (src/film): ./gradlew runFilm -Pfilm=SCENE
