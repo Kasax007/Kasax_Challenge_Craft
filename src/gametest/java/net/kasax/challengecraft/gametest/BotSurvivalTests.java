@@ -1,0 +1,255 @@
+package net.kasax.challengecraft.gametest;
+
+import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.kasax.challengecraft.bot.Bot;
+import net.kasax.challengecraft.bot.learn.CoverPolicy;
+import net.kasax.challengecraft.bot.plan.ObtainPlanner;
+import net.kasax.challengecraft.bot.task.MineTask;
+import net.kasax.challengecraft.bot.task.ObtainTask;
+import net.kasax.challengecraft.bot.task.WaitTask;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+import static net.kasax.challengecraft.gametest.BotArena.FEET;
+import static net.kasax.challengecraft.gametest.BotArena.GROUND;
+import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
+
+/**
+ * The deaths of the opening, the kit trip and the first night (round 2 of the league work), each
+ * as a scene built after the self-play games it happened in, on hard:
+ *
+ * <ul>
+ *   <li>{@code drown_flooded_stairs}, {@code drown_lake_stone}: under water with a roof over the
+ *   head (a staircase dug from a lake's bottom, flooded) and the first stone wanted from a lake -
+ *   five drownings in forty bot-games of the new code, none in forty of the old.</li>
+ *   <li>{@code unarmed_zombies_night}: two zombies at night and no weapon yet, a few blocks in the
+ *   pack - the pillar ran out of blocks, the hole was dug too slowly.</li>
+ *   <li>{@code skeletons_down_the_stairs}: the staircase down to the shield's iron opens onto two
+ *   skeletons in the dark, no shield yet.</li>
+ *   <li>{@code zombie_pack_model}, {@code spider_model}: the learnt cover model choosing for the
+ *   guardian - it ran from three zombies the rules fight (13 to 20 hearts lost against 4.5), and
+ *   it took to a pillar or a run with a spider at it (four of four such choices died).</li>
+ * </ul>
+ */
+public class BotSurvivalTests {
+
+    private static void command(GameTestHelper h, String cmd) {
+        var server = h.getLevel().getServer();
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), cmd);
+    }
+
+    /** A monster at this spot after the bot, with a helmet (no burning in the test's daylight) and kept. */
+    private static <T extends Mob> T mob(GameTestHelper h, BotArena a, EntityType<T> type, int x, int y, int z) {
+        T m = type.create(h.getLevel(), EntitySpawnReason.MOB_SUMMONED);
+        m.setPos(Vec3.atBottomCenterOf(a.abs(x, y, z)));
+        m.setPersistenceRequired();
+        m.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+        if (m instanceof net.minecraft.world.entity.monster.skeleton.AbstractSkeleton) m.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        h.getLevel().addFreshEntity(m);
+        return m;
+    }
+
+    // ---- under water ------------------------------------------------------------------------------
+
+    /**
+     * A lake (water y 10 to 15 over x 6..17) and its east bank of soil and stone, and a staircase
+     * dug from the lake's bottom into the bank, five steps down, flooded: the bot at its foot with
+     * five seconds of air left - the way out is back up the steps and up through the lake; the roof
+     * over the head is eight blocks of the bank. (League 9 and the knowledge league: "up for air:
+     * dig instead" under such a roof, the spot unchanged, drowned.)
+     */
+    @GameTest(environment = "challengecraft:survival_water", structure = STRUCTURE, maxTicks = 900, skyAccess = true, padding = 8)
+    public void drownFloodedStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drown_flooded_stairs");
+        command(h, "difficulty hard");
+        a.fill(0, GROUND - 6, 0, BotArena.SIZE - 1, GROUND - 1, BotArena.SIZE - 1, Blocks.DIRT);
+        a.fill(6, 10, 10, 17, GROUND, 24, Blocks.WATER);
+        a.fill(6, 9, 10, 17, 9, 24, Blocks.STONE);
+        // The staircase: from feet (16, 10) on the lake's floor, step k at x 16+k, y 10-k .. 12-k.
+        for (int k = 1; k <= 5; k++) a.fill(16 + k, 10 - k, 17, 16 + k, 12 - k, 17, Blocks.WATER);
+        Bot bot = a.spawn(21, 5, 17, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 12));
+        var body = bot.body();
+        body.setAirSupply(100);
+        int[] lowest = {body.getAirSupply()};
+        a.run(new WaitTask(700), 880, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_flooded_stairs: drowned");
+            if (h.getTick() % 40 == 0) BotArena.LOG.info("[BOTTEST] drown_flooded_stairs air {} hp {} at {}", body.getAirSupply(), body.getHealth(), a.feet().toShortString());
+            lowest[0] = Math.min(lowest[0], body.getAirSupply());
+            boolean out = !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            if (out) BotArena.LOG.info("[BOTTEST] drown_flooded_stairs breathing at {} after {} ticks, hp {}", a.feet().toShortString(), h.getTick(), body.getHealth());
+            return out;
+        });
+    }
+
+    /**
+     * Stone wanted (a wooden pickaxe in hand, sticks and planks), the bot afloat in the middle of a
+     * lake six deep whose banks are soil all round: the stone dug from dry ground, never a staircase
+     * from the water (league 9: "no rock at hand: a staircase down" out of a lake on seed -3882...,
+     * drowned there three times in one game). Passes with a stone pickaxe, never having been down
+     * to a third of its air.
+     */
+    @GameTest(environment = "challengecraft:survival_water", structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    public void drownLakeStone(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drown_lake_stone");
+        command(h, "difficulty hard");
+        a.fill(0, GROUND - 9, 0, BotArena.SIZE - 1, GROUND - 1, BotArena.SIZE - 1, Blocks.DIRT);
+        a.fill(12, GROUND - 6, 12, 27, GROUND, 27, Blocks.WATER);
+        a.fill(12, GROUND - 7, 12, 27, GROUND - 7, 27, Blocks.STONE);
+        Bot bot = a.spawn(20, GROUND, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.OAK_PLANKS, 8), new ItemStack(Items.STICK, 4),
+                new ItemStack(Items.CRAFTING_TABLE));
+        var body = bot.body();
+        int[] lowest = {body.getMaxAirSupply()};
+        a.run(new ObtainTask(Set.of(Items.STONE_PICKAXE), 1, new ObtainPlanner()), 2980, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_lake_stone: drowned");
+            lowest[0] = Math.min(lowest[0], body.getAirSupply());
+            if (h.getTick() % 100 == 0) BotArena.LOG.info("[BOTTEST] drown_lake_stone air {} (lowest {}) hp {} at {}", body.getAirSupply(), lowest[0], body.getHealth(), a.feet().toShortString());
+            h.assertTrue(lowest[0] >= body.getMaxAirSupply() / 3, "drown_lake_stone: down to " + lowest[0] + " air");
+            return ObtainPlanner.countAny(body, Set.of(Items.STONE_PICKAXE)) > 0;
+        });
+    }
+
+    // ---- no weapon at night -------------------------------------------------------------------------
+
+    /**
+     * Night on hard, two zombies coming, a stone pickaxe and no weapon yet, ten cobblestone (two to
+     * spare: the rest is the furnace's), room all round: away from them at a run (they are half as
+     * fast), not a pillar that runs out of blocks halfway up nor a hole dug with them at its edge
+     * (seed -987...: the pillar failed, dug in on a slope, dead in the first two minutes).
+     */
+    @GameTest(environment = "challengecraft:survival_night", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 44)
+    public void unarmedZombiesNight(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "unarmed_zombies_night");
+        command(h, "difficulty hard");
+        command(h, "time set 14000");
+        a.fill(-20, GROUND - 4, -20, BotArena.SIZE + 19, GROUND - 3, BotArena.SIZE + 19, Blocks.STONE);
+        Bot bot = a.spawn(20, FEET, 20, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 10), new ItemStack(Items.OAK_PLANKS, 2));
+        var body = bot.body();
+        List<Mob> zombies = new ArrayList<>();
+        zombies.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 20));
+        zombies.add(mob(h, a, EntityTypes.ZOMBIE, 25, FEET, 24));
+        float[] low = {body.getHealth()};
+        a.run(new WaitTask(900), 980, () -> {
+            for (var z : zombies) if (z.isAlive() && z.getTarget() != body) z.setTarget(body);
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "unarmed_zombies_night: killed");
+            low[0] = Math.min(low[0], body.getHealth());
+            if (20 - low[0] > 9) h.fail("unarmed_zombies_night: lost " + (20 - low[0]) + " health");
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] unarmed_zombies_night hp {} guardian {}/{}/{}/{} at {}", body.getHealth(),
+                    bot.guardian.boxes, bot.guardian.pillars, bot.guardian.digs, bot.guardian.runs, a.feet().toShortString());
+            if (h.getTick() < 900) return false;
+            BotArena.LOG.info("[BOTTEST] unarmed_zombies_night lost {} health", 20 - low[0]);
+            BotArena.day(h);
+            return true;
+        });
+    }
+
+    // ---- skeletons on the way down before the shield ------------------------------------------------
+
+    /**
+     * The shield's iron down a staircase (a stone sword, no shield, no armour): the steps open onto
+     * a dark room with two skeletons, iron in its far wall. Alive at the end, not shot to pieces in
+     * the one-wide stairs (league 9, seed -2038...: down to the iron at y 40, two skeletons, the box
+     * no help - dead).
+     */
+    @GameTest(environment = "challengecraft:survival_stairs", structure = STRUCTURE, maxTicks = 1300, skyAccess = true, padding = 24)
+    public void skeletonsDownTheStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "skeletons_down_the_stairs");
+        command(h, "difficulty hard");
+        // The staircase: from the surface at x 8 down to y 8 at x 16 (one wide, z 20), a roof of stone.
+        for (int k = 0; k <= 8; k++) a.fill(8 + k, FEET - k, 20, 8 + k, FEET + 2 - k, 20, Blocks.AIR);
+        // The room at its foot, dark under eight blocks of rock: x 17..30, y 8..11, z 15..25.
+        a.fill(17, 8, 15, 30, 11, 25, Blocks.AIR);
+        a.fill(31, 8, 18, 31, 10, 22, Blocks.IRON_ORE);
+        List<Mob> skeletons = new ArrayList<>();
+        skeletons.add(mob(h, a, EntityTypes.SKELETON, 27, 8, 18));
+        skeletons.add(mob(h, a, EntityTypes.SKELETON, 28, 8, 23));
+        Bot bot = a.spawn(7, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.STONE_AXE),
+                new ItemStack(Items.COBBLESTONE, 24), new ItemStack(Items.BREAD, 6));
+        var body = bot.body();
+        float[] low = {body.getHealth()};
+        var iron = net.minecraft.world.level.block.Blocks.IRON_ORE;
+        a.run(new MineTask("raw_iron", s -> s.is(iron), Set.of(Items.RAW_IRON), 3, null, a.abs(31, 9, 20)).knownOnly(), 1280, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "skeletons_down_the_stairs: shot dead");
+            low[0] = Math.min(low[0], body.getHealth());
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] skeletons_down_the_stairs hp {} skeletons {} at {} ({})", body.getHealth(),
+                    skeletons.stream().filter(Mob::isAlive).count(), a.feet().toShortString(), bot.status());
+            if (20 - low[0] > 12) h.fail("skeletons_down_the_stairs: lost " + (20 - low[0]) + " health");
+            if (h.getTick() < 1200) return false;
+            BotArena.LOG.info("[BOTTEST] skeletons_down_the_stairs lost {} health, iron {}", 20 - low[0], ObtainPlanner.countAny(body, Set.of(Items.RAW_IRON)));
+            return true;
+        });
+    }
+
+    // ---- the learnt cover model -----------------------------------------------------------------
+
+    /**
+     * The brawl of three zombies (one a baby) with a stone sword, the learnt cover model choosing
+     * for the guardian (whatever -PbotLearned says): no more lost than the rules lose there.
+     */
+    @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
+    public void zombiePackModel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "zombie_pack_model");
+        command(h, "difficulty hard");
+        List<Mob> mobs = new ArrayList<>();
+        mobs.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 18));
+        mobs.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 22));
+        var baby = mob(h, a, EntityTypes.ZOMBIE, 24, FEET, 26);
+        ((net.minecraft.world.entity.monster.zombie.Zombie) baby).setBaby(true);
+        mobs.add(baby);
+        Bot bot = a.spawn(16, FEET, 20, new ItemStack(Items.STONE_SWORD));
+        bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
+        var body = bot.body();
+        float[] low = {body.getHealth()};
+        a.run(new net.kasax.challengecraft.bot.task.KillTask(Set.of(EntityTypes.ZOMBIE), Set.of(), 0, 3), 1500, () -> {
+            low[0] = Math.min(low[0], body.getHealth());
+            if (20 - low[0] > 8) h.fail("zombie_pack_model: lost " + (20 - low[0]) + " health (runs " + bot.guardian.runs + ")");
+            boolean done = mobs.stream().noneMatch(Mob::isAlive);
+            if (done) BotArena.LOG.info("[BOTTEST] zombie_pack_model lost {} health, guardian runs {} fights {}", 20 - low[0], bot.guardian.runs, bot.guardian.fights);
+            return done;
+        });
+    }
+
+    /**
+     * At night a spider and a zombie at him, a stone sword, twelve hearts and blocks enough for
+     * anything, the learnt model choosing: no pillar (it climbs), no run (it is quicker), no hole
+     * dug with it at the rim - alive, not badly hurt. (Four of four times the model took a pillar,
+     * a run or a hole with a spider at him in the leagues, he died.)
+     */
+    @GameTest(environment = "challengecraft:survival_night2", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 44)
+    public void spiderModel(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "spider_model");
+        command(h, "difficulty hard");
+        command(h, "time set 14000");
+        Bot bot = a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.DIRT, 32));
+        bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
+        var body = bot.body();
+        body.setHealth(14);
+        List<Mob> mobs = new ArrayList<>();
+        mobs.add(mob(h, a, EntityTypes.SPIDER, 24, FEET, 20));
+        mobs.add(mob(h, a, EntityTypes.ZOMBIE, 20, FEET, 25));
+        float[] low = {body.getHealth()};
+        a.run(new WaitTask(900), 980, () -> {
+            for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "spider_model: killed");
+            low[0] = Math.min(low[0], body.getHealth());
+            if (14 - low[0] > 9) h.fail("spider_model: lost " + (14 - low[0]) + " health (pillars " + bot.guardian.pillars + ", runs " + bot.guardian.runs + ", digs " + bot.guardian.digs + ")");
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] spider_model hp {} guardian {}/{}/{}/{} mobs {}", body.getHealth(),
+                    bot.guardian.boxes, bot.guardian.pillars, bot.guardian.digs, bot.guardian.runs, mobs.stream().filter(Mob::isAlive).count());
+            if (h.getTick() < 900 && mobs.stream().anyMatch(Mob::isAlive)) return false;
+            BotArena.LOG.info("[BOTTEST] spider_model lost {} health", 14 - low[0]);
+            BotArena.day(h);
+            return true;
+        });
+    }
+}

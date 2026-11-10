@@ -48,6 +48,13 @@ public final class AirTask implements BotTask {
     @Override
     public Result tick(Bot bot) {
         var body = bot.body();
+        if (ticks == 0 && breathing == 0 && body.isEyeInFluid(FluidTags.WATER)) {
+            ServerLevel lv = (ServerLevel) body.level();
+            BlockPos f = body.blockPosition();
+            bot.say("short of air at " + f.toShortString() + " (" + body.getAirSupply() + "/" + body.getMaxAirSupply()
+                    + (openAbove(lv, f, 24) ? ", open water above" : thinRoof(lv, BlockPos.containing(body.getX(), body.getEyeY(), body.getZ())) ? ", a thin roof" : ", a roof over the water")
+                    + ")");
+        }
         // Head out: there until the lungs are nearly full again - a breath and straight back
         // under (the way on leads through the water) and the next breath is shorter, until
         // there is none. Meanwhile still, afloat (head kept up) or standing.
@@ -272,6 +279,38 @@ public final class AirTask implements BotTask {
             }
         }
         return best;
+    }
+
+    /**
+     * The blocks round {@code feet} for the log, one layer a line from the top down, each layer
+     * its rows (north to south) of columns (west to east), the feet's column in the middle:
+     * {@code #} solid, {@code W} solid and waterlogged, {@code ~} still water, {@code ,} flowing
+     * water, {@code L} lava, {@code .} air, {@code o} anything else one passes through, {@code F}
+     * and {@code H} the bot's feet and head.
+     */
+    public static String scene(ServerLevel level, BlockPos feet, int r, int below, int above) {
+        StringBuilder sb = new StringBuilder();
+        for (int dy = above; dy >= -below; dy--) {
+            sb.append(String.format("  y %d%s: ", feet.getY() + dy, dy == 0 ? " (feet)" : dy == 1 ? " (head)" : ""));
+            for (int dz = -r; dz <= r; dz++) {
+                if (dz > -r) sb.append('|');
+                for (int dx = -r; dx <= r; dx++) {
+                    BlockPos q = feet.offset(dx, dy, dz);
+                    var st = level.getBlockState(q);
+                    var fluid = level.getFluidState(q);
+                    boolean solid = !st.getCollisionShape(level, q).isEmpty();
+                    char c = solid ? (fluid.isEmpty() ? '#' : 'W')
+                            : fluid.is(net.minecraft.tags.FluidTags.LAVA) ? 'L'
+                            : !fluid.isEmpty() ? (fluid.isSource() ? '~' : ',')
+                            : st.isAir() ? '.' : 'o';
+                    // (The bot's own feet and head, where it can be: F and H.)
+                    if (dx == 0 && dz == 0 && (dy == 0 || dy == 1) && !solid) c = dy == 0 ? 'F' : 'H';
+                    sb.append(c);
+                }
+            }
+            if (dy > -below) sb.append('\n');
+        }
+        return sb.toString();
     }
 
     @Override

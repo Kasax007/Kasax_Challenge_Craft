@@ -902,6 +902,8 @@ public final class MineTask implements BotTask {
                         bot.say("can't dig on here");
                         return Result.FAILED;
                     }
+                    bot.say("no safe step down from " + feet.toShortString() + ": a few blocks away, to " + away.toShortString()
+                            + (bot.body().isInWater() ? " (in the water)" : ""));
                     bot.interject(new GoToTask(away, 2));
                 }
                 return Result.RUNNING;

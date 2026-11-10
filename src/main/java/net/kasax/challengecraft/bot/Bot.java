@@ -441,7 +441,15 @@ public final class Bot {
             BotManager.LOG.info("[Bot] {}: out of air at {} (eye block {}): {} | nav {} | diving {}", name, body.blockPosition().toShortString(),
                     body.level().getBlockState(net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ())).getBlock().getName().getString(),
                     status(), navigator.debug(), navigator.diving());
+            // (Once a dive: the blocks round it, layer by layer - the drownings of the leagues
+            // could not be built as a test from the log alone.)
+            if (!airSceneLogged) {
+                airSceneLogged = true;
+                BotManager.LOG.info("[Bot] {}: drowning scene at {}:\n{}", name, body.blockPosition().toShortString(),
+                        net.kasax.challengecraft.bot.task.AirTask.scene((net.minecraft.server.level.ServerLevel) body.level(), body.blockPosition(), 5, 3, 7));
+            }
         }
+        if (!body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) airSceneLogged = false;
         reflexes();
         // (Not in the middle of a fight or a flight: the plan waits till that is over.)
         if (brain != null && !inReflex()) brain.tick(this);
@@ -541,6 +549,8 @@ public final class Bot {
     }
 
     private boolean fallLogged;
+    /** The blocks round it logged for this dive already (see {@link net.kasax.challengecraft.bot.task.AirTask#scene}). */
+    private boolean airSceneLogged;
     /** The health a tick ago, for the log of hits taken (-1: not looked at yet). */
     private float lastHp = -1;
 
