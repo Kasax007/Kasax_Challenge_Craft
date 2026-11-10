@@ -415,17 +415,25 @@ public final class MineTask implements BotTask {
                     break;
                 }
             }
-            if (!wet && worthIt(level, bot, p)) return p;
+            if (wet || !worthIt(level, bot, p)) continue;
+            // (Not into a cave mouth with its skeletons: nothing hostile about the spot - the
+            // staircase is the safer stone then.)
+            if (!level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, new net.minecraft.world.phys.AABB(p).inflate(14, 8, 14),
+                    mob -> mob.isAlive() && !(mob instanceof net.minecraft.world.entity.monster.Enderman)).isEmpty()) continue;
+            return p;
         }
         return null;
     }
 
-    /** A block with open air in daylight beside it or on top (seen from the surface, not deep in a cave). */
+    /**
+     * A block with open air under the open sky beside it or on top: seen from the surface - not
+     * deep in a cave, nor under the overhang of a cave mouth (the sky light falls off there).
+     */
     private static boolean daylit(ServerLevel level, BlockPos p) {
         for (Direction d : Direction.values()) {
             if (d == Direction.DOWN) continue;
             BlockPos n = p.relative(d);
-            if (level.getBlockState(n).isAir() && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, n) >= 12) return true;
+            if (level.getBlockState(n).isAir() && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, n) >= 14) return true;
         }
         return false;
     }
