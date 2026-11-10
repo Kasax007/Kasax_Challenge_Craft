@@ -1300,7 +1300,7 @@ public final class Bot {
         if (closest == null || closest.distanceTo(body) > 6 || !body.hasLineOfSight(closest) && closest.distanceTo(body) > 3) return false;
         // (Hunting these very ones - a tile wants a zombie killed: the hunt's own business. Nor
         // with a hit to be taken on the shield: up to the monster on purpose.)
-        if (hunting(closest.getType()) || tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.ShieldTask)) return false;
+        if (hunting(closest.getType()) || wantsHit()) return false;
         if (net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)) {
             actions.reset();
             navigator.stop();
@@ -1326,6 +1326,11 @@ public final class Bot {
         retreat = new net.kasax.challengecraft.bot.task.GoToTask(to, 2).sprinting();
         reflex(retreat);
         return true;
+    }
+
+    /** A hit to be taken on purpose is the task (the shield's tile: a monster let come, the shield up to it). */
+    public boolean wantsHit() {
+        return tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.ShieldTask);
     }
 
     /** Whether a task on the stack hunts this kind (then meeting one is the job). */

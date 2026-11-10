@@ -383,11 +383,12 @@ public final class Guardian {
             rule = net.kasax.challengecraft.bot.learn.CoverOption.DIG;
         } else if (onlyReachless && reachless != null && r.ticksLeft() >= 40 && pillarPossible) {
             rule = net.kasax.challengecraft.bot.learn.CoverOption.PILLAR_FIGHT;
-        } else if (bare && outrun && bot.params.on("unarmedrun") && bot.roomToRun(centre(r), UNARMED_RUN_ROOM)) {
+        } else if (bare && outrun && bot.params.on("unarmedrun") && !bot.wantsHit() && bot.roomToRun(centre(r), UNARMED_RUN_ROOM)) {
             // Nothing to fight with, no pillar to be had, and they are slow: away at a run, as a
             // player does - not a box or a hole begun with them at the elbow (seed -987..., the
             // second minute: the pillar ran out of blocks, the hole was too slow, dead; seed
-            // 2582...: walled in at dawn with nothing in hand, the box would not shut).
+            // 2582...: walled in at dawn with nothing in hand, the box would not shut). (Not with
+            // a hit to be taken on the shield: the tile wants the zombie at the shield.)
             rule = net.kasax.challengecraft.bot.learn.CoverOption.RUN;
             ruleWhy = "no weapon, and they are slower than me: away at a run";
         } else if (crossbows(r) >= 2 && roomToRun) {
