@@ -123,6 +123,8 @@ public class BotOpeningTests {
         BotArena.day(h);
         var server = h.getLevel().getServer();
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(), "difficulty hard");
+        // (Rock under the soil out in the padding too: a staircase that leaves the arena still ends in stone.)
+        a.fill(-20, GROUND - 14, -20, BotArena.SIZE + 19, GROUND - 10, BotArena.SIZE + 19, Blocks.STONE);
         a.fill(-20, GROUND - 9, -20, BotArena.SIZE + 19, GROUND - 1, BotArena.SIZE + 19, Blocks.DIRT);
         a.fill(31, FEET, 12, 37, FEET + 3, 28, Blocks.STONE);
         a.fill(31, FEET + 1, 18, 31, FEET + 1, 20, Blocks.IRON_ORE);

@@ -170,6 +170,13 @@ def compare(a_path, b_path):
             tb = sum(b[k][3][key].get(act, 0) for k in keys) / max(1, len(keys))
             if ta >= 0.5 or tb >= 0.5:
                 print(f"    {act:8s} {ta:6.0f} -> {tb:6.0f}")
+    print("  by decider, first ten minutes (s a game):")
+    deciders = sorted({d for k in keys for r in (a[k], b[k]) for d in r[3]["by"]})
+    for d in deciders:
+        da = sum(sum(a[k][3]["by"].get(d, {}).values()) for k in keys) / max(1, len(keys))
+        db = sum(sum(b[k][3]["by"].get(d, {}).values()) for k in keys) / max(1, len(keys))
+        if da >= 0.5 or db >= 0.5:
+            print(f"    {d:10s} {da:6.0f} -> {db:6.0f}")
     ta = sum(a[k][4] for k in keys) / max(1, len(keys))
     tb = sum(b[k][4] for k in keys) / max(1, len(keys))
     da = sum(a[k][5] for k in keys) / max(1, len(keys))
