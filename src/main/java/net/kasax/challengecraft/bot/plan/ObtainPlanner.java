@@ -181,6 +181,14 @@ public final class ObtainPlanner {
         scannedAt = -10_000; // look again
     }
 
+    /**
+     * One of its furnaces left cooking could not be got back to (a side trip to it failed or ran
+     * out of time): no plan fetches from it until {@code until} (game time) either.
+     */
+    public void restFurnace(BlockPos pos, long until) {
+        failed.merge("collect:" + pos.toShortString(), until, Math::max);
+    }
+
     private boolean isMissing(Object source) {
         Long until = missing.get(source);
         return until != null && until > costsAt;

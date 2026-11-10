@@ -2141,6 +2141,7 @@ public final class LockoutBrain implements BotBrain {
             if (sideId != null) restUntil.put(sideId, now + REST_TICKS);
             if (sideWant != null) wantRest.put(sideWant, now + 6000);
             if (sideChest != null) lootedIn.put("chest@" + sideChest.toShortString(), 99);
+            furnaceTripFailed(now);
             // (Only the side trip ends: the goal underneath goes on, its clock having stood still.)
             if (goalTask != null) goalPaused += now - sideStarted;
             BotTask side = sideTask;
@@ -2481,6 +2482,22 @@ public final class LockoutBrain implements BotBrain {
     }
 
     private long furnaceChanceAt;
+    /**
+     * Its furnaces left alone until a game time: one a side trip just went to (a minute), one it
+     * could not get back to in time (three) - not the same twenty seconds' walk every ten
+     * seconds to a furnace it cannot reach (seed 4416..., three in a row underground).
+     */
+    private final Map<net.minecraft.core.BlockPos, Long> furnaceRest = new java.util.HashMap<>();
+    /** The furnace the side trip under way goes to (null: none). */
+    private net.minecraft.core.BlockPos sideFurnace;
+
+    /** The side trip to its furnace did not get there: that furnace left alone a while (also by the plans). */
+    private void furnaceTripFailed(long now) {
+        if (sideFurnace == null) return;
+        furnaceRest.put(sideFurnace, now + 3600);
+        planner.restFurnace(sideFurnace, now + 3600);
+        sideFurnace = null;
+    }
 
     /** A buried treasure's column on dry land (sand or soil on top, no water over it); unknown while its chunk is not loaded. */
     private static boolean dryTreasure(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos spot) {
@@ -2500,11 +2517,14 @@ public final class LockoutBrain implements BotBrain {
         var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
         for (net.minecraft.core.BlockPos p : bot.furnaces.readyNear(level, bot.body().blockPosition(), 12)) {
             if (!(level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity f)) continue;
+            if (furnaceRest.getOrDefault(p, 0L) > now) continue;
             var out = f.getItem(2);
             // (Only when the cooking is done, or a good lot is: not a walk over for every ingot.)
             if (!f.getItem(0).isEmpty() && out.getCount() < 4) continue;
             sideTask = new net.kasax.challengecraft.bot.task.FurnaceCollectTask(p, Set.of(out.getItem()),
                     ObtainPlanner.countAny(bot.body(), Set.of(out.getItem())) + out.getCount());
+            furnaceRest.put(p.immutable(), now + 1200);
+            sideFurnace = p.immutable();
             sideId = null;
             sideWant = null;
             sideStarted = now;
@@ -2587,6 +2607,8 @@ public final class LockoutBrain implements BotBrain {
             if (goalTask != null) goalPaused += bot.body().level().getGameTime() - sideStarted;
             if (!success && sideId != null) restUntil.put(sideId, bot.body().level().getGameTime() + REST_TICKS);
             if (!success && sideWant != null) wantRest.put(sideWant, bot.body().level().getGameTime() + 6000);
+            if (!success) furnaceTripFailed(bot.body().level().getGameTime());
+            sideFurnace = null;
             sideTask = null;
             sideWant = null;
             sideId = null;
@@ -2706,6 +2728,7 @@ public final class LockoutBrain implements BotBrain {
         sideTask = null;
         sideId = null;
         sideWant = null;
+        sideFurnace = null;
         bot.clearTasks();
     }
 
