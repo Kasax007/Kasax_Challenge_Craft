@@ -223,6 +223,22 @@ Bots) und `deaths.py`.
 6. **Mob-Suche am Tag:** Für Arten, die die Sonne verbrennt, gibt es am Tag nur das Warten auf die
    Nacht. Ein Spieler sucht sie in einer Höhle, wenn er einen Eingang kennt.
 
+### Runde 2 (`bob/r2-brain`)
+
+Gemessen auf den Journalen und Logs der Ligen 9 und 10 und der Wissens-Liga (153 Zielstarts mit
+Schätzweise 2): zwei Drittel der Zeit auf Zielen (8.237 von 12.518 s) gingen in Starts ohne Feld.
+
+| Was | vorher | jetzt (Knopf) |
+| --- | --- | --- |
+| Blätter (3 Sapling Types, Äpfel) | jede Blattart 5 s entfernt, ein Blatt 0,6 s | Blätter dort, wo ihr Baum steht (Kosten wie seine Stämme, nur im Biom), 1,2 s je Blatt (`estfix`) |
+| Höhlenbiome (Dripstone Caves, Lush Caves, Deep Dark) | nur der Weg über Land | dazu die Treppe hinunter zum gespürten Ort und 20 s den Eingang finden (`estfix`) |
+| Fall 20 Blocks, Take Fall Damage, Missing 10 Hearts | 0,7 s je Säulenblock + 5 s | 1,2 s je Block + 15 s (`estfix`); der Sturz wartet bis 30 s auf die Herzen (`fallheal`) |
+| Reach Y -50 | 0,8 s je Ebene | Treppe im Tempo des Planers (`estfix`) |
+| Vorwissen je Ziel | – | `bob-models/goal-priors.json`: Sekunden je geholtem Feld (Fehlstarts mitgezählt) gegen die Planzahl, halbes Spiel je Start, neben der eigenen Erfahrung (`goalprior`); der Laptop-Trainer schreibt es aus seinen Journalen neu |
+| Fehlstart | lehrte nichts | Untergrenze wie ein Überlauf (`failexp`) |
+| Feld geholt, während die Aufgabe noch lief | im Journal „dropped“, nichts gelernt | „done“, als Erfolg gelernt (7 von 22 „dropped“ der Ligen 9/10 waren eigene Felder) |
+| Kisten einer Struktur, Mob am Wohnort | erst „angekommen“, wenn Bob in einem Teil der Struktur stand (beim vergrabenen Schatz nie) | angekommen 8 Blöcke vom bekannten Ort (Kisten) bzw. 12 Blöcke oder Mob in Sicht (Jagd) |
+
 ## Die größten Lücken
 
 Aus der Tabelle unten, den Ligen 1 bis 8 und den beiden Ligen dieses Abschnitts:
