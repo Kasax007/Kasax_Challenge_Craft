@@ -201,7 +201,9 @@ public final class LockoutBrain implements BotBrain {
         if (!surviving && bot.body().level().dimension() == net.minecraft.world.level.Level.OVERWORLD && bot.body().getHealth() >= 12
                 && !bot.body().level().isDarkOutside()) {
             var level = (net.minecraft.server.level.ServerLevel) bot.body().level();
-            boolean ironWanted = (strategist.wantsIron() || !openingIron) && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT)) < 3;
+            // (The ingots its furnaces still cook count - smeltgo: no raid for iron that is in the furnace.)
+            boolean ironWanted = (strategist.wantsIron() || !openingIron) && ObtainPlanner.countAny(bot.body(), Set.of(net.minecraft.world.item.Items.IRON_INGOT))
+                    + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT) < 3;
             // Only for what is wanted: iron (the kit, the board), food running low; a ruined
             // portal for its obsidian and gold when the board or the way to the Nether wants them.
             boolean foodLow = bot.body().getFoodData().getFoodLevel() < 12 && net.kasax.challengecraft.bot.task.EatTask.bestFood(bot.body()) < 0;
@@ -1447,7 +1449,9 @@ public final class LockoutBrain implements BotBrain {
                 && bot.body().getHealth() >= 12 && bot.body().level().getGameTime() >= shallowIronAt) {
             shallowIronAt = bot.body().level().getGameTime() + 600;
             var body = bot.body();
-            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON));
+            // (With what its furnaces still cook - smeltgo.)
+            int iron = ObtainPlanner.countAny(body, Set.of(net.minecraft.world.item.Items.IRON_INGOT, net.minecraft.world.item.Items.RAW_IRON))
+                    + planner.inFurnaces(bot, net.minecraft.world.item.Items.IRON_INGOT);
             int need = 1 + (has(body, Set.of(net.minecraft.world.item.Items.IRON_PICKAXE, net.minecraft.world.item.Items.DIAMOND_PICKAXE,
                     net.minecraft.world.item.Items.NETHERITE_PICKAXE)) ? 0 : 3);
             var ore = shallowIron(bot, shallowTried);
