@@ -3936,3 +3936,28 @@ Grundlage der Reihenfolge:
   SIM=1 python3 scripts/bot/league.py --a - --b - --seeds "$SEEDS" --seconds 1200 --difficulty hard --parallel 2 --out liga.jsonl
   ```
   Auswerten mit `compare.py alt.jsonl neu.jsonl`, `deaths.py`, `goals.py`, `opening.py show`.
+
+## 28. Runde 23 (10.11.2026): abgebrochen – Zwischenstand und Entscheidung
+
+Drei Agenten auf eigenen Zweigen (`bob/r2-survival`, `bob/r2-kit`, `bob/r2-brain`), am Abend auf
+Wunsch des Nutzers gestoppt, bevor die Integrations-Liga lief. Grund: Der Gewinn war in echten Partien
+nicht messbar, die Kosten hoch (je Runde rund drei Millionen erzeugte Tokens; die Agenten warteten
+stundenlang auf den einen Build-Lock). Zwischenstand der Messungen:
+
+| Zweig | Was | Gemessen |
+| --- | --- | --- |
+| survival | Ertrinken (Ursache: rocksight führt in einen See, die Treppe beginnt im Wasser, AirTask gräbt die dünne Decke statt einen Block zur Seite zu schwimmen), Zombies ohne Waffe, Skelette vor dem Schild, Veto für das Deckungsmodell | 10 feste Szenen: alter Code ertrinkt/stirbt, neuer besteht. Liga (12 Seeds, 20 min): Tode 5 statt 6 je 24 Bot-Spiele, Felder 2,75 statt 2,88 – im Rauschen |
+| kit | Adern zuerst, Schmelzen ohne Warten (FurnaceLedger), Essen in Sicht, Eisen aus vergrabenen Schätzen und im Berg, Item-Verlangsamung | Eröffnung (8 Seeds, 900 s): Ausrüstung 281 statt 371 s (SE 67), Schild nach 229 statt 533 s, erstes Feld 161 statt 275 s. Duell neu gegen alt in denselben Partien (12): 2,50 gegen 3,00 Felder, 6 gegen 3 Tode |
+| brain | Simulator auf den neuen Code kalibriert (2,91 gegen real 2,86 Felder, Korrelation je Ziel 0,78), Schätzungen (estfix, goalprior, failexp, fallheal), Vorausschau mit Chores (`search=2`) | Simulator: +1,1 Felder/20 min. Echte Liga (12 Seeds): +0,42 (SE 0,40), Tode 4 gegen 1 – bleibt aus. Neu trainiertes Zielmodell ohne Gewinn – nicht übernommen |
+
+**Entscheidung (Nutzer, 10.11.):** Der Ertrinken-Fix (`drystairs`, `halfair`, `airsafe`, `drowsafe`)
+ist übernommen und immer an. Alle anderen Änderungen sind zusammengeführt (`bob/r2-knobs`), aber im
+normalen Spiel aus (`bob-models/champion.json`) und stehen in den Liga-Tabellen (Autopilot `Knobs.java`,
+Laptop `bobleague.py`, Standard 0). Die Liga auf dem BisectHosting-Server (Paket 2) schaltet sie als
+Herausforderer einzeln ein und übernimmt nur, was klar mehr Felder holt. Keine weiteren Agenten-Runden
+im Container; „Bob Pro“ (offene Vorteile auf der höchsten Stufe) bleibt die Reserve, falls die Liga
+nichts bringt.
+
+**Lehre:** Einzelne Fähigkeiten werden in festen Szenen klar besser, aber 12 echte Partien sind zu
+wenige, um 0,5 Felder sicher zu sehen (SE 0,4–1,2). Messen gehört auf Hardware, die rund um die Uhr
+spielt und keine Tokens kostet.

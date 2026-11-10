@@ -211,6 +211,20 @@ Bekommst du im Chat eine neue `challengecraft-1.1.4.jar`:
 Die Liga läuft weiter. Jedes Ergebnis merkt sich, mit welcher Bob-Version es gespielt wurde.
 Kommt im Chat auch eine neue `bob-autopilot.jar` mit, ersetzt du sie im Hauptordner genauso.
 
+### Paket 2 (10.11.2026): die Liga testet die neuen Schalter
+
+Paket 2 bringt den Ertrinken-Fix (immer an) und alle übrigen Änderungen der zweiten Runde als
+**Schalter, die im normalen Spiel aus sind**: Überleben (`pillarblocks`, `unarmedrun`, `coverveto`,
+`swordstone`, `bowmanwary`), schnellere Ausrüstung (`veinfirst`, `smeltgo`, `cookalong`, `foodsight`,
+`treasureiron`, `mountainiron`, `itemslow`), Schätzungen (`estfix`, `goalprior`, `failexp`, `fallheal`)
+und die Vorausschau, die auch über Essen, Schild und Eisen entscheidet (`search=2`). Die Liga darf
+sie einschalten: Ein Herausforderer schaltet einen oder zwei davon um und wird nur Champion, wenn er
+über mehrere Spiele klar mehr Felder holt. Du musst dafür nichts einstellen.
+
+Umstieg von Paket 1: Server stoppen, `challengecraft-1.1.4.jar` im Ordner `mods` und
+`bob-autopilot.jar` im Hauptordner durch die neuen ersetzen, starten. Der Liga-Stand bleibt; die
+neuen Schalter beginnen aus.
+
 ## Wenn etwas nicht geht
 
 | Meldung oder Problem | Lösung |
