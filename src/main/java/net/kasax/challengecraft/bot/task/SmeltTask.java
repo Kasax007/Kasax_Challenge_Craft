@@ -116,6 +116,11 @@ public final class SmeltTask extends StationTask {
                     g.setChanged();
                     break;
                 }
+                // Nothing burning to move it into and nothing to burn (smeltgo): its ore back into
+                // the pack - not left in a cold furnace while the wait runs out (two minutes on
+                // seed 4038, the main furnace done, the extra one cold with two ores in it); the
+                // errand then gets fuel and smelts the rest.
+                if (bot.params.on("smeltgo")) coldBack(body, f);
             }
         }
         if (ObtainPlanner.countAny(body, java.util.Set.of(route.result())) >= target) return finish(bot, furnace);
@@ -248,6 +253,8 @@ public final class SmeltTask extends StationTask {
         int cooking = 0;
         for (var f : all) {
             takeOutput(bot.body(), f);
+            // (One gone cold with nothing to burn would never finish: its ore comes along instead.)
+            coldBack(bot.body(), f);
             if (!f.getItem(IN).isEmpty()) {
                 bot.furnaces.add(level, f.getBlockPos());
                 cooking += f.getItem(IN).getCount();
@@ -277,6 +284,16 @@ public final class SmeltTask extends StationTask {
             java.util.Map.entry(Blocks.REDSTONE_ORE, Items.REDSTONE), java.util.Map.entry(Blocks.DEEPSLATE_REDSTONE_ORE, Items.REDSTONE),
             java.util.Map.entry(Blocks.LAPIS_ORE, Items.LAPIS_LAZULI), java.util.Map.entry(Blocks.DEEPSLATE_LAPIS_ORE, Items.LAPIS_LAZULI),
             java.util.Map.entry(Blocks.DIAMOND_ORE, Items.DIAMOND), java.util.Map.entry(Blocks.DEEPSLATE_DIAMOND_ORE, Items.DIAMOND));
+
+    /** The input of a furnace gone cold (not lit, no fuel) back into the pack, as a player takes it out. */
+    private static void coldBack(BotPlayer body, AbstractFurnaceBlockEntity f) {
+        ItemStack in = f.getItem(IN);
+        if (in.isEmpty() || !f.getItem(FUEL).isEmpty() || isLit(f)) return;
+        ItemStack back = in.copy();
+        f.setItem(IN, ItemStack.EMPTY);
+        f.setChanged();
+        CraftTask.give(body, back);
+    }
 
     /** What of the result is out: in the pack and in these furnaces' output slots. */
     private int ready(ServerLevel level, java.util.List<net.minecraft.core.BlockPos> furnaces, BotPlayer body) {
