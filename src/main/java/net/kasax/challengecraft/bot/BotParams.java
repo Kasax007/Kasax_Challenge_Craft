@@ -38,7 +38,9 @@ import java.util.Map;
  *       simulator ({@code lockout.sim}), calibrated figures for what tiles really take, no iron kit
  *       or Nether phase for their own sake; 2: the look-ahead decides the chores too - the stock of
  *       food while not starving, the shield until the evening, copper armour, the iron pickaxe and
- *       the bucket, the way into the Nether are candidates beside the tiles (round 2).</li>
+ *       the bucket, the way into the Nether are candidates beside the tiles (round 2). Leagues: 1
+ *       against the route -1.00 tiles a game (SE 0.75, league 10); 2 +0.42 (SE 0.40, 12 games,
+ *       round 2's league B) but four deaths against one - both stay off.</li>
  *   <li>{@code searchfloor} - 1 (the default): with the look-ahead, a tile that what was learnt of
  *       it (the leagues' prior, the server's experience) says takes longer than planned is believed
  *       to take at least Bob's whole estimate; 0: at least the {@code ownfloor} share of it.</li>
