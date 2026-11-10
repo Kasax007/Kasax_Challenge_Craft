@@ -49,9 +49,20 @@ else
     echo $! > $RUN/server.pid
 fi
 # The server and everything it started (gradle: the wrapper, its daemon, the server).
+# (kill_tree <pid> [signal]: TERM by default.)
 kill_tree() {
-    for c in $(pgrep -P $1); do kill_tree $c; done
-    kill $1 2>/dev/null || true
+    for c in $(pgrep -P $1); do kill_tree $c $2; done
+    kill ${2:--TERM} $1 2>/dev/null || true
+}
+# Ends the server after its stop: TERM after 20 s, KILL 10 s later - a JVM stuck saving chunks in its
+# own shutdown ignores TERM, and alive it keeps the slot's ports: the next games there fail to bind
+# them (no result; two seeds of an integration league were lost so).
+end_server() {
+    PID=$(cat $RUN/server.pid)
+    for i in $(seq 1 20); do kill -0 $PID 2>/dev/null || return 0; sleep 1; done
+    kill_tree $PID
+    for i in $(seq 1 10); do kill -0 $PID 2>/dev/null || return 0; sleep 1; done
+    kill_tree $PID -KILL
 }
 for i in $(seq 1 120); do sleep 5; grep -q "Done (" $LOG && break; grep -q "BUILD FAILED" $LOG && { tail -20 $LOG; exit 1; }; done
 SIDES=""
@@ -70,8 +81,7 @@ for i in $(seq 1 4320); do sleep 5; grep -q "\[BOTVS\] result" $LOG && break; do
 python3 $HERE/rcon.py stop > /dev/null 2>&1 || true
 # (Saving thousands of chunks at the stop can overflow the stack in the game's own chunk code and
 # hang the server - the world is thrown away anyway: whatever still runs after 20 s is ended.)
-for i in $(seq 1 20); do kill -0 $(cat $RUN/server.pid) 2>/dev/null || break; sleep 1; done
-kill -0 $(cat $RUN/server.pid) 2>/dev/null && kill_tree $(cat $RUN/server.pid)
+end_server
 # (The world is played out: only the log is kept - a league leaves sixty worlds otherwise.)
 [ "${KEEP_WORLD:-0}" = 1 ] || rm -rf $RUN/versus_$SEED
 grep "\[BOTVS\] result" $LOG | sed 's/.*\[BOTVS\] result //'
