@@ -117,6 +117,43 @@ public class BotSurvivalTests {
     }
 
     /**
+     * The drowning of seed -3882... as the log printed it (AirTask.scene, the repro of league 9 on
+     * the base): seven deep in a lake by its bank, the bank's top block reaching one block out over
+     * the head at the water's surface, the open lake one block east; a few seconds of air left.
+     * Over to the open water and up - not digging at the ledge afloat (five times slower under
+     * water, five again off the ground), the counter of a dig that gets nowhere reset by every bob
+     * up and down: so it drowned three times in one league game, and in the repro again.
+     */
+    @GameTest(environment = "challengecraft:survival_water", structure = STRUCTURE, maxTicks = 600, skyAccess = true, padding = 8)
+    public void drownUnderTheLedge(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drown_under_the_ledge");
+        command(h, "difficulty hard");
+        // y 65 .. 55 of the scene at y 18 .. 8 of the arena: the water's surface (y 62) at the grass's height.
+        scene(a, 20, 18, 20,
+                "#######....|######.....|######.....|#####....##|#####....##|####.....##|####.....##|###o......#|######.....|######.....|######.....",
+                "########...|#######....|#######....|######.....|######.....|#####......|#####......|####o......|####.......|####.......|####.......",
+                "########...|########...|#######....|######.....|######.....|#####......|#####......|#####......|####.......|####.......|####......#",
+                "########~~~|########~~~|#######~~~~|######~~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~#",
+                "########~~~|#######~~~~|#######~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "########~~~|#######~~~~|#######~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "########~~~|#######~~~~|#######~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "########~~~|########~~~|#######~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "########~~~|########~~~|#######~~~~|######~~~~~|######~~~~~|#####~~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "###########|###########|###########|#######~~~#|######~~~~~|#####~~~~~~|#####~~~~~~|#####~~~~~~|####~~~~~~~|####~~~~~~~|####~~~~~~~",
+                "###########|###########|###########|###########|###########|######~~~~#|#####~~~~~#|#####~~~~~#|####~~~~~~~|####~~~~~~~|####~~~~~~~");
+        Bot bot = a.spawn(20, 11, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.OAK_PLANKS, 6));
+        var body = bot.body();
+        body.setAirSupply(160);
+        a.run(new WaitTask(500), 580, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_under_the_ledge: drowned");
+            if (h.getTick() % 20 == 0) BotArena.LOG.info("[BOTTEST] drown_under_the_ledge air {} hp {} at {} ({})", body.getAirSupply(), body.getHealth(), a.feet().toShortString(), bot.status());
+            boolean out = !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            if (out) BotArena.LOG.info("[BOTTEST] drown_under_the_ledge breathing at {} after {} ticks, hp {}", a.feet().toShortString(), h.getTick(), body.getHealth());
+            return out;
+        });
+    }
+
+    /**
      * The same staircase under the lake, dug dry and then filled from the lake as it is in a game -
      * flowing water down the steps, not still water - with the bot at its foot when the water comes:
      * the air runs out under eight blocks of bank with no way back it knows of (it was dry when it

@@ -27,8 +27,7 @@ public final class AirTask implements BotTask {
     private final java.util.EnumSet<Way> spent = java.util.EnumSet.noneOf(Way.class);
     /** Digging up: when it last got higher or broke a block, and how many solid blocks were over the head then. */
     private int digIdle, digSolid = -1;
-    private double digFromY;
-    private float digBroke;
+    private double digFromY = Double.NEGATIVE_INFINITY;
     private int sealTicks;
     private boolean started, backTried;
     /** Straight up did not get it any higher (a current, a waterfall): not again. */
@@ -81,13 +80,18 @@ public final class AirTask implements BotTask {
             // The way it came, while it is known (the dive trail): back along it is the way a
             // player takes - the path finder's guess, steered straight up, led into the roof
             // over a flooded staircase three times in one game (seed -3882...).
-            if (bot.params.on("airsafe") && bot.diveTrail.size() >= 2 && !openAbove(lv, f, 24)) {
-                crumbs = new java.util.ArrayDeque<>(bot.diveTrail);
-                way = Way.RETRACE;
+            if (bot.params.on("airsafe") && !openAbove(lv, f, 24)) {
+                if (bot.diveTrail.size() >= 2) crumbs = new java.util.ArrayDeque<>(bot.diveTrail);
+                BlockPos open = openColumn(lv, f, triedColumns);
+                if (open != null && open.distSqr(f) <= 9) {
+                    way = Way.SWIM;
+                    swimColumn = open;
+                } else if (crumbs != null) way = Way.RETRACE;
             }
             bot.say("short of air at " + f.toShortString() + " (" + body.getAirSupply() + "/" + body.getMaxAirSupply()
                     + (openAbove(lv, f, 24) ? ", open water above" : thinRoof(lv, BlockPos.containing(body.getX(), body.getEyeY(), body.getZ())) ? ", a thin roof" : ", a roof over the water")
-                    + (way == Way.RETRACE ? "): back the way I dived, " + crumbs.size() + " blocks" : ")"));
+                    + (way == Way.RETRACE ? "): back the way I dived, " + crumbs.size() + " blocks"
+                    : way == Way.SWIM ? "): to the open water at " + swimColumn.toShortString() : ")"));
         }
         // Head out: there until the lungs are nearly full again - a breath and straight back
         // under (the way on leads through the water) and the next breath is shorter, until
@@ -169,21 +173,23 @@ public final class AirTask implements BotTask {
                 // till the air is gone (seed -3882..., three times in one game; seeds 2582... and
                 // 4416... in the knowledge league).
                 if (bot.params.on("airsafe")) {
+                    // (Progress is a block gone from over the head or a new highest point - not
+                    // the bobbing: afloat it sank to dig and jumped up again, every second, and a
+                    // counter reset by each rise never ran out.)
                     int solid = 0;
                     for (int up = 1; up <= 3; up++) if (blocksTheWayUp(level, head.above(up))) solid++;
-                    float broke = bot.actions().breakProgress();
-                    if (digSolid < 0 || solid < digSolid || body.getY() > digFromY + 0.5 || broke > digBroke + 0.01f) {
+                    if (digSolid < 0 || solid < digSolid || body.getY() > digFromY + 0.5) {
                         digSolid = solid;
-                        digFromY = body.getY();
-                        digBroke = broke;
+                        digFromY = Math.max(digFromY, body.getY());
                         digIdle = 0;
                     }
                     // (Getting somewhere, but too slowly for the air there is: the roof would take
                     // longer than the breath lasts - stone with a wooden pickaxe, under water.)
                     boolean tooSlow = ticks % 20 == 0 && digTicksUp(bot, level, head) > body.getAirSupply() + 60 && spent.size() < Way.values().length - 2;
-                    if (tooSlow || ++digIdle > 40) {
+                    if (tooSlow || ++digIdle > 60) {
                         digIdle = 0;
                         digSolid = -1;
+                        digFromY = Double.NEGATIVE_INFINITY;
                         spent.add(Way.DIG);
                         Way was = way;
                         way = next(bot, level, feet);
@@ -306,9 +312,15 @@ public final class AirTask implements BotTask {
     private Way nextSafe(Bot bot, ServerLevel level, BlockPos feet) {
         if (spent.size() >= Way.values().length - 1) spent.clear();
         BlockPos head = BlockPos.containing(bot.body().getX(), bot.body().getEyeY(), bot.body().getZ());
+        // Still water open to the sky a few strokes off first: swum to and up - quicker than any
+        // digging under water (seed -3882...: a ledge of the bank one block over the head, the open
+        // lake one block east, and it dug at the ledge afloat till it drowned, five times).
+        if (way == Way.SWIM && swimColumn != null) triedColumns.add(swimColumn.atY(0));
+        swimColumn = null;
+        if (!spent.contains(Way.SWIM) && openColumn(level, feet, triedColumns) != null) return Way.SWIM;
+        if (!spent.contains(Way.RETRACE) && crumbs != null && !crumbs.isEmpty()) return Way.RETRACE;
         boolean quickDig = digTicksUp(bot, level, head) < bot.body().getAirSupply() * 0.7;
         if (!spent.contains(Way.DIG) && thinRoof(level, head) && quickDig) return Way.DIG;
-        if (!spent.contains(Way.RETRACE) && crumbs != null && !crumbs.isEmpty()) return Way.RETRACE;
         if (!spent.contains(Way.BACK) && !backTried) {
             backTried = true;
             back = trailBack(bot, level, feet);
@@ -317,9 +329,6 @@ public final class AirTask implements BotTask {
                 return Way.BACK;
             }
         }
-        if (way == Way.SWIM && swimColumn != null) triedColumns.add(swimColumn.atY(0));
-        swimColumn = null;
-        if (!spent.contains(Way.SWIM) && openColumn(level, feet, triedColumns) != null) return Way.SWIM;
         if (!spent.contains(Way.SEAL) && sealable(bot, level, feet)) return Way.SEAL;
         if (!spent.contains(Way.SEARCH)) return Way.SEARCH;
         return Way.DIG;
