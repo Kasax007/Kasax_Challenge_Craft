@@ -38,9 +38,9 @@ import static net.kasax.challengecraft.gametest.BotArena.STRUCTURE;
  *   pack - the pillar ran out of blocks, the hole was dug too slowly.</li>
  *   <li>{@code skeletons_down_the_stairs}: the staircase down to the shield's iron opens onto two
  *   skeletons in the dark, no shield yet.</li>
- *   <li>{@code zombie_pack_model}, {@code spider_model}: the learnt cover model choosing for the
- *   guardian - it ran from three zombies the rules fight (13 to 20 hearts lost against 4.5), and
- *   it took to a pillar or a run with a spider at it (four of four such choices died).</li>
+ *   <li>{@code zombie_trio_model}, {@code spider_pack_model}: the learnt cover model choosing for
+ *   the guardian - it ran from three zombies the rules fight (10 to 17 hearts lost against 4.5),
+ *   and it took to a pillar or a run with a spider at it (four of four such choices died).</li>
  * </ul>
  */
 public class BotSurvivalTests {
@@ -105,12 +105,14 @@ public class BotSurvivalTests {
         Bot bot = a.spawn(21, 5, 17, new ItemStack(Items.STONE_PICKAXE), new ItemStack(Items.COBBLESTONE, 12));
         var body = bot.body();
         body.setAirSupply(100);
-        int[] lowest = {body.getAirSupply()};
+        boolean[] under = {false};
         a.run(new WaitTask(700), 880, () -> {
             h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_flooded_stairs: drowned");
-            if (h.getTick() % 40 == 0) BotArena.LOG.info("[BOTTEST] drown_flooded_stairs air {} hp {} at {}", body.getAirSupply(), body.getHealth(), a.feet().toShortString());
-            lowest[0] = Math.min(lowest[0], body.getAirSupply());
-            boolean out = !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            if (h.getTick() % 40 == 0) BotArena.LOG.info("[BOTTEST] drown_flooded_stairs air {} hp {} at {} ({})", body.getAirSupply(), body.getHealth(), a.feet().toShortString(), bot.status());
+            // (Not before the first tick has seen it under: the eye's fluid is only known from then.)
+            boolean eyeIn = body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            under[0] |= eyeIn;
+            boolean out = under[0] && !eyeIn;
             if (out) BotArena.LOG.info("[BOTTEST] drown_flooded_stairs breathing at {} after {} ticks, hp {}", a.feet().toShortString(), h.getTick(), body.getHealth());
             return out;
         });
@@ -144,10 +146,13 @@ public class BotSurvivalTests {
         Bot bot = a.spawn(20, 11, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.OAK_PLANKS, 6));
         var body = bot.body();
         body.setAirSupply(160);
+        boolean[] under = {false};
         a.run(new WaitTask(500), 580, () -> {
             h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_under_the_ledge: drowned");
             if (h.getTick() % 20 == 0) BotArena.LOG.info("[BOTTEST] drown_under_the_ledge air {} hp {} at {} ({})", body.getAirSupply(), body.getHealth(), a.feet().toShortString(), bot.status());
-            boolean out = !body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            boolean eyeIn = body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            under[0] |= eyeIn;
+            boolean out = under[0] && !eyeIn;
             if (out) BotArena.LOG.info("[BOTTEST] drown_under_the_ledge breathing at {} after {} ticks, hp {}", a.feet().toShortString(), h.getTick(), body.getHealth());
             return out;
         });
@@ -346,62 +351,71 @@ public class BotSurvivalTests {
     // ---- the learnt cover model -----------------------------------------------------------------
 
     /**
-     * The brawl of three zombies (one a baby) with a stone sword, the learnt cover model choosing
-     * for the guardian (whatever -PbotLearned says): no more lost than the rules lose there. (The
-     * rules lose 4.5 hearts alone, up to 10.8 in a loaded suite; running, the model lost 13 to 20:
-     * the limit is between.)
+     * The brawl of three zombies (brawl_zombie_trio) with a stone sword, the learnt cover model
+     * choosing for the guardian (whatever -PbotLearned says): no run while armed with more than
+     * half the hearts - they are slower, they keep coming, and the fight after the run is had
+     * bunched up (the model ran there and lost 10 to 17 hearts, the rules 4.5 standing).
      */
     @GameTest(environment = "challengecraft:brawl", structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 24)
-    public void zombiePackModel(GameTestHelper h) {
-        BotArena a = BotArena.flat(h, "zombie_pack_model");
+    public void zombieTrioModel(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "zombie_trio_model");
         command(h, "difficulty hard");
         List<Mob> mobs = new ArrayList<>();
         mobs.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 18));
         mobs.add(mob(h, a, EntityTypes.ZOMBIE, 26, FEET, 22));
-        var baby = mob(h, a, EntityTypes.ZOMBIE, 24, FEET, 26);
-        ((net.minecraft.world.entity.monster.zombie.Zombie) baby).setBaby(true);
-        mobs.add(baby);
+        mobs.add(mob(h, a, EntityTypes.ZOMBIE, 24, FEET, 26));
         Bot bot = a.spawn(16, FEET, 20, new ItemStack(Items.STONE_SWORD));
         bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
         var body = bot.body();
         float[] low = {body.getHealth()};
+        int[] runs = {0};
         a.run(new net.kasax.challengecraft.bot.task.KillTask(Set.of(EntityTypes.ZOMBIE), Set.of(), 0, 3), 1500, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "zombie_trio_model: killed");
+            // (A run chosen this tick: only when down to half the hearts.)
+            if (bot.guardian.runs > runs[0] && body.getHealth() > 10) h.fail("zombie_trio_model: ran from them armed, with " + body.getHealth() + " health");
+            runs[0] = bot.guardian.runs;
             low[0] = Math.min(low[0], body.getHealth());
-            if (20 - low[0] > 11) h.fail("zombie_pack_model: lost " + (20 - low[0]) + " health (runs " + bot.guardian.runs + ")");
             boolean done = mobs.stream().noneMatch(Mob::isAlive);
-            if (done) BotArena.LOG.info("[BOTTEST] zombie_pack_model lost {} health, guardian runs {} fights {}", 20 - low[0], bot.guardian.runs, bot.guardian.fights);
+            if (done) BotArena.LOG.info("[BOTTEST] zombie_trio_model lost {} health, guardian runs {} fights {}", 20 - low[0], bot.guardian.runs, bot.guardian.fights);
             return done;
         });
     }
 
     /**
-     * At night a spider and a zombie at him, a stone sword, twelve hearts and blocks enough for
-     * anything, the learnt model choosing: no pillar (it climbs), no run (it is quicker), no hole
-     * dug with it at the rim - alive, not badly hurt. (Four of four times the model took a pillar,
-     * a run or a hole with a spider at him in the leagues, he died.)
+     * At night a spider and two zombies at him, a stone sword, iron helmet and boots, four blocks
+     * of dirt, the learnt model choosing: not up a pillar to fight from (the spider climbs it) nor a
+     * run (it is quicker) - the league's deaths with a spider among them (four of four times the
+     * model took a pillar, a run or a hole there, he died). The choice is the test: it ends a few
+     * seconds after the guardian first stepped in.
      */
-    @GameTest(environment = "challengecraft:survival_night2", structure = STRUCTURE, maxTicks = 1000, skyAccess = true, padding = 44)
-    public void spiderModel(GameTestHelper h) {
-        BotArena a = BotArena.wide(h, "spider_model");
+    @GameTest(environment = "challengecraft:survival_night2", structure = STRUCTURE, maxTicks = 800, skyAccess = true, padding = 44)
+    public void spiderPackModel(GameTestHelper h) {
+        BotArena a = BotArena.wide(h, "spider_pack_model");
         command(h, "difficulty hard");
         command(h, "time set 14000");
-        Bot bot = a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.COBBLESTONE, 40), new ItemStack(Items.DIRT, 32));
+        Bot bot = a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.DIRT, 4), new ItemStack(Items.BREAD, 4));
         bot.cover.set(CoverPolicy.Mode.MODEL, 1, "cover.json");
         var body = bot.body();
-        body.setHealth(14);
+        body.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
+        body.setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.IRON_BOOTS));
         List<Mob> mobs = new ArrayList<>();
-        mobs.add(mob(h, a, EntityTypes.SPIDER, 24, FEET, 20));
+        var spider = mob(h, a, EntityTypes.SPIDER, 25, FEET, 20);
+        mobs.add(spider);
         mobs.add(mob(h, a, EntityTypes.ZOMBIE, 20, FEET, 25));
-        float[] low = {body.getHealth()};
-        a.run(new WaitTask(900), 980, () -> {
+        mobs.add(mob(h, a, EntityTypes.ZOMBIE, 16, FEET, 23));
+        long[] stepped = {-1};
+        a.run(new WaitTask(700), 780, () -> {
             for (var m : mobs) if (m.isAlive() && m.getTarget() != body) m.setTarget(body);
-            h.assertTrue(a.bot().body() == body && body.isAlive(), "spider_model: killed");
-            low[0] = Math.min(low[0], body.getHealth());
-            if (14 - low[0] > 9) h.fail("spider_model: lost " + (14 - low[0]) + " health (pillars " + bot.guardian.pillars + ", runs " + bot.guardian.runs + ", digs " + bot.guardian.digs + ")");
-            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] spider_model hp {} guardian {}/{}/{}/{} mobs {}", body.getHealth(),
-                    bot.guardian.boxes, bot.guardian.pillars, bot.guardian.digs, bot.guardian.runs, mobs.stream().filter(Mob::isAlive).count());
-            if (h.getTick() < 900 && mobs.stream().anyMatch(Mob::isAlive)) return false;
-            BotArena.LOG.info("[BOTTEST] spider_model lost {} health", 14 - low[0]);
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "spider_pack_model: killed");
+            if (spider.isAlive() && (bot.guardian.pillars > 0 || bot.guardian.runs > 0))
+                h.fail("spider_pack_model: a pillar or a run with a spider at him (pillars " + bot.guardian.pillars + ", runs " + bot.guardian.runs + ")");
+            if (stepped[0] < 0 && bot.guardian.inEpisode()) stepped[0] = h.getTick();
+            if (h.getTick() % 50 == 0) BotArena.LOG.info("[BOTTEST] spider_pack_model hp {} guardian {}/{}/{}/{}/{} mobs {}", body.getHealth(),
+                    bot.guardian.boxes, bot.guardian.pillars, bot.guardian.digs, bot.guardian.runs, bot.guardian.fights, mobs.stream().filter(Mob::isAlive).count());
+            if (stepped[0] < 0 || h.getTick() < stepped[0] + 100) return false;
+            BotArena.LOG.info("[BOTTEST] spider_pack_model guardian in at tick {}: boxes {} pillars {} digs {} runs {} fights {}, {} health", stepped[0],
+                    bot.guardian.boxes, bot.guardian.pillars, bot.guardian.digs, bot.guardian.runs, bot.guardian.fights, body.getHealth());
+            for (var m : mobs) m.discard();
             BotArena.day(h);
             return true;
         });

@@ -1298,8 +1298,9 @@ public final class Bot {
             return false;
         }
         if (closest == null || closest.distanceTo(body) > 6 || !body.hasLineOfSight(closest) && closest.distanceTo(body) > 3) return false;
-        // (Hunting these very ones - a tile wants a zombie killed: the hunt's own business.)
-        if (hunting(closest.getType())) return false;
+        // (Hunting these very ones - a tile wants a zombie killed: the hunt's own business. Nor
+        // with a hit to be taken on the shield: up to the monster on purpose.)
+        if (hunting(closest.getType()) || tasks.stream().anyMatch(t -> BotTask.innermost(t) instanceof net.kasax.challengecraft.bot.task.ShieldTask)) return false;
         if (net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)) {
             actions.reset();
             navigator.stop();

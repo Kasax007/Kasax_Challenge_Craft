@@ -61,7 +61,8 @@ import java.util.Map;
  *       once they are behind; 0: as before.</li>
  *   <li>{@code coverveto} - 1 (the default): the learnt cover model is not offered what the rules
  *       know never works against the threats (a pillar or a hole with a spider at it, a run from
- *       anything as quick); 0: every way possible there.</li>
+ *       anything as quick, or from zombies while armed and over half the hearts); 0: every way
+ *       possible there.</li>
  *   <li>{@code swordstone} - 1 (the default): stone dug while there is no weapon includes the
  *       sword's two; 0: only what is wanted now.</li>
  *   <li>{@code bowmanwary} - 1 (the default): without a shield, no block is gone for (nor a cave

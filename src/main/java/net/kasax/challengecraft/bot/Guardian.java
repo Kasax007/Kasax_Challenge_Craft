@@ -432,8 +432,8 @@ public final class Guardian {
         if (digTicks < Integer.MAX_VALUE && dark) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.SHELTER);
         // What the rules know never works against these is not offered to the model either: it
         // learnt from too few such fights - in the leagues four of four times it took a pillar, a
-        // run or a hole with a spider at him, he died; it ran from three zombies with a baby among
-        // them that the rules fight (13 to 20 hearts lost against 4.5).
+        // run or a hole with a spider at him, he died; it ran from three zombies that the rules
+        // fight, armed and unhurt (10 to 17 hearts lost against 4.5).
         if (bot.params.on("coverveto")) {
             String vetoed = veto(possible, r, rule, shooters, climbers, jumpers, tall, onlyReachless, outrun, bare);
             if (vetoed != null && body.tickCount - vetoSaidAt > 100) {
@@ -490,8 +490,9 @@ public final class Guardian {
      * choice stays): a pillar against anything that climbs it, leaps up it, reaches up it or shoots
      * at the one standing on top; a pillar fight unless all of them only strike close; a run from
      * anything as quick as he is (a spider, an enderman, a baby zombie, a magma cube), and, where
-     * the rules would not run, unless there is room for a long one; a hole with a spider or a cube
-     * a few blocks off (it bites through the digging). Returns what it took out, or null.
+     * the rules would not run, unless there is room for a long one and he is unarmed or down to
+     * half his hearts; a hole with a spider or a cube a few blocks off (it bites through the
+     * digging). Returns what it took out, or null.
      */
     private String veto(java.util.Set<net.kasax.challengecraft.bot.learn.CoverOption> possible, Reckoning r,
                         net.kasax.challengecraft.bot.learn.CoverOption rule, boolean shooters, boolean climbers, boolean jumpers,
@@ -505,6 +506,12 @@ public final class Guardian {
         if (!slowMelee || climbers || tall || jumpers || shooters && rule != net.kasax.challengecraft.bot.learn.CoverOption.RUN)
             out.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
         else if (rule != net.kasax.challengecraft.bot.learn.CoverOption.RUN && !bot.roomToRun(centre(r), MODEL_RUN_ROOM))
+            out.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
+        // Armed, more than half the hearts, nothing but slow ones (zombies): no run either - they
+        // keep coming, and the fight is had all the same, later and bunched up (the brawl of three
+        // with the model: 10 to 14 hearts lost after its run, the rules 4.5 standing). The journal
+        // charges a run only up to its end, half a minute on with them still after him.
+        else if (rule != net.kasax.challengecraft.bot.learn.CoverOption.RUN && outrun && !bare && bot.body().getHealth() > 10)
             out.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
         boolean biterNear = false;
         for (Threat t : r.threats()) {
