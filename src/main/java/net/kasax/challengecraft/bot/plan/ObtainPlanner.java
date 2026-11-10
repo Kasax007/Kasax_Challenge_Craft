@@ -126,9 +126,19 @@ public final class ObtainPlanner {
             return new Leaf(cost * f, search * f, at, lot);
         }
 
-        /** {@code n} of the item from each block broken or mob killed: one item's share of it. */
+        /**
+         * {@code n} of the item from each block broken or mob killed: one item's share of it. In a
+         * batch the first item still takes a whole block or kill and each further one an n-th of
+         * one; with less than one per block (flint from gravel) every item takes 1/n blocks, the
+         * first one too.
+         */
         Leaf perDrop(double n) {
-            return new Leaf(cost / n, search / n, at, new Lot(lot.once(), lot.each() / n, lot.onceLuck(), lot.eachLuck() / n, lot.tool(), lot.per()));
+            // (The first kill used to be cut to an n-th as well: once + each/n. For a mob in sight
+            // "once" is the first kill less one each, below nought when the next one is a long
+            // search away - a squid in sight came to "5 Dye Colors, ~-1913 s" in a league.)
+            double whole = n > 1 ? 1 - 1 / n : 0;
+            return new Leaf(cost / n, search / n, at, new Lot(lot.once() + lot.each() * whole, lot.each() / n,
+                    lot.onceLuck() + lot.eachLuck() * whole, lot.eachLuck() / n, lot.tool(), lot.per()));
         }
     }
 

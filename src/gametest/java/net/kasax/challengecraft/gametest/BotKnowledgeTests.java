@@ -116,6 +116,35 @@ public class BotKnowledgeTests {
     }
 
     /**
+     * A drop that comes several to a kill (ink sacs, two a squid), the squid in sight in a pond and
+     * none elsewhere in the biome: the first sac is still a whole kill. Its share of a kill alone
+     * once made it negative (the next squid a long search away): "5 Dye Colors, ~-1913 s" in a
+     * league, taken as a quick tile.
+     */
+    @GameTest(structure = STRUCTURE, maxTicks = 100, skyAccess = true, padding = 8)
+    public void squidInSightDrops(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "squid_in_sight_drops");
+        a.fill(24, GROUND - 3, 17, 30, GROUND, 23, Blocks.WATER);
+        var squid = net.minecraft.world.entity.EntityTypes.SQUID.create(h.getLevel(), net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
+        squid.setPos(net.minecraft.world.phys.Vec3.atCenterOf(a.abs(27, GROUND - 1, 20)));
+        squid.setPersistenceRequired();
+        h.getLevel().addFreshEntity(squid);
+        a.spawn(20, FEET, 20, new ItemStack(Items.STONE_SWORD), new ItemStack(Items.SHIELD), new ItemStack(Items.CRAFTING_TABLE));
+        h.runAfterDelay(20, () -> {
+            var bot = a.bot();
+            var p = new ObtainPlanner();
+            double sac1 = p.estimate(bot, Set.of(Items.INK_SAC), 1), sac2 = p.estimate(bot, Set.of(Items.INK_SAC), 2);
+            var blackDye = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace("black_dye"));
+            double dye = p.estimate(bot, Set.of(blackDye), 1);
+            BotArena.LOG.info("[BOTTEST] squid_in_sight_drops: ink sacs 1 ~{} s, 2 ~{} s; black dye ~{} s", Math.round(sac1), Math.round(sac2), Math.round(dye));
+            h.assertTrue(sac1 >= 5 && sac1 < 1e8, "one ink sac ~" + Math.round(sac1) + " s: not a whole kill of the squid in sight");
+            h.assertTrue(sac2 >= sac1, "two ink sacs ~" + Math.round(sac2) + " s, less than one");
+            h.assertTrue(dye >= sac1, "black dye ~" + Math.round(dye) + " s, less than its ink sac");
+            a.run(new net.kasax.challengecraft.bot.task.WaitTask(1), 100, () -> true);
+        });
+    }
+
+    /**
      * The tiles the leagues found worst, from a typical spot (stone tools, a table, sugar cane by
      * the water, no creeper about): a name tag a paper's craft and a nugget's (the leagues: 110 s
      * against "~18 s"); a firework rocket by day waits for a creeper - its gunpowder (the leagues:
