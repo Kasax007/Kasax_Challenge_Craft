@@ -102,7 +102,7 @@ public final class Autopilot {
 
     /** How many league games at once: the setting, or what memory and cores allow; never more than fit in memory. */
     static int leagueGames(Config cfg, Log log) {
-        long total = Host.totalMb();
+        long total = Host.totalMb() - ownMemoryMb(log);
         int auto = Host.autoLeagueGames(total, Host.cores(), cfg.gameMemoryMb, cfg.arenaServers, cfg.arenaMemoryMb);
         if (cfg.leagueGames.equals("auto")) return auto;
         int wanted = Config.parseInt(cfg.leagueGames);
@@ -114,6 +114,21 @@ public final class Autopilot {
             return fit;
         }
         return wanted;
+    }
+
+    /**
+     * The memory this launcher holds for good: next to nothing, unless the panel's start flags
+     * touch its whole heap at once (-XX:+AlwaysPreTouch with a large -Xms, as some "optimised"
+     * flag sets do) - then that memory is not there for the games, and the person is told why.
+     */
+    static long ownMemoryMb(Log log) {
+        long committed = Runtime.getRuntime().totalMemory() >> 20;
+        boolean pretouch = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments().contains("-XX:+AlwaysPreTouch");
+        if (!pretouch || committed < 1024) return 0;
+        log.warn(String.format(Locale.GERMANY, "Die Startparameter geben dem Autopiloten selbst %.1f GB (-Xms mit -XX:+AlwaysPreTouch); "
+                + "er braucht unter 0,1 GB. Der Speicher fehlt den Spielen: im Panel unter Startup die zusaetzlichen Java-Parameter "
+                + "(z.B. Aikar's Flags) abschalten.", committed / 1024.0));
+        return committed;
     }
 
     static boolean eulaAccepted(Path root) {

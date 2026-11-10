@@ -220,6 +220,7 @@ Kommt im Chat auch eine neue `bob-autopilot.jar` mit, ersetzt du sie im Hauptord
 | „… kennt Bob noch nicht“ | Das ist die Version von CurseForge. Bitte die Jar aus dem Chat nehmen. |
 | „Zwei Challenge-Craft-Jars im Mods-Ordner“ | Die ältere löschen. |
 | „Server beim Start beendet“ / „Spiel zu langsam“ / „Server hängt“ | Der Autopilot versucht es nach einer Minute neu. Nach fünf Fehlern in 30 Minuten macht er 15 Minuten Pause. Den Grund zeigt die Zeile in der Konsole. Die Logs liegen in `bob-autopilot/games` und kommen ins nächste Paket. Schick mir das Paket. |
+| „Die Startparameter geben dem Autopiloten selbst … GB“ | Im Reiter **Startup** zusätzliche Java-Parameter (zum Beispiel „Aikar's Flags“) abschalten. Der Autopilot braucht selbst kaum Speicher; die Spiele bekommen ihren eigenen. |
 | „OutOfMemoryError“ in einer Fehlerzeile | `game_memory_mb=5120` eintragen und `league_games` um eins senken. |
 | Die Konsole zeigt „Starting“ statt „Running“ | Das ist nur die Anzeige. Der Autopilot meldet sich mit `Done (…)` wie ein Minecraft-Server; manche Panels warten auf einen anderen Text. |
 | Die Festplatte wird voll | In `bob-autopilot.properties` `journal_max_mb` und `game_logs_max_mb` kleiner machen. |
