@@ -6,10 +6,13 @@ $App = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Jar = Join-Path $App 'app\bob-trainer.jar'
 
 function Get-JavaMajor([string]$exe) {
+    # (java -version writes to stderr: with 'Stop' Windows PowerShell would take that for an error.)
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
         $out = & $exe -version 2>&1 | Out-String
         if ($out -match 'version "(\d+)') { return [int]$Matches[1] }
-    } catch { }
+    } catch { } finally { $ErrorActionPreference = $old }
     return 0
 }
 
@@ -19,16 +22,18 @@ function Find-Java {
     if ($env:JAVA_HOME) { $c.Add((Join-Path $env:JAVA_HOME 'bin\java.exe')) }
     $onPath = Get-Command java.exe -ErrorAction SilentlyContinue
     if ($onPath) { $c.Add($onPath.Source) }
-    $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, (Join-Path $env:LOCALAPPDATA 'Programs')) | Where-Object { $_ }
+    $roots = @(@($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ })
+    if ($env:LOCALAPPDATA) { $roots += (Join-Path $env:LOCALAPPDATA 'Programs') }
     foreach ($r in $roots) {
         foreach ($vendor in 'Eclipse Adoptium', 'Java', 'Microsoft', 'Zulu', 'Amazon Corretto', 'BellSoft') {
             Get-ChildItem -Path (Join-Path $r $vendor) -Directory -ErrorAction SilentlyContinue | ForEach-Object { $c.Add((Join-Path $_.FullName 'bin\java.exe')) }
         }
     }
     # The Minecraft launcher's own Java (the old launcher, the Store launcher).
-    $mc = @((Join-Path $env:APPDATA '.minecraft\runtime'),
-            (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime'),
-            (Join-Path ${env:ProgramFiles(x86)} 'Minecraft Launcher\runtime'))
+    $mc = New-Object System.Collections.Generic.List[string]
+    if ($env:APPDATA) { $mc.Add((Join-Path $env:APPDATA '.minecraft\runtime')) }
+    if ($env:LOCALAPPDATA) { $mc.Add((Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.4297127D64EC6_8wekyb3d8bbwe\LocalCache\Local\runtime')) }
+    if (${env:ProgramFiles(x86)}) { $mc.Add((Join-Path ${env:ProgramFiles(x86)} 'Minecraft Launcher\runtime')) }
     foreach ($m in $mc) {
         Get-ChildItem -Path $m -Recurse -Filter java.exe -ErrorAction SilentlyContinue | ForEach-Object { $c.Add($_.FullName) }
     }

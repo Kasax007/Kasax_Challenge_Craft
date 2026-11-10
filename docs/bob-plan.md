@@ -4091,3 +4091,34 @@ Kein zusätzlicher Schaden in keinem Lauf.
 - Ende-zu-Ende im Container: Zip entpackt, Linux-Skript, EULA über die API, zwei Spiele parallel
   (5 min), Pause (laufende spielen zu Ende, keine neuen), Weiter, Sofort pausieren, Beenden (kein
   Spiel-Java bleibt übrig), Neustart (Duell, Herausforderer und Pause erhalten), Export (68 KB) – bestanden.
+
+### 29.5 Tests am Ende
+
+- Volle Suite mit den Standards (alle drei Knöpfe an), 2. Lauf: 8 Pflichttests rot – die bekannten
+  (`copper_armour` und `smelt_and_go` je beide Wege, `search_claims_first_tile`, `parallel_smelt`
+  mit `smeltgo` an, `brawl_enderman` wacklig) und `add_move_remove` (Lobby: in beiden vollen Läufen
+  mit den Knöpfen rot, allein und im Lobby-Stapel dreimal grün, ohne die Knöpfe grün – hängt an
+  der Last der vollen Suite; offen).
+- Volle Suite mit `-PbotKnobs=riskpath=0,beliefs=0,motionsearch=0`: 6 Pflichttests rot, alle
+  bekannt (`loot_village_route`, `copper_armour` ×2, `smelt_and_go` ×2, `parallel_smelt`).
+- Im ersten Durchgang fielen zwei Schätz-Tests (`sapling_types_estimate`,
+  `worst_tiles_estimates`): Die Baum-Priors galten für Eiche, Birke, Fichte und Schwarzeiche gleich.
+  Jetzt nur für Eiche; die anderen behalten die Biom-Regel. `opening_kit(_old_way)` schwankt auf
+  beiden Wegen (je einmal rot, sonst grün).
+- `bobAutopilotTest` (mit neuen Liga-Tests: ungetestete zuerst, Thompson, skeptische Posterior)
+  und `bobSimTest` grün.
+
+### 29.6 Offen
+
+1. **Die Liga entscheidet.** Alle drei Knöpfe sind im normalen Spiel aus; der Trainer testet sie
+   zuerst. Die Szenen zeigen Wirkung, ob sie Felder bringt, zeigt nur die Liga.
+2. **`motionsearch`** gewinnt wenig (Wald +6 %, sonst ±3 %): Bob sprintet und springt auf den
+   Testkursen schon. Wo die 3,3 Blöcke/s aus echten Partien herkommen, wäre zuerst zu messen
+   (Journale: Suchpausen, Wasser, Graben); Treppen bleiben beim alten Regler.
+3. **`beliefs`:** keine eigene Nachtsuche nach Monstern; die Erz-Posterior gilt je Grabung, nicht
+   je Chunk über Aufgaben hinweg; Baum-Priors nur für Eiche. Die Journale mit `ctx` erlauben jetzt
+   die Kalibrierung der Schätzungen je Kontext.
+4. **`riskpath`:** Pfeile treffen einen sprintenden Bob selten (Skelette zielen nicht vor); das
+   Modell rechnet mit einem stehenden Ziel und ist dort vorsichtiger als nötig.
+5. **Trainer:** C2ME/ScalableLux ungeprüft (Gleichheit der Welten); die Windows-Skripte konnten im
+   Container nicht laufen (kein Windows) – beim ersten Start auf dem Laptop prüfen.
