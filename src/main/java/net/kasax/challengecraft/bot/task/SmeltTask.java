@@ -445,7 +445,10 @@ public final class SmeltTask extends StationTask {
             }
             fetchingFurnace = true;
             extraTries++;
-            bot.interject(new ObtainTask(java.util.Set.of(Items.FURNACE), 1, new ObtainPlanner(), true));
+            // (smeltgo: all the extra furnaces made at the one table in one go, not a table put
+            // down and packed again for each.)
+            int make = bot.params.on("smeltgo") ? Math.max(1, Math.min(want - extras.size(), stone / 8)) : 1;
+            bot.interject(new ObtainTask(java.util.Set.of(Items.FURNACE), make, new ObtainPlanner(), true));
             return Result.RUNNING;
         }
         fetchingFurnace = false;
