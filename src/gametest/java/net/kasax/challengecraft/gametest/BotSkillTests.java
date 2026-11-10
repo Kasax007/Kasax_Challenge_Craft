@@ -34,13 +34,15 @@ public class BotSkillTests {
 
     /**
      * Three ingots wanted now, six on the board: all six smelted in one go with coal (not the
-     * planks), and the furnace taken back along.
+     * planks), and the furnace taken back along. (Waited for, all six: smeltgo off - with it the
+     * three for later are left cooking, see BotKitTests.smelt_and_go.)
      */
     @GameTest(structure = STRUCTURE, maxTicks = 1600, skyAccess = true, padding = 8)
     public void batchSmelt(GameTestHelper h) {
         BotArena a = BotArena.flat(h, "batch_smelt");
         a.spawn(20, FEET, 20, new ItemStack(Items.RAW_IRON, 6), new ItemStack(Items.COAL, 2), new ItemStack(Items.OAK_PLANKS, 8),
                 new ItemStack(Items.FURNACE), new ItemStack(Items.STONE_PICKAXE));
+        a.bot().params = net.kasax.challengecraft.bot.BotParams.parse("smeltgo=0");
         var planner = new ObtainPlanner();
         planner.boardDemand.put(Items.IRON_INGOT, 6);
         var body = a.bot().body();
