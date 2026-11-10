@@ -204,6 +204,37 @@ public class BotSurvivalTests {
         });
     }
 
+    /**
+     * Stone wanted at the bottom of a lake nine deep, soil all round and under it (no rock within
+     * reach of a look): out and up onto the bank for the staircase - not the staircase begun down
+     * there, nor "a few blocks away" to a spot inside the lake's floor, tunnelled to under the water
+     * (seed -3882..., league 9, the knowledge league and a solo bench of the base: the same three
+     * steps every time - "a staircase down", "can't dig on here", "go to" four blocks below the
+     * feet - and drowned under the tunnel's roof). Passes with three cobblestone, alive, never
+     * down to a quarter of its air.
+     */
+    @GameTest(environment = "challengecraft:survival_water", structure = STRUCTURE, maxTicks = 3000, skyAccess = true, padding = 8)
+    public void drownLakeBottomStairs(GameTestHelper h) {
+        BotArena a = BotArena.flat(h, "drown_lake_bottom_stairs");
+        command(h, "difficulty hard");
+        a.fill(0, GROUND - 11, 0, BotArena.SIZE - 1, GROUND - 1, BotArena.SIZE - 1, Blocks.DIRT);
+        a.fill(14, GROUND - 8, 14, 25, GROUND, 25, Blocks.WATER);
+        Bot bot = a.spawn(20, GROUND - 8, 20, new ItemStack(Items.WOODEN_PICKAXE), new ItemStack(Items.OAK_PLANKS, 8), new ItemStack(Items.STICK, 4));
+        var body = bot.body();
+        int[] lowest = {body.getMaxAirSupply()};
+        var rock = net.minecraft.world.level.block.Blocks.STONE;
+        a.run(new MineTask("cobblestone", s -> s.is(rock), Set.of(Items.COBBLESTONE), 3, 0), 2980, () -> {
+            h.assertTrue(a.bot().body() == body && body.isAlive(), "drown_lake_bottom_stairs: drowned");
+            lowest[0] = Math.min(lowest[0], body.getAirSupply());
+            if (h.getTick() % 100 == 0) BotArena.LOG.info("[BOTTEST] drown_lake_bottom_stairs air {} (lowest {}) hp {} at {} ({})", body.getAirSupply(), lowest[0],
+                    body.getHealth(), a.feet().toShortString(), bot.status());
+            h.assertTrue(lowest[0] >= body.getMaxAirSupply() / 4, "drown_lake_bottom_stairs: down to " + lowest[0] + " air");
+            boolean done = ObtainPlanner.countAny(body, Set.of(Items.COBBLESTONE)) >= 3;
+            if (done) BotArena.LOG.info("[BOTTEST] drown_lake_bottom_stairs cobblestone after {} ticks, lowest air {}", h.getTick(), lowest[0]);
+            return done;
+        });
+    }
+
     // ---- no weapon at night -------------------------------------------------------------------------
 
     /**
