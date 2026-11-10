@@ -61,6 +61,29 @@ public class BotSurvivalTests {
         return m;
     }
 
+    /**
+     * Builds a scene as the drowning log prints it (see AirTask.scene): {@code layers} from the
+     * top down, each its rows north to south separated by '|', each row west to east; the middle
+     * of the middle row is {@code (cx, cz)}, the first layer at {@code top}. '#' and 'W' stone,
+     * '~' still water, ',' and '.' and 'F'/'H' air (flowing water comes back by itself from the
+     * still water), 'o' air too.
+     */
+    static void scene(BotArena a, int cx, int top, int cz, String... layers) {
+        for (int i = 0; i < layers.length; i++) {
+            String[] rows = layers[i].split("\\|");
+            int r = rows.length / 2;
+            for (int dz = -r; dz <= r; dz++) {
+                String row = rows[dz + r];
+                for (int dx = -r; dx <= r; dx++) {
+                    char c = row.charAt(dx + r);
+                    var state = c == '#' || c == 'W' ? Blocks.STONE.defaultBlockState()
+                            : c == '~' ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    a.fill(cx + dx, top - i, cz + dz, cx + dx, top - i, cz + dz, state);
+                }
+            }
+        }
+    }
+
     // ---- under water ------------------------------------------------------------------------------
 
     /**

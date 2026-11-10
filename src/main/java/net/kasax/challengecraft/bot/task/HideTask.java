@@ -249,6 +249,10 @@ public final class HideTask implements BotTask {
         ServerLevel level = (ServerLevel) body.level();
         BlockPos head = feet.above();
         for (int i = 1; i <= 4; i++) if (!level.getBlockState(head.above(i)).getCollisionShape(level, head.above(i)).isEmpty()) return false;
+        // The blocks for all of it, not just one: a pillar three blocks up (more on a slope) -
+        // with two to spare it stopped halfway, the zombie struck at the feet, and the hole dug
+        // after that came too late (seed -987..., dead in the second minute).
+        if (bot.params.on("pillarblocks") && bot.actions().spendableBlocks() < PillarFightTask.blocksNeeded(level, feet)) return false;
         return true;
     }
 

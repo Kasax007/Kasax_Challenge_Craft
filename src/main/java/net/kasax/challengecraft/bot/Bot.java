@@ -450,6 +450,7 @@ public final class Bot {
             }
         }
         if (!body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) airSceneLogged = false;
+        layDiveTrail();
         reflexes();
         // (Not in the middle of a fight or a flight: the plan waits till that is over.)
         if (brain != null && !inReflex()) brain.tick(this);
@@ -546,6 +547,31 @@ public final class Bot {
         if (trail.isEmpty() || trail.get(trail.size() - 1).distSqr(feet) >= TRAIL_STEP * TRAIL_STEP) trail.add(feet);
         // Long: every other crumb in the middle dropped (the ends matter most).
         if (trail.size() > TRAIL_CAP) for (int i = trail.size() - 2; i > 0; i -= 2) trail.remove(i);
+    }
+
+    /**
+     * The way it went since its head was last out of the water, block by block (loops cut out):
+     * the way back up a player keeps in mind on a dive - swum back along it when the air runs
+     * short (see AirTask). Empty while it breathes.
+     */
+    public final java.util.ArrayDeque<net.minecraft.core.BlockPos> diveTrail = new java.util.ArrayDeque<>();
+    private static final int DIVE_TRAIL_CAP = 400;
+
+    private void layDiveTrail() {
+        if (!body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) {
+            diveTrail.clear();
+            diveTrail.add(body.blockPosition());
+            return;
+        }
+        var feet = body.blockPosition();
+        if (feet.equals(diveTrail.peekLast())) return;
+        // (Back on a spot of the way already: whatever came after it was a loop.)
+        if (diveTrail.contains(feet)) {
+            while (!diveTrail.isEmpty() && !diveTrail.peekLast().equals(feet)) diveTrail.pollLast();
+            return;
+        }
+        diveTrail.addLast(feet);
+        if (diveTrail.size() > DIVE_TRAIL_CAP) diveTrail.pollFirst();
     }
 
     private boolean fallLogged;
@@ -684,7 +710,25 @@ public final class Bot {
         // (A lid over the head, no water above it to swim up through: at once, while there is air.)
         net.minecraft.core.BlockPos overHead = net.minecraft.core.BlockPos.containing(body.getX(), body.getEyeY(), body.getZ()).above();
         boolean lid = !body.level().getBlockState(overHead).getCollisionShape(body.level(), overHead).isEmpty();
-        if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < body.getMaxAirSupply() * (lid ? 4 : 2) / 5
+        // (The rule of half the air: past it, back - the way back is as long as the way in. Only
+        // with the surface right over the head, a few strokes up, does it wait for less: a dive
+        // for clay on a river bed. Without it the reflex came at two fifths of the air under a roof
+        // of water and rock, too late for the way back - five drownings in forty bot-games.)
+        int airMark = body.getMaxAirSupply() * (lid ? 4 : 2) / 5;
+        if (params.on("halfair") && body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) {
+            int above = net.kasax.challengecraft.bot.task.AirTask.waterAbove(body);
+            if (above >= 0) {
+                // Open water up to the air (a lake, the sea): up whenever the swim up wants half as
+                // much again as it takes - some eight ticks a block - never later than before.
+                airMark = Math.max(airMark, Math.min(body.getMaxAirSupply() * 9 / 10, (above * 8 + 20) * 3 / 2));
+            } else {
+                // A roof over the water: back at half - and never later than the way back along
+                // the dive takes, with half as much again to spare (some eight ticks a block).
+                airMark = Math.max(airMark, body.getMaxAirSupply() / 2);
+                airMark = Math.max(airMark, Math.min(body.getMaxAirSupply() * 9 / 10, (diveTrail.size() * 8 + 20) * 3 / 2));
+            }
+        }
+        if (body.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) && body.getAirSupply() < airMark
                 && !(top instanceof net.kasax.challengecraft.bot.task.AirTask)) {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.AirTask());
@@ -782,6 +826,11 @@ public final class Bot {
         // (Not while running from something already - its own retreat - but on any other walk: a
         // creeper behind it on the way somewhere is no less a creeper.)
         boolean running = retreat != null && top == retreat;
+        // No weapon yet, and something slow that only strikes close coming for it (a zombie in the
+        // first minutes, at night, at dawn in the shade): away at a run before it is in reach -
+        // it is half as fast - instead of the blows and then a pillar or a hole begun at its
+        // elbow; once it is well behind, a weapon made from the pack if the makings are there.
+        if (!running && !cornered && params.on("unarmedrun") && unarmedKeepAway(top)) return;
         // A crowd out for it (four and more close by - a cave full of them, the dark round a
         // village): no fight at all, but away the way it came, at a run - in a cave that is back
         // up into the light, where the zombies burn; arrows on the way end in the shield (seed 77,
@@ -1181,6 +1230,74 @@ public final class Bot {
             actions.reset();
             reflex(new net.kasax.challengecraft.bot.task.EatTask());
         }
+    }
+
+    /** When it last ran from something slow for want of a weapon (body ticks), and when a weapon was last tried for after that. */
+    private int keptAwayAt = -1000, weaponTriedAt = -1000;
+    private static final java.util.Set<net.minecraft.world.item.Item> MAKESHIFT_SWORDS = java.util.Set.of(
+            net.minecraft.world.item.Items.WOODEN_SWORD, net.minecraft.world.item.Items.STONE_SWORD);
+
+    /**
+     * No weapon (sword or axe) in the pack: something slow that only strikes close and is after it
+     * (a zombie, a husk; all of those after it slow, none drawing a bow) closer than six blocks is
+     * kept off - up a pillar and struck from above where there are the blocks for it, else away at
+     * a run while there is room (it covers half the ground a running player does). Once a run has
+     * left them ten blocks behind, a sword is made if the pack holds the makings (a few seconds at
+     * the table). Returns whether it set something going.
+     */
+    private boolean unarmedKeepAway(BotTask top) {
+        if (armed() || Guardian.enclosed(body) || body.isInWater() || !body.onGround()) return false;
+        if (tasks.stream().anyMatch(Guardian::protective)) return false;
+        var after = body.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, body.getBoundingBox().inflate(16, 6, 16),
+                m -> m.isAlive() && m.getTarget() == body && m instanceof net.minecraft.world.entity.monster.Enemy
+                        && !(m instanceof net.minecraft.world.entity.monster.Creeper));
+        net.minecraft.world.entity.Mob closest = null;
+        for (var m : after) {
+            // (Anything quick or shooting among them: not this - the guardian and the other reflexes.)
+            if (Guardian.shooter(m) || !Guardian.slowChaser(m)) return false;
+            if (closest == null || m.distanceToSqr(body) < closest.distanceToSqr(body)) closest = m;
+        }
+        // Well behind (or none after it): a weapon, if the pack has what one is made of.
+        if ((closest == null || closest.distanceTo(body) > 10) && body.tickCount - keptAwayAt < 600 && body.tickCount - weaponTriedAt > 600) {
+            weaponTriedAt = body.tickCount;
+            var planner = new net.kasax.challengecraft.bot.plan.ObtainPlanner();
+            double est = planner.estimate(this, MAKESHIFT_SWORDS, 1);
+            if (est <= 10) {
+                say("no weapon, " + (closest == null ? "nothing after me now" : "they are well behind") + ": a sword from the pack first (~" + Math.round(est) + " s)");
+                actions.reset();
+                reflex(new net.kasax.challengecraft.bot.task.ObtainTask(MAKESHIFT_SWORDS, 1, planner));
+                return true;
+            }
+            return false;
+        }
+        if (closest == null || closest.distanceTo(body) > 6 || !body.hasLineOfSight(closest) && closest.distanceTo(body) > 3) return false;
+        // (Hunting these very ones - a tile wants a zombie killed: the hunt's own business.)
+        if (hunting(closest.getType())) return false;
+        if (net.kasax.challengecraft.bot.task.PillarFightTask.possible(this)) {
+            actions.reset();
+            navigator.stop();
+            say("no weapon, a " + closest.getType().toShortString() + " " + String.format("%.1f", closest.distanceTo(body)) + " off: up a pillar before it is here, and from above");
+            reflex(new net.kasax.challengecraft.bot.task.PillarFightTask(closest).untilClear());
+            return true;
+        }
+        net.minecraft.world.phys.Vec3 centre = net.minecraft.world.phys.Vec3.ZERO;
+        int close = 0;
+        for (var m : after) {
+            if (m.distanceTo(body) > 12) continue;
+            centre = centre.add(m.position());
+            close++;
+        }
+        centre = centre.scale(1.0 / Math.max(1, close));
+        if (!roomToRun(centre, Guardian.UNARMED_RUN_ROOM)) return false;
+        net.minecraft.core.BlockPos to = escapeCrumb(centre);
+        if (to == null) to = net.minecraft.core.BlockPos.containing(body.position().add(openWayFrom(centre, 24)));
+        keptAwayAt = body.tickCount;
+        say("no weapon, " + close + " " + closest.getType().toShortString() + (close > 1 ? "s" : "") + " coming (" + String.format("%.1f", closest.distanceTo(body))
+                + " off): away at a run, to " + to.toShortString());
+        actions.reset();
+        retreat = new net.kasax.challengecraft.bot.task.GoToTask(to, 2).sprinting();
+        reflex(retreat);
+        return true;
     }
 
     /** Whether a task on the stack hunts this kind (then meeting one is the job). */

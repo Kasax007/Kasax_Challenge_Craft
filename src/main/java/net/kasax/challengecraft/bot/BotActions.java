@@ -105,6 +105,11 @@ public final class BotActions {
         return breaking != null && progress > 0;
     }
 
+    /** How far the block being broken is (0 to 1; 0 when none is). */
+    public float breakProgress() {
+        return breaking == null ? 0 : progress;
+    }
+
     public void reset() {
         if (breaking != null) bot.level().destroyBlockProgress(bot.getId(), breaking, -1);
         breaking = null;

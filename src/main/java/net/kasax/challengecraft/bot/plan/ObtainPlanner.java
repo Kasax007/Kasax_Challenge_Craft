@@ -1420,8 +1420,13 @@ public final class ObtainPlanner {
                 // the compass): taken in the same trip while the vein is right there.
                 int extra = 0;
                 for (Item i : p.accept()) extra = Math.max(extra, boardDemand.getOrDefault(i, 0) - have - total);
+                // No weapon yet and stone being dug (the opening's first stone): the sword's two in
+                // the same haul, not a second trip for them - a zombie came between the pickaxe and
+                // the sword on seed -987..., in the second minute, with nothing to fight it with.
+                int needNow = have + total;
+                if (bot.params.on("swordstone") && p.accept().contains(Items.COBBLESTONE) && !net.kasax.challengecraft.bot.Guardian.armed(bot.body())) needNow += 2;
                 MineTask mine = new MineTask(names(p.accept()), s -> blocks.contains(s.getBlock()), p.accept(),
-                        have + total + Math.max(0, Math.min(extra, 16)), depth, lead(bot, blocks)).atLeast(have + total);
+                        Math.max(needNow, have + total + Math.max(0, Math.min(extra, 16))), depth, lead(bot, blocks)).atLeast(needNow);
                 // Not lying about anywhere (a furnace, bricks): taken where seen, never searched
                 // for (that walk can be a thousand blocks long); otherwise made.
                 boolean nether = bot.body().level().dimension() == net.minecraft.world.level.Level.NETHER;

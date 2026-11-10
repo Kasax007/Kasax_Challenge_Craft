@@ -658,6 +658,7 @@ public final class MineTask implements BotTask {
         // while has gone by with nothing found on land: then it is dived for.)
         boolean diveFor = shallowWater(level, p) && (level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CLAY) || searchTicks > 600);
         if (!diggable(level, bot, p, diveFor)) return false;
+        if (bot.params.on("bowmanwary") && bowmenBy(level, bot, p)) return false;
         if (depth != null) {
             // One remembered far off against digging down for it here: the walk (some 2.5 blocks
             // a second over and under ground) must beat the dig down plus a minute's search at
@@ -781,7 +782,7 @@ public final class MineTask implements BotTask {
             // player turns round at the groaning and the rattling (seed 77, hard: five zombies, two
             // skeletons and a creeper down one, and dead in it). Its ground is kept clear of a while.
             int about = monstersAbout(level, caveSpot, 16);
-            if (about >= (bot.body().getArmorValue() >= 6 ? 5 : 3)) {
+            if (about >= (bot.body().getArmorValue() >= 6 ? 5 : 3) || bot.params.on("bowmanwary") && bowmenBy(level, bot, caveSpot)) {
                 bot.say("a cave full of monsters (" + about + " about " + caveSpot.toShortString() + "): not that one");
                 caveVisited.add(caveSpot);
                 bot.markDanger(caveSpot);
@@ -836,6 +837,19 @@ public final class MineTask implements BotTask {
         if (searchTicks % 600 == 0) bot.say("digging for " + what + ": at " + nav.feet().toShortString() + ", heading " + heading.getName() + ", y " + (digDepth != null ? digDepth : depth) + " wanted");
         if (digTo == null) {
             BlockPos feet = nav.feet();
+            // In the water (come up for air in a lake, swum out to rock that was not to be had): out
+            // onto dry ground first, and the staircase from there - never one from the lake's
+            // bottom, which fills as it is dug, with the lake for a roof (seed -3882..., league 9:
+            // three times drowned in such a staircase in one game).
+            if (bot.params.on("drystairs") && !sealed && (bot.body().isInWater() || !level.getFluidState(feet).isEmpty())) {
+                if (++ashoreTries > 3) {
+                    bot.say("can't dig on here: in the water, and no way ashore");
+                    return Result.FAILED;
+                }
+                bot.say("in the water: ashore first, the staircase from dry ground");
+                bot.interject(ashore(feet));
+                return Result.RUNNING;
+            }
             if (digDepth == null) digDepth = depth != null ? depth : feet.getY() - 8;
             // Rock: the staircase goes on down till it is in rock (its own steps then are the
             // cobblestone) - not a tunnel along eight blocks down, through terracotta or dirt
@@ -854,7 +868,9 @@ public final class MineTask implements BotTask {
             // The next step has no floor: a cave right below. A short drop into it is the way on
             // (and its walls show more than any tunnel); else on along the level for a step.
             if (down && !safeStep(level, digBlocks, digTo)) {
-                if (!sealed && shortDrop(level, digBlocks, digTo)) {
+                // (Not down into a cave with bowmen in it, before the shield: the staircase goes on
+                // another way.)
+                if (!sealed && shortDrop(level, digBlocks, digTo) && !(bot.params.on("bowmanwary") && bowmenBy(level, bot, digTo))) {
                     // (The landing is wherever it comes down: the step is taken from there.)
                     // Broken into a cave: that is walked first, as any cave found.
                     if (depth != null && cavesDone) {
@@ -891,11 +907,15 @@ public final class MineTask implements BotTask {
                     // spot 26 blocks lower in the water drowned it on seed 77.)
                     boolean below = SurfaceTask.underground(bot.body());
                     BlockPos away = null;
-                    for (int i = 0; i < 8 && away == null; i++) {
+                    for (int i = 0; i < (bot.params.on("drystairs") ? 24 : 8) && away == null; i++) {
                         BlockPos c = feet.offset(bot.body().getRandom().nextInt(13) - 6, 0, bot.body().getRandom().nextInt(13) - 6);
                         BlockPos g = below ? c : Explorer.ground(level, c, feet.getY());
                         if (Math.abs(g.getY() - feet.getY()) > 4) continue;
                         if (!level.getFluidState(g).isEmpty() || !level.getFluidState(g.below()).isEmpty()) continue;
+                        // (A spot to stand on, dry all round - not one inside the rock, tunnelled to
+                        // through a lake's bank: "go to -205, 55, -155", three below the feet at the
+                        // bottom of a lake, and the tunnel filled behind it, seed -3882....)
+                        if (bot.params.on("drystairs") && !dryStand(level, g)) continue;
                         away = g;
                     }
                     if (away == null) {
@@ -981,6 +1001,55 @@ public final class MineTask implements BotTask {
             heading = heading.getClockWise();
         }
         return Result.RUNNING;
+    }
+
+    private long bowmenSaidAt = -1000;
+
+    /**
+     * Without a shield (and without armour to speak of): two bowmen within fourteen blocks of
+     * the block (sixteen up or down: a ravine's floor), skeletons in the dark room the iron is in
+     * - a player hears them rattle - or one and two other monsters: not walked into for it. (League 9, seed -2038...: down into a
+     * ravine for the shield's iron, two skeletons at the bottom, shot dead in a box that did not
+     * help.) With the shield on the arm, the arrows end in it.
+     */
+    private boolean bowmenBy(ServerLevel level, Bot bot, BlockPos p) {
+        var body = bot.body();
+        if (body.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD) || body.getArmorValue() >= 10) return false;
+        int bowmen = 0, others = 0;
+        // (Down to the floor of a ravine too: two skeletons at its bottom shot at it on the walls.)
+        for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, new net.minecraft.world.phys.AABB(p).inflate(14, 16, 14),
+                m -> m.isAlive() && !(m instanceof net.minecraft.world.entity.monster.Enderman))) {
+            if (net.kasax.challengecraft.bot.Guardian.shooter(m)) bowmen++;
+            else others++;
+        }
+        boolean wary = bowmen >= 2 || bowmen >= 1 && others >= 2;
+        if (wary && level.getGameTime() - bowmenSaidAt > 200) {
+            bowmenSaidAt = level.getGameTime();
+            bot.say(what + " at " + p.toShortString() + ": " + bowmen + " bowmen by it and no shield - not that one");
+        }
+        return wary;
+    }
+
+    /** How often it went ashore to start a staircase (in the water again each time: given up). */
+    private int ashoreTries;
+
+    /**
+     * A spot to stand on dry: nothing solid and no liquid where the feet and the head go, solid
+     * dry ground under it, and no water beside the feet or under the floor's edges (a step dug
+     * down from there would let it in).
+     */
+    static boolean dryStand(ServerLevel level, BlockPos g) {
+        if (!level.getBlockState(g).getCollisionShape(level, g).isEmpty() || !level.getBlockState(g.above()).getCollisionShape(level, g.above()).isEmpty()) return false;
+        if (level.getBlockState(g.below()).getCollisionShape(level, g.below()).isEmpty()) return false;
+        for (BlockPos q : BlockPos.betweenClosed(g.offset(-1, -1, -1), g.offset(1, 1, 1))) {
+            if (!level.getFluidState(q).isEmpty()) return false;
+        }
+        return true;
+    }
+
+    /** Out of the water onto the nearest dry ground (a minute at most), steered back the way it is facing from. */
+    static BotTask ashore(BlockPos from) {
+        return new NavGoalTask("ashore before digging", (lv, p) -> dryStand(lv, p), b -> from, 1200);
     }
 
     /**

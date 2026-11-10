@@ -174,6 +174,11 @@ public final class PillarFightTask implements BotTask {
         return Result.RUNNING;
     }
 
+    /** The blocks a pillar out of reach from {@code feet} takes: three, and as many more as the ground beside it rises. */
+    public static int blocksNeeded(ServerLevel level, BlockPos feet) {
+        return 3 + rise(level, feet);
+    }
+
     /**
      * The ground beside the foot of the pillar (the eight blocks round it, where one stands that
      * strikes at it), how much higher than the foot at most: 0 to 2.

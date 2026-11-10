@@ -46,6 +46,26 @@ import java.util.Map;
  *       mined beside it; 0: it waits at the furnace.</li>
  *   <li>{@code rocksight} - 1 (the default): rock showing in the open up to forty blocks off is
  *       walked to before a staircase is dug for stone; 0: the staircase at once.</li>
+ *   <li>{@code drystairs} - 1 (the default): a staircase down is begun from dry ground only (out
+ *       of a lake first), and "a few blocks away" is a dry spot to stand on; 0: as before.</li>
+ *   <li>{@code halfair} - 1 (the default): under water, back for air at half of it (unless the
+ *       surface is a few strokes up), and never later than the way back along the dive takes;
+ *       0: at two fifths (four with a block over the head).</li>
+ *   <li>{@code airsafe} - 1 (the default): out of air, back along the way it dived first, a dig
+ *       that gets nowhere given up for another way, the water walled off round it when nothing
+ *       else works; 0: as before.</li>
+ *   <li>{@code pillarblocks} - 1 (the default): a pillar out of reach only with the blocks for
+ *       all of it (three, more on a slope); 0: with one.</li>
+ *   <li>{@code unarmedrun} - 1 (the default): no weapon, and only slow things that strike close
+ *       after it (zombies): kept off at a run (or from a pillar), a sword made from the pack
+ *       once they are behind; 0: as before.</li>
+ *   <li>{@code coverveto} - 1 (the default): the learnt cover model is not offered what the rules
+ *       know never works against the threats (a pillar or a hole with a spider at it, a run from
+ *       anything as quick); 0: every way possible there.</li>
+ *   <li>{@code swordstone} - 1 (the default): stone dug while there is no weapon includes the
+ *       sword's two; 0: only what is wanted now.</li>
+ *   <li>{@code bowmanwary} - 1 (the default): without a shield, no block is gone for (nor a cave
+ *       walked or broken into) with two bowmen by it; 0: as before.</li>
  * </ul>
  */
 public final class BotParams {

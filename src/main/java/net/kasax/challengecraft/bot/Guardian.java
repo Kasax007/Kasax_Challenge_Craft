@@ -372,6 +372,10 @@ public final class Guardian {
         boolean night = bare && dark;
         boolean boxPossible = HideTask.boxPossible(bot, true), pillarPossible = HideTask.pillarPossible(bot);
         boolean roomToRun = bot.roomToRun(centre(r), 8);
+        // Every one of them slower than he is at a run (a zombie, a husk, a creeper - not a baby
+        // zombie, a spider, a vindicator, a wolf): a run gets away from them.
+        boolean outrun = !shooters && !climbers && !jumpers && !tall;
+        for (Threat t : r.threats()) outrun &= slowChaser(t.mob);
         // The rules' way out.
         net.kasax.challengecraft.bot.learn.CoverOption rule;
         String ruleWhy = null;
@@ -379,6 +383,13 @@ public final class Guardian {
             rule = net.kasax.challengecraft.bot.learn.CoverOption.DIG;
         } else if (onlyReachless && reachless != null && r.ticksLeft() >= 40 && pillarPossible) {
             rule = net.kasax.challengecraft.bot.learn.CoverOption.PILLAR_FIGHT;
+        } else if (bare && outrun && bot.params.on("unarmedrun") && bot.roomToRun(centre(r), UNARMED_RUN_ROOM)) {
+            // Nothing to fight with, no pillar to be had, and they are slow: away at a run, as a
+            // player does - not a box or a hole begun with them at the elbow (seed -987..., the
+            // second minute: the pillar ran out of blocks, the hole was too slow, dead; seed
+            // 2582...: walled in at dawn with nothing in hand, the box would not shut).
+            rule = net.kasax.challengecraft.bot.learn.CoverOption.RUN;
+            ruleWhy = "no weapon, and they are slower than me: away at a run";
         } else if (crossbows(r) >= 2 && roomToRun) {
             // Pillagers: where two shoot, more come (an outpost spawns them for as long as one
             // stands in it, a patrol is five) - and the box is no cover from bolts out of every
@@ -419,6 +430,17 @@ public final class Guardian {
         if (roomToRun) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
         if (digTicks < Integer.MAX_VALUE) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.DIG);
         if (digTicks < Integer.MAX_VALUE && dark) possible.add(net.kasax.challengecraft.bot.learn.CoverOption.SHELTER);
+        // What the rules know never works against these is not offered to the model either: it
+        // learnt from too few such fights - in the leagues four of four times it took a pillar, a
+        // run or a hole with a spider at him, he died; it ran from three zombies with a baby among
+        // them that the rules fight (13 to 20 hearts lost against 4.5).
+        if (bot.params.on("coverveto")) {
+            String vetoed = veto(possible, r, rule, shooters, climbers, jumpers, tall, onlyReachless, outrun, bare);
+            if (vetoed != null && body.tickCount - vetoSaidAt > 100) {
+                vetoSaidAt = body.tickCount;
+                BotManager.LOG.info("[Bot] {}: guardian: not for the model here: {}", bot.name, vetoed);
+            }
+        }
         possible.add(rule);
         // Which one: the rules, the learnt model, or (in the arena) a random one - and kept to
         // for the rest of the fight once chosen otherwise than by the rules.
@@ -444,6 +466,68 @@ public final class Guardian {
         if (episode != null) episode.decisions++;
         if (pick != rule) ruleWhy = null;
         return take(r, pick, how, reachless, ruleWhy);
+    }
+
+    /** Open ground a run from them needs when it is the rules' way (no weapon): blocks. */
+    static final int UNARMED_RUN_ROOM = 16;
+    /** Open ground a run needs when the model would run where the rules would not: blocks (a run of eight has them at the heels again). */
+    static final int MODEL_RUN_ROOM = 20;
+    /** A chaser covering less than this on the ground (blocks a tick) is left behind by a run (a player sprints some 0.28). */
+    static final double SLOW_CHASE = 0.15;
+    private int vetoSaidAt = -1000;
+
+    /**
+     * Slower than a running player on the ground: a zombie, a husk, a drowned on land, a creeper.
+     * Not a baby zombie (half again as fast), a spider, a vindicator, a brute, a wolf.
+     */
+    static boolean slowChaser(Mob m) {
+        return chaseSpeed(m) < SLOW_CHASE && !(m instanceof net.minecraft.world.entity.monster.spider.Spider)
+                && !(m instanceof net.minecraft.world.entity.animal.wolf.Wolf) && !(m instanceof Enderman);
+    }
+
+    /**
+     * Takes out of {@code possible} what the rules never do against these threats (the rule's own
+     * choice stays): a pillar against anything that climbs it, leaps up it, reaches up it or shoots
+     * at the one standing on top; a pillar fight unless all of them only strike close; a run from
+     * anything as quick as he is (a spider, an enderman, a baby zombie, a magma cube), and, where
+     * the rules would not run, unless there is room for a long one; a hole with a spider or a cube
+     * a few blocks off (it bites through the digging). Returns what it took out, or null.
+     */
+    private String veto(java.util.Set<net.kasax.challengecraft.bot.learn.CoverOption> possible, Reckoning r,
+                        net.kasax.challengecraft.bot.learn.CoverOption rule, boolean shooters, boolean climbers, boolean jumpers,
+                        boolean tall, boolean onlyReachless, boolean outrun, boolean bare) {
+        var out = java.util.EnumSet.noneOf(net.kasax.challengecraft.bot.learn.CoverOption.class);
+        if (shooters || climbers || jumpers || tall) out.add(net.kasax.challengecraft.bot.learn.CoverOption.PILLAR);
+        if (!onlyReachless) out.add(net.kasax.challengecraft.bot.learn.CoverOption.PILLAR_FIGHT);
+        // (Every threat a bowman: running takes the arrows in the back - the rules box or dig; a
+        // run from pillagers is the rules' own, and stays as theirs.)
+        boolean slowMelee = outrun || r.threats().stream().allMatch(t -> t.ranged() || slowChaser(t.mob()));
+        if (!slowMelee || climbers || tall || jumpers || shooters && rule != net.kasax.challengecraft.bot.learn.CoverOption.RUN)
+            out.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
+        else if (rule != net.kasax.challengecraft.bot.learn.CoverOption.RUN && !bot.roomToRun(centre(r), MODEL_RUN_ROOM))
+            out.add(net.kasax.challengecraft.bot.learn.CoverOption.RUN);
+        boolean biterNear = false;
+        for (Threat t : r.threats()) {
+            if ((t.mob() instanceof net.minecraft.world.entity.monster.spider.Spider
+                    || t.mob() instanceof net.minecraft.world.entity.monster.cubemob.AbstractCubeMob) && t.mob().distanceTo(bot.body()) < 6) biterNear = true;
+        }
+        if (biterNear) {
+            out.add(net.kasax.challengecraft.bot.learn.CoverOption.DIG);
+            out.add(net.kasax.challengecraft.bot.learn.CoverOption.SHELTER);
+        }
+        // Nothing in hand to strike one out of the box's gap with, and one at the elbow already:
+        // no box (seed 2582..., league 9: walled in at dawn with a zombie a step off and nothing
+        // to fight with - four blows through the side that would not go in, dead).
+        if (bare && rule == net.kasax.challengecraft.bot.learn.CoverOption.RUN) {
+            for (Threat t : r.threats()) {
+                if (!t.ranged() && t.mob().distanceTo(bot.body()) < 3) out.add(net.kasax.challengecraft.bot.learn.CoverOption.BOX);
+            }
+        }
+        out.remove(rule);
+        out.retainAll(possible);
+        if (out.isEmpty()) return null;
+        possible.removeAll(out);
+        return out.toString();
     }
 
     /** The way out chosen, set going: the task for it (a cover), or none (the reflexes fight on, or run). */
