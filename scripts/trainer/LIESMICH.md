@@ -8,6 +8,15 @@ wird Bob besser.
 Du brauchst kein Minecraft-Konto, kein Python und nichts zum Programmieren. Nur beim ersten Start
 braucht der Trainer einmal Internet (für Java, falls keins da ist, und für den Minecraft-Server).
 
+## Wohin mit dem Ordner
+
+Am besten an eine Stelle **außerhalb von OneDrive** (oder Dropbox, Google Drive, iCloud), zum
+Beispiel `C:\Bob-Trainer`. Ein Sync-Programm öffnet jede Datei, die ein Spiel schreibt, um sie
+hochzuladen, und sperrt sie dabei – Minecraft-Welten sind Tausende Dateien, die nach jedem Spiel
+wieder gelöscht werden. Liegt der Trainer trotzdem in OneDrive, merkt er das und legt die
+Spielwelten und den Minecraft-Server in einen Ordner deines Rechners
+(`%LOCALAPPDATA%\Bob-Trainer`); das Dashboard zeigt ihn unter „Spielwelten“.
+
 ## Starten
 
 - **Windows:** Doppelklick auf **`Bob-Trainer starten.bat`**. Ein schwarzes Fenster blitzt kurz auf
@@ -75,6 +84,9 @@ höchstens die Spiele, die gerade liefen. Eine Pause bleibt auch über einen Neu
   schlechter, nur weil es schneller läuft.
 - Nach jedem Spiel wird die Welt gelöscht. Das Tagebuch und die Logs werden begrenzt (zusammen
   höchstens etwa 4,5 GB; die ältesten gehen zuerst).
+- Minecraft lädt nur das erste Spiel herunter, einmal und allein. Jeder Spiel-Platz (liga-1,
+  liga-2, …) richtet sich beim ersten Mal sein eigenes Fabric ein (ein paar MB); gemeinsam ist nur
+  die Minecraft-Datei, und die wird nur gelesen. So sperrt kein Spiel einem anderen eine Datei.
 - Zur Beschleunigung laufen die Server mit den Mods **Lithium** und **FerriteCore** (siehe
   `THIRD-PARTY.txt`).
 - Einstellungen für Fortgeschrittene stehen in `server/bob-autopilot.properties` (mit Erklärung).
@@ -84,5 +96,13 @@ höchstens die Spiele, die gerade liefen. Eine Pause bleibt auch über einen Neu
 - **Das Dashboard öffnet sich nicht:** im Browser `http://127.0.0.1:8765/` eingeben (oder die
   Adresse in `server/bob-autopilot/dashboard.url`).
 - **„Spiel zu langsam“ oder der Rechner ist zäh:** Leistung auf *niedrig* stellen.
+- **„Start nicht möglich: … laesst sich nicht leeren“ oder „… gesperrt“:** ein anderes Programm hält
+  Dateien eines Spiels offen – meist OneDrive oder ein Virenscanner. Den Trainer beenden, den Ordner
+  aus OneDrive heraus verschieben (siehe oben) und neu starten.
+- **„Fünf Fehler in 30 Minuten: 15 Minuten Pause“:** Der Trainer wartet, statt immer wieder zu
+  scheitern. Die Logs der Spiele liegen in `server/bob-autopilot/games`, die Fehler stehen in
+  `server/bob-autopilot/league/failures.jsonl`: beides im Chat hochladen.
 - **Fehler beim ersten Start:** die Datei `server/bob-autopilot/autopilot.log` im Chat hochladen.
-- **Ganz entfernen:** den Trainer beenden und den Ordner löschen. Er schreibt nichts woanders hin.
+- **Ganz entfernen:** den Trainer beenden und den Ordner löschen. Lag er in OneDrive, auch den Ordner
+  `%LOCALAPPDATA%\Bob-Trainer` (im Explorer oben in die Adresszeile eingeben). Sonst schreibt er
+  nirgends etwas hin.

@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  * is untouched by it: it runs only where the panel is set to start this jar.
  */
 public final class Autopilot {
-    static final String VERSION = "1.0";
+    static final String VERSION = "1.1";
 
     private Autopilot() {
     }

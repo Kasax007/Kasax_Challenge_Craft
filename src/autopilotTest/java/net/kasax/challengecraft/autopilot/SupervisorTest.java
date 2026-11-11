@@ -119,6 +119,38 @@ class SupervisorTest {
         assertTrue(next.gameCounter >= sup.gamesDone);
     }
 
+    /** A trainer in OneDrive (11.11.2026): the games' folders outside it, the old work folder gone (not what it linked to). */
+    @Test
+    void aTrainerInOneDrivePlaysItsGamesOutsideIt() throws Exception {
+        System.setProperty("bob.localDir", tmp.resolve("local").toString());
+        try {
+            Path root = FakeRoot.create(tmp.resolve("OneDrive/Documents/Bob Trainer/Bob-Trainer/server"),
+                    "league_games=1\ngame_minutes=2\nexport_hours=0\nserver_jar=fake-server.jar\n");
+            Path oldGame = Files.createDirectories(root.resolve("bob-autopilot/work/liga-1"));
+            Files.createDirectories(oldGame.resolve("world/region"));
+            Files.createSymbolicLink(oldGame.resolve("mods"), oldGame.relativize(root.resolve("mods")));
+            Supervisor sup = supervisor(root);
+            assertTrue(sup.relocated && sup.work.startsWith(tmp.resolve("local")), sup.work.toString());
+            Thread loop = new Thread(sup::run);
+            loop.start();
+            Path results = root.resolve("bob-autopilot/league/results.jsonl");
+            waitFor(() -> lines(results).size() >= 2, 120_000);
+            sup.commands.add("stop");
+            loop.join(90_000);
+            assertFalse(loop.isAlive(), "the loop did not end on stop");
+            assertFalse(Files.exists(root.resolve("bob-autopilot/work")), "the old work folder is gone");
+            assertTrue(Files.exists(root.resolve("mods/challengecraft-1.1.4.jar")), "and not what it linked to");
+            Path game = sup.work.resolve("liga-1");
+            assertTrue(Files.isSymbolicLink(game.resolve("mods")));
+            assertTrue(Files.isDirectory(game.resolve("config")));
+            assertFalse(Files.exists(game.resolve("world")));
+            assertTrue(list(root.resolve("bob-autopilot/games")).size() >= 2, "the logs stay beside the trainer");
+            assertTrue(console.toString(StandardCharsets.UTF_8).contains("liegt in OneDrive"));
+        } finally {
+            System.clearProperty("bob.localDir");
+        }
+    }
+
     @Test
     void aServerThatBreaksDownAtTheStartIsWrittenDownWithItsReason() throws Exception {
         Path root = FakeRoot.create(tmp, "league_games=1\nexport_hours=0\nserver_jar=fake-server.jar\nextra_jvm_flags=-Dfake.mode=crash\n");

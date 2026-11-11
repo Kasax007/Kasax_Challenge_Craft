@@ -49,12 +49,14 @@ final class Config {
     int exportMaxMb = 25;
     int keepExports = 6;
     String seeds = "";
+    /** Where the games' folders and Minecraft go (auto: beside the trainer, or outside OneDrive when the trainer is in it). */
+    String workDir = "auto";
     String machine = "bisect";
 
     private static final Set<String> KEYS = Set.of("league_games", "arena_servers", "game_minutes", "game_memory_mb", "arena_memory_mb",
             "arena_bots", "arena_restart_minutes", "long_game_every", "long_game_minutes", "dashboard_port", "tuned", "view_distance", "simulation_distance", "difficulty", "search_threads", "server_jar",
             "mods_folder", "java", "extra_jvm_flags", "journal_max_mb", "game_logs_max_mb", "export_hours", "export_max_mb",
-            "keep_exports", "seeds", "machine");
+            "keep_exports", "seeds", "machine", "work_dir");
 
     /** Reads the file (writing the default one first if there is none); {@code warn} hears what was wrong. */
     static Config load(Path file, Consumer<String> warn) throws IOException {
@@ -105,6 +107,7 @@ final class Config {
         c.exportMaxMb = number(p, "export_max_mb", c.exportMaxMb, 1, 10_000, warn);
         c.keepExports = number(p, "keep_exports", c.keepExports, 1, 1000, warn);
         c.seeds = text(p, "seeds", c.seeds);
+        c.workDir = text(p, "work_dir", c.workDir);
         c.machine = text(p, "machine", c.machine).replaceAll("[^A-Za-z0-9_.-]", "_");
         return c;
     }
@@ -276,6 +279,11 @@ final class Config {
 
             # Der Port des Dashboards (nur auf diesem Rechner erreichbar: 127.0.0.1).
             dashboard_port=8765
+
+            # Wohin die Spielwelten und Minecraft kommen. auto = neben den Trainer, oder - liegt der
+            # Trainer in OneDrive oder einem anderen Sync-Ordner - in einen Ordner dieses Rechners
+            # (unter Windows %LOCALAPPDATA%\\Bob-Trainer). Sonst ein Ordner, mit / statt \\, z. B. D:/Bob-Welten
+            work_dir=auto
 
             # Feste Seeds, der Reihe nach (durch Komma getrennt). Leer = jede Partie eine neue Welt.
             seeds=

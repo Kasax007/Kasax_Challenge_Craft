@@ -64,6 +64,12 @@ final class Supervisor {
     }
 
     final Path root, home, work, leagueDir, journal, games, exports, models;
+    /** The folder of Minecraft's own server jar, one for all games (each game's Fabric is its own). */
+    final Path minecraftDir;
+    /** The games' folders and Minecraft are outside the trainer's folder (work_dir, or the trainer in a synced folder). */
+    final boolean relocated;
+    /** After a start that failed, no other start for a while: one failure is reported, not one per slot. */
+    private long startsBlockedUntil;
     final Config cfg;
     final Layout layout;
     final Path ownJar;
@@ -115,7 +121,11 @@ final class Supervisor {
         this.log = log;
         this.leagueSlots = leagueSlots;
         home = root.resolve("bob-autopilot");
-        work = home.resolve("work");
+        Path local = localBase(root, cfg);
+        relocated = local != null;
+        work = relocated ? local.resolve("work") : home.resolve("work");
+        // (Beside the trainer where earlier versions kept it: a Minecraft downloaded before is used.)
+        minecraftDir = relocated ? local.resolve("minecraft") : root.resolve(".fabric").resolve("server");
         leagueDir = home.resolve("league");
         journal = home.resolve("journal");
         games = home.resolve("games");
@@ -126,19 +136,46 @@ final class Supervisor {
         league = loadLeague();
         saveLeague();
         for (int i = 1; i <= leagueSlots; i++) {
-            Slot slot = new Slot(new GameServer("liga-" + i, GameServer.Kind.LEAGUE, work.resolve("liga-" + i), home));
+            Slot slot = new Slot(new GameServer("liga-" + i, GameServer.Kind.LEAGUE, work.resolve("liga-" + i), work));
             slot.leagueNo = i;
             slots.add(slot);
         }
         activeLeague = leagueSlots;
         paused = Files.exists(home.resolve("paused"));
         for (int i = 1; i <= cfg.arenaServers; i++) {
-            slots.add(new Slot(new GameServer("arena-" + i, GameServer.Kind.ARENA, work.resolve("arena-" + i), home)));
+            slots.add(new Slot(new GameServer("arena-" + i, GameServer.Kind.ARENA, work.resolve("arena-" + i), work)));
         }
         export = new Export(this);
         lastExport = System.currentTimeMillis();
         // (The first short status on the console ten minutes in: at the start there is nothing to say yet.)
         lastSummary = lastExport;
+    }
+
+    /**
+     * Where the games' folders and Minecraft go when not beside the trainer: the folder set as
+     * work_dir; else, with the trainer in OneDrive or another synced folder, a folder of this
+     * computer's own (the sync program opens and marks every file a game writes, and on Windows a
+     * world then cannot be deleted, nor a file replaced). Null: beside it, in bob-autopilot/work.
+     */
+    static Path localBase(Path root, Config cfg) {
+        if (cfg.workDir != null && !cfg.workDir.isBlank() && !cfg.workDir.equalsIgnoreCase("auto")) {
+            return root.resolve(cfg.workDir.trim()).toAbsolutePath().normalize();
+        }
+        if (!Disk.cloudSynced(root)) return null;
+        // (One folder for each trainer folder: two copies of the trainer never share their games.)
+        String id = Integer.toHexString(root.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT).hashCode());
+        return Disk.localDataDir().resolve("trainer-" + id);
+    }
+
+    /** Minecraft's own server jar for all games (null: the Fabric jar is no downloading launcher). */
+    Path minecraftJar() {
+        return layout.minecraftJar(minecraftDir);
+    }
+
+    /** Minecraft is there (downloaded once, by the first game), or nothing is to be downloaded. */
+    boolean minecraftReady() {
+        Path jar = minecraftJar();
+        return jar == null || Files.isRegularFile(jar) && Disk.sizeOf(jar) > 10_000_000L;
     }
 
     // ---- the league's state -------------------------------------------------------------------------
@@ -200,12 +237,15 @@ final class Supervisor {
 
     static void writeAtomically(Path file, String text) throws IOException {
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-        Files.writeString(tmp, text, StandardCharsets.UTF_8);
-        try {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
-        }
+        // (Tried again for a few seconds: a sync program or a virus scanner may hold the file a moment.)
+        Disk.retrying(() -> {
+            Files.writeString(tmp, text, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException e) {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        });
     }
 
     private void appendLine(Path file, Map<String, Object> o) {
@@ -221,6 +261,24 @@ final class Supervisor {
     void run() {
         event("Autopilot gestartet: " + leagueSlots + " Liga-Spiel(e) gleichzeitig, " + cfg.arenaServers + " Arena(s), "
                 + cfg.gameMinutes + " Spielminuten je Spiel");
+        if (relocated) {
+            event(Disk.cloudSynced(root)
+                    ? "Der Trainer-Ordner liegt in OneDrive (oder einem anderen Sync-Ordner): die Spielwelten und Minecraft liegen deshalb in "
+                    + work.getParent() + ". Dein Liga-Stand, Journal und Export bleiben in " + home + "."
+                    : "Spielwelten und Minecraft liegen in " + work.getParent() + " (work_dir)");
+            // (The work folder of an earlier start beside the trainer: thrown-away worlds, gone now.)
+            Path old = home.resolve("work");
+            if (Files.exists(old, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                workers.submit(() -> {
+                    try {
+                        Disk.deleteTreeRetrying(old, home);
+                        log.info("Alter Arbeitsordner geloescht: " + old);
+                    } catch (IOException e) {
+                        log.warn("Alter Arbeitsordner " + old + " nicht ganz geloescht (" + Disk.describe(e) + "): er kann von Hand geloescht werden");
+                    }
+                });
+            }
+        }
         while (true) {
             handleCommands();
             if (stopRequested) break;
@@ -252,11 +310,14 @@ final class Supervisor {
         GameServer g = s.server;
         switch (s.state) {
             case IDLE -> {
-                if (finishRequested || paused || now < s.retryAt || now < pausedUntil) return;
+                if (finishRequested || paused || now < s.retryAt || now < pausedUntil || now < startsBlockedUntil) return;
                 // (The app's power setting: only so many league games at once.)
                 if (s.leagueNo > activeLeague) return;
                 // (One server starting at a time: the first one also downloads Minecraft, if need be.)
                 if (slots.stream().anyMatch(o -> o.state == State.STARTING)) return;
+                // (Minecraft not yet downloaded: the first game's launcher downloads it, alone - a game
+                // that started meanwhile would find half a file.)
+                if (!minecraftReady() && slots.stream().anyMatch(o -> o != s && o.state != State.IDLE)) return;
                 start(s, now);
             }
             case STARTING -> {
@@ -367,12 +428,13 @@ final class Supervisor {
             seed = rng.nextLong();
         }
         try {
-            g.prepare(layout, ownJar, GameServer.properties(cfg, g.kind, seed, g.name), log);
+            g.prepare(layout, ownJar, GameServer.properties(cfg, g.kind, seed, g.name), log, minecraftDir);
             g.start(command(g.kind), environment(g));
         } catch (IOException e) {
-            failure(s, "Start nicht moeglich: " + e.getMessage());
+            failure(s, "Start nicht moeglich: " + Disk.describe(e));
             s.state = State.IDLE;
             s.retryAt = now + 60_000;
+            startsBlockedUntil = now + 20_000;
             return;
         }
         s.state = State.STARTING;
@@ -402,6 +464,9 @@ final class Supervisor {
                     "-XX:G1MixedGCLiveThresholdPercent=90", "-XX:SurvivorRatio=32", "-XX:+PerfDisableSharedMem", "-XX:MaxTenuringThreshold=1"));
         }
         c.addAll(cfg.extraFlags());
+        Path mc = minecraftJar();
+        // (Fabric's downloading launcher: Minecraft's jar the one for all games - see GameServer.prepare.)
+        if (mc != null) c.add("-Dfabric.installer.server.gameJar=" + mc.toAbsolutePath());
         c.add("-jar");
         c.add(layout.fabricJar.getFileName().toString());
         c.add("nogui");
@@ -687,7 +752,7 @@ final class Supervisor {
         gone = Disk.prune(games, p -> true, cfg.gameLogsMaxMb * (1L << 20), export::wasExported, 60_000L);
         if (!gone.isEmpty()) log.info("Spiel-Logs ueber " + cfg.gameLogsMaxMb + " MB: " + gone.size() + " aelteste geloescht");
         export.keepNewest(cfg.keepExports);
-        workers.submit(() -> diskBytes = Disk.size(home));
+        workers.submit(() -> diskBytes = Disk.size(home) + (relocated ? Disk.size(work) + Disk.size(minecraftDir) : 0));
     }
 
     void startExport(String why) {

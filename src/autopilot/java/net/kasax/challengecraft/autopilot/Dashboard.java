@@ -166,8 +166,8 @@ final class Dashboard {
         app.put("eula", Autopilot.eulaAccepted(root));
         app.put("phase", s == null ? phase : s.stopRequested ? "beendet sich" : s.paused ? "pausiert" : "laeuft");
         app.put("export_dir", home.resolve("export").toAbsolutePath().toString());
-        app.put("minecraft_ready", Files.isDirectory(root.resolve(".fabric").resolve("server"))
-                && Disk.size(root.resolve(".fabric").resolve("server")) > 10_000_000L);
+        app.put("minecraft_ready", s != null && s.minecraftReady());
+        if (s != null && s.relocated) app.put("work_dir", s.work.getParent().toAbsolutePath().toString());
         String snap = s == null ? "{}" : s.snapshot;
         // (The snapshot is a JSON object: the app's fields go in front of it.)
         String head = Json.write(app);
@@ -239,6 +239,7 @@ final class Dashboard {
                <tr><td>Platz</td><td class="num">${s.disk_mb!=null?s.disk_mb+' MB':'-'}</td><td class="mute">${s.host?s.host.cores+' Kerne, '+Math.round(s.host.ram_mb/1024)+' GB':''}</td></tr>
                <tr><td>Letzter Export</td><td colspan="2">${s.exporting?'wird gepackt...':s.last_export?`<code>${esc(s.last_export)}</code> (${esc(s.last_export_at)})<br><span class="mute">Diese Datei im Chat hochladen.</span>`:'<span class="mute">noch keiner</span>'}</td></tr>
                <tr><td>Exportordner</td><td colspan="2"><code>${esc(a.export_dir)}</code></td></tr>
+               ${a.work_dir?`<tr><td>Spielwelten</td><td colspan="2"><code>${esc(a.work_dir)}</code><br><span class="mute">ausserhalb von OneDrive: dort sperrt nichts die Dateien der Spiele</span></td></tr>`:''}
                ${a.eula&&!a.minecraft_ready?'<tr><td colspan="3" class="mute">Erster Start: Minecraft wird heruntergeladen (einmalig, einige Minuten).</td></tr>':''}
               </table>`;
               const sv=(s.servers||[]).filter(x=>x.state!=='idle');

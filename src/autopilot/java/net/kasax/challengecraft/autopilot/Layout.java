@@ -31,6 +31,10 @@ final class Layout {
     /** The Challenge Craft jar in the mods folder, and what it says of itself. */
     final Path modJar;
     final String modVersion, modCommit, modSha;
+    /** The Fabric jar is the downloading launcher (read once: the loop asks before every start). */
+    private final boolean downloadingLauncher;
+    /** The Minecraft version the downloading launcher installs (null: no downloading launcher). */
+    private final String gameVersion;
 
     private Layout(Path root, Path fabricJar, Path mods, Path modJar, String modVersion, String modCommit, String modSha) {
         this.root = root;
@@ -40,6 +44,8 @@ final class Layout {
         this.modVersion = modVersion;
         this.modCommit = modCommit;
         this.modSha = modSha;
+        this.downloadingLauncher = "net.fabricmc.installer.ServerLauncher".equals(mainClass(fabricJar));
+        this.gameVersion = downloadingLauncher ? gameVersion(fabricJar) : null;
     }
 
     /** What is wrong with the server's folder, said so a person can put it right. */
@@ -143,7 +149,30 @@ final class Layout {
 
     /** Whether the Fabric jar is the downloading launcher (fabricmc.net's server jar): it keeps Minecraft in .fabric/server. */
     boolean fabricKeepsServerInDotFabric() {
-        return "net.fabricmc.installer.ServerLauncher".equals(mainClass(fabricJar));
+        return downloadingLauncher;
+    }
+
+    /**
+     * Minecraft's own server jar in {@code dir}, as Fabric's downloading launcher names it
+     * ({@code <game version>-server.jar}, the version from the launcher's install.properties);
+     * null when the Fabric jar is no downloading launcher or does not say its version.
+     */
+    Path minecraftJar(Path dir) {
+        return gameVersion == null ? null : dir.resolve(gameVersion + "-server.jar");
+    }
+
+    /** The Minecraft version a downloading launcher installs (its install.properties), or null. */
+    private static String gameVersion(Path launcher) {
+        String props = entry(launcher, "install.properties");
+        if (props == null) return null;
+        java.util.Properties p = new java.util.Properties();
+        try {
+            p.load(new java.io.StringReader(props));
+        } catch (IOException e) {
+            return null;
+        }
+        String v = p.getProperty("game-version");
+        return v == null || v.isBlank() ? null : v.trim();
     }
 
     static String mainClass(Path jar) {

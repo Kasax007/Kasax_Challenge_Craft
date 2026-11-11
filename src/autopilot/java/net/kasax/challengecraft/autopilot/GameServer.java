@@ -21,7 +21,8 @@ import java.util.regex.Pattern;
 
 /**
  * One dedicated Minecraft server the autopilot runs - a league game or an arena - in a folder of
- * its own under {@code bob-autopilot/work}: the server's jars, libraries and mods linked in, its
+ * its own under the work folder ({@code bob-autopilot/work}, or outside a synced folder such as
+ * OneDrive: see {@link Supervisor}): the server's jars, libraries and mods linked in, its
  * configs copied, a world of its own. Started with the same Java as the autopilot, told what to do
  * through its console (as a person types at a server console) and watched through its output and
  * Bob's status file: no network involved, the game listens only on 127.0.0.1.
@@ -32,7 +33,7 @@ final class GameServer {
     final String name;
     final Kind kind;
     final Path dir;
-    /** The autopilot's folder: nothing outside it is ever deleted from here. */
+    /** The work folder: nothing outside it is ever deleted from here. */
     private final Path within;
 
     private Process process;
@@ -56,30 +57,34 @@ final class GameServer {
 
     /**
      * Sets the folder up for a new start: links to the server's jars, libraries and mods (made
-     * once, checked each time), the configs and the EULA copied fresh, the last world, logs and
-     * output gone, and its own server.properties.
+     * once, kept while they point where they should), the configs and the EULA copied fresh, the
+     * last world, logs and output gone, and its own server.properties. {@code minecraftDir}: the
+     * folder of Minecraft's own server jar, one for all games.
      */
-    void prepare(Layout layout, Path ownJar, Map<String, String> properties, Log log) throws IOException {
+    void prepare(Layout layout, Path ownJar, Map<String, String> properties, Log log, Path minecraftDir) throws IOException {
         Files.createDirectories(dir);
         for (Path entry : layout.linkedEntries(ownJar)) link(dir.resolve(entry.getFileName().toString()), entry, log);
         link(dir.resolve("mods"), layout.mods, log);
         Path dotFabric = dir.resolve(".fabric");
         if (layout.fabricKeepsServerInDotFabric()) {
-            // (Fabric's downloading launcher keeps Minecraft and its libraries in .fabric/server: one
-            // copy for all games, downloaded by the first that starts. The rest of .fabric - the
-            // loader's caches - stays each game's own.)
-            Path shared = layout.root.resolve(".fabric").resolve("server");
-            Files.createDirectories(shared);
-            Files.createDirectories(dotFabric);
-            link(dotFabric.resolve("server"), shared, log);
+            // (Fabric's downloading launcher: Minecraft's own jar is one for all games, downloaded by
+            // the first that starts and then only read (-Dfabric.installer.server.gameJar). The rest
+            // is each game's own: the launch jar in .fabric/server and the libraries it names in
+            // libraries/, installed by the game's launcher at its first start. Shared, the launch jar
+            // was made again by every new game's launcher - on Windows impossible while another game
+            // ran from it. A link left by an earlier version gives way to a folder of the game's own.)
+            Files.createDirectories(minecraftDir);
+            Path own = dotFabric.resolve("server");
+            if (Files.isSymbolicLink(own) || Disk.junction(own)) Disk.deleteTreeRetrying(own, within);
+            Files.createDirectories(own);
         }
         for (String copied : new String[]{"config", "fabric-server-launcher.properties", "eula.txt"}) {
             Path from = layout.root.resolve(copied), to = dir.resolve(copied);
-            Disk.deleteTree(to, within);
-            if (Files.exists(from)) Disk.copyTree(from, to);
+            Disk.deleteTreeRetrying(to, within);
+            if (Files.exists(from)) Disk.retrying(() -> Disk.copyTree(from, to));
         }
         for (String old : new String[]{"world", "logs", "crash-reports", "server.out", "bob-status.json", "bob-status.json.tmp"}) {
-            Disk.deleteTree(dir.resolve(old), within);
+            Disk.deleteTreeRetrying(dir.resolve(old), within);
         }
         StringBuilder b = new StringBuilder("# Written by the Bob-Autopilot for each start.\n");
         properties.forEach((k, v) -> b.append(k).append('=').append(v).append('\n'));
@@ -87,13 +92,16 @@ final class GameServer {
     }
 
     /** A link {@code at} to {@code target} (relative, inside the server's folder); a copy where links cannot be made. */
-    private void link(Path at, Path target, Log log) throws IOException {
+    void link(Path at, Path target, Log log) throws IOException {
         Path rel = at.getParent().relativize(target);
         if (Files.isSymbolicLink(at)) {
             if (Files.readSymbolicLink(at).equals(rel)) return;
             Files.delete(at);
         } else if (Files.exists(at, LinkOption.NOFOLLOW_LINKS)) {
-            Disk.deleteTree(at, within);
+            // (A hard link or a junction made before is kept: on Windows a hard link cannot even be
+            // deleted while another game runs from the file it shares.)
+            if (linked(at, target)) return;
+            Disk.deleteTreeRetrying(at, within);
         }
         try {
             Files.createSymbolicLink(at, rel);
@@ -104,6 +112,16 @@ final class GameServer {
             if (linkWithoutRights(at, target)) return;
             log.info(name + ": Verknuepfung nicht moeglich (" + e.getMessage() + "), kopiere " + target.getFileName());
             Disk.copyTree(target, at);
+        }
+    }
+
+    /** Whether {@code at} is {@code target} itself - a hard link to it, or a junction to it - and not a copy. */
+    static boolean linked(Path at, Path target) {
+        try {
+            return Files.exists(at) && Files.exists(target) && Files.isSameFile(at, target)
+                    && (Files.isRegularFile(target) || Disk.junction(at));
+        } catch (IOException e) {
+            return false;
         }
     }
 
@@ -373,7 +391,7 @@ final class GameServer {
                 Disk.gzip(r, keepAs.resolveSibling(base + "_" + r.getFileName() + ".gz"));
             }
         }
-        for (String old : new String[]{"world", "logs", "crash-reports", "server.out"}) Disk.deleteTree(dir.resolve(old), within);
+        for (String old : new String[]{"world", "logs", "crash-reports", "server.out"}) Disk.deleteTreeRetrying(dir.resolve(old), within);
         return kept;
     }
 }
