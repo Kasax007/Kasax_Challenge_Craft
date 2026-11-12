@@ -82,4 +82,23 @@ class ConfigTest {
         // At least one, however small.
         assertEquals(1, Host.autoLeagueGames(4096, 1, 4096, 0, 3072));
     }
+
+    /** Windows paths as people write them: backslashes are separators, not escapes (C:\\users would be a broken \\u escape). */
+    @Test
+    void windowsPathsAreTakenAsWritten() throws IOException {
+        Path f = tmp.resolve(Config.FILE);
+        Files.writeString(f, "work_dir=D:\\Bob-Welten\njava = \"C:\\users\\lars\\Java\\bin\\java.exe\"\nserver_jar=fabric\\\\server.jar\n"
+                + "# work_dir=C:\\nicht\\das\nmods_folder=//nas/share/mods\n");
+        List<String> warnings = new ArrayList<>();
+        Config c = Config.load(f, warnings::add);
+        assertEquals("D:/Bob-Welten", c.workDir);
+        assertEquals("C:/users/lars/Java/bin/java.exe", c.java);
+        assertEquals("fabric/server.jar", c.serverJar);
+        assertEquals("//nas/share/mods", c.modsFolder);
+        assertTrue(warnings.isEmpty(), warnings.toString());
+        // A broken escape elsewhere: a readable failure, no crash.
+        Files.writeString(f, "machine=lap\\uZZZZ\n");
+        IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class, () -> Config.load(f, warnings::add));
+        assertTrue(e.getMessage().contains(Config.FILE), e.getMessage());
+    }
 }

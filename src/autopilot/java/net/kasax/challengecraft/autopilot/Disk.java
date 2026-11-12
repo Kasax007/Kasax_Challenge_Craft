@@ -62,9 +62,9 @@ final class Disk {
 
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
-                if (e instanceof NoSuchFileException) return FileVisitResult.CONTINUE;
-                // (A link whose target is gone is still deleted.)
-                Files.deleteIfExists(file);
+                // (Gone meanwhile: nothing to do. A link whose target is gone - a symbolic link, a
+                // junction - is still deleted, as the link it is.)
+                if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) Files.delete(file);
                 return FileVisitResult.CONTINUE;
             }
 
@@ -74,6 +74,21 @@ final class Disk {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    /**
+     * A symbolic link, or a Windows junction (a folder that leads to another folder) - and not a
+     * real folder that merely carries a sync program's mark, as OneDrive marks the folders it syncs.
+     */
+    static boolean linkElsewhere(Path p) {
+        if (Files.isSymbolicLink(p)) return true;
+        if (!junction(p)) return false;
+        try {
+            Path abs = p.toAbsolutePath().normalize();
+            return !abs.toRealPath().equals(abs.getParent().toRealPath().resolve(abs.getFileName()));
+        } catch (IOException e) {
+            return true; // (a junction whose target is gone)
+        }
     }
 
     /**
@@ -169,7 +184,8 @@ final class Disk {
             if (!base.isEmpty() && (abs.equals(base) || abs.startsWith(base + "/"))) return true;
         }
         for (String part : abs.split("/")) {
-            if (part.startsWith("onedrive") || part.equals("dropbox") || part.startsWith("google drive") || part.equals("googledrive")
+            if (part.startsWith("onedrive") || part.startsWith("dropbox") || part.startsWith("google drive") || part.equals("googledrive")
+                    || part.equals("my drive") || part.equals("meine ablage") || part.equals("shared drives") || part.equals("geteilte ablagen")
                     || part.equals("icloud drive") || part.equals("iclouddrive") || part.equals("mobile documents") || part.equals("cloudstorage")) {
                 return true;
             }
@@ -213,13 +229,15 @@ final class Disk {
             Files.walkFileTree(dir, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path d, BasicFileAttributes attrs) {
-                    // (A Windows junction: what it points to is counted where it lives.)
-                    return attrs.isOther() && !d.equals(dir) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                    // (A Windows junction: what it points to is counted where it lives. A folder that
+                    // only carries a sync program's mark is counted.)
+                    return attrs.isOther() && !d.equals(dir) && linkElsewhere(d) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
                 }
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (attrs.isRegularFile()) total[0] += attrs.size();
+                    // (A file a sync program marks is "other" to Java: counted all the same; a link is not.)
+                    if (!attrs.isDirectory() && !attrs.isSymbolicLink()) total[0] += attrs.size();
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -270,7 +288,8 @@ final class Disk {
         long total = 0;
         try (Stream<Path> s = Files.list(dir)) {
             for (Path p : (Iterable<Path>) s::iterator) {
-                if (!Files.isRegularFile(p, LinkOption.NOFOLLOW_LINKS) || !which.test(p)) continue;
+                // (A file a sync program marks is "other" to Java, and is pruned all the same; links and folders are not.)
+                if (Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(p) || !which.test(p)) continue;
                 files.add(p);
                 total += sizeOf(p);
             }

@@ -1,7 +1,6 @@
 package net.kasax.challengecraft.autopilot;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,8 +66,10 @@ final class Config {
     static Config load(Path file, Consumer<String> warn, String template) throws IOException {
         if (!Files.exists(file)) Files.writeString(file, template, StandardCharsets.UTF_8);
         Properties p = new Properties();
-        try (Reader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            p.load(r);
+        try {
+            p.load(new java.io.StringReader(pathsAsWritten(Files.readString(file, StandardCharsets.UTF_8))));
+        } catch (IllegalArgumentException e) {
+            throw new IOException(FILE + " ist nicht lesbar (" + e.getMessage() + ")");
         }
         Config c = new Config();
         for (String key : p.stringPropertyNames()) {
@@ -110,6 +111,42 @@ final class Config {
         c.workDir = text(p, "work_dir", c.workDir);
         c.machine = text(p, "machine", c.machine).replaceAll("[^A-Za-z0-9_.-]", "_");
         return c;
+    }
+
+    /** The settings that are paths: a Windows path is taken as written (D:\\Bob-Welten), not as escapes. */
+    private static final Set<String> PATH_KEYS = Set.of("work_dir", "java", "server_jar", "mods_folder");
+
+    /**
+     * The file's text with the values of the path settings made safe for the properties format: a
+     * backslash there is no escape but a separator (written as /, which Java and Windows both take),
+     * doubled ones counted once, quotes around the value dropped.
+     */
+    static String pathsAsWritten(String text) {
+        StringBuilder out = new StringBuilder();
+        for (String line : text.split("\\R", -1)) {
+            String t = line.strip();
+            int eq = -1;
+            for (int i = 0; i < t.length(); i++) {
+                char ch = t.charAt(i);
+                if (ch == '=' || ch == ':') {
+                    eq = i;
+                    break;
+                }
+            }
+            if (!t.startsWith("#") && !t.startsWith("!") && eq > 0 && PATH_KEYS.contains(t.substring(0, eq).strip())) {
+                String v = t.substring(eq + 1).strip();
+                if (v.length() >= 2 && (v.startsWith("\"") && v.endsWith("\"") || v.startsWith("'") && v.endsWith("'"))) {
+                    v = v.substring(1, v.length() - 1).strip();
+                }
+                v = v.replace('\\', '/');
+                // (A network path keeps its two leading slashes; elsewhere a doubled one is one.)
+                String lead = v.startsWith("//") ? "/" : "";
+                v = lead + v.replaceAll("/{2,}", "/");
+                line = t.substring(0, eq).strip() + "=" + v;
+            }
+            out.append(line).append('\n');
+        }
+        return out.toString();
     }
 
     /** The seeds to replay in turn (empty: a new random one each game). */
@@ -282,7 +319,7 @@ final class Config {
 
             # Wohin die Spielwelten und Minecraft kommen. auto = neben den Trainer, oder - liegt der
             # Trainer in OneDrive oder einem anderen Sync-Ordner - in einen Ordner dieses Rechners
-            # (unter Windows %LOCALAPPDATA%\\Bob-Trainer). Sonst ein Ordner, mit / statt \\, z. B. D:/Bob-Welten
+            # (unter Windows %LOCALAPPDATA%\\Bob-Trainer). Sonst ein Ordner, z. B. D:\\Bob-Welten
             work_dir=auto
 
             # Feste Seeds, der Reihe nach (durch Komma getrennt). Leer = jede Partie eine neue Welt.

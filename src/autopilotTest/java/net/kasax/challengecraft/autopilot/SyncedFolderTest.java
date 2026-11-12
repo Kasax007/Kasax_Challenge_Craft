@@ -130,6 +130,52 @@ class SyncedFolderTest {
         assertTrue(sup.minecraftReady());
     }
 
+    /** A work folder on another drive (Windows cannot relativize across drives): the link holds an absolute path. */
+    @Test
+    void aLinkAcrossDrivesHoldsAnAbsolutePath() {
+        Path target = tmp.resolve("server/fabric-launcher.jar");
+        assertEquals(Path.of("../../server/fabric-launcher.jar"), GameServer.linkTarget(tmp.resolve("work/liga-1/fabric-launcher.jar"), target));
+        // (On Linux a relative and an absolute path cannot be relativized either: the same fallback.)
+        assertEquals(target.toAbsolutePath(), GameServer.linkTarget(Path.of("work/liga-1/fabric-launcher.jar"), target));
+    }
+
+    /** work_dir pointing into bob-autopilot: the startup cleanup never takes the folder in use. */
+    @Test
+    void theOldWorkFolderIsNeverTheOneInUse() throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("server"));
+        Layout layout = fabricRoot(root);
+        Files.writeString(root.resolve("eula.txt"), "eula=true\n");
+        Log log = new Log(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+        Files.createDirectories(root.resolve("bob-autopilot/work/liga-1"));
+        Files.writeString(root.resolve(Config.FILE), "work_dir=bob-autopilot\n");
+        Supervisor inside = new Supervisor(root, Config.load(root.resolve(Config.FILE), log::warn), layout, null, "java", log, 1);
+        assertTrue(inside.relocated);
+        assertNull(inside.oldWork(), "work_dir inside bob-autopilot: nothing is cleaned up");
+        Files.writeString(root.resolve(Config.FILE), "work_dir=" + tmp.resolve("elsewhere") + "\n");
+        Supervisor outside = new Supervisor(root, Config.load(root.resolve(Config.FILE), log::warn), layout, null, "java", log, 1);
+        assertEquals(root.resolve("bob-autopilot/work"), outside.oldWork());
+        Supervisor beside = new Supervisor(root, new Config(), layout, null, "java", log, 1);
+        assertNull(beside.oldWork(), "not relocated: the work folder is the one in use");
+    }
+
+    /** With the downloading launcher a game's libraries are its own: the root's are not linked in, an old link gives way. */
+    @Test
+    void theRootsLibrariesAreNotSharedWithTheDownloadingLauncher() throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("server"));
+        Layout layout = fabricRoot(root);
+        Files.createDirectories(root.resolve("libraries/org/ow2/asm"));
+        Files.writeString(root.resolve("libraries/org/ow2/asm/asm.jar"), "the root's own");
+        assertTrue(layout.linkedEntries(null).stream().noneMatch(p -> p.getFileName().toString().equals("libraries")));
+        Path work = Files.createDirectories(tmp.resolve("work"));
+        Path game = Files.createDirectories(work.resolve("liga-1"));
+        Files.createSymbolicLink(game.resolve("libraries"), game.relativize(root.resolve("libraries")));
+        GameServer g = new GameServer("liga-1", GameServer.Kind.LEAGUE, game, work);
+        Log log = new Log(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+        g.prepare(layout, null, Map.of("level-name", "world"), log, tmp.resolve("mc"));
+        assertFalse(Files.exists(game.resolve("libraries"), java.nio.file.LinkOption.NOFOLLOW_LINKS), "the old link is gone");
+        assertEquals("the root's own", Files.readString(root.resolve("libraries/org/ow2/asm/asm.jar")));
+    }
+
     @Test
     void aFailureWithFilesSaysWhatHeldThem() {
         String full = Disk.describe(new DirectoryNotEmptyException("C:\\Bob\\work\\liga-5\\config"));

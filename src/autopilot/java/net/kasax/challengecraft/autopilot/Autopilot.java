@@ -75,6 +75,9 @@ public final class Autopilot {
         } catch (IOException e) {
             fail(log, "Kann nicht in den Server-Ordner schreiben: " + e.getMessage());
             return;
+        } catch (RuntimeException e) {
+            fail(log, "Fehler beim Start: " + e);
+            return;
         }
         readConsole(sup);
         CountDownLatch done = new CountDownLatch(1);

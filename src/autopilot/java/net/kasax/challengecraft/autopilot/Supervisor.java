@@ -167,6 +167,18 @@ final class Supervisor {
         return Disk.localDataDir().resolve("trainer-" + id);
     }
 
+    /**
+     * The work folder an earlier start left beside the trainer, now that the games' folders are
+     * elsewhere; null when there is none, or when the games' folders are in bob-autopilot after all
+     * (work_dir pointing there: never the folder in use).
+     */
+    Path oldWork() {
+        Path old = home.resolve("work");
+        if (!relocated || work.toAbsolutePath().normalize().startsWith(home.toAbsolutePath().normalize())
+                || minecraftDir.toAbsolutePath().normalize().startsWith(old.toAbsolutePath().normalize())) return null;
+        return Files.exists(old, java.nio.file.LinkOption.NOFOLLOW_LINKS) ? old : null;
+    }
+
     /** Minecraft's own server jar for all games (null: the Fabric jar is no downloading launcher). */
     Path minecraftJar() {
         return layout.minecraftJar(minecraftDir);
@@ -262,21 +274,23 @@ final class Supervisor {
         event("Autopilot gestartet: " + leagueSlots + " Liga-Spiel(e) gleichzeitig, " + cfg.arenaServers + " Arena(s), "
                 + cfg.gameMinutes + " Spielminuten je Spiel");
         if (relocated) {
-            event(Disk.cloudSynced(root)
+            event(Disk.cloudSynced(work)
+                    ? "Achtung: die Spielwelten (" + work.getParent() + ") liegen selbst in OneDrive oder einem anderen Sync-Ordner - "
+                    + "der sperrt ihre Dateien. Bitte work_dir auf einen Ordner ausserhalb setzen (oder auto)."
+                    : Disk.cloudSynced(root)
                     ? "Der Trainer-Ordner liegt in OneDrive (oder einem anderen Sync-Ordner): die Spielwelten und Minecraft liegen deshalb in "
                     + work.getParent() + ". Dein Liga-Stand, Journal und Export bleiben in " + home + "."
                     : "Spielwelten und Minecraft liegen in " + work.getParent() + " (work_dir)");
-            // (The work folder of an earlier start beside the trainer: thrown-away worlds, gone now.)
-            Path old = home.resolve("work");
-            if (Files.exists(old, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
-                workers.submit(() -> {
-                    try {
-                        Disk.deleteTreeRetrying(old, home);
-                        log.info("Alter Arbeitsordner geloescht: " + old);
-                    } catch (IOException e) {
-                        log.warn("Alter Arbeitsordner " + old + " nicht ganz geloescht (" + Disk.describe(e) + "): er kann von Hand geloescht werden");
-                    }
-                });
+            // (The work folder of an earlier start beside the trainer: thrown-away worlds, gone before
+            // the first game starts - on Windows a hard link in it could not go while a game runs.)
+            Path old = oldWork();
+            if (old != null) {
+                try {
+                    Disk.deleteTreeRetrying(old, home);
+                    log.info("Alter Arbeitsordner geloescht: " + old);
+                } catch (IOException e) {
+                    log.warn("Alter Arbeitsordner " + old + " nicht ganz geloescht (" + Disk.describe(e) + "): er kann von Hand geloescht werden");
+                }
             }
         }
         while (true) {
@@ -430,8 +444,8 @@ final class Supervisor {
         try {
             g.prepare(layout, ownJar, GameServer.properties(cfg, g.kind, seed, g.name), log, minecraftDir);
             g.start(command(g.kind), environment(g));
-        } catch (IOException e) {
-            failure(s, "Start nicht moeglich: " + Disk.describe(e));
+        } catch (IOException | RuntimeException e) {
+            failure(s, "Start nicht moeglich: " + (e instanceof IOException io ? Disk.describe(io) : e.toString()));
             s.state = State.IDLE;
             s.retryAt = now + 60_000;
             startsBlockedUntil = now + 20_000;

@@ -15,7 +15,8 @@ Beispiel `C:\Bob-Trainer`. Ein Sync-Programm öffnet jede Datei, die ein Spiel s
 hochzuladen, und sperrt sie dabei – Minecraft-Welten sind Tausende Dateien, die nach jedem Spiel
 wieder gelöscht werden. Liegt der Trainer trotzdem in OneDrive, merkt er das und legt die
 Spielwelten und den Minecraft-Server in einen Ordner deines Rechners
-(`%LOCALAPPDATA%\Bob-Trainer`); das Dashboard zeigt ihn unter „Spielwelten“.
+(`%LOCALAPPDATA%\Bob-Trainer`); das Dashboard zeigt ihn unter „Spielwelten“. Verschiebst du den
+Trainer später aus OneDrive heraus, kannst du diesen Ordner löschen.
 
 ## Starten
 

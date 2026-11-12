@@ -2,6 +2,7 @@ package net.kasax.challengecraft.autopilot;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,10 +36,15 @@ class LayoutTest {
         assertEquals("challengecraft-1.1.4.jar", l.modJar.getFileName().toString());
         // Everything to link, but not our own jar.
         assertTrue(l.linkedEntries(own).stream().noneMatch(p -> p.equals(own)));
-        assertTrue(l.linkedEntries(own).contains(root.resolve("libraries")));
+        // (With Fabric's downloading launcher each game installs its own libraries: shared, every new
+        // game's install would write files the running games hold - on Windows impossible.)
+        assertFalse(l.linkedEntries(own).contains(root.resolve("libraries")));
         // (The installer's own name wins when there are two.)
         FakeRoot.jar(root.resolve("fabric-server-launch.jar"), "net.fabricmc.loader.impl.launch.server.FabricServerLauncher", null, Map.of());
-        assertEquals("fabric-server-launch.jar", Layout.find(root, cfg, own).fabricJar.getFileName().toString());
+        Layout installed = Layout.find(root, cfg, own);
+        assertEquals("fabric-server-launch.jar", installed.fabricJar.getFileName().toString());
+        // (A server Fabric's installer set up: its libraries, unpacked once, are linked into the games.)
+        assertTrue(installed.linkedEntries(own).contains(root.resolve("libraries")));
     }
 
     @Test

@@ -130,8 +130,10 @@ final class Layout {
     }
 
     /**
-     * The root's entries a game's folder links to (they are only read): every jar but our own,
-     * the libraries and versions Minecraft unpacked, and Fabric's downloaded server files.
+     * The root's entries a game's folder links to (they are only read): every jar but our own, and
+     * the libraries and versions Minecraft unpacked - not with Fabric's downloading launcher, whose
+     * games each install their own libraries (shared, every new game's install would write files
+     * the running games hold).
      */
     List<Path> linkedEntries(Path ownJar) throws IOException {
         List<Path> out = new ArrayList<>();
@@ -139,7 +141,8 @@ final class Layout {
             for (Path p : (Iterable<Path>) s::iterator) {
                 String name = p.getFileName().toString();
                 boolean jar = name.toLowerCase(Locale.ROOT).endsWith(".jar") && Files.isRegularFile(p);
-                if (jar && (ownJar == null || !sameFile(p, ownJar)) || (name.equals("libraries") || name.equals("versions")) && Files.isDirectory(p)) {
+                boolean unpacked = !downloadingLauncher && (name.equals("libraries") || name.equals("versions")) && Files.isDirectory(p);
+                if (jar && (ownJar == null || !sameFile(p, ownJar)) || unpacked) {
                     out.add(p);
                 }
             }

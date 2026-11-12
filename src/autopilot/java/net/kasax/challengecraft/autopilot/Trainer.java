@@ -75,7 +75,7 @@ public final class Trainer {
         try {
             cfg = Config.load(root.resolve(Config.FILE), log::warn, Config.TEMPLATE_APP);
             dash = Dashboard.start(root, home, cfg.dashboardPort);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             log.warn("Dashboard nicht gestartet: " + e.getMessage());
             System.exit(1);
             return;
@@ -118,7 +118,7 @@ public final class Trainer {
                     Host.totalMb() / 1024.0, slots, level, Autopilot.powerGames(level, cfg)));
             sup = new Supervisor(root, cfg, layout, ownJar, java, log, slots);
             sup.setPower(level);
-        } catch (Layout.Problem | IOException e) {
+        } catch (Layout.Problem | IOException | RuntimeException e) {
             log.warn("Der Trainer kann nicht starten: " + e.getMessage());
             dash.phase = "Fehler: " + e.getMessage();
             // (The page says why; the person ends it with its button.)

@@ -74,9 +74,10 @@ final class GameServer {
             // was made again by every new game's launcher - on Windows impossible while another game
             // ran from it. A link left by an earlier version gives way to a folder of the game's own.)
             Files.createDirectories(minecraftDir);
-            Path own = dotFabric.resolve("server");
-            if (Files.isSymbolicLink(own) || Disk.junction(own)) Disk.deleteTreeRetrying(own, within);
-            Files.createDirectories(own);
+            for (Path own : new Path[]{dotFabric.resolve("server"), dir.resolve("libraries"), dir.resolve("versions")}) {
+                if (Disk.linkElsewhere(own)) Disk.deleteTreeRetrying(own, within);
+            }
+            Files.createDirectories(dotFabric.resolve("server"));
         }
         for (String copied : new String[]{"config", "fabric-server-launcher.properties", "eula.txt"}) {
             Path from = layout.root.resolve(copied), to = dir.resolve(copied);
@@ -93,7 +94,7 @@ final class GameServer {
 
     /** A link {@code at} to {@code target} (relative, inside the server's folder); a copy where links cannot be made. */
     void link(Path at, Path target, Log log) throws IOException {
-        Path rel = at.getParent().relativize(target);
+        Path rel = linkTarget(at, target);
         if (Files.isSymbolicLink(at)) {
             if (Files.readSymbolicLink(at).equals(rel)) return;
             Files.delete(at);
@@ -112,6 +113,21 @@ final class GameServer {
             if (linkWithoutRights(at, target)) return;
             log.info(name + ": Verknuepfung nicht moeglich (" + e.getMessage() + "), kopiere " + target.getFileName());
             Disk.copyTree(target, at);
+        }
+    }
+
+    /**
+     * What a link at {@code at} holds for {@code target}: relative where it can be (the folders may
+     * move together), else absolute - the work folder on another drive than the trainer (Windows
+     * cannot relativize across drives).
+     */
+    static Path linkTarget(Path at, Path target) {
+        try {
+            Path root = at.getRoot();
+            if (root != null && !root.equals(target.getRoot())) return target.toAbsolutePath();
+            return at.getParent().relativize(target);
+        } catch (IllegalArgumentException e) {
+            return target.toAbsolutePath();
         }
     }
 
