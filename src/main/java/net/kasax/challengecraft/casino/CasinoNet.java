@@ -461,7 +461,6 @@ public final class CasinoNet {
         public static final int BJ_DOUBLE = 12;
         public static final int BJ_SPLIT = 13;
         public static final int CASHIER_TAB = 14;
-        public static final int ROULETTE_LEAVE = 15;
 
         public static final Type<Action> ID = payloadType("casino_action");
         public static final StreamCodec<RegistryFriendlyByteBuf, Action> CODEC = StreamCodec.ofMember(

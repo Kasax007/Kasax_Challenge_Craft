@@ -1137,7 +1137,7 @@
   "challengecraft.casino.blackjack.guide.double": "VERDOPPELN - genau eine Karte, dann halten",
   "challengecraft.casino.blackjack.guide.split": "TEILEN - dein Paar als zwei Hände spielen",
   "challengecraft.casino.blackjack.guide.clock": "Noch %s s - dann hält das Haus für dich",
-  "challengecraft.casino.blackjack.guide.dealer_plays": "Der Dealer spielt seine Hand ...",
+  "challengecraft.casino.blackjack.guide.dealer_plays": "Der Dealer spielt seine Hand...",
   "challengecraft.casino.blackjack.guide.result.win": "Gewonnen - das Haus lässt dich gehen.",
   "challengecraft.casino.blackjack.guide.result.lose": "Das Haus gewinnt - du stirbst, wo du gefallen bist.",
   "challengecraft.casino.blackjack.guide.result.push": "Unentschieden - es wird neu gegeben.",

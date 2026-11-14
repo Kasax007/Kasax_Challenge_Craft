@@ -71,12 +71,6 @@ public class RouletteScreen extends Screen {
     }
 
     @Override
-    public void onClose() {
-        CasinoClient.send(CasinoNet.Action.of(CasinoNet.Action.ROULETTE_LEAVE));
-        super.onClose();
-    }
-
-    @Override
     public boolean isPauseScreen() {
         return false;
     }
